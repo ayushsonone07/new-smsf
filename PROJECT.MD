@@ -42,19 +42,51 @@ src/
 │   ├── departments.api.ts          # get/create/update/delete department (mock)
 │   ├── feature-permissions.api.ts  # get/update feature permissions (mock)
 │   └── mock/db.ts                  # In-memory store + seed data
-├── features/
-│   ├── departments/
-│   │   ├── pages/DepartmentManagementPage.tsx   # /admin
-│   │   ├── components/DepartmentTable.tsx       # row click → features
-│   │   └── hooks/useDepartments.ts              # queryKey: ['departments']
-│   └── permissions/
-│       ├── pages/FeaturePermissionsPage.tsx     # /admin/departments/:id
-│       ├── components/FeaturePermissionsTable.tsx
-│       └── hooks/
-│           ├── useDepartmentFeatures.ts         # queryKey: ['department-features', id]
-│           └── useUpdateFeaturePermission.ts    # mutation + invalidate
-└── components/layout/             # AdminLayout + AdminSidebar
+├── components/                     # ⭐ ALL reusable React components
+│   ├── layout/                     # AdminLayout, AdminSidebar, PageLayout, PageHeader
+│   ├── ui/                         # Button, Input, Select, Modal, ConfirmDialog, Badge,
+│   │                               # Card, DataTable, LoadingState, ErrorState,
+│   │                               # EmptyState, SearchInput
+│   ├── common/                     # StatCard, StatusBadge, FormField, ProfileChip
+│   ├── departments/                # DepartmentTable, DepartmentStats, DepartmentForm,
+│   │                               # DepartmentFormModal, DeleteDepartmentDialog,
+│   │                               # DepartmentFilters
+│   └── permissions/                # FeaturePermissionsTable, PermissionToggle
+└── features/
+    ├── departments/
+    │   ├── pages/DepartmentManagementPage.tsx   # /admin — composes reusable components
+    │   ├── hooks/                               # useDepartments + create/update/delete
+    │   └── types/department.types.ts
+    └── permissions/
+        ├── pages/FeaturePermissionsPage.tsx     # /admin/departments/:id — dynamic departmentId
+        ├── hooks/                               # useDepartmentFeatures, useUpdateFeaturePermission
+        └── types/permission.types.ts
 ```
+
+---
+
+## Component & Department Template Architecture
+
+**Rule:** every reusable React component lives in `src/components/` (grouped by
+`layout/`, `ui/`, `common/`, `departments/`, `permissions/`). Pages under
+`src/features/**/pages/` only compose these components — they don't define UI.
+
+**Department pages are templates, not per-department files.** A department is
+*data*, not a separate React codebase. The active department comes from the route
+(`departmentId` param) and is passed into TanStack Query hooks:
+
+`Route → departmentId (useParams) → Page → useDepartmentFeatures(id) → API`
+
+So `/admin/departments/dept-1` and `/admin/departments/dept-2` render the
+**same** `FeaturePermissionsPage` + `FeaturePermissionsTable` — only the loaded
+data differs. Never create `FinanceDashboard.tsx` / `SalesDashboard.tsx` etc.
+Creating a new department requires **zero** new React files.
+
+- No department name or ID is hardcoded inside reusable components.
+- Reusable components never call APIs directly — pages pass data/callbacks in.
+- `DepartmentContext` is intentionally **not** added yet: no component is nested
+  deep enough to need it. Add it only if `departmentId` must be threaded through
+  many levels.
 
 ---
 
