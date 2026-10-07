@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type {
   CreateDepartmentRequest,
   Department,
@@ -30,17 +30,20 @@ export function DepartmentFormModal({
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [wasOpen, setWasOpen] = useState(open)
 
   const isEdit = Boolean(department)
 
-  useEffect(() => {
-    if (!open) return
+  if (open !== wasOpen) {
+    setWasOpen(open)
 
-    setName(department?.name ?? '')
-    setUsername(department?.username ?? '')
-    setEmail(department?.email ?? '')
-    setPassword('')
-  }, [open, department])
+    if (open) {
+      setName(department?.name ?? '')
+      setUsername(department?.username ?? '')
+      setEmail(department?.email ?? '')
+      setPassword('')
+    }
+  }
 
   if (!open) {
     return null

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { DepartmentStats } from '../components/DepartmentStats'
 import { DepartmentTable } from '../components/DepartmentTable'
 import { DepartmentFormModal } from '../components/DepartmentFormModal'
@@ -14,6 +15,7 @@ import type {
 } from '../types/department.types'
 
 export function DepartmentManagementPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [editingDepartment, setEditingDepartment] =
     useState<Department | null>(null)
@@ -27,7 +29,10 @@ export function DepartmentManagementPage() {
   const updateMutation = useUpdateDepartment()
   const deleteMutation = useDeleteDepartment()
 
-  const departments = departmentsQuery.data ?? []
+  const departments = useMemo(
+    () => departmentsQuery.data ?? [],
+    [departmentsQuery.data],
+  )
 
   const filteredDepartments = useMemo(() => {
     const value = search.trim().toLowerCase()
@@ -75,6 +80,15 @@ export function DepartmentManagementPage() {
         },
       },
     )
+  }
+
+  function handleViewFeatures(
+    department: Department,
+  ) {
+    navigate({
+      to: '/admin/departments/$departmentId',
+      params: { departmentId: department.id },
+    })
   }
 
   function handleDelete() {
@@ -210,6 +224,7 @@ export function DepartmentManagementPage() {
           departments={filteredDepartments}
           onEdit={setEditingDepartment}
           onDelete={setDepartmentToDelete}
+          onViewFeatures={handleViewFeatures}
         />
       </section>
 
