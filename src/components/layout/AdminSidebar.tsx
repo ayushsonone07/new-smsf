@@ -55,7 +55,15 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  onNavigate?: () => void
+  onClose?: () => void
+}
+
+export function AdminSidebar({
+  onNavigate,
+  onClose,
+}: AdminSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -68,6 +76,7 @@ export function AdminSidebar() {
 
   function handleLogout() {
     clearSession()
+    onNavigate?.()
     navigate({ to: '/login' })
   }
 
@@ -80,6 +89,16 @@ export function AdminSidebar() {
           <strong>SMSF</strong>
           <span>Admin Portal</span>
         </div>
+
+        <button
+          type="button"
+          className="sidebar-close"
+          aria-label="Close sidebar"
+          title="Close sidebar"
+          onClick={onClose}
+        >
+          ✕
+        </button>
       </div>
 
       <nav className="navigation">
@@ -96,6 +115,7 @@ export function AdminSidebar() {
             }`}
             onClick={(event) => {
               event.preventDefault()
+              onNavigate?.()
               navigate({ to: item.to })
             }}
           >
