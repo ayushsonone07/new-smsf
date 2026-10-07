@@ -5,6 +5,14 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router'
+import {
+  requireAuth,
+  requireRole,
+} from './middleware/auth.middleware'
+import {
+  getSession,
+  homeForRole,
+} from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { ErrorState } from '../components/ui/ErrorState'
@@ -14,13 +22,22 @@ import { DepartmentCustomersPage } from '../features/departments/pages/Departmen
 import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
 import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
 import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
+import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
+import { LoginPage } from '../features/auth/pages/LoginPage'
+import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
+
+function pendingPage(title: string) {
+  return (
+    <main className="page-content">
+      <div className="loading-state">
+        {title} — page coming soon
+      </div>
+    </main>
+  )
+}
 
 const rootRoute = createRootRoute({
-  component: () => (
-    <AdminLayout>
-      <Outlet />
-    </AdminLayout>
-  ),
+  component: () => <Outlet />,
   notFoundComponent: () => (
     <PageLayout>
       <ErrorState
@@ -35,20 +52,93 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/admin' })
+    const session = getSession()
+
+    throw redirect({
+      to: session
+        ? homeForRole(session.user.role)
+        : '/login',
+    })
   },
 })
 
-const adminRoute = createRoute({
+const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
+  path: '/login',
+  component: LoginPage,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { token?: string } => ({
+    token:
+      typeof search.token === 'string'
+        ? search.token
+        : undefined,
+  }),
+  beforeLoad: () => {
+    const session = getSession()
+
+    if (session) {
+      throw redirect({
+        to: homeForRole(session.user.role),
+      })
+    }
+  },
+})
+
+const authedLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_authed',
+  beforeLoad: requireAuth,
+  component: () => (
+    <AdminLayout>
+      <Outlet />
+    </AdminLayout>
+  ),
+})
+
+const adminRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
   path: '/admin',
   component: DepartmentManagementPage,
+  beforeLoad: requireRole('ADMIN'),
 })
 
 const departmentFeaturesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/admin/departments/$departmentId',
   component: FeaturePermissionsPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const accessTokensRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/tokens',
+  component: AccessTokensPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const headRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/head',
+  component: () => pendingPage('Head Panel'),
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const usersRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/users',
+  component: () => pendingPage('Users'),
+  beforeLoad: requireRole(
+    'ADMIN',
+    'HEAD',
+    'USER',
+  ),
+})
+
+const forbiddenRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/forbidden',
+  component: ForbiddenPage,
 })
 
 const departmentDashboardRoute = createRoute({
