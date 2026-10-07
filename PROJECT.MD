@@ -81,7 +81,7 @@ src/
 │       └── hooks/
 │           ├── useDepartmentFeatures.ts         # queryKey: ['department-features', id]
 │           └── useUpdateFeaturePermission.ts    # mutation + invalidate
-└── components/layout/             # AdminLayout + AdminSidebar (role-based nav)
+└── components/layout/             # AdminLayout (sidebar toggle + drawer) + AdminSidebar
 ```
 
 ---
@@ -229,6 +229,52 @@ sequenceDiagram
   - `src/App.css` orphan hai (Vite template ka), koi import nahi karta.
 - Jab pura UI ek din rewrite ho, tabhi full Tailwind migration sochna
   (abhi dono saath me rakhna hi plan hai).
+
+---
+
+## Responsive & Sidebar — STRICT Rules (mandatory)
+
+> Har naya UI banate waqt yeh rules **non-negotiable** hain. Koi page/tab tab
+> tak "done" nahi maana jayega jab tak niche ke checks pass na ho.
+
+### Sidebar — open/close (implemented)
+
+- **Open:** topbar ka **☰** button. **Close:** sidebar ke andar brand row me
+  **✕** button (desktop collapse + mobile drawer dono ke liye).
+- State `src/components/layout/AdminLayout.tsx` me:
+  - \>900px → default **open**; ≤900px → default **closed**.
+  - Mobile par navigation (sidebar link, browser back) ke baad drawer apne aap
+    band ho jata hai.
+  - Backdrop tap karne par bhi band; open hone par ☰ hide ho jata hai.
+- **z-index order:** sidebar drawer `60` > backdrop `55` > modal `50` >
+  topbar `40`.
+- Sidebar ke andar content overflow kare to scroll andar hi ho
+  (`.sidebar { overflow-y: auto }`) — page ka scroll nahi.
+- **Gotcha (dobara mat karna):** close par UI mat todo — `.main-content` ko
+  `grid-column: 2` explicit rakha hai, warna sidebar hide hote hi wo 0-width
+  column me auto-place ho jata tha. Naya grid item add karo to placement
+  check karo. Collapse smooth rahe isliye `.app-shell` par
+  `transition: grid-template-columns` hai; mobile par
+  `body:has(.sidebar-open) { overflow: hidden }` se background scroll lock
+  hota hai.
+
+### Responsive checklist (har page ke liye)
+
+1. **375px / 768px / 1440px** — teeno widths par dev tools se check karo;
+   mobile par **horizontal page scroll bilkul nahi**.
+2. Fixed width mat lagao — hamesha `max-width` + `width: 100%`.
+3. Tables hamesha `.table-wrapper` (`overflow-x: auto`) ke andar.
+4. Multi-column grids (`.stats-grid` etc.) ≤900px par 1-col.
+5. Toolbars/topbars me `flex-wrap` — warna mobile par buttons overflow ho jate hain.
+6. Page/modal padding mobile par compact (media queries me already:
+   `.page-content`, `.modal`, `.content-card`, `.forbidden-card`, `.auth-card`).
+7. Plain CSS classes likh rahe ho to unka mobile rule bhi `@media (max-width: 900px)`
+   me likho; **Tailwind** utilities ho to `sm:` / `md:` prefixes.
+8. Buttons/inputs **tap-friendly** (min ~34px height) rakho.
+
+**Definition of done:** naya screen → mobile par koi overflow nahi, sidebar
+drawer kaam kare, sab kuch tap-friendly. PROJECT.MD me is section ko update
+karte raho agar naya breakpoint ya rule add ho.
 
 ---
 
