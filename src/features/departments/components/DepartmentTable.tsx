@@ -4,12 +4,14 @@ interface DepartmentTableProps {
   departments: Department[]
   onEdit: (department: Department) => void
   onDelete: (department: Department) => void
+  onViewFeatures: (department: Department) => void
 }
 
 export function DepartmentTable({
   departments,
   onEdit,
   onDelete,
+  onViewFeatures,
 }: DepartmentTableProps) {
   if (departments.length === 0) {
     return (
@@ -39,7 +41,13 @@ export function DepartmentTable({
 
         <tbody>
           {departments.map((department) => (
-            <tr key={department.id}>
+            <tr
+              key={department.id}
+              className="clickable-row"
+              onClick={() =>
+                onViewFeatures(department)
+              }
+            >
               <td>
                 <div className="department-cell">
                   <div className="department-icon">
@@ -84,8 +92,23 @@ export function DepartmentTable({
                 <div className="row-actions">
                   <button
                     type="button"
+                    className="action-button features"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onViewFeatures(department)
+                    }}
+                    title="View Features"
+                  >
+                    ⚙
+                  </button>
+
+                  <button
+                    type="button"
                     className="action-button edit"
-                    onClick={() => onEdit(department)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onEdit(department)
+                    }}
                     title="Edit"
                   >
                     ✎
@@ -94,7 +117,10 @@ export function DepartmentTable({
                   <button
                     type="button"
                     className="action-button delete"
-                    onClick={() => onDelete(department)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onDelete(department)
+                    }}
                     title="Delete"
                   >
                     ⌫

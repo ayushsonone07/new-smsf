@@ -1,12 +1,8 @@
-import { AdminLayout } from './components/layout/AdminLayout'
-import { DepartmentManagementPage } from './features/departments/pages/DepartmentManagementPage'
+import { RouterProvider } from '@tanstack/react-router'
+import { router } from './app/router'
 
 function App() {
-  return (
-    <AdminLayout>
-      <DepartmentManagementPage />
-    </AdminLayout>
-  )
+  return <RouterProvider router={router} />
 }
 
 export default App
