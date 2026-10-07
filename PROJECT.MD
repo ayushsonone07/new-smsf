@@ -58,73 +58,52 @@ src/
 │   ├── client.ts                   # fetch wrapper + ApiError (real API ke liye)
 │   ├── departments.api.ts          # get/create/update/delete department (mock)
 │   ├── feature-permissions.api.ts  # get/update feature permissions (mock)
-│   ├── auth.api.ts                 # login, issue/revoke token (mock)
-│   └── mock/
-│       ├── db.ts                   # Departments + features store + seed
-│       └── auth.db.ts              # Users + issued tokens store, token generator
-├── features/
-│   ├── auth/
-│   │   ├── types/auth.types.ts     # UserRole, AuthSession, IssuedLoginToken
-│   │   ├── pages/LoginPage.tsx     # /login
-│   │   ├── pages/ForbiddenPage.tsx # /forbidden
-│   │   ├── pages/AccessTokensPage.tsx # /admin/tokens
-│   │   ├── components/             # IssueTokenTable, IssuedTokensTable
-│   │   ├── hooks/                  # login, users, issue/revoke token hooks
-│   │   └── utils/loginLink.ts      # buildLoginLink() → /login?token=...
-│   ├── departments/
-│   │   ├── pages/DepartmentManagementPage.tsx   # /admin
-│   │   ├── components/DepartmentTable.tsx       # row click → features
-│   │   └── hooks/useDepartments.ts              # queryKey: ['departments']
-│   └── permissions/
-│       ├── pages/FeaturePermissionsPage.tsx     # /admin/departments/:id
-│       ├── components/FeaturePermissionsTable.tsx
-│       └── hooks/
-│           ├── useDepartmentFeatures.ts         # queryKey: ['department-features', id]
-│           └── useUpdateFeaturePermission.ts    # mutation + invalidate
-└── components/layout/             # AdminLayout (sidebar toggle + drawer) + AdminSidebar
+│   └── mock/db.ts                  # In-memory store + seed data
+├── components/                     # ⭐ ALL reusable React components
+│   ├── layout/                     # AdminLayout, AdminSidebar, PageLayout, PageHeader
+│   ├── ui/                         # Button, Input, Select, Modal, ConfirmDialog, Badge,
+│   │                               # Card, DataTable, LoadingState, ErrorState,
+│   │                               # EmptyState, SearchInput
+│   ├── common/                     # StatCard, StatusBadge, FormField, ProfileChip
+│   ├── departments/                # DepartmentTable, DepartmentStats, DepartmentForm,
+│   │                               # DepartmentFormModal, DeleteDepartmentDialog,
+│   │                               # DepartmentFilters
+│   └── permissions/                # FeaturePermissionsTable, PermissionToggle
+└── features/
+    ├── departments/
+    │   ├── pages/DepartmentManagementPage.tsx   # /admin — composes reusable components
+    │   ├── hooks/                               # useDepartments + create/update/delete
+    │   └── types/department.types.ts
+    └── permissions/
+        ├── pages/FeaturePermissionsPage.tsx     # /admin/departments/:id — dynamic departmentId
+        ├── hooks/                               # useDepartmentFeatures, useUpdateFeaturePermission
+        └── types/permission.types.ts
 ```
 
 ---
 
-## Auth & Middleware
+## Component & Department Template Architecture
 
-**Roles:** `ADMIN`, `HEAD`, `USER` — strict matrix:
+**Rule:** every reusable React component lives in `src/components/` (grouped by
+`layout/`, `ui/`, `common/`, `departments/`, `permissions/`). Pages under
+`src/features/**/pages/` only compose these components — they don't define UI.
 
-| Route | ADMIN | HEAD | USER |
-|---|---|---|---|
-| `/admin`, `/admin/departments/:id`, `/admin/tokens` | ✅ | ❌ | ❌ |
-| `/head` | ✅ | ✅ | ❌ |
-| `/users` | ✅ | ✅ | ✅ |
-| `/forbidden` | ✅ | ✅ | ✅ |
+**Department pages are templates, not per-department files.** A department is
+*data*, not a separate React codebase. The active department comes from the route
+(`departmentId` param) and is passed into TanStack Query hooks:
 
-- **Session** localStorage me (`smsf.auth.session`) — fake-JWT token + user.
-- **Admin login:** `admin@smsf.test` / `admin123` (email + password form).
-- **Head/User login (magic link):** admin `/admin/tokens` par **login link**
-  generate karta hai → Head/User woh link kholte hi auto-login hoke seedha
-  apne dashboard par pahunchte hain (`/head` ya `/users`). Link me token
-  query param me hota hai: `/login?token=...`.
-- Link tab tak valid hai jab tak admin revoke na kare (one-time use nahi);
-  manual token paste wala fallback bhi `/login` par maujood hai.
-- USER role ka home `/users` hai.
+`Route → departmentId (useParams) → Page → useDepartmentFeatures(id) → API`
 
-```mermaid
-flowchart TD
-    A["Protected route hit<br/>e.g. /admin ya /head"] --> B{"_authed layout —<br/>requireAuth: session hai?"}
-    B -->|No| C["redirect → /login"]
-    B -->|Yes| D{"requireRole(...):<br/>role allowed hai?"}
-    D -->|No| E["redirect → /forbidden"]
-    D -->|Yes| F["✅ Page render"]
+So `/admin/departments/dept-1` and `/admin/departments/dept-2` render the
+**same** `FeaturePermissionsPage` + `FeaturePermissionsTable` — only the loaded
+data differs. Never create `FinanceDashboard.tsx` / `SalesDashboard.tsx` etc.
+Creating a new department requires **zero** new React files.
 
-    C --> G["/login"]
-    G -->|"Admin — email + password"| H["loginWithCredentials()"]
-    G -->|"/login?token=... link khola"| I["auto loginWithToken()"]
-    H --> J["setSession(localStorage)<br/>navigate → role home"]
-    I --> J
-
-    K["Admin → /admin/tokens<br/>Generate Login Link"] --> L["issueLoginToken() → token + URL"]
-    L --> M["Link Head/User ko bhejo"]
-    M --> I
-```
+- No department name or ID is hardcoded inside reusable components.
+- Reusable components never call APIs directly — pages pass data/callbacks in.
+- `DepartmentContext` is intentionally **not** added yet: no component is nested
+  deep enough to need it. Add it only if `departmentId` must be threaded through
+  many levels.
 
 ---
 

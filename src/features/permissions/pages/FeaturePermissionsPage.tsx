@@ -2,11 +2,17 @@ import {
   Link,
   useParams,
 } from '@tanstack/react-router'
-import { FeaturePermissionsTable } from '../components/FeaturePermissionsTable'
 import { useDepartmentFeatures } from '../hooks/useDepartmentFeatures'
 import { useUpdateFeaturePermission } from '../hooks/useUpdateFeaturePermission'
 import { useDepartments } from '../../departments/hooks/useDepartments'
 import type { UpdateFeaturePermissionRequest } from '../types/permission.types'
+import { FeaturePermissionsTable } from '../../../components/permissions/FeaturePermissionsTable'
+import { PageHeader } from '../../../components/layout/PageHeader'
+import { PageLayout } from '../../../components/layout/PageLayout'
+import { ProfileChip } from '../../../components/common/ProfileChip'
+import { Card } from '../../../components/ui/Card'
+import { ErrorState } from '../../../components/ui/ErrorState'
+import { LoadingState } from '../../../components/ui/LoadingState'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
@@ -32,42 +38,31 @@ export function FeaturePermissionsPage() {
 
   if (featuresQuery.isPending) {
     return (
-      <main className="page-content">
-        <div className="loading-state">
-          Loading features...
-        </div>
-      </main>
+      <PageLayout>
+        <LoadingState message="Loading features..." />
+      </PageLayout>
     )
   }
 
   if (featuresQuery.isError) {
     return (
-      <main className="page-content">
-        <div className="error-state">
-          <strong>
-            Unable to load features
-          </strong>
-
-          <p>{featuresQuery.error.message}</p>
-
-          <button
-            className="primary-button"
-            onClick={() => featuresQuery.refetch()}
-          >
-            Try Again
-          </button>
-        </div>
-      </main>
+      <PageLayout>
+        <ErrorState
+          title="Unable to load features"
+          message={featuresQuery.error.message}
+          onRetry={() => featuresQuery.refetch()}
+        />
+      </PageLayout>
     )
   }
 
   const features = featuresQuery.data
 
   return (
-    <main className="page-content">
-      <header className="topbar">
-        <div>
-          <p className="breadcrumb">
+    <PageLayout>
+      <PageHeader
+        breadcrumb={
+          <>
             <Link to="/admin">
               Administration
             </Link>
@@ -77,41 +72,25 @@ export function FeaturePermissionsPage() {
             </Link>
             {' / '}
             {department?.name ?? 'Features'}
-          </p>
+          </>
+        }
+        title={`${department?.name ?? 'Department'} Features`}
+        description="Enable or disable features and set role permissions for this department."
+        actions={
+          <>
+            <Link
+              to="/admin"
+              className="secondary-button back-link"
+            >
+              ← Back to Departments
+            </Link>
 
-          <h1>
-            {department?.name ?? 'Department'}{' '}
-            Features
-          </h1>
+            <ProfileChip />
+          </>
+        }
+      />
 
-          <p className="page-description">
-            Enable or disable features and set
-            role permissions for this department.
-          </p>
-        </div>
-
-        <div className="topbar-actions">
-          <Link
-            to="/admin"
-            className="secondary-button back-link"
-          >
-            ← Back to Departments
-          </Link>
-
-          <div className="profile-chip">
-            <div className="admin-avatar small">
-              A
-            </div>
-
-            <div>
-              <strong>Admin</strong>
-              <span>Super Admin</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <section className="content-card">
+      <Card>
         <div className="table-toolbar">
           <div>
             <h2>Feature Access</h2>
@@ -139,7 +118,7 @@ export function FeaturePermissionsPage() {
           }
           onUpdate={handleUpdate}
         />
-      </section>
-    </main>
+      </Card>
+    </PageLayout>
   )
 }

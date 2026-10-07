@@ -14,7 +14,13 @@ import {
   homeForRole,
 } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
+import { PageLayout } from '../components/layout/PageLayout'
+import { ErrorState } from '../components/ui/ErrorState'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
+import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
+import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
+import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
+import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
 import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
 import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
@@ -33,16 +39,12 @@ function pendingPage(title: string) {
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
   notFoundComponent: () => (
-    <main className="page-content">
-      <div className="error-state">
-        <strong>Page not found</strong>
-
-        <p>
-          The page you are looking for does not
-          exist.
-        </p>
-      </div>
-    </main>
+    <PageLayout>
+      <ErrorState
+        title="Page not found"
+        message="The page you are looking for does not exist."
+      />
+    </PageLayout>
   ),
 })
 
@@ -139,17 +141,38 @@ const forbiddenRoute = createRoute({
   component: ForbiddenPage,
 })
 
+const departmentDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/departments/$departmentId/dashboard',
+  component: DepartmentDashboardPage,
+})
+
+const departmentCustomersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/departments/$departmentId/customers',
+  component: DepartmentCustomersPage,
+})
+
+const departmentHelpCenterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/departments/$departmentId/help-center',
+  component: DepartmentHelpCenterPage,
+})
+
+const departmentServicesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/departments/$departmentId/services',
+  component: DepartmentServicesPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  loginRoute,
-  authedLayoutRoute.addChildren([
-    adminRoute,
-    departmentFeaturesRoute,
-    accessTokensRoute,
-    headRoute,
-    usersRoute,
-    forbiddenRoute,
-  ]),
+  adminRoute,
+  departmentFeaturesRoute,
+  departmentDashboardRoute,
+  departmentCustomersRoute,
+  departmentHelpCenterRoute,
+  departmentServicesRoute,
 ])
 
 export const router = createRouter({
