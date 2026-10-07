@@ -10,7 +10,7 @@ import type { UpdateFeaturePermissionRequest } from '../types/permission.types'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
-    from: '/admin/departments/$departmentId',
+    from: '/_authed/admin/departments/$departmentId',
   })
 
   const departmentsQuery = useDepartments()
