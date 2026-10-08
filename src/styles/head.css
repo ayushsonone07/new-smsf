@@ -596,17 +596,75 @@
 
 /* --- Responsive ---------------------------------------------- */
 
+.htop__menu-btn {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--c-text);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.htop__menu-btn:hover {
+  background: var(--c-blue-hover);
+  color: var(--c-blue-dark);
+}
+
+.hside-backdrop {
+  display: none;
+}
+
 @media (max-width: 760px) {
+  .htop__menu-btn {
+    display: grid;
+  }
+
   .hside {
     position: fixed;
     z-index: 40;
     box-shadow: 0 0 40px rgb(15 23 42 / 15%);
+    left: 0;
+    top: 0;
+    bottom: 0;
   }
 
   .hside.is-collapsed {
     width: 0;
     overflow: hidden;
     border: 0;
+  }
+
+  .hside-backdrop.is-visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(2px);
+    animation: hin 0.15s ease-out;
+  }
+
+  .htop {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .htop__title {
+    flex: 1 1 180px;
+  }
+
+  .htop__title h1 {
+    font-size: 17px;
+    white-space: normal;
+  }
+
+  .hbody {
+    padding: 10px 10px 24px;
+    gap: 10px;
   }
 }
 /* ===============================================================
@@ -1437,4 +1495,58 @@
   background: #eef2f7;
   font-size: 12px;
   color: #334155;
+}
+
+/* =============================================================
+   RESPONSIVE — Additional head.css rules
+   Breakpoints: 768 / 480
+   ============================================================= */
+
+@media (max-width: 768px) {
+  /* Notification bell — constrain to viewport */
+  .hbell__menu {
+    width: min(300px, calc(100vw - 24px));
+    right: -8px;
+  }
+
+  /* Topbar notification count (hide text on very small screens) */
+  .htop__notif-label {
+    display: none;
+  }
+
+  /* Section cards — reduce padding */
+  .section-card {
+    padding: 14px;
+  }
+
+  .section-card__header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Users table — horizontal scroll */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .users-table {
+    min-width: 700px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hbell__menu {
+    right: 0;
+    width: calc(100vw - 20px);
+  }
+
+  .section-card {
+    padding: 10px;
+  }
+
+  .head-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
