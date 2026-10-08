@@ -64,6 +64,13 @@ export function HeadShell({
 
   return (
     <div className="hshell">
+      {/* Mobile backdrop — closes sidebar on tap */}
+      <div
+        className={`hside-backdrop${sidebarOpen ? ' is-visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        role="presentation"
+      />
+
       <HeadSidebar
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((value) => !value)}
@@ -71,7 +78,11 @@ export function HeadShell({
         items={navItems}
         secondaryItems={secondaryNavItems}
         activeKey={activeKey}
-        onSelect={onNavigate}
+        onSelect={(item) => {
+          onNavigate(item)
+          /* Auto-close sidebar on mobile after navigation */
+          if (window.innerWidth <= 760) setSidebarOpen(false)
+        }}
         account={account}
         role={role}
         onRoleChange={onRoleChange}
@@ -85,6 +96,7 @@ export function HeadShell({
           actions={topbarActions}
           notifications={notifications}
           onMarkAllRead={onMarkAllRead}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
         >
           {topbarContent}
         </HeadTopbar>

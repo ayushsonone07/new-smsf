@@ -1242,3 +1242,146 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* =============================================================
+   RESPONSIVE — CustomersList
+   Breakpoints: 1024 / 768 / 480
+   ============================================================= */
+
+/* ── 1024px: tablet landscape ── */
+@media (max-width: 1024px) {
+  .cl-controls-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .cl-controls-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cl-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+  .cl-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .cl-drawer {
+    width: 420px;
+    max-width: calc(100vw - 16px);
+  }
+  .cl-drawer__kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cl-assign-menu,
+  .cl-status-menu,
+  .cl-remark-menu {
+    max-width: 95vw;
+  }
+}
+
+/* ── 768px: tablet portrait ── */
+@media (max-width: 768px) {
+  .cl-controls-bar {
+    gap: 8px;
+  }
+  .cl-searchbar {
+    width: 100%;
+  }
+  .cl-searchbar input {
+    width: 100%;
+  }
+  .cl-date-filter,
+  .cl-assignee-filter {
+    flex: 1;
+    min-width: 130px;
+  }
+  .cl-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cl-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    border-left: 0;
+    box-shadow: none;
+    z-index: 200;
+  }
+  .cl-drawer__header {
+    padding: 14px 16px;
+  }
+  .cl-drawer__body {
+    padding: 16px;
+  }
+  .cl-drawer__kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .cl-drawer__kpi-val {
+    font-size: 19px;
+  }
+  .cl-drawer__tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+  }
+  .cl-drawer__tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .cl-drawer__tab-btn {
+    white-space: nowrap;
+  }
+  .cl-tab-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .cl-page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cl-page-header-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* ── 480px: compact mobile ── */
+@media (max-width: 480px) {
+  .cl-tabs {
+    gap: 4px;
+  }
+  .cl-tab-btn {
+    padding: 5px 8px;
+    font-size: 11.5px;
+  }
+  .cl-controls-right {
+    gap: 6px;
+  }
+  .cl-drawer__kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .cl-drawer__kpi-val {
+    font-size: 17px;
+  }
+  .cl-drawer__kpi-label {
+    font-size: 10px;
+  }
+  .cl-drawer__section-title {
+    font-size: 11px;
+  }
+  .cl-assign-menu,
+  .cl-status-menu,
+  .cl-remark-menu {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: 100%;
+  }
+}
