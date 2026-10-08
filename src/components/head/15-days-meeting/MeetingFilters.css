@@ -1,0 +1,56 @@
+.meeting-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meeting-filters__status-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.meeting-filters__status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.meeting-filters__status-tab:hover {
+  background: #e2e8f0;
+}
+
+.meeting-filters__status-tab.is-active {
+  background: var(--head-blue);
+  color: #fff;
+}
+
+.meeting-filters__status-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meeting-filters__status-tab.is-active .meeting-filters__status-count {
+  background: rgb(255 255 255 / 22%);
+  color: #fff;
+}

@@ -1,0 +1,400 @@
+/* ===============================================================
+   SOP Page Styles — matches the reference screenshot exactly
+   =============================================================== */
+
+.sop-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.sop-page__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--head-text);
+  letter-spacing: -0.02em;
+}
+
+.sop-page__description {
+  margin: 0;
+  font-size: 15px;
+  color: var(--head-muted);
+  line-height: 1.5;
+}
+
+.sop-page__search {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
+/* Make the shared SearchBar more compact for SOP page */
+.sop-page__search .head-search {
+  padding: 0 14px;
+  height: 44px;
+  border-radius: 12px;
+  border-color: var(--head-border);
+  background: #fff;
+}
+
+.sop-page__search .head-search__icon {
+  width: 18px;
+  height: 18px;
+  color: var(--head-muted);
+}
+
+.sop-page__search .head-search input {
+  padding: 10px 0;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.sop-page__search .head-search input::placeholder {
+  color: var(--head-muted);
+  font-size: 15px;
+}
+
+.sop-page__search .head-search:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
+}
+
+.sop-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .sop-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Empty State ---------------------------------------------- */
+
+.sop-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--head-muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+.sop-page__empty p {
+  margin: 0;
+  font-weight: 500;
+  color: var(--head-text);
+}
+
+/* --- SOP Card ------------------------------------------------- */
+
+.sop-card {
+  border: 1px solid var(--head-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  overflow: hidden;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.sop-card:hover {
+  box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+  border-color: #c7d2fe;
+}
+
+.sop-card--editing {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 1px #93c5fd, 0 4px 12px rgb(29 78 224 / 10%);
+}
+
+.sop-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+
+.sop-card__icon-wrapper {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--head-blue-soft);
+  color: var(--head-blue);
+}
+
+.sop-card__icon {
+  color: var(--head-blue);
+}
+
+.sop-card__title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sop-card__name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--head-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.sop-card__step-count {
+  font-size: 12.5px;
+  color: var(--head-muted);
+  font-weight: 500;
+}
+
+.sop-card__edit-btn,
+.sop-card__save-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  height: 34px;
+  white-space: nowrap;
+}
+
+.sop-card__save-btn {
+  background: var(--head-blue);
+  border-color: var(--head-blue);
+  color: #fff;
+}
+
+.sop-card__save-btn:hover {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+/* --- SOP Steps (Normal) --------------------------------------- */
+
+.sop-card__steps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 14px;
+}
+
+.sop-step-container {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sop-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--head-border);
+  border-radius: 999px;
+  background: var(--head-blue-soft);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--head-text);
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sop-step-pill__number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--head-blue);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sop-step-pill__name {
+  color: var(--head-text);
+}
+
+.sop-step-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--head-yellow);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.sop-step-arrow__icon {
+  transform: rotate(-90deg);
+  display: block;
+}
+
+/* --- SOP Steps (Editing) -------------------------------------- */
+
+.sop-step-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--head-blue-soft);
+  border: 1px solid var(--head-border);
+  border-radius: 999px;
+  padding: 4px 10px 4px 6px;
+  white-space: nowrap;
+}
+
+.sop-step-edit__number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--head-blue);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sop-step-edit__input {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--head-text);
+  min-width: 100px;
+  max-width: 180px;
+  padding: 2px 6px;
+  outline: none;
+}
+
+.sop-step-edit__input::placeholder {
+  color: var(--head-muted);
+}
+
+.sop-step-edit__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--head-border);
+}
+
+.sop-step-edit__action-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--head-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sop-step-edit__action-btn:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--head-text);
+}
+
+.sop-step-edit__action-btn:focus-visible {
+  outline: 2px solid var(--head-blue);
+  outline-offset: 2px;
+}
+
+.sop-step-edit__action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.sop-step-edit__action-btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.sop-step-edit__icon--up {
+  transform: rotate(180deg);
+  display: block;
+}
+
+/* --- Add Step Row --------------------------------------------- */
+
+.sop-card__add-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--head-border);
+  background: #fafbfd;
+}
+
+.sop-card__add-step-select {
+  flex: 1;
+  max-width: 280px;
+  padding: 8px 12px;
+  border: 1px solid var(--head-border);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--head-text);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 36px;
+}
+
+.sop-card__add-step-select:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 224 / 10%);
+}
+
+.sop-card__add-step-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--head-yellow);
+  color: var(--head-text);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.sop-card__add-step-btn:hover {
+  background: #eab308;
+}
+
+.sop-card__add-step-btn:focus-visible {
+  outline: 2px solid var(--head-blue);
+  outline-offset: 2px;
+}
