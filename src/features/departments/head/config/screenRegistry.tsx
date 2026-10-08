@@ -6,6 +6,7 @@ import type {
 import { DashboardPage } from '../pages/DashboardPage'
 import { DepartmentUsersPage } from '../pages/DepartmentUsersPage'
 import { CustomerListPage } from '../pages/CustomerListPage'
+import { AttendancePage } from '../pages/AttendancePage'
 import { MeetingPage } from '../pages/MeetingPage'
 import { SopPage } from '../pages/SopPage'
 import { HelpCenterPage } from '../pages/HelpCenterPage'
@@ -25,7 +26,8 @@ interface ScreenEntry {
 export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   dashboard: { component: DashboardPage, title: 'Onboarding Dashboard' },
   users: { component: DepartmentUsersPage, title: 'Department Management' },
-  customers: { component: CustomerListPage, title: 'Customer Onboarding' },
+customers: { component: CustomerListPage, title: 'Customer List' },
+  attendance: { component: AttendancePage, title: 'Attendance' },
   meeting: { component: MeetingPage, title: '15 Days Meeting' },
   sop: { component: SopPage, title: 'SOP' },
   'help-center': { component: HelpCenterPage, title: 'Help Center' },

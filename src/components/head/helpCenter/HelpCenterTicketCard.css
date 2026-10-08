@@ -1,0 +1,137 @@
+.hc-ticket-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--head-border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.hc-ticket-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+}
+
+.hc-ticket-card.is-selected {
+  border-color: var(--head-blue);
+  box-shadow: 0 0 0 2px var(--head-blue-soft), 0 2px 8px rgb(29 78 224 / 8%);
+  background: #fafbff;
+}
+
+.hc-ticket-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.hc-ticket-id {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--head-text);
+}
+
+.hc-ticket-id.hc-priority--high {
+  color: #dc2626;
+}
+
+.hc-ticket-id.hc-priority--medium {
+  color: #f59e0b;
+}
+
+.hc-ticket-id.hc-priority--low {
+  color: #64748b;
+}
+
+.hc-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.hc-status-badge.hc-status--unassigned {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.hc-status-badge.hc-status--pending {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+
+.hc-status-badge.hc-status--in-progress {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.hc-status-badge.hc-status--completed {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.hc-ticket-card__subject {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--head-text);
+  line-height: 1.25;
+}
+
+.hc-ticket-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hc-ticket-card__customer-row,
+.hc-ticket-card__company-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--head-muted);
+}
+
+.hc-ticket-card__customer-row .Icon,
+.hc-ticket-card__company-row .Icon {
+  flex-shrink: 0;
+  color: var(--head-muted);
+  width: 13px;
+  height: 13px;
+}
+
+.hc-ticket-card__customer {
+  font-weight: 500;
+  color: var(--head-text);
+}
+
+.hc-ticket-card__company {
+  color: var(--head-muted);
+}
+
+.hc-ticket-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  border-top: 1px solid var(--head-border);
+  font-size: 10.5px;
+}
+
+.hc-ticket-card__category {
+  color: var(--head-muted);
+}
+
+.hc-ticket-card__date {
+  color: var(--head-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

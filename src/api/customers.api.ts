@@ -37,6 +37,11 @@ export async function createCustomer(
     company: data.company,
     status: 'ACTIVE',
     createdAt: new Date().toISOString(),
+    onboardingStatus: 'pending',
+    callStatus: 'connected',
+    assigneeId: null,
+    remark: '',
+    updatedLabel: 'Just now',
   }
 
   customers.push(customer)

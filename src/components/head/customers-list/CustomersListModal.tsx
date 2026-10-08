@@ -89,6 +89,45 @@ const SAMPLE_FOUNDER_BUSINESSES: Record<string, BusinessItem[]> = {
       submittedBy: 'Founder',
     },
   ],
+  'cust-1': [
+    {
+      id: 'b-1',
+      name: 'Main · Sector 21',
+      location: 'Sector 21',
+      status: 'Pending',
+      submittedBy: 'Founder',
+    },
+    {
+      id: 'b-2',
+      name: 'Sector 15',
+      location: 'Sector 15',
+      status: 'In progress',
+      submittedBy: 'Branch manager',
+    },
+    {
+      id: 'b-3',
+      name: 'NIT',
+      location: 'NIT',
+      status: 'Pending',
+      submittedBy: 'Founder',
+    },
+  ],
+  'cust-2': [
+    {
+      id: 'b-1',
+      name: 'Main · Sector 21',
+      location: 'Sector 21',
+      status: 'Pending',
+      submittedBy: 'Founder',
+    },
+    {
+      id: 'b-2',
+      name: 'Sector 15',
+      location: 'Sector 15',
+      status: 'In progress',
+      submittedBy: 'Branch manager',
+    },
+  ],
 }
 
 /**

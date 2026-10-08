@@ -54,6 +54,14 @@ export const FEATURE_TEMPLATE: Array<{
     defaultEnabled: true,
   },
   {
+    name: 'Attendance',
+    description: 'Track daily check-in and monthly attendance',
+    screen: 'attendance',
+    slug: 'attendance',
+    icon: 'clock',
+    defaultEnabled: true,
+  },
+  {
     name: '15 Days Meeting',
     description: 'Track and manage customer 15-day onboarding meetings',
     screen: 'meeting',
@@ -119,6 +127,16 @@ export const customers: Customer[] = [
     company: 'Northwind Traders',
     status: 'ACTIVE',
     createdAt: '2026-01-15T09:15:00.000Z',
+    onboardingStatus: 'in-progress',
+    callStatus: 'connected',
+    assigneeId: 'u-1',
+    remark: 'Call back Friday re package choice',
+    updatedLabel: '2 hr ago',
+    contactDate: '18 Sep 2026',
+    businessRelationType: 'main',
+    businessCount: 3,
+    businessIndex: 1,
+    duplicateCount: 2,
   },
   {
     id: 'cust-2',
@@ -129,6 +147,15 @@ export const customers: Customer[] = [
     company: 'Acme Corp',
     status: 'ACTIVE',
     createdAt: '2026-01-22T14:40:00.000Z',
+    onboardingStatus: 'pending',
+    callStatus: 'not-answered',
+    assigneeId: 'u-2',
+    remark: '',
+    updatedLabel: '5 hr ago',
+    contactDate: '20 Sep 2026',
+    businessRelationType: 'branch',
+    businessCount: 2,
+    businessIndex: 2,
   },
   {
     id: 'cust-3',
@@ -139,6 +166,13 @@ export const customers: Customer[] = [
     company: 'Globex',
     status: 'INACTIVE',
     createdAt: '2026-02-03T11:05:00.000Z',
+    onboardingStatus: 'completed',
+    callStatus: 'connected',
+    assigneeId: 'u-1',
+    remark: 'All docs verified',
+    updatedLabel: 'Yesterday',
+    contactDate: '16 Sep 2026',
+    duplicateCount: 1,
   },
   {
     id: 'cust-4',
@@ -149,6 +183,12 @@ export const customers: Customer[] = [
     company: 'Initech',
     status: 'ACTIVE',
     createdAt: '2026-02-18T16:25:00.000Z',
+    onboardingStatus: 'in-progress',
+    callStatus: 'connected',
+    assigneeId: 'u-3',
+    remark: 'Waiting for GST registration',
+    updatedLabel: '1 day ago',
+    contactDate: '19 Sep 2026',
   },
   {
     id: 'cust-5',
@@ -159,6 +199,12 @@ export const customers: Customer[] = [
     company: 'Umbrella',
     status: 'ACTIVE',
     createdAt: '2026-03-01T10:50:00.000Z',
+    onboardingStatus: 'pending',
+    callStatus: 'connected',
+    assigneeId: null,
+    remark: '',
+    updatedLabel: '3 days ago',
+    contactDate: '01 Oct 2026',
   },
   {
     id: 'cust-6',
@@ -169,6 +215,12 @@ export const customers: Customer[] = [
     company: 'Hooli',
     status: 'INACTIVE',
     createdAt: '2026-03-12T13:35:00.000Z',
+    onboardingStatus: 'completed',
+    callStatus: 'not-answered',
+    assigneeId: 'u-4',
+    remark: 'Renewal due Mar 2027',
+    updatedLabel: '1 week ago',
+    contactDate: '15 Sep 2026',
   },
   {
     id: 'cust-7',
@@ -179,6 +231,12 @@ export const customers: Customer[] = [
     company: 'Stark Industries',
     status: 'ACTIVE',
     createdAt: '2026-03-05T08:20:00.000Z',
+    onboardingStatus: 'in-progress',
+    callStatus: 'connected',
+    assigneeId: 'u-1',
+    remark: '',
+    updatedLabel: '4 hr ago',
+    contactDate: '22 Sep 2026',
   },
   {
     id: 'cust-8',
@@ -189,6 +247,12 @@ export const customers: Customer[] = [
     company: 'Wayne Enterprises',
     status: 'ACTIVE',
     createdAt: '2026-03-09T12:10:00.000Z',
+    onboardingStatus: 'completed',
+    callStatus: 'connected',
+    assigneeId: 'u-2',
+    remark: 'Handover done',
+    updatedLabel: '6 hr ago',
+    contactDate: '21 Sep 2026',
   },
   {
     id: 'cust-9',
@@ -199,6 +263,12 @@ export const customers: Customer[] = [
     company: 'Massive Dynamic',
     status: 'INACTIVE',
     createdAt: '2026-03-14T09:45:00.000Z',
+    onboardingStatus: 'pending',
+    callStatus: 'not-answered',
+    assigneeId: null,
+    remark: '',
+    updatedLabel: '2 days ago',
+    contactDate: '25 Sep 2026',
   },
   {
     id: 'cust-10',
@@ -209,6 +279,12 @@ export const customers: Customer[] = [
     company: 'Cyberdyne',
     status: 'ACTIVE',
     createdAt: '2026-03-20T15:30:00.000Z',
+    onboardingStatus: 'in-progress',
+    callStatus: 'connected',
+    assigneeId: 'u-3',
+    remark: 'Theme demo booked',
+    updatedLabel: '1 day ago',
+    contactDate: '23 Sep 2026',
   },
   {
     id: 'cust-11',
@@ -219,6 +295,12 @@ export const customers: Customer[] = [
     company: 'Tyrell Corp',
     status: 'ACTIVE',
     createdAt: '2026-03-25T10:00:00.000Z',
+    onboardingStatus: 'completed',
+    callStatus: 'connected',
+    assigneeId: 'u-4',
+    remark: 'Package activated',
+    updatedLabel: '1 week ago',
+    contactDate: '18 Sep 2026',
   },
 ]
 
@@ -548,6 +630,8 @@ export function getDepartmentDashboardData(
 
 const MOCK_DB_KEY = 'db'
 const MOCK_DB_VERSION = 1
+/** Exact browser storage key; used to sync admin changes across tabs. */
+export const MOCK_DB_STORAGE_KEY = 'smsf.mock.db'
 
 interface MockDbSnapshot {
   departments: Department[]
@@ -575,18 +659,78 @@ function replaceAll<T>(target: T[], source: T[]): void {
   target.push(...source)
 }
 
-const storedDb = readPersisted<MockDbSnapshot>(
-  MOCK_DB_KEY,
-  MOCK_DB_VERSION,
-)
+/**
+ * Reloads the module-level mock arrays from localStorage.
+ * Needed because each browser tab owns a separate JS module instance.
+ */
+export function hydrateMockDb(): boolean {
+  const storedDb = readPersisted<MockDbSnapshot>(
+    MOCK_DB_KEY,
+    MOCK_DB_VERSION,
+  )
 
-if (storedDb) {
+  if (!storedDb) return false
+
   replaceAll(departments, storedDb.departments)
   replaceAll(featurePermissions, storedDb.featurePermissions)
   departmentIdCounter = storedDb.departmentIdCounter
   featureIdCounter = storedDb.featureIdCounter
-} else {
+  return true
+}
+
+/**
+ * Adds built-in template screens that are missing from a
+ * department. New screens (e.g. Attendance) must reach
+ * departments that already have a persisted snapshot —
+ * a plain version bump would silently wipe admin tweaks.
+ */
+function ensureTemplateScreens(): number {
+  let added = 0
+  const defaults: PermissionLevel[] = ['CAN_READ', 'CAN_EDIT']
+
+  for (const department of departments) {
+    const existingSlugs = new Set(
+      featurePermissions
+        .filter(
+          (feature) =>
+            feature.departmentId === department.id &&
+            feature.kind === 'screen',
+        )
+        .map((feature) => feature.slug),
+    )
+
+    FEATURE_TEMPLATE.forEach((item, index) => {
+      if (existingSlugs.has(item.slug)) return
+
+      featurePermissions.push({
+        id: nextFeatureId(),
+        departmentId: department.id,
+        name: item.name,
+        description: item.description,
+        enabled: item.defaultEnabled,
+        roleAPermission: defaults[index % 2],
+        roleBPermission: 'CAN_READ',
+        screen: item.screen,
+        slug: item.slug,
+        icon: item.icon,
+        order: featurePermissions.filter(
+          (feature) => feature.departmentId === department.id,
+        ).length,
+        category: 'screens',
+        kind: 'screen',
+      })
+      existingSlugs.add(item.slug)
+      added += 1
+    })
+  }
+
+  return added
+}
+
+if (!hydrateMockDb()) {
   seedFeaturePermissions('dept-1')
   seedFeaturePermissions('dept-2')
+  persistMockDb()
+} else if (ensureTemplateScreens() > 0) {
   persistMockDb()
 }

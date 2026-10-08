@@ -91,7 +91,7 @@ Portal: useHeadNav(departmentId) ─ enabled ∧ screen ∧ sort(order) ─▶ H
 | Field | Matlab |
 |---|---|
 | `name`, `description` | Sidebar label · topbar subtitle |
-| `screen` | `dashboard` \| `users` \| `customers` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
+| `screen` | `dashboard` \| `users` \| `customers` \| `attendance` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
 | `slug` | URL segment: `/head/<slug>` ya `/users/<slug>` (department me unique) |
 | `icon` | `IconName` (`components/head/shared/iconPaths.ts`) |
 | `order` | Sidebar position (admin ▲▼ se) |
@@ -145,7 +145,7 @@ src/
 │   ├── feature-permissions.api.ts      # get / create / update / delete / move (mock)
 │   ├── auth.api.ts, customers.api.ts, services.api.ts, help-center.api.ts, department-dashboard.api.ts
 │   └── mock/
-│       ├── db.ts                       # departments + FEATURE_TEMPLATE (7 screens) + COLUMN templates + seed
+│       ├── db.ts                       # departments + FEATURE_TEMPLATE (8 built-in screens) + COLUMN templates + seed + template reconciliation
 │       ├── persist.ts                  # readPersisted/writePersisted (localStorage, versioned keys)
 │       ├── auth.db.ts                  # users (head/user → departmentId: 'dept-1') + issuedTokens (persisted)
 │       ├── head.db.ts                  # department users, work items, notifications
@@ -168,7 +168,9 @@ src/
 │       ├── customer/                   # (pending)
 │       ├── 15-days-meeting/            # meeting filters/list/search components
 │       ├── sop/                        # SOP search/modal components
-│       └── help-center/                # (pending)
+│       ├── help-center/                # (pending)
+│       └── user/
+│           └── attendance/             # `checkin.tsx` (DailyAttendanceCard) + `calender.tsx` (AttendanceCalendar) — dashboard page me composed
 └── features/
     ├── auth/        # login, tokens, forbidden (types me AuthUser.departmentId add hua)
     ├── permissions/
@@ -187,14 +189,15 @@ src/
             ├── hooks/useHeadDepartmentId.ts
             ├── types/head.types.ts             # HeadNavItem, HeadAccount, HeadNotification, DepartmentUser…
             └── pages/
-            ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
-            ├── HeadIndexPage.tsx           # /head or /users → first enabled
-            ├── HeadScreenPage.tsx          # shared dynamic screen resolver
+                ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
+                ├── HeadIndexPage.tsx           # /head or /users → first enabled
+                ├── HeadScreenPage.tsx          # shared dynamic screen resolver
                 ├── DashboardPage.tsx           # placeholder body
                 ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
-                ├── CustomerListPage.tsx        # ✅ full (filters, column config, CRUD gated)
-            ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
-            ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
+                ├── CustomerListPage.tsx        # ✅ customers-list UI (composes components/head/customers-list)
+                ├── AttendancePage.tsx          # ✅ composed from user/attendance widgets (check-in + month calendar)
+                ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
+                ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
                 ├── HelpCenterPage.tsx          # placeholder body
                 └── CustomFeaturePage.tsx       # admin ke custom features ke liye generic
 ```
@@ -294,9 +297,17 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
 ## Mock Data Layer
 
 - `db.ts`: 2 departments (Finance, Operations); har department ko `FEATURE_TEMPLATE`
-  se 7 features seed: Dashboard, Department Users, Customer List, 15 Days Meeting, SOP,
-  Help Center (enabled) + Reports (custom, disabled) + **6 Customer columns + 8 User
-  columns** (`kind: 'column'`, nav me kabhi nahi aate).
+  se 8 features seed: Dashboard, Department Users, Customer List, **Attendance**,
+  15 Days Meeting, SOP, Help Center (enabled) + Reports (custom, disabled) + **6
+  Customer columns + 8 User columns** (`kind: 'column'`, nav me kabhi nahi aate).
+- `db.ts` customers (11) ab **onboarding fields ke saath seed** hote hain —
+  `onboardingStatus` (pending/in-progress/completed), `callStatus`, `assigneeId`
+  (head.db users), `remark`, `updatedLabel`, `contactDate`, biz-relation pills
+  (`businessRelationType/businessCount/businessIndex/duplicateCount`). Purane kisi bhi
+  profile ke liye `CustomerListPage` fallback derive karta hai — customers array persist
+  nahi hota (load par code se fresh seed), isliye naye fields turant sabko dikhte hain.
+- `ensureTemplateScreens()` — persisted dept me template screen missing ho to add karke
+  persist karta hai (naya built-in screen purane snapshots me bhi paucha, data wipe na).
 - Naya department → auto seed; delete → cascade.
 - `head.db.ts`: 8 department users, Abhishek/Mohit ke work items, notifications.
 - `auth.db.ts`: `admin@smsf.test / admin123` (ADMIN) · `head@smsf.test` (HEAD, dept-1) ·
@@ -308,6 +319,11 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
   - `smsf.mock.issued-tokens` (v1) → magic links (taki admin ke banaye token reload/HMR/new
     tab me bhi kaam kare)
   - `smsf.auth.session` → login session (purana)
+  - Admin kisi doosre tab me feature add/remove/toggle kare to `storage` event par
+    `hydrateMockDb()` module-level arrays reload karta hai aur React Query ke department/
+    feature queries invalidate hote hain; open Head/User sidebar bina reload update hota hai.
+  - Auth session bhi localStorage-based hai, isliye same browser profile ke tabs ek session
+    share karte hain. Simultaneous ADMIN aur HEAD/USER testing ke liye alag profile/incognito use karo.
   - Reset chahiye → browser me in keys ko delete kar do (profile wipe).
   - Real API aane par sirf `src/api/*.api.ts` bodies `apiRequest(...)` se replace karni hain;
     hooks/pages same.
@@ -327,13 +343,23 @@ npm run lint    # eslint
 ## Status (08 Oct 2026)
 
 **Build ✅ · Lint ✅ · tsc ✅**. Latest role-route/permission changes production build aur
-ESLint se verify hue. Pehle ka headless Chromium E2E (CDP, preview build) flow bhi pass tha:
+ESLint se verify hue. Naye E2E (CDP, preview build) me `smoke.mjs` sab steps pass:
 admin login → link issue → reload persistence → 3 category cards (6/8 rows) → Company
-column off → reload → head magic link → sidebar/ CUSTOMER table → Department Users
-headers → raw token paste login. Uske upar **Actions Role A → CAN_READ → customer table
-read-only** (ACTIONS column + Add Customer gayab) bhi E2E me verify hua. NOTE: source files
-kabhi kabhi external editor se overwrite ho rahe the (dot network), isliye page gates aakhiri
-sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-gate).
+column off → reload → head magic link → sidebar → **customers-list UI** (`/head/customers`
+par `components/head/customers-list/`: SearchBar + tab/assignee/date Filters + table
+[#/Business/Contact/Status/Assign To/Internal Remark/Updated] + biz pill + drawer) →
+Department Users headers → raw token paste login. **Actions Role A → CAN_READ → customers-list
+read-only** (status/assign/phone-edit buttons disabled, remark read-only; drawer phir bhi
+khulta hai) bhi E2E verified. **Attendance** screen (`attendance.mjs`) pehle pass tha.
+NOTE: source files kabhi kabhi external editor se overwrite ho rahe the (dot network) —
+is baar `screenRegistry.tsx` ka `customers` mapping `CustomerListPage` se
+`CustomerOnboardingPage` par revert hua aur `CustomerListPage.tsx` double-gate
+(`screenPermission && canEdit`) par wapis gaya; dono dobara fix kiye. Aakhiri decided design:
+Actions column **single-gate** — `CustomerListPage` ab wahi `columnFeatures.canEdit('actions')`
+se `canEdit` leta hai aur customers-list components ko wired karta hai (updates `useUpdateCustomer`
+se persist; `CustomerOnboardingPage.tsx` local-only overrides wala aata hai, registered nahi).
+Dhyan rahe: Customer Columns config (admin card) ab customers-list table ka layout control
+nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Done
 - [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
@@ -361,14 +387,33 @@ sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-ga
       actions permission gating + head `CustomerListPage` full
 - [x] Mock persistence (departments, feature permissions, issued tokens) + pre-existing tsc
       errors (`customer/dashboard.tsx`, `user/attendance/checkin.tsx`) fixed
+- [x] **Cross-tab feature sync** — admin add/remove/toggle ke `smsf.mock.db` storage event par
+      mock DB rehydrate + React Query invalidation; open Head/User nav live refresh
+- [x] **Attendance screen** — `HeadScreenKey` + `SCREEN_OPTIONS` + `screenRegistry` +
+      `AttendancePage` (composes `DailyAttendanceCard` + `AttendanceCalendar` from
+      `components/user/attendance/`) + FEATURE_TEMPLATE seed; head & user console me
+      sidebar item + `/head` `/users` par E2E render verified (check-in card, calendar,
+      check-out interaction)
+- [x] **Customers-list UI on Customer List screen** — `CustomerListPage` ab
+      `components/head/customers-list/*` compose karta hai: SearchBar + tab/assignee/
+      date-range Filters + onboarding table (status/assign/remark inline edit, founder-
+      biz pill, duplicates, phone/call, updated, action icons) + detail drawer
+      (`CustomersListModal`, SAMPLE_FOUNDER_BUSINESSES cust-1/cust-2 ke liye extend).
+      `Customer` type/`UpdateCustomerRequest` onboard fields extend, `db.ts` 11 customers
+      seeded (onboardingStatus/callStatus/assigneeId/remark/updatedLabel/contactDate/
+      biz pills/duplicates), `createCustomer` defaults onboard fields. Edits
+      `useUpdateCustomer` se persist; access **single-gate** (`canEdit = canEdit('actions')`),
+      CAN_READ par disabled/read-only + drawer khulta hai — E2E verified.
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
    (abhi purane bigger styles par hai; shell compact 14px hai)
 2. `components/head/dashboard/` — KPI cards, trend chart, status breakdown, most active day,
    delay-side donut, team target & performance table + `DashboardPage`
-3. `components/head/customer/` — customer onboarding table, status/assignee filters, detail
-   drawer, duplicates, call log, booking + `CustomerListPage`
+3. ~~`components/head/customer/` — customer onboarding table, status/assignee filters, detail
+   drawer, duplicates, call log, booking + `CustomerListPage`~~ ✅ done — ~`components/head/
+   customer/`~ ab `components/head/customers-list/` (user ke dots se) + `CustomerListPage` wired.
+   Baaki: call-log/booking sections prototype ke saath aur match karna.
 4. 15 Days Meeting ke local mock interactions ko real API/persistence se connect karna
 5. SOP inline sequence editing ko real API/persistence se connect karna
 6. `components/head/help-center/` — tickets, assign (manual / round robin) + `HelpCenterPage`
