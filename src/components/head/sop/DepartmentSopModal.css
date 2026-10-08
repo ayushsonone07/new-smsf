@@ -205,3 +205,38 @@
   font-size: 15px;
   font-weight: 600;
 }
+
+/* =============================================================
+   RESPONSIVE — DepartmentSopModal
+   ============================================================= */
+@media (max-width: 768px) {
+  .sop-modal__overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .sop-modal__box {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 12px 12px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .sop-modal__footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sop-modal__cancel-btn,
+  .sop-modal__save-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .sop-modal__header {
+    padding: 12px 14px;
+  }
+  .sop-modal__body {
+    padding: 14px;
+  }
+}

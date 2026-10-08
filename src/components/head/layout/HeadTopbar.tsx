@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { NotificationsMenu } from './NotificationsMenu'
+import { Icon } from '../shared/Icon'
 import type { HeadNotification } from '../../../features/departments/head/types/head.types'
 
 interface HeadTopbarProps {
@@ -14,6 +15,7 @@ interface HeadTopbarProps {
   actions?: ReactNode
   notifications?: HeadNotification[]
   onMarkAllRead?: () => void
+  onToggleSidebar?: () => void
 }
 
 /** Sticky translucent header: title + subtitle (or custom banner), actions, bell. */
@@ -24,9 +26,21 @@ export function HeadTopbar({
   actions,
   notifications = [],
   onMarkAllRead,
+  onToggleSidebar,
 }: HeadTopbarProps) {
   return (
     <header className="htop">
+      {onToggleSidebar ? (
+        <button
+          type="button"
+          className="htop__menu-btn"
+          aria-label="Toggle navigation"
+          title="Toggle navigation"
+          onClick={onToggleSidebar}
+        >
+          <Icon name="menu" size={17} />
+        </button>
+      ) : null}
       {children ?? (
         <div className="htop__title">
           <h1>{title}</h1>
