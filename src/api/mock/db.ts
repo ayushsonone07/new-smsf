@@ -54,6 +54,14 @@ export const FEATURE_TEMPLATE: Array<{
     defaultEnabled: true,
   },
   {
+    name: 'Attendance',
+    description: 'Track daily check-in and monthly attendance',
+    screen: 'attendance',
+    slug: 'attendance',
+    icon: 'clock',
+    defaultEnabled: true,
+  },
+  {
     name: '15 Days Meeting',
     description: 'Track and manage customer 15-day onboarding meetings',
     screen: 'meeting',
@@ -596,8 +604,59 @@ export function hydrateMockDb(): boolean {
   return true
 }
 
+/**
+ * Adds built-in template screens that are missing from a
+ * department. New screens (e.g. Attendance) must reach
+ * departments that already have a persisted snapshot —
+ * a plain version bump would silently wipe admin tweaks.
+ */
+function ensureTemplateScreens(): number {
+  let added = 0
+  const defaults: PermissionLevel[] = ['CAN_READ', 'CAN_EDIT']
+
+  for (const department of departments) {
+    const existingSlugs = new Set(
+      featurePermissions
+        .filter(
+          (feature) =>
+            feature.departmentId === department.id &&
+            feature.kind === 'screen',
+        )
+        .map((feature) => feature.slug),
+    )
+
+    FEATURE_TEMPLATE.forEach((item, index) => {
+      if (existingSlugs.has(item.slug)) return
+
+      featurePermissions.push({
+        id: nextFeatureId(),
+        departmentId: department.id,
+        name: item.name,
+        description: item.description,
+        enabled: item.defaultEnabled,
+        roleAPermission: defaults[index % 2],
+        roleBPermission: 'CAN_READ',
+        screen: item.screen,
+        slug: item.slug,
+        icon: item.icon,
+        order: featurePermissions.filter(
+          (feature) => feature.departmentId === department.id,
+        ).length,
+        category: 'screens',
+        kind: 'screen',
+      })
+      existingSlugs.add(item.slug)
+      added += 1
+    })
+  }
+
+  return added
+}
+
 if (!hydrateMockDb()) {
   seedFeaturePermissions('dept-1')
   seedFeaturePermissions('dept-2')
+  persistMockDb()
+} else if (ensureTemplateScreens() > 0) {
   persistMockDb()
 }

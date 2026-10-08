@@ -19,15 +19,13 @@ import { useDeleteCustomer } from '../../hooks/useDeleteCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import type { Customer } from '../../types/customer.types'
-import type { FeaturePermission } from '../../../permissions/types/permission.types'
-import { getSession } from '../../../../app/auth/session'
 
 /**
  * Head panel — Customer List. Which columns show up (and whether
  * this role may edit them) comes from the admin's column
  * features, so the table follows the permissions page live.
  */
-export function CustomerListPage({ feature }: { feature: FeaturePermission }) {
+export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
@@ -43,14 +41,12 @@ export function CustomerListPage({ feature }: { feature: FeaturePermission }) {
   const [editing, setEditing] = useState<Customer | null>(null)
   const [deleting, setDeleting] = useState<Customer | null>(null)
 
-  // Whether this role may create/edit/delete customers is decided
+// Whether this role may create/edit/delete customers is decided
   // by the admin's Actions column permission — no separate screen
   // gate, so setting Actions to CAN_READ really makes it read-only.
-  const screenPermission = getSession()?.user.role === 'USER'
-    ? feature.roleBPermission
-    : feature.roleAPermission
+  // (See department-users page for the same single-gate approach.)
   const canManage =
-    screenPermission === 'CAN_EDIT' && columnFeatures.canEdit('actions')
+    columnFeatures.canEdit('actions')
 
   const filtered = useMemo(() => {
     const value = search.trim().toLowerCase()

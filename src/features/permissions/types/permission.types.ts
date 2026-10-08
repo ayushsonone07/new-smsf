@@ -30,6 +30,7 @@ export type HeadScreenKey =
   | 'dashboard'
   | 'users'
   | 'customers'
+  | 'attendance'
   | 'meeting'
   | 'sop'
   | 'help-center'

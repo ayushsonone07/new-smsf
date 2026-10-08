@@ -91,7 +91,7 @@ Portal: useHeadNav(departmentId) ─ enabled ∧ screen ∧ sort(order) ─▶ H
 | Field | Matlab |
 |---|---|
 | `name`, `description` | Sidebar label · topbar subtitle |
-| `screen` | `dashboard` \| `users` \| `customers` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
+| `screen` | `dashboard` \| `users` \| `customers` \| `attendance` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
 | `slug` | URL segment: `/head/<slug>` ya `/users/<slug>` (department me unique) |
 | `icon` | `IconName` (`components/head/shared/iconPaths.ts`) |
 | `order` | Sidebar position (admin ▲▼ se) |
@@ -145,7 +145,7 @@ src/
 │   ├── feature-permissions.api.ts      # get / create / update / delete / move (mock)
 │   ├── auth.api.ts, customers.api.ts, services.api.ts, help-center.api.ts, department-dashboard.api.ts
 │   └── mock/
-│       ├── db.ts                       # departments + FEATURE_TEMPLATE (7 screens) + COLUMN templates + seed
+│       ├── db.ts                       # departments + FEATURE_TEMPLATE (8 built-in screens) + COLUMN templates + seed + template reconciliation
 │       ├── persist.ts                  # readPersisted/writePersisted (localStorage, versioned keys)
 │       ├── auth.db.ts                  # users (head/user → departmentId: 'dept-1') + issuedTokens (persisted)
 │       ├── head.db.ts                  # department users, work items, notifications
@@ -168,7 +168,9 @@ src/
 │       ├── customer/                   # (pending)
 │       ├── 15-days-meeting/            # meeting filters/list/search components
 │       ├── sop/                        # SOP search/modal components
-│       └── help-center/                # (pending)
+│       ├── help-center/                # (pending)
+│       └── user/
+│           └── attendance/             # `checkin.tsx` (DailyAttendanceCard) + `calender.tsx` (AttendanceCalendar) — dashboard page me composed
 └── features/
     ├── auth/        # login, tokens, forbidden (types me AuthUser.departmentId add hua)
     ├── permissions/
@@ -187,14 +189,15 @@ src/
             ├── hooks/useHeadDepartmentId.ts
             ├── types/head.types.ts             # HeadNavItem, HeadAccount, HeadNotification, DepartmentUser…
             └── pages/
-            ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
-            ├── HeadIndexPage.tsx           # /head or /users → first enabled
-            ├── HeadScreenPage.tsx          # shared dynamic screen resolver
+                ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
+                ├── HeadIndexPage.tsx           # /head or /users → first enabled
+                ├── HeadScreenPage.tsx          # shared dynamic screen resolver
                 ├── DashboardPage.tsx           # placeholder body
                 ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
                 ├── CustomerListPage.tsx        # ✅ full (filters, column config, CRUD gated)
-            ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
-            ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
+                ├── AttendancePage.tsx          # ✅ composed from user/attendance widgets (check-in + month calendar)
+                ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
+                ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
                 ├── HelpCenterPage.tsx          # placeholder body
                 └── CustomFeaturePage.tsx       # admin ke custom features ke liye generic
 ```
@@ -294,9 +297,11 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
 ## Mock Data Layer
 
 - `db.ts`: 2 departments (Finance, Operations); har department ko `FEATURE_TEMPLATE`
-  se 7 features seed: Dashboard, Department Users, Customer List, 15 Days Meeting, SOP,
-  Help Center (enabled) + Reports (custom, disabled) + **6 Customer columns + 8 User
-  columns** (`kind: 'column'`, nav me kabhi nahi aate).
+  se 8 features seed: Dashboard, Department Users, Customer List, **Attendance**,
+  15 Days Meeting, SOP, Help Center (enabled) + Reports (custom, disabled) + **6
+  Customer columns + 8 User columns** (`kind: 'column'`, nav me kabhi nahi aate).
+- `ensureTemplateScreens()` — persisted dept me template screen missing ho to add karke
+  persist karta hai (naya built-in screen purane snapshots me bhi paucha, data wipe na).
 - Naya department → auto seed; delete → cascade.
 - `head.db.ts`: 8 department users, Abhishek/Mohit ke work items, notifications.
 - `auth.db.ts`: `admin@smsf.test / admin123` (ADMIN) · `head@smsf.test` (HEAD, dept-1) ·
@@ -336,9 +341,13 @@ ESLint se verify hue. Pehle ka headless Chromium E2E (CDP, preview build) flow b
 admin login → link issue → reload persistence → 3 category cards (6/8 rows) → Company
 column off → reload → head magic link → sidebar/ CUSTOMER table → Department Users
 headers → raw token paste login. Uske upar **Actions Role A → CAN_READ → customer table
-read-only** (ACTIONS column + Add Customer gayab) bhi E2E me verify hua. NOTE: source files
-kabhi kabhi external editor se overwrite ho rahe the (dot network), isliye page gates aakhiri
-sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-gate).
+read-only** (ACTIONS column + Add Customer gayab) bhi E2E me verify hua, aur **Attendance**
+screen (sidebar item + `/head`/`/users` page render + check-out interaction) ka naya E2E
+(`attendance.mjs`) bhi pass hua. NOTE: source files kabhi kabhi external editor se overwrite
+ho rahe the (dot network) — is baar `screenRegistry.tsx` ka `customers` mapping `CustomerListPage`
+se `CustomerOnboardingPage` par revert hua aur `CustomerListPage.tsx` double-gate
+(`screenPermission && canEdit`) par wapis gaya; dono dobara fix kiye. Aakhiri decided design:
+Actions column **single-gate** (Actions column hi manage-access decide karta hai).
 
 ### Done
 - [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
@@ -368,6 +377,11 @@ sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-ga
       errors (`customer/dashboard.tsx`, `user/attendance/checkin.tsx`) fixed
 - [x] **Cross-tab feature sync** — admin add/remove/toggle ke `smsf.mock.db` storage event par
       mock DB rehydrate + React Query invalidation; open Head/User nav live refresh
+- [x] **Attendance screen** — `HeadScreenKey` + `SCREEN_OPTIONS` + `screenRegistry` +
+      `AttendancePage` (composes `DailyAttendanceCard` + `AttendanceCalendar` from
+      `components/user/attendance/`) + FEATURE_TEMPLATE seed; head & user console me
+      sidebar item + `/head` `/users` par E2E render verified (check-in card, calendar,
+      check-out interaction)
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
