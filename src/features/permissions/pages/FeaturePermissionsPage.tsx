@@ -1,12 +1,21 @@
+import { useState } from 'react'
 import {
   Link,
   useParams,
 } from '@tanstack/react-router'
 import { useDepartmentFeatures } from '../hooks/useDepartmentFeatures'
 import { useUpdateFeaturePermission } from '../hooks/useUpdateFeaturePermission'
+import { useFeatureMutations } from '../hooks/useFeatureMutations'
 import { useDepartments } from '../../departments/hooks/useDepartments'
-import type { UpdateFeaturePermissionRequest } from '../types/permission.types'
+import type {
+  CreateFeaturePermissionRequest,
+  FeaturePermission,
+  UpdateFeaturePermissionRequest,
+} from '../types/permission.types'
 import { FeaturePermissionsTable } from '../../../components/permissions/FeaturePermissionsTable'
+import { FeatureFormModal } from '../../../components/permissions/FeatureFormModal'
+import { Button } from '../../../components/ui/Button'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { ProfileChip } from '../../../components/common/ProfileChip'
@@ -24,6 +33,17 @@ export function FeaturePermissionsPage() {
     useDepartmentFeatures(departmentId)
   const updateMutation =
     useUpdateFeaturePermission(departmentId)
+  const { create, remove, move } =
+    useFeatureMutations(departmentId)
+
+  const [modal, setModal] = useState<
+    | { kind: 'none' }
+    | { kind: 'create' }
+    | { kind: 'edit'; feature: FeaturePermission }
+    | { kind: 'delete'; feature: FeaturePermission }
+  >({ kind: 'none' })
+
+  const closeModal = () => setModal({ kind: 'none' })
 
   const department = departmentsQuery.data?.find(
     (item) => item.id === departmentId,
@@ -93,14 +113,19 @@ export function FeaturePermissionsPage() {
       <Card>
         <div className="table-toolbar">
           <div>
-            <h2>Feature Access</h2>
+            <h2>Head panel menu</h2>
 
             <p>
-              Three controls per row: enable or
-              disable the feature, then pick a
-              permission for Role A and Role B.
+              Each row is a sidebar item in this
+              department&apos;s head panel. Reorder,
+              enable/disable, set Role A / Role B
+              access, or add new pages.
             </p>
           </div>
+
+          <Button onClick={() => setModal({ kind: 'create' })}>
+            + Add feature
+          </Button>
         </div>
 
         {updateMutation.isError && (
@@ -117,8 +142,56 @@ export function FeaturePermissionsPage() {
               : undefined
           }
           onUpdate={handleUpdate}
+          onEdit={(feature) => setModal({ kind: 'edit', feature })}
+          onDelete={(feature) => setModal({ kind: 'delete', feature })}
+          onMove={(feature, direction) =>
+            move.mutate({ id: feature.id, direction })
+          }
         />
       </Card>
+
+      <FeatureFormModal
+        open={modal.kind === 'create'}
+        mode="create"
+        onClose={closeModal}
+        isSubmitting={create.isPending}
+        error={create.error?.message}
+        onSubmit={(values: CreateFeaturePermissionRequest) =>
+          create.mutate(values, { onSuccess: closeModal })
+        }
+      />
+
+      {modal.kind === 'edit' ? (
+        <FeatureFormModal
+          open
+          mode="edit"
+          initialValues={modal.feature}
+          onClose={closeModal}
+          isSubmitting={updateMutation.isPending}
+          error={updateMutation.error?.message}
+          onSubmit={(values) =>
+            updateMutation.mutate(
+              { id: modal.feature.id, data: values },
+              { onSuccess: closeModal },
+            )
+          }
+        />
+      ) : null}
+
+      {modal.kind === 'delete' ? (
+        <ConfirmDialog
+          open
+          title="Remove this menu item?"
+          message={`"${modal.feature.name}" will disappear from the head panel sidebar.`}
+          confirmLabel="Remove"
+          isLoading={remove.isPending}
+          error={remove.error?.message}
+          onClose={closeModal}
+          onConfirm={() =>
+            remove.mutate(modal.feature.id, { onSuccess: closeModal })
+          }
+        />
+      ) : null}
     </PageLayout>
   )
 }

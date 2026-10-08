@@ -21,12 +21,14 @@ export const storedUsers: StoredUser[] = [
     name: 'Ayesha Head',
     email: 'head@smsf.test',
     role: 'HEAD',
+    departmentId: 'dept-1',
   },
   {
     id: 'usr-3',
     name: 'Bilal User',
     email: 'user@smsf.test',
     role: 'USER',
+    departmentId: 'dept-1',
   },
 ]
 
@@ -40,6 +42,7 @@ export function toAuthUser(
     name: user.name,
     email: user.email,
     role: user.role,
+    departmentId: user.departmentId,
   }
 }
 

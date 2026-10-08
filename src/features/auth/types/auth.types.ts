@@ -5,6 +5,8 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  /** Department this HEAD / USER belongs to. */
+  departmentId?: string
 }
 
 export interface AuthSession {

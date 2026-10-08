@@ -1,6 +1,8 @@
 import type { Department } from '../../features/departments/types/department.types'
+import type { IconName } from '../../components/head/shared/iconPaths'
 import type {
   FeaturePermission,
+  HeadScreenKey,
   PermissionLevel,
 } from '../../features/permissions/types/permission.types'
 import type { Customer } from '../../features/departments/types/customer.types'
@@ -14,47 +16,67 @@ import type {
 export const FEATURE_TEMPLATE: Array<{
   name: string
   description: string
+  screen: HeadScreenKey
+  slug: string
+  icon: IconName
   defaultEnabled: boolean
 }> = [
   {
     name: 'Dashboard',
-    description: 'Overview widgets and KPI cards',
+    description: 'Monitor team onboarding performance',
+    screen: 'dashboard',
+    slug: 'dashboard',
+    icon: 'grid',
+    defaultEnabled: true,
+  },
+  {
+    name: 'Department Users',
+    description: 'Manage department users and sub-users',
+    screen: 'users',
+    slug: 'users',
+    icon: 'userPlus',
+    defaultEnabled: true,
+  },
+  {
+    name: 'Customer List',
+    description: 'Manage and track your customer onboarding process',
+    screen: 'customers',
+    slug: 'customers',
+    icon: 'list',
+    defaultEnabled: true,
+  },
+  {
+    name: '15 Days Meeting',
+    description: 'Track and manage customer 15-day onboarding meetings',
+    screen: 'meeting',
+    slug: 'meeting',
+    icon: 'calendar',
+    defaultEnabled: true,
+  },
+  {
+    name: 'SOP',
+    description:
+      'Set the steps and statuses for each department — status updates follow the SOP',
+    screen: 'sop',
+    slug: 'sop',
+    icon: 'flow',
+    defaultEnabled: true,
+  },
+  {
+    name: 'Help Center',
+    description: 'Customer tickets — assign manually or by round robin',
+    screen: 'help-center',
+    slug: 'help-center',
+    icon: 'help',
     defaultEnabled: true,
   },
   {
     name: 'Reports',
     description: 'Generate and export reports',
-    defaultEnabled: true,
-  },
-  {
-    name: 'User Management',
-    description: 'Create and manage user accounts',
-    defaultEnabled: true,
-  },
-  {
-    name: 'Billing',
-    description: 'Invoices and payment records',
-    defaultEnabled: true,
-  },
-  {
-    name: 'Audit Log',
-    description: 'Track activity history',
+    screen: 'custom',
+    slug: 'reports',
+    icon: 'bar',
     defaultEnabled: false,
-  },
-  {
-    name: 'Settings',
-    description: 'Workspace configuration',
-    defaultEnabled: true,
-  },
-  {
-    name: 'Notifications',
-    description: 'Alerts and email preferences',
-    defaultEnabled: false,
-  },
-  {
-    name: 'Data Export',
-    description: 'Export data to CSV',
-    defaultEnabled: true,
   },
 ]
 
@@ -440,6 +462,10 @@ export function seedFeaturePermissions(
       enabled: feature.defaultEnabled,
       roleAPermission: defaults[index % 2],
       roleBPermission: 'CAN_READ',
+      screen: feature.screen,
+      slug: feature.slug,
+      icon: feature.icon,
+      order: index,
     }),
   )
 

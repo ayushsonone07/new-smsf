@@ -1,8 +1,14 @@
-# PROJECT.MD — SMSF Admin Portal
+# PROJECT.MD — SMSF Admin Portal + MBG Onboarding Console (Head Panel)
 
-Department management aur feature-level role permissions ke liye admin panel.
-Routing **TanStack Router**, data fetching/caching **TanStack Query**, auth/role
-checking **router middleware** (`beforeLoad`) se hoti hai.
+Do hisse ek hi React app me:
+
+1. **Admin Portal** (`/admin/*`) — departments banana, har department ke **features
+   (= head panel ke menu items)** manage karna, Head/User ke liye login links issue karna.
+2. **Head Panel / MBG Onboarding Console** (`/head/*`) — department head ka console.
+   Sidebar ke items **admin ke feature permissions se dynamically** aate hain.
+
+Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
+`beforeLoad`** se.
 
 ---
 
@@ -13,34 +19,69 @@ checking **router middleware** (`beforeLoad`) se hoti hai.
 | UI | React 19 + TypeScript (Vite) |
 | Routing | `@tanstack/react-router` (code-based, `src/app/router.tsx`) |
 | Server state | `@tanstack/react-query` v5 |
-| Data layer | `src/api/*` — abhi **mock in-memory store**, real API ke liye `apiRequest` (fetch) ready hai |
-| Styling | **Hybrid** — purana UI plain CSS (`src/index.css`), naya UI **Tailwind CSS v4** (`@tailwindcss/vite`) |
+| Data layer | `src/api/*` — abhi **mock in-memory store**, real API ke liye `apiRequest` (fetch) ready |
+| Styling | Admin: plain CSS (`src/index.css`) · Head panel: plain CSS (`src/styles/head.css`, font **Jost**) · Tailwind v4 available |
 
 ---
 
 ## Routes
 
+### Public / Admin
+
 | Path | Access | Kya dikhata hai | Component |
 |---|---|---|---|
-| `/` | — | Role ke home (`/admin` / `/head` / `/users`), warna `/login` redirect | `beforeLoad` redirect |
-| `/login` | Public (guest) | Admin login (email + password) + magic access link se auto-login | `LoginPage` |
-| `/admin` | **ADMIN** | Department list + **Add Department** button + stats/search | `DepartmentManagementPage` |
-| `/admin/departments/$departmentId` | **ADMIN** | Department ki feature list (row ke end me 3 controls) | `FeaturePermissionsPage` |
-| `/admin/tokens` | **ADMIN** | Head/User ke liye **magic login link** issue / revoke | `AccessTokensPage` |
-| `/head` | **ADMIN, HEAD** | Route stub — real page aane tak placeholder | `pendingPage('Head Panel')` |
-| `/users` | **ADMIN, HEAD, USER** | Route stub — USER ka dashboard (page aane tak placeholder) | `pendingPage('Users')` |
-| `/forbidden` | Logged-in | 403 — role ke paas route access nahi | `ForbiddenPage` |
+| `/` | — | Role ke home (`/admin` / `/head` / `/users`), warna `/login` | `beforeLoad` redirect |
+| `/login` | Guest | Admin login (email + password) + access-token / magic-link login | `LoginPage` |
+| `/admin` | **ADMIN** | Department list + Add Department + stats/search | `DepartmentManagementPage` |
+| `/admin/departments/$departmentId` | **ADMIN** | **Head panel menu builder** — features add/edit/delete/reorder/toggle + Role A/B | `FeaturePermissionsPage` |
+| `/admin/tokens` | **ADMIN** | Head/User ke liye magic login link issue / revoke | `AccessTokensPage` |
+| `/users` | ADMIN, HEAD, USER | Stub — USER dashboard (pending) | `pendingPage('Users')` |
+| `/forbidden` | Logged-in | 403 | `ForbiddenPage` |
+| `/departments/$departmentId/{dashboard,customers,help-center,services}` | — | Purane department template pages | `Department*Page` |
 
-**Middleware** (`src/app/middleware/auth.middleware.ts`):
+### Head Panel (`_head` layout → `HeadConsoleLayout`)
 
-- `_authed` layout route har protected route par pehle `requireAuth` chalata hai —
-  session nahi mila to `/login` redirect.
-- Uske baad har route par `requireRole(...)` — role allow list me nahi to
-  `/forbidden` redirect.
-- `/login` par ulta check: pehle se logged-in hai to apne role ke home par redirect.
-- `/head` aur `/users` abhi sirf routes hain (permission check test karne ke liye) —
-  inke real pages/components baad me provide honge; tab router me sirf
-  `component` swap karna hoga, guards waise ke waise rahenge.
+| Path | Access | Kya hota hai |
+|---|---|---|
+| `/head` | ADMIN, HEAD | Pehle **enabled** feature par redirect (`HeadIndexPage`) |
+| `/head/$screen` | ADMIN, HEAD | `$screen` = feature ka **slug** → enabled feature dhundho → `SCREEN_REGISTRY[feature.screen]` ka page render (`HeadScreenPage`) |
+
+> Sirf **2 routes** — naya menu item add karne par router me kuch nahi badalna.
+> Disabled / unknown slug → "Page not available" card.
+
+**Middleware** (`src/app/middleware/auth.middleware.ts`): `requireAuth` + `requireRole(...)`.
+`/login` par ulta check (logged-in → apne home). HEAD/USER session me `departmentId`
+hota hai (`AuthUser.departmentId`); admin preview ke liye fallback `dept-1`.
+
+---
+
+## Dynamic Head Navbar (core design)
+
+**Feature permission == sidebar item.** Admin jo karega, head ko turant dikhega:
+
+```
+Admin: /admin/departments/$id  ──(create/update/delete/move/toggle)──▶  featurePermissions[]
+                                                                             │
+Head:  useHeadNav(departmentId) ── enabled ∧ sort(order) ──▶ nav items ──▶ HeadShell sidebar
+                                                                             │
+       /head/$screen ── slug match ──▶ SCREEN_REGISTRY[screen].component ──▶ page body
+```
+
+`FeaturePermission` fields:
+
+| Field | Matlab |
+|---|---|
+| `name`, `description` | Sidebar label · topbar subtitle |
+| `screen` | `dashboard` \| `users` \| `customers` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
+| `slug` | URL segment: `/head/<slug>` (department me unique) |
+| `icon` | `IconName` (`components/head/shared/iconPaths.ts`) |
+| `order` | Sidebar position (admin ▲▼ se) |
+| `enabled` | Off → sidebar se gayab + route block |
+| `roleAPermission`, `roleBPermission` | `CAN_READ` / `CAN_EDIT` |
+
+Naya screen type add karna ho: `permission.types.ts` me `HeadScreenKey` → page banao
+`features/departments/head/pages/` me → `screenRegistry.tsx` me map karo →
+`features/permissions/config/screenOptions.ts` me admin dropdown option.
 
 ---
 
@@ -49,245 +90,164 @@ checking **router middleware** (`beforeLoad`) se hoti hai.
 ```
 src/
 ├── app/
-│   ├── router.tsx                  # Routes + route guards (beforeLoad)
-│   ├── middleware/auth.middleware.ts # requireAuth + requireRole (yehi "middleware" hai)
-│   ├── auth/session.ts             # localStorage session + homeForRole()
-│   ├── queryClient.ts              # QueryClient singleton (staleTime 30s)
-│   └── providers/QueryProvider.tsx # QueryClientProvider wrapper
+│   ├── router.tsx                      # saare routes + guards (admin + _head layout)
+│   ├── middleware/auth.middleware.ts   # requireAuth / requireRole
+│   ├── auth/session.ts                 # localStorage session + homeForRole()
+│   ├── queryClient.ts / providers/QueryProvider.tsx
 ├── api/
-│   ├── client.ts                   # fetch wrapper + ApiError (real API ke liye)
-│   ├── departments.api.ts          # get/create/update/delete department (mock)
-│   ├── feature-permissions.api.ts  # get/update feature permissions (mock)
-│   └── mock/db.ts                  # In-memory store + seed data
-├── components/                     # ⭐ ALL reusable React components
-│   ├── layout/                     # AdminLayout, AdminSidebar, PageLayout, PageHeader
-│   ├── ui/                         # Button, Input, Select, Modal, ConfirmDialog, Badge,
-│   │                               # Card, DataTable, LoadingState, ErrorState,
-│   │                               # EmptyState, SearchInput
-│   ├── common/                     # StatCard, StatusBadge, FormField, ProfileChip
-│   ├── departments/                # DepartmentTable, DepartmentStats, DepartmentForm,
-│   │                               # DepartmentFormModal, DeleteDepartmentDialog,
-│   │                               # DepartmentFilters
-│   └── permissions/                # FeaturePermissionsTable, PermissionToggle
+│   ├── client.ts                       # fetch wrapper (real API ke liye)
+│   ├── departments.api.ts              # mock CRUD
+│   ├── feature-permissions.api.ts      # get / create / update / delete / move (mock)
+│   ├── auth.api.ts, customers.api.ts, services.api.ts, help-center.api.ts, department-dashboard.api.ts
+│   └── mock/
+│       ├── db.ts                       # departments + FEATURE_TEMPLATE (7 screens) + seed
+│       ├── auth.db.ts                  # users (head/user → departmentId: 'dept-1')
+│       ├── head.db.ts                  # department users, work items, notifications
+│       └── staff-report.db.ts          # sample staff report items
+├── styles/
+│   └── head.css                        # head panel ka poora CSS (.hshell tokens) — index.css se @import
+├── components/
+│   ├── layout/   ui/   common/   departments/   customers/   dashboard/   services/   help-center/
+│   ├── permissions/
+│   │   ├── FeaturePermissionsTable.tsx # order ▲▼ · icon+path · toggle · Role A/B · edit/delete
+│   │   ├── FeatureFormModal.tsx        # add/edit feature (screen → slug/icon auto-fill)
+│   │   └── PermissionToggle.tsx
+│   ├── reports/                        # StaffReportModal, WorkReportTable, workReportMeta
+│   └── head/                           # ⭐ MBG Onboarding Console components
+│       ├── layout/                     # HeadShell, HeadSidebar, HeadTopbar, NotificationsMenu, ImpersonationBanner
+│       ├── shared/                     # Icon + iconPaths, SegmentedControl, IconButton, Avatar, SearchBar, SectionCard, LearningButton
+│       ├── users/                      # DepartmentUsersTable, UserFormModal, UserDetails, RolePill, MetricPill, roleMeta
+│       ├── dashboard/                  # (pending)
+│       ├── customer/                   # (pending)
+│       ├── meeting/                    # (pending — 15 Days Meeting)
+│       ├── sop/                        # (pending)
+│       └── help-center/                # (pending)
 └── features/
-    ├── departments/
-    │   ├── pages/DepartmentManagementPage.tsx   # /admin — composes reusable components
-    │   ├── hooks/                               # useDepartments + create/update/delete
-    │   └── types/department.types.ts
-    └── permissions/
-        ├── pages/FeaturePermissionsPage.tsx     # /admin/departments/:id — dynamic departmentId
-        ├── hooks/                               # useDepartmentFeatures, useUpdateFeaturePermission
-        └── types/permission.types.ts
+    ├── auth/        # login, tokens, forbidden (types me AuthUser.departmentId add hua)
+    ├── permissions/
+    │   ├── types/permission.types.ts   # FeaturePermission (+screen/slug/icon/order), HeadScreenKey
+    │   ├── config/screenOptions.ts     # admin dropdown: screens + ICON_OPTIONS
+    │   ├── hooks/useDepartmentFeatures.ts, useUpdateFeaturePermission.ts, useFeatureMutations.ts (create/remove/move)
+    │   └── pages/FeaturePermissionsPage.tsx
+    ├── reports/types/staff-report.types.ts
+    └── departments/
+        ├── types/ hooks/ components/ pages/   # purane department template pages
+        └── head/                       # ⭐ Head panel pages
+            ├── config/screenRegistry.tsx       # screen key → page component
+            ├── hooks/useHeadNav.ts             # features → nav items (+bySlug)
+            ├── hooks/useHeadDepartmentId.ts
+            ├── types/head.types.ts             # HeadNavItem, HeadAccount, HeadNotification, DepartmentUser…
+            └── pages/
+                ├── HeadConsoleLayout.tsx       # _head layout (HeadShell + Outlet)
+                ├── HeadIndexPage.tsx           # /head → first enabled
+                ├── HeadScreenPage.tsx          # /head/$screen resolver
+                ├── DashboardPage.tsx           # placeholder body
+                ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
+                ├── CustomerListPage.tsx        # placeholder body
+                ├── MeetingPage.tsx             # placeholder body
+                ├── SopPage.tsx                 # placeholder body
+                ├── HelpCenterPage.tsx          # placeholder body
+                └── CustomFeaturePage.tsx       # admin ke custom features ke liye generic
 ```
+
+**Rule:** reusable UI sirf `src/components/` me; `features/**/pages/` sirf compose karte hain.
+Head panel ke component **page-wise subfolder** me jate hain (`head/users/`, `head/customer/` …),
+shared primitives `head/shared/` me, shell `head/layout/` me.
 
 ---
 
-## Component & Department Template Architecture
+## Head Panel — Design Source & Tokens
 
-**Rule:** every reusable React component lives in `src/components/` (grouped by
-`layout/`, `ui/`, `common/`, `departments/`, `permissions/`). Pages under
-`src/features/**/pages/` only compose these components — they don't define UI.
+Design source: `MBG_Onboarding_Console.html` (prototype, 11 screens). Shell usi se
+pixel-match hai. Tokens `.hshell` par CSS variables me:
 
-**Department pages are templates, not per-department files.** A department is
-*data*, not a separate React codebase. The active department comes from the route
-(`departmentId` param) and is passed into TanStack Query hooks:
+| Token | Value |
+|---|---|
+| Blue / hover | `#2459e0` / `#1a45b8` |
+| Yellow | `#ffc629` (active nav bar, badges, brand mark) |
+| BG / border | `#f4f6fb` / `#e6e9f0` |
+| Font | Jost 14px (Google Fonts link `index.html` me) |
+| Sidebar | 236px open / 64px collapsed (`is-collapsed`) |
 
-`Route → departmentId (useParams) → Page → useDepartmentFeatures(id) → API`
-
-So `/admin/departments/dept-1` and `/admin/departments/dept-2` render the
-**same** `FeaturePermissionsPage` + `FeaturePermissionsTable` — only the loaded
-data differs. Never create `FinanceDashboard.tsx` / `SalesDashboard.tsx` etc.
-Creating a new department requires **zero** new React files.
-
-- No department name or ID is hardcoded inside reusable components.
-- Reusable components never call APIs directly — pages pass data/callbacks in.
-- `DepartmentContext` is intentionally **not** added yet: no component is nested
-  deep enough to need it. Add it only if `departmentId` must be threaded through
-  many levels.
+Shell features: collapsible sidebar, yellow active bar, account card (email + role),
+Head/User `SegmentedControl` switch, logout, sticky blur topbar, bell + unread badge +
+dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
 
 ---
 
-## User Flow
+## Reusable Components (head + reports)
 
-```mermaid
-flowchart TD
-    A["main.tsx<br/>QueryProvider → App"] --> B["router.tsx<br/>RouterProvider"]
-    B -->|"/"| C["redirect → role home<br/>(guest → /login)"]
-    C --> D["/admin — Department Management<br/>DepartmentManagementPage"]
-
-    D -->|"+ Create Department Login"| E["Department Form Modal"]
-    E -->|Submit| F["useCreateDepartment mutation<br/>createDepartment() → mock db"]
-    F --> G["invalidateQueries(['departments'])"]
-    G --> H["useDepartments refetch<br/>✅ naya department list me dikh jata hai"]
-
-    D -->|"Row click / ⚙ button"| I["/admin/departments/:departmentId<br/>FeaturePermissionsPage"]
-    I --> J["useDepartmentFeatures(departmentId)<br/>feature rows load"]
-    J --> K["Row ke 3 controls"]
-
-    K --> L["1. Enable / Disable toggle"]
-    K --> M["2. Dropdown → Role A<br/>Can Read | Can Edit"]
-    K --> N["3. Dropdown → Role B<br/>Can Read | Can Edit"]
-
-    L --> O["useUpdateFeaturePermission mutation<br/>updateFeaturePermission() → mock db"]
-    M --> O
-    N --> O
-    O --> P["invalidateQueries<br/>['department-features', id]"]
-    P --> Q["✅ features refetch — updated state dikhta hai"]
-```
+| Component | Props ka gist |
+|---|---|
+| `HeadShell` | `navItems, activeKey, onNavigate, account, role/onRoleChange, onLogout, title/subtitle | topbarContent, notifications, impersonating, children` |
+| `SegmentedControl<T>` | `options[{value,label,count?}], value, onChange, fill, size` |
+| `Icon` | `name: IconName` (ek path-map), `size`, `strokeWidth`, ya raw `d` |
+| `DepartmentUsersTable` | `users, onView/onEdit/onDelete/onLoginAs (optional), renderExpanded` |
+| `UserFormModal` | `mode: 'create' \| 'edit'` (edit me password field nahi), `initialValues, onSubmit` |
+| `StaffReportModal` | `person, items, target, summary?/stats? override` — stats/tabs/filter khud derive |
+| `FeatureFormModal` | admin: `mode, initialValues, onSubmit(CreateFeaturePermissionRequest)` |
+| `Modal` (ui) | `size: sm/md/lg/xl`, `flush`, Escape-to-close — purane callers unchanged |
+| `DataTable` (ui) | legacy `children` mode **ya** `rows + rowKey + column.render` generic mode |
+| `Pill`, `StatTile`, `FilterTabs`, `ProfileHeader`, `EntityCell/DelayCell/RemarkCell` | staff report ke building blocks |
 
 ---
 
 ## Data Flow (TanStack Query)
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant P as Page Component
-    participant H as React Query Hook
-    participant Q as Query Cache
-    participant A as Mock API (src/api)
-
-    Note over U,A: Flow 1 — Department add karna
-    U->>P: "Create Department Login" submit
-    P->>H: useCreateDepartment().mutate(data)
-    H->>A: createDepartment(data)
-    A-->>H: new Department (+ default feature set)
-    H->>Q: invalidateQueries(['departments'])
-    Q->>A: getDepartments()
-    A-->>Q: Department[]
-    Q-->>P: updated list re-renders
-    P-->>U: ✅ list me naya department
-
-    Note over U,A: Flow 2 — Department click → Features
-    U->>P: Department row click
-    P->>P: navigate('/admin/departments/:id')
-    P->>H: useDepartmentFeatures(id)
-    H->>Q: queryKey ['department-features', id]
-    Q->>A: getFeaturePermissions(id)
-    A-->>Q: FeaturePermission[]
-    Q-->>P: feature rows render
-
-    Note over U,A: Flow 3 — Row ka control change
-    U->>P: toggle / dropdown change
-    P->>H: useUpdateFeaturePermission(id).mutate({id, data})
-    H->>A: updateFeaturePermission(id, patch)
-    A-->>H: updated FeaturePermission
-    H->>Q: invalidateQueries(['department-features', id])
-    Q->>A: getFeaturePermissions(id)
-    A-->>Q: fresh FeaturePermission[]
-    Q-->>P: rows refreshed
-```
-
-**Conventions**
-
-- Query key read hook me export hoti hai (`departmentsQueryKey`, `departmentFeaturesQueryKey(id)`), mutation hooks wahi import karke `invalidateQueries` karte hain.
-- Mutations me retry 0, queries me retry 1, `staleTime: 30_000` (`src/app/queryClient.ts`).
-- UI side-effects (modal close) page se `.mutate(data, { onSuccess })` se hote hain; cache invalidation hook ke andar.
+- Query key read hook me export (`departmentsQueryKey`, `departmentFeaturesQueryKey(id)`),
+  mutation hooks wahi import karke `invalidateQueries`.
+- Head nav bhi **usi** `['department-features', id]` query par chalta hai → admin ke
+  mutation ke baad head sidebar auto-refresh (same session).
+- Mutations retry 0, queries retry 1, `staleTime: 30_000`.
+- UI side-effects (modal close) page se `.mutate(data, { onSuccess })`.
 
 ---
 
-## Styling Conventions (Hybrid CSS + Tailwind)
+## Styling Conventions
 
-**Rule: purane components me plain CSS classes, naye UI me Tailwind utilities.**
-
-- Setup (Tailwind **v4**, config-file free):
-  1. devDep: `tailwindcss` + `@tailwindcss/vite`
-  2. `vite.config.ts` me `tailwindcss()` plugin
-  3. `src/index.css` ki **pehli line**: `@import "tailwindcss";`
-- Naye pages (`/head`, `/users`, aane wale naye screens) Tailwind utilities se
-  banao — jaldi hota hai.
-- **Gotchas:**
-  - v4 me Tailwind **cascade layers** use karta hai → hamari custom CSS
-    (unlayered) hamesha utilities ko override karti hai. Matlab purani
-    classes (`.nav-item`, `.table-wrapper`, ...) ke upar utility class se
-    override nahi hoga — mixing karte waqt dhyan do.
-  - Tailwind **preflight** base reset karta hai (margins, button/input
-    defaults); purani custom CSS unhe override kar leti hai — purane screens
-    par asar nahi hona chahiye, but major change ke baad ek baar visual
-    check kar lena.
-  - `src/App.css` orphan hai (Vite template ka), koi import nahi karta.
-- Jab pura UI ek din rewrite ho, tabhi full Tailwind migration sochna
-  (abhi dono saath me rakhna hi plan hai).
+- Admin screens: plain CSS `src/index.css`. Head panel: `src/styles/head.css`
+  (`@import` index.css ki 2nd line par). Tailwind v4 bhi loaded hai (`@import "tailwindcss"`).
+- **Gotcha:** Tailwind v4 cascade layers — unlayered custom CSS utilities ko override
+  karti hai. `.modal label` / `.modal input` jaise global rules naye forms par lag jate
+  hain → naye form ko apni class se specificity do (jaise `.user-form-modal label.user-form__field`).
+- `.hshell button { font: inherit }` — `color: inherit` **mat** lagana (specificity
+  se child classes ka color override ho jata tha).
+- `src/App.css` orphan hai.
 
 ---
 
 ## Responsive & Sidebar — STRICT Rules (mandatory)
 
-> Har naya UI banate waqt yeh rules **non-negotiable** hain. Koi page/tab tab
-> tak "done" nahi maana jayega jab tak niche ke checks pass na ho.
+### Admin sidebar (`AdminLayout`)
+- Open: topbar ☰ · Close: sidebar ✕ · >900px default open, ≤900px closed, mobile drawer
+  nav ke baad auto-close, backdrop tap close.
+- z-index: drawer 60 > backdrop 55 > modal 50 > topbar 40.
+- `.main-content { grid-column: 2 }` explicit — hatana mat.
 
-### Sidebar — open/close (implemented)
+### Head sidebar (`HeadShell`)
+- ☰ toggle collapse (236 → 64px, icons-only, labels/account hide).
+- ≤760px: sidebar `position: fixed` drawer; collapsed = width 0.
 
-- **Open:** topbar ka **☰** button. **Close:** sidebar ke andar brand row me
-  **✕** button (desktop collapse + mobile drawer dono ke liye).
-- State `src/components/layout/AdminLayout.tsx` me:
-  - \>900px → default **open**; ≤900px → default **closed**.
-  - Mobile par navigation (sidebar link, browser back) ke baad drawer apne aap
-    band ho jata hai.
-  - Backdrop tap karne par bhi band; open hone par ☰ hide ho jata hai.
-- **z-index order:** sidebar drawer `60` > backdrop `55` > modal `50` >
-  topbar `40`.
-- Sidebar ke andar content overflow kare to scroll andar hi ho
-  (`.sidebar { overflow-y: auto }`) — page ka scroll nahi.
-- **Gotcha (dobara mat karna):** close par UI mat todo — `.main-content` ko
-  `grid-column: 2` explicit rakha hai, warna sidebar hide hote hi wo 0-width
-  column me auto-place ho jata tha. Naya grid item add karo to placement
-  check karo. Collapse smooth rahe isliye `.app-shell` par
-  `transition: grid-template-columns` hai; mobile par
-  `body:has(.sidebar-open) { overflow: hidden }` se background scroll lock
-  hota hai.
-
-### Responsive checklist (har page ke liye)
-
-1. **375px / 768px / 1440px** — teeno widths par dev tools se check karo;
-   mobile par **horizontal page scroll bilkul nahi**.
-2. Fixed width mat lagao — hamesha `max-width` + `width: 100%`.
-3. Tables hamesha `.table-wrapper` (`overflow-x: auto`) ke andar.
-4. Multi-column grids (`.stats-grid` etc.) ≤900px par 1-col.
-5. Toolbars/topbars me `flex-wrap` — warna mobile par buttons overflow ho jate hain.
-6. Page/modal padding mobile par compact (media queries me already:
-   `.page-content`, `.modal`, `.content-card`, `.forbidden-card`, `.auth-card`).
-7. Plain CSS classes likh rahe ho to unka mobile rule bhi `@media (max-width: 900px)`
-   me likho; **Tailwind** utilities ho to `sm:` / `md:` prefixes.
-8. Buttons/inputs **tap-friendly** (min ~34px height) rakho.
-
-**Definition of done:** naya screen → mobile par koi overflow nahi, sidebar
-drawer kaam kare, sab kuch tap-friendly. PROJECT.MD me is section ko update
-karte raho agar naya breakpoint ya rule add ho.
-
----
-
-## Feature Row Controls
-
-Har feature row ke **end me 3 controls**:
-
-| # | Control | UI | Mutation field | Options |
-|---|---|---|---|---|
-| 1 | Enable / Disable | Toggle switch | `enabled` | on / off |
-| 2 | Role A permission | Dropdown | `roleAPermission` | `Can Read`, `Can Edit` |
-| 3 | Role B permission | Dropdown | `roleBPermission` | `Can Read`, `Can Edit` |
-
-- Feature **disabled** ho to dono dropdowns bhi disable ho jate hain (permission sirf enabled feature par lagti hai).
-- Row ke control update ke dauran sirf wahi control disable hota hai (`updatingFeatureId`).
-- Har update ek independent mutation hai — invalidation ke baad poori list refetch hoti hai.
+### Checklist (har page)
+1. 375 / 768 / 1440px check; mobile par horizontal scroll **nahi**.
+2. `max-width` + `width:100%`, fixed widths nahi. Tables `.table-wrapper` (overflow-x) me.
+3. Grids ≤900px par 1-col; toolbars `flex-wrap`.
+4. Tap targets ≥34px. Plain CSS ho to `@media` rule saath likho.
 
 ---
 
 ## Mock Data Layer
 
-Abhi koi backend nahi hai, isliye API functions ek in-memory store (`src/api/mock/db.ts`) par chalte hain:
-
-- Seed: 2 departments (Finance, Operations), har department ke liye 8 default features
-  (Dashboard, Reports, User Management, Billing, Audit Log, Settings, Notifications, Data Export).
-- Naya department banate hi uske liye default feature set auto-seed hota hai.
-- Department delete karne par uske feature permissions bhi delete hote hain (cascade).
-- Har call pehle `delay()` se simulated network latency (250–300 ms) leta hai.
-
-**Real API me swap karne ke liye:** `src/api/departments.api.ts` aur
-`src/api/feature-permissions.api.ts` ke andar function bodies ko wapas
-`apiRequest('/endpoint', {...})` calls se replace karein — signatures same hain,
-hooks/pages ko bilkul change nahi karna padega. Base URL:
-`VITE_API_BASE_URL` (default `http://localhost:3000/api`), wrapper `src/api/client.ts` me hai.
+- `db.ts`: 2 departments (Finance, Operations); har department ko `FEATURE_TEMPLATE`
+  se 7 features seed: Dashboard, Department Users, Customer List, 15 Days Meeting, SOP,
+  Help Center (enabled) + Reports (custom, disabled).
+- Naya department → auto seed; delete → cascade.
+- `head.db.ts`: 8 department users, Abhishek/Mohit ke work items, notifications.
+- `auth.db.ts`: `admin@smsf.test / admin123` (ADMIN) · `head@smsf.test` (HEAD, dept-1) ·
+  `user@smsf.test` (USER, dept-1) — head/user magic link se login.
+- `delay()` 150–300 ms.
+- **In-memory hai** → page reload par admin ke feature changes reset. Real API aane par
+  sirf `src/api/*.api.ts` bodies `apiRequest(...)` se replace karni hain; hooks/pages same.
 
 ---
 
@@ -299,42 +259,39 @@ npm run build   # tsc -b && vite build
 npm run lint    # eslint
 ```
 
-**Current status (07 Oct 2026):** `npm run build` ✅ (0 errors) · `npm run lint` ✅ (0 errors, 0 warnings).
-
 ---
 
-## Recovery & Restore Log (07 Oct 2026)
+## Status (08 Oct 2026)
 
-Ek git `stash` + remote merge ne kai tracked files ko purane (remote) versions par revert kar diya tha aur kuch files delete kar di thi. Neeche sab restore hua:
+**Build ✅ · Lint ✅ · tsc ✅** (verified headless Chromium me bhi: login → admin → head flows).
 
-**Recreate kiye gaye files (purani content se):**
+### Done
+- [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
+- [x] Auth pages ka missing CSS (`auth-*`, `forbidden-*`, `role-badge`, `status-badge`, tokens page)
+- [x] `Modal` (size/flush/Esc), `DataTable` generic mode, `Pill`, `StatTile`, `FilterTabs`, `ProfileHeader`, `TableCells`
+- [x] `StaffReportModal` (daily work report — On time / On track / delayed + side tag)
+- [x] Head shell prototype-match (`components/head/layout/` + `shared/` + `styles/head.css`)
+- [x] Head folder structure: `layout/ shared/ users/ dashboard/ customer/ meeting/ sop/ help-center/`
+- [x] Head pages `features/departments/head/pages/` + `screenRegistry` + `useHeadNav`
+- [x] **Dynamic navbar** — admin feature CRUD + reorder + toggle → head sidebar/routes live
+- [x] Admin `FeatureFormModal`, table me order ▲▼ / icon / path / edit / delete
+- [x] `AuthUser.departmentId`
 
-| File | Kya hai |
-|---|---|
-| `src/App.tsx` | `RouterProvider` wrapper (AdminLayout wala purana version hataya) |
-| `src/api/departments.api.ts` | mock in-memory CRUD (fetch/`apiRequest` wapas nahi) |
-| `src/api/mock/db.ts` | departments + feature store + seed |
-| `src/api/feature-permissions.api.ts` | get/update feature permissions (mock) |
-| `src/features/permissions/types/permission.types.ts` | `FeaturePermission`, `PermissionLevel` |
-| `src/features/permissions/hooks/useDepartmentFeatures.ts` | query `['department-features', id]` |
-| `src/features/permissions/hooks/useUpdateFeaturePermission.ts` | mutation + invalidate |
-| `src/features/permissions/components/FeaturePermissionsTable.tsx` | feature rows + toggle + dropdowns |
-| `src/features/departments/hooks/useDepartments.ts` | query `['departments']` + export key |
+### Pending (order me)
+1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
+   (abhi purane bigger styles par hai; shell compact 14px hai)
+2. `components/head/dashboard/` — KPI cards, trend chart, status breakdown, most active day,
+   delay-side donut, team target & performance table + `DashboardPage`
+3. `components/head/customer/` — customer onboarding table, status/assignee filters, detail
+   drawer, duplicates, call log, booking + `CustomerListPage`
+4. `components/head/meeting/` — 15 Days Meeting + `MeetingPage`
+5. `components/head/sop/` — SOP step builder + `SopPage`
+6. `components/head/help-center/` — tickets, assign (manual / round robin) + `HelpCenterPage`
+7. `/users` (USER role dashboard) — abhi stub; head ke `role switch` se `/users` jata hai
+8. Mock → real API (`src/api/*.api.ts` bodies)
+9. Git: purana unmerged index / `stash@{0}` user khud resolve kare (AI commit nahi karega)
 
-**Re-apply kiye gaye edits (reverted files par wapas):**
-
-- `DepartmentTable.tsx` — `onViewFeatures` prop, row click → features, ⚙ button (stopPropagation)
-- `DepartmentManagementPage.tsx` — `useNavigate`, `handleViewFeatures`, `onViewFeatures` prop, `departments` ko `useMemo` me
-- `DepartmentFormModal.tsx` — `useEffect` reset ki jagah render-phase `wasOpen` fix
-- `LoginPage.tsx` — `handleSessionCreated` ko `useCallback` me wrap (lint warning)
-- `router.tsx` / `index.css` — merge conflict markers already hataye the; dono ab clean hain
-
-**Restore ke baad:** build + lint dono green.
-
----
-
-## Pending Work
-
-1. **Git index abhi unmerged hai** — `git status` me `UU`/`DU`/`MM` entries pending hain (`router.tsx`, `index.css`, `PROJECT.MD`, `FeaturePermissionsPage.tsx`, `AdminSidebar.tsx`). User ko khud resolve karke commit karna hai (AI commit nahi karega). Ek purana stash bhi `stash@{0}` par pada hai.
-2. **`/head` aur `/users` ke real pages** — abhi `pendingPage(...)` stubs hain; user pages dega to sirf router me `component` swap hoga, guards waise ke waise rahenge.
-3. **Stray file:** `src/features/departments/Haed/page.tsx` — user ne banayi hai (abhi empty, naam me typo `Haed`); hataani/karna user decide karega.
+### Cleanup notes
+- `src/features/head/` aur `src/features/departments/Haed/` **delete** ho chuke (naya path
+  `features/departments/head/`). `components/head/` root par ab koi file nahi — sab subfolders me.
+- `src/App.css` orphan.

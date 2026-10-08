@@ -25,6 +25,9 @@ import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePer
 import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
+import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
+import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
+import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
 
 function pendingPage(title: string) {
   return (
@@ -117,11 +120,24 @@ const accessTokensRoute = createRoute({
   beforeLoad: requireRole('ADMIN'),
 })
 
-const headRoute = createRoute({
-  getParentRoute: () => authedLayoutRoute,
-  path: '/head',
-  component: () => pendingPage('Head Panel'),
+const headLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_head',
+  component: HeadConsoleLayout,
   beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const headIndexRoute = createRoute({
+  getParentRoute: () => headLayoutRoute,
+  path: '/head',
+  component: HeadIndexPage,
+})
+
+/** Dynamic: slug comes from admin-managed feature permissions. */
+const headScreenRoute = createRoute({
+  getParentRoute: () => headLayoutRoute,
+  path: '/head/$screen',
+  component: HeadScreenPage,
 })
 
 const usersRoute = createRoute({
@@ -167,8 +183,18 @@ const departmentServicesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  adminRoute,
-  departmentFeaturesRoute,
+  loginRoute,
+  headLayoutRoute.addChildren([
+    headIndexRoute,
+    headScreenRoute,
+  ]),
+  authedLayoutRoute.addChildren([
+    adminRoute,
+    departmentFeaturesRoute,
+    accessTokensRoute,
+    usersRoute,
+    forbiddenRoute,
+  ]),
   departmentDashboardRoute,
   departmentCustomersRoute,
   departmentHelpCenterRoute,
