@@ -811,6 +811,13 @@
   color: #334155;
 }
 
+.cl-status-btn:disabled,
+.cl-assign-btn:disabled,
+.cl-icon-micro:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
 /* ── Empty state ──────────────────────────────────────────── */
 
 .cl-empty {

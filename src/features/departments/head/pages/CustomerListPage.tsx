@@ -5,6 +5,7 @@ import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { CustomerTable } from '../../../../components/customers/CustomerTable'
+import { CustomerStats } from '../../../../components/customers/CustomerStats'
 import { CustomerFormModal } from '../../../../components/customers/CustomerFormModal'
 import { DeleteCustomerDialog } from '../../../../components/customers/DeleteCustomerDialog'
 import {
@@ -18,13 +19,15 @@ import { useDeleteCustomer } from '../../hooks/useDeleteCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import type { Customer } from '../../types/customer.types'
+import type { FeaturePermission } from '../../../permissions/types/permission.types'
+import { getSession } from '../../../../app/auth/session'
 
 /**
  * Head panel — Customer List. Which columns show up (and whether
  * this role may edit them) comes from the admin's column
  * features, so the table follows the permissions page live.
  */
-export function CustomerListPage() {
+export function CustomerListPage({ feature }: { feature: FeaturePermission }) {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
@@ -43,7 +46,11 @@ export function CustomerListPage() {
   // Whether this role may create/edit/delete customers is decided
   // by the admin's Actions column permission — no separate screen
   // gate, so setting Actions to CAN_READ really makes it read-only.
-  const canManage = columnFeatures.canEdit('actions')
+  const screenPermission = getSession()?.user.role === 'USER'
+    ? feature.roleBPermission
+    : feature.roleAPermission
+  const canManage =
+    screenPermission === 'CAN_EDIT' && columnFeatures.canEdit('actions')
 
   const filtered = useMemo(() => {
     const value = search.trim().toLowerCase()
@@ -98,6 +105,8 @@ export function CustomerListPage() {
 
   return (
     <>
+      <CustomerStats customers={customersQuery.data ?? []} />
+
       <div className="head-toolbar">
         <CustomerFilters
           search={search}
