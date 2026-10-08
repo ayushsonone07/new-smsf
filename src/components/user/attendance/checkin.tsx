@@ -1,6 +1,5 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
-
 // --- Types ---
 interface DailyAttendanceProps {
   date?: string; // e.g., "30 Sep"
