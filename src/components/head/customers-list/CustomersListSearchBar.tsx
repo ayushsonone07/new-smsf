@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 
 export interface CustomersListSearchBarProps {
@@ -17,7 +18,12 @@ export function CustomersListSearchBar({
   placeholder = 'Search name, email, phone...',
 }: CustomersListSearchBarProps) {
   return (
-    <label className="cl-search">
+    <motion.label
+      className="cl-search"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2 }}
+    >
       <Icon name="search" size={15} strokeWidth={2} />
       <input
         type="search"
@@ -26,6 +32,6 @@ export function CustomersListSearchBar({
         placeholder={placeholder}
         aria-label="Search customers"
       />
-    </label>
+    </motion.label>
   )
 }
