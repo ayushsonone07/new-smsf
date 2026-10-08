@@ -22,6 +22,7 @@ Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
 | Routing | `@tanstack/react-router` (code-based, `src/app/router.tsx`) |
 | Server state | `@tanstack/react-query` v5 |
 | Data layer | `src/api/*` — abhi **mock in-memory store**, real API ke liye `apiRequest` (fetch) ready |
+| Animation | `framer-motion` v14 — customers-list UI me (row stagger, dropdowns, drawer slide/fade, tab stagger) |
 | Styling | Admin: plain CSS (`src/index.css`) · Head panel: plain CSS (`src/styles/head.css`, font **Jost**) · Tailwind v4 available |
 
 ---
@@ -404,6 +405,13 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
       biz pills/duplicates), `createCustomer` defaults onboard fields. Edits
       `useUpdateCustomer` se persist; access **single-gate** (`canEdit = canEdit('actions')`),
       CAN_READ par disabled/read-only + drawer khulta hai — E2E verified.
+- [x] **Framer Motion animations (customers-list UI)** — `framer-motion@14` install; drawer
+      overlay fade + right-to-left spring slide + **close slide-out** (`startClose` →
+      `onAnimationComplete('hidden')` → `onClose`), header/pills fade-up stagger, founder-biz
+      cards + stats stagger, tab content fade-slide; table rows stagger entrance (`motion.tbody`
+      staggerChildren), status/assign/assignee/date menus fade+scale, controls bar fade-down,
+      tab buttons `whileTap`, green reset `whileTap` rotate. E2E verified: rows settle opacity 1,
+      menu animates, drawer spring translate + overlay fade-in + close unmounts.
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
