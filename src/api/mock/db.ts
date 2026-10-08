@@ -12,6 +12,14 @@ import type {
   ActivityItem,
   DepartmentDashboard,
 } from '../../features/departments/types/dashboard.types'
+import {
+  COLUMN_TEMPLATES,
+  categoryMeta,
+} from '../../features/permissions/config/featureCategories'
+import {
+  readPersisted,
+  writePersisted,
+} from './persist'
 
 export const FEATURE_TEMPLATE: Array<{
   name: string
@@ -452,9 +460,10 @@ export function seedFeaturePermissions(
   departmentId: string,
 ): FeaturePermission[] {
   const defaults: PermissionLevel[] = ['CAN_READ', 'CAN_EDIT']
+  const created: FeaturePermission[] = []
 
-  const created = FEATURE_TEMPLATE.map(
-    (feature, index): FeaturePermission => ({
+  FEATURE_TEMPLATE.forEach((feature, index) => {
+    created.push({
       id: nextFeatureId(),
       departmentId,
       name: feature.name,
@@ -465,9 +474,35 @@ export function seedFeaturePermissions(
       screen: feature.screen,
       slug: feature.slug,
       icon: feature.icon,
-      order: index,
-    }),
-  )
+      order: created.length,
+      category: 'screens',
+      kind: 'screen',
+    })
+  })
+
+  // Column features — one block per table, so the admin can
+  // enable/disable every column of Customer List / Department
+  // Users independently.
+  for (const category of ['customers', 'users'] as const) {
+    for (const column of COLUMN_TEMPLATES[category]) {
+      created.push({
+        id: nextFeatureId(),
+        departmentId,
+        name: column.name,
+        description: column.description,
+        enabled: true,
+        roleAPermission: 'CAN_EDIT',
+        roleBPermission: column.roleBDefault ?? 'CAN_EDIT',
+        screen: category === 'customers' ? 'customers' : 'users',
+        slug: `col-${category}-${column.columnKey}`,
+        icon: categoryMeta(category).icon,
+        order: created.length,
+        category,
+        kind: 'column',
+        columnKey: column.columnKey,
+      })
+    }
+  }
 
   featurePermissions.push(...created)
 
@@ -511,5 +546,47 @@ export function getDepartmentDashboardData(
   }
 }
 
-seedFeaturePermissions('dept-1')
-seedFeaturePermissions('dept-2')
+const MOCK_DB_KEY = 'db'
+const MOCK_DB_VERSION = 1
+
+interface MockDbSnapshot {
+  departments: Department[]
+  featurePermissions: FeaturePermission[]
+  departmentIdCounter: number
+  featureIdCounter: number
+}
+
+/**
+ * Departments + feature permissions are kept in localStorage so an
+ * admin's enable/disable work survives reloads, new tabs and dev
+ * HMR — the previous in-memory store reset on every refresh.
+ */
+export function persistMockDb(): void {
+  writePersisted<MockDbSnapshot>(MOCK_DB_KEY, MOCK_DB_VERSION, {
+    departments,
+    featurePermissions,
+    departmentIdCounter,
+    featureIdCounter,
+  })
+}
+
+function replaceAll<T>(target: T[], source: T[]): void {
+  target.length = 0
+  target.push(...source)
+}
+
+const storedDb = readPersisted<MockDbSnapshot>(
+  MOCK_DB_KEY,
+  MOCK_DB_VERSION,
+)
+
+if (storedDb) {
+  replaceAll(departments, storedDb.departments)
+  replaceAll(featurePermissions, storedDb.featurePermissions)
+  departmentIdCounter = storedDb.departmentIdCounter
+  featureIdCounter = storedDb.featureIdCounter
+} else {
+  seedFeaturePermissions('dept-1')
+  seedFeaturePermissions('dept-2')
+  persistMockDb()
+}

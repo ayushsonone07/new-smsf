@@ -1,4 +1,9 @@
-import { delay, featurePermissions, nextFeatureId } from './mock/db'
+import {
+  delay,
+  featurePermissions,
+  nextFeatureId,
+  persistMockDb,
+} from './mock/db'
 import type {
   CreateFeaturePermissionRequest,
   FeaturePermission,
@@ -9,10 +14,28 @@ function byOrder(a: FeaturePermission, b: FeaturePermission) {
   return a.order - b.order
 }
 
-function ofDepartment(departmentId: string) {
+/**
+ * Features of a department, optionally limited to one
+ * category (menu items and each column list are moved and
+ * re-indexed independently).
+ */
+function ofDepartment(
+  departmentId: string,
+  category?: FeaturePermission['category'],
+) {
   return featurePermissions
-    .filter((feature) => feature.departmentId === departmentId)
+    .filter(
+      (feature) =>
+        feature.departmentId === departmentId &&
+        (!category || feature.category === category),
+    )
     .sort(byOrder)
+}
+
+function reindex(departmentId: string, category: FeaturePermission['category']) {
+  ofDepartment(departmentId, category).forEach((feature, i) => {
+    feature.order = i
+  })
 }
 
 export async function getFeaturePermissions(
@@ -28,6 +51,9 @@ export async function createFeaturePermission(
 ): Promise<FeaturePermission> {
   await delay(250)
 
+  const category = data.category ?? 'screens'
+  const kind = data.kind ?? 'screen'
+
   const slugTaken = ofDepartment(departmentId).some(
     (feature) => feature.slug === data.slug,
   )
@@ -35,14 +61,27 @@ export async function createFeaturePermission(
     throw new Error(`Slug "${data.slug}" is already used in this department`)
   }
 
+  const siblings = ofDepartment(departmentId, category)
+
   const feature: FeaturePermission = {
     id: nextFeatureId(),
     departmentId,
-    order: ofDepartment(departmentId).length,
-    ...data,
+    category,
+    kind,
+    columnKey: data.columnKey,
+    order: (siblings[siblings.length - 1]?.order ?? -1) + 1,
+    name: data.name,
+    description: data.description,
+    screen: data.screen,
+    slug: data.slug,
+    icon: data.icon,
+    enabled: data.enabled,
+    roleAPermission: data.roleAPermission,
+    roleBPermission: data.roleBPermission,
   }
 
   featurePermissions.push(feature)
+  persistMockDb()
   return structuredClone(feature)
 }
 
@@ -66,7 +105,12 @@ export async function updateFeaturePermission(
     }
   }
 
-  Object.assign(feature, data)
+  const patch = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as UpdateFeaturePermissionRequest
+
+  Object.assign(feature, patch)
+  persistMockDb()
   return structuredClone(feature)
 }
 
@@ -80,10 +124,9 @@ export async function deleteFeaturePermission(id: string): Promise<void> {
 
   const [removed] = featurePermissions.splice(index, 1)
 
-  // close the gap in ordering
-  ofDepartment(removed.departmentId).forEach((feature, i) => {
-    feature.order = i
-  })
+  // close the gap inside the removed feature's own category
+  reindex(removed.departmentId, removed.category)
+  persistMockDb()
 }
 
 export async function moveFeaturePermission(
@@ -97,7 +140,7 @@ export async function moveFeaturePermission(
     throw new Error('Feature permission not found')
   }
 
-  const siblings = ofDepartment(feature.departmentId)
+  const siblings = ofDepartment(feature.departmentId, feature.category)
   const index = siblings.findIndex((item) => item.id === id)
   const swapWith = direction === 'up' ? index - 1 : index + 1
 
@@ -107,4 +150,5 @@ export async function moveFeaturePermission(
 
   const other = siblings[swapWith]
   ;[feature.order, other.order] = [other.order, feature.order]
+  persistMockDb()
 }

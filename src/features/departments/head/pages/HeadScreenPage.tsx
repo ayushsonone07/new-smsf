@@ -10,7 +10,7 @@ import { ErrorState } from '../../../../components/ui/ErrorState'
  * feature and renders that screen's component.
  */
 export function HeadScreenPage() {
-  const { screen } = useParams({ from: '/_head/head/$screen' })
+  const { screen } = useParams({ strict: false }) as { screen?: string }
   const departmentId = useHeadDepartmentId()
   const nav = useHeadNav(departmentId)
 
@@ -28,7 +28,7 @@ export function HeadScreenPage() {
     )
   }
 
-  const feature = nav.bySlug(screen)
+  const feature = screen ? nav.bySlug(screen) : undefined
 
   if (!feature) {
     return (

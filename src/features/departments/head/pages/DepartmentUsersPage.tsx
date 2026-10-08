@@ -16,6 +16,8 @@ import {
   sampleDepartmentUsers,
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
+import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
+import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -35,7 +37,12 @@ type ModalState =
  * the API is ready.
  */
 export function DepartmentUsersPage() {
-  // feature prop is accepted via SCREEN_REGISTRY but not needed here
+  const departmentId = useHeadDepartmentId()
+  const columnFeatures = useColumnFeatures(departmentId, 'users')
+  // Manage access follows the admin's Actions column permission
+  // (Role A = head, Role B = user); Actions = CAN_READ → read-only.
+  const canManageUsers = columnFeatures.canEdit('actions')
+
   const [users, setUsers] = useState(sampleDepartmentUsers)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
@@ -133,13 +140,15 @@ export function DepartmentUsersPage() {
 
         <LearningButton newCount={2} />
 
-        <Button
-          className="head-primary-button"
-          onClick={() => setModal({ kind: 'create' })}
-        >
-          <Icon name="userPlus" size={16} />
-          Add User
-        </Button>
+        {canManageUsers ? (
+          <Button
+            className="head-primary-button"
+            onClick={() => setModal({ kind: 'create' })}
+          >
+            <Icon name="userPlus" size={16} />
+            Add User
+          </Button>
+        ) : null}
       </div>
 
       <SectionCard
@@ -159,26 +168,30 @@ export function DepartmentUsersPage() {
       >
         <DepartmentUsersTable
           users={filteredUsers}
+          hiddenColumns={columnFeatures.hiddenColumns}
+          canEditActions={canManageUsers}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}
           onDelete={(user) =>
             setModal({ kind: 'delete', user })
           }
-          onLoginAs={(user) => setViewingAs(user)}
+          onLoginAs={canManageUsers ? (user) => setViewingAs(user) : undefined}
           renderExpanded={(user) => (
             <UserDetails user={user} />
           )}
         />
       </SectionCard>
 
-      <UserFormModal
-        open={modal.kind === 'create'}
-        mode="create"
-        onClose={closeModal}
-        onSubmit={handleCreate}
-      />
+      {canManageUsers ? (
+        <UserFormModal
+          open={modal.kind === 'create'}
+          mode="create"
+          onClose={closeModal}
+          onSubmit={handleCreate}
+        />
+      ) : null}
 
-      {modal.kind === 'edit' ? (
+      {canManageUsers && modal.kind === 'edit' ? (
         <UserFormModal
           open
           mode="edit"
@@ -196,7 +209,7 @@ export function DepartmentUsersPage() {
         />
       ) : null}
 
-      {modal.kind === 'delete' ? (
+      {canManageUsers && modal.kind === 'delete' ? (
         <ConfirmDialog
           open
           title="Remove user?"

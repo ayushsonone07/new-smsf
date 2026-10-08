@@ -13,7 +13,9 @@ import type {
   UpdateFeaturePermissionRequest,
 } from '../types/permission.types'
 import { FeaturePermissionsTable } from '../../../components/permissions/FeaturePermissionsTable'
+import { ColumnFeaturesTable } from '../../../components/permissions/ColumnFeaturesTable'
 import { FeatureFormModal } from '../../../components/permissions/FeatureFormModal'
+import { FEATURE_CATEGORIES } from '../config/featureCategories'
 import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { PageHeader } from '../../../components/layout/PageHeader'
@@ -78,6 +80,13 @@ export function FeaturePermissionsPage() {
 
   const features = featuresQuery.data
 
+  const grouped = FEATURE_CATEGORIES.map((meta) => ({
+    meta,
+    items: features.filter(
+      (feature) => feature.category === meta.key,
+    ),
+  }))
+
   return (
     <PageLayout>
       <PageHeader
@@ -95,7 +104,7 @@ export function FeaturePermissionsPage() {
           </>
         }
         title={`${department?.name ?? 'Department'} Features`}
-        description="Enable or disable features and set role permissions for this department."
+        description="Manage this department category by category — head panel menu items plus the columns of the Customer List and Department Users tables."
         actions={
           <>
             <Link
@@ -110,45 +119,62 @@ export function FeaturePermissionsPage() {
         }
       />
 
-      <Card>
-        <div className="table-toolbar">
-          <div>
-            <h2>Head panel menu</h2>
+      {updateMutation.isError && (
+        <p className="form-error">
+          {updateMutation.error.message}
+        </p>
+      )}
 
-            <p>
-              Each row is a sidebar item in this
-              department&apos;s head panel. Reorder,
-              enable/disable, set Role A / Role B
-              access, or add new pages.
-            </p>
+      {grouped.map(({ meta, items }) => (
+        <Card key={meta.key}>
+          <div className="table-toolbar">
+            <div>
+              <h2>{meta.label}</h2>
+
+              <p>{meta.description}</p>
+            </div>
+
+            {meta.key === 'screens' ? (
+              <Button
+                onClick={() => setModal({ kind: 'create' })}
+              >
+                + Add feature
+              </Button>
+            ) : null}
           </div>
 
-          <Button onClick={() => setModal({ kind: 'create' })}>
-            + Add feature
-          </Button>
-        </div>
-
-        {updateMutation.isError && (
-          <p className="form-error">
-            {updateMutation.error.message}
-          </p>
-        )}
-
-        <FeaturePermissionsTable
-          features={features}
-          updatingFeatureId={
-            updateMutation.isPending
-              ? updateMutation.variables?.id
-              : undefined
-          }
-          onUpdate={handleUpdate}
-          onEdit={(feature) => setModal({ kind: 'edit', feature })}
-          onDelete={(feature) => setModal({ kind: 'delete', feature })}
-          onMove={(feature, direction) =>
-            move.mutate({ id: feature.id, direction })
-          }
-        />
-      </Card>
+          {meta.key === 'screens' ? (
+            <FeaturePermissionsTable
+              features={items}
+              updatingFeatureId={
+                updateMutation.isPending
+                  ? updateMutation.variables?.id
+                  : undefined
+              }
+              onUpdate={handleUpdate}
+              onEdit={(feature) =>
+                setModal({ kind: 'edit', feature })
+              }
+              onDelete={(feature) =>
+                setModal({ kind: 'delete', feature })
+              }
+              onMove={(feature, direction) =>
+                move.mutate({ id: feature.id, direction })
+              }
+            />
+          ) : (
+            <ColumnFeaturesTable
+              features={items}
+              updatingFeatureId={
+                updateMutation.isPending
+                  ? updateMutation.variables?.id
+                  : undefined
+              }
+              onUpdate={handleUpdate}
+            />
+          )}
+        </Card>
+      ))}
 
       <FeatureFormModal
         open={modal.kind === 'create'}
