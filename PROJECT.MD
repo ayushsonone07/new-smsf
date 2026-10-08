@@ -308,6 +308,11 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
   - `smsf.mock.issued-tokens` (v1) → magic links (taki admin ke banaye token reload/HMR/new
     tab me bhi kaam kare)
   - `smsf.auth.session` → login session (purana)
+  - Admin kisi doosre tab me feature add/remove/toggle kare to `storage` event par
+    `hydrateMockDb()` module-level arrays reload karta hai aur React Query ke department/
+    feature queries invalidate hote hain; open Head/User sidebar bina reload update hota hai.
+  - Auth session bhi localStorage-based hai, isliye same browser profile ke tabs ek session
+    share karte hain. Simultaneous ADMIN aur HEAD/USER testing ke liye alag profile/incognito use karo.
   - Reset chahiye → browser me in keys ko delete kar do (profile wipe).
   - Real API aane par sirf `src/api/*.api.ts` bodies `apiRequest(...)` se replace karni hain;
     hooks/pages same.
@@ -361,6 +366,8 @@ sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-ga
       actions permission gating + head `CustomerListPage` full
 - [x] Mock persistence (departments, feature permissions, issued tokens) + pre-existing tsc
       errors (`customer/dashboard.tsx`, `user/attendance/checkin.tsx`) fixed
+- [x] **Cross-tab feature sync** — admin add/remove/toggle ke `smsf.mock.db` storage event par
+      mock DB rehydrate + React Query invalidation; open Head/User nav live refresh
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna

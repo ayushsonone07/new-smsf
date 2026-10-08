@@ -47,6 +47,7 @@ export interface CustomersListProps {
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
   onOpenDetail: (customer: OnboardingCustomer) => void
+  canEdit?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -93,6 +94,7 @@ export function CustomersList({
   onAssigneeChange,
   onRemarkChange,
   onOpenDetail,
+  canEdit = true,
 }: CustomersListProps) {
   if (customers.length === 0) {
     return (
@@ -135,6 +137,7 @@ export function CustomersList({
                 onRemarkChange(customer.id, remark)
               }
               onOpenDetail={() => onOpenDetail(customer)}
+              canEdit={canEdit}
             />
           ))}
         </tbody>
@@ -152,6 +155,7 @@ interface CustomerRowProps {
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
   onOpenDetail: () => void
+  canEdit: boolean
 }
 
 function CustomerRow({
@@ -161,6 +165,7 @@ function CustomerRow({
   onAssigneeChange,
   onRemarkChange,
   onOpenDetail,
+  canEdit,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -205,6 +210,7 @@ function CustomerRow({
       : `Business ${customer.businessIndex} of ${customer.businessCount}`
 
   function startEditing() {
+    if (!canEdit) return
     setRemarkDraft(customer.remark)
     setRemarkEditing(true)
   }
@@ -261,6 +267,7 @@ function CustomerRow({
             className="cl-icon-micro"
             title="Edit phone"
             aria-label="Edit phone number"
+            disabled={!canEdit}
           >
             <Icon name="pencil" size={12} strokeWidth={2} />
           </button>
@@ -297,6 +304,7 @@ function CustomerRow({
             type="button"
             className={`cl-status-btn ${statusMeta.btnClass}`}
             onClick={() => setStatusOpen((o) => !o)}
+            disabled={!canEdit}
             aria-expanded={statusOpen}
             aria-haspopup="listbox"
           >
@@ -305,7 +313,7 @@ function CustomerRow({
             <Icon name="chevronDown" size={12} strokeWidth={2.5} />
           </button>
 
-          {statusOpen && (
+          {canEdit && statusOpen && (
             <div className="cl-status-menu" role="listbox">
               {STATUS_OPTIONS.map((opt) => (
                 <button
@@ -339,6 +347,7 @@ function CustomerRow({
             type="button"
             className="cl-assign-btn"
             onClick={() => setAssignOpen((o) => !o)}
+            disabled={!canEdit}
             aria-expanded={assignOpen}
             aria-haspopup="listbox"
           >
@@ -353,7 +362,7 @@ function CustomerRow({
             <Icon name="chevronDown" size={12} strokeWidth={2.5} />
           </button>
 
-          {assignOpen && (
+          {canEdit && assignOpen && (
             <div className="cl-assign-menu" role="listbox">
               <button
                 type="button"
@@ -424,12 +433,12 @@ function CustomerRow({
               !customer.remark ? ' cl-remark--placeholder' : ''
             }`}
             role="button"
-            tabIndex={0}
+            tabIndex={canEdit ? 0 : -1}
             onClick={startEditing}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') startEditing()
             }}
-            title="Click to edit remark"
+            title={canEdit ? 'Click to edit remark' : 'Read-only remark'}
           >
             {customer.remark || 'Add remark...'}
           </span>

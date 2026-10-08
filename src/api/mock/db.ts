@@ -548,6 +548,8 @@ export function getDepartmentDashboardData(
 
 const MOCK_DB_KEY = 'db'
 const MOCK_DB_VERSION = 1
+/** Exact browser storage key; used to sync admin changes across tabs. */
+export const MOCK_DB_STORAGE_KEY = 'smsf.mock.db'
 
 interface MockDbSnapshot {
   departments: Department[]
@@ -575,17 +577,26 @@ function replaceAll<T>(target: T[], source: T[]): void {
   target.push(...source)
 }
 
-const storedDb = readPersisted<MockDbSnapshot>(
-  MOCK_DB_KEY,
-  MOCK_DB_VERSION,
-)
+/**
+ * Reloads the module-level mock arrays from localStorage.
+ * Needed because each browser tab owns a separate JS module instance.
+ */
+export function hydrateMockDb(): boolean {
+  const storedDb = readPersisted<MockDbSnapshot>(
+    MOCK_DB_KEY,
+    MOCK_DB_VERSION,
+  )
 
-if (storedDb) {
+  if (!storedDb) return false
+
   replaceAll(departments, storedDb.departments)
   replaceAll(featurePermissions, storedDb.featurePermissions)
   departmentIdCounter = storedDb.departmentIdCounter
   featureIdCounter = storedDb.featureIdCounter
-} else {
+  return true
+}
+
+if (!hydrateMockDb()) {
   seedFeaturePermissions('dept-1')
   seedFeaturePermissions('dept-2')
   persistMockDb()
