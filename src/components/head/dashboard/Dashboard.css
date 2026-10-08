@@ -1048,6 +1048,33 @@
   text-overflow: ellipsis;
 }
 
+.hdb-meetings__footer {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  text-align: right;
+}
+
+.hdb-meetings__see-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s, gap 0.15s;
+}
+
+.hdb-meetings__see-more:hover {
+  color: #1d4ed8;
+  gap: 8px;
+}
+
+.hdb-meetings__see-more svg {
+  flex-shrink: 0;
+}
+
 /* ── Bottom Row: Performance Overview & Top Performers ───── */
 
 .hdb-row-bottom {
