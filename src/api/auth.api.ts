@@ -2,6 +2,7 @@ import { delay } from './mock/db'
 import {
   generateToken,
   issuedTokens,
+  persistIssuedTokens,
   storedUsers,
   toAuthUser,
 } from './mock/auth.db'
@@ -53,17 +54,52 @@ export async function loginWithCredentials(
   return createSession(user)
 }
 
+/**
+ * The same token can reach the login form in different shapes:
+ * raw value, whole login link, line-wrapped paste or a link whose
+ * "+" characters were decoded as spaces. Try every plausible shape.
+ */
+function tokenCandidates(raw: string): string[] {
+  const trimmed = raw.trim()
+  const candidates: string[] = []
+
+  const push = (value: string) => {
+    if (value && !candidates.includes(value)) {
+      candidates.push(value)
+    }
+  }
+
+  push(trimmed)
+
+  const fromLink = trimmed.match(/[?&]token=([^&#\s]+)/)
+  if (fromLink) {
+    try {
+      push(decodeURIComponent(fromLink[1]))
+    } catch {
+      push(fromLink[1])
+    }
+  }
+
+  if (/\s/.test(trimmed)) {
+    push(trimmed.replace(/\s+/g, ''))
+    push(trimmed.replace(/\s+/g, '+'))
+  }
+
+  return candidates
+}
+
 export async function loginWithToken(
   token: string,
 ): Promise<AuthSession> {
   await delay(400)
 
-  const cleaned = token.trim()
-
-  const issued = issuedTokens.find(
-    (item) =>
-      item.token === cleaned && !item.revoked,
-  )
+  const issued = tokenCandidates(token)
+    .map((candidate) =>
+      issuedTokens.find(
+        (item) => item.token === candidate && !item.revoked,
+      ),
+    )
+    .find(Boolean)
 
   if (!issued) {
     throw new Error(
@@ -115,6 +151,7 @@ export async function issueLoginToken(
   }
 
   issuedTokens.unshift(record)
+  persistIssuedTokens()
 
   return record
 }
@@ -141,4 +178,5 @@ export async function revokeLoginToken(
   }
 
   record.revoked = true
+  persistIssuedTokens()
 }

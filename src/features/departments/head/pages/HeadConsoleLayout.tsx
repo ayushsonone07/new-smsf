@@ -8,12 +8,16 @@ import { clearSession, getSession } from '../../../../app/auth/session'
 import { sampleNotifications } from '../../../../api/mock/head.db'
 import type { HeadNotification, HeadRole } from '../types/head.types'
 
+interface HeadConsoleLayoutProps {
+  portalRole: HeadRole
+}
+
 /**
  * Frame for every /head/* route. Sidebar items come
  * from the admin-managed feature permissions; the
  * topbar title follows the current slug.
  */
-export function HeadConsoleLayout() {
+export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const session = getSession()
@@ -21,11 +25,13 @@ export function HeadConsoleLayout() {
 
   const nav = useHeadNav(departmentId)
 
-  const slug = location.pathname.replace(/^\/head\/?/, '').split('/')[0]
+  const basePath = portalRole === 'USER' ? '/users' : '/head'
+  const slug = location.pathname
+    .replace(new RegExp(`^${basePath}/?`), '')
+    .split('/')[0]
   const feature = nav.bySlug(slug)
   const registry = feature ? SCREEN_REGISTRY[feature.screen] : undefined
 
-  const [role, setRole] = useState<HeadRole>('HEAD')
   const [notifications, setNotifications] =
     useState<HeadNotification[]>(sampleNotifications)
 
@@ -43,14 +49,10 @@ export function HeadConsoleLayout() {
       }}
       account={{
         label: session?.user.email ?? 'onboarding@mbg.com',
-        roleLabel: 'Department Head',
+        roleLabel: portalRole === 'USER' ? 'Department User' : 'Department Head',
         initial: session?.user.name ?? 'O',
       }}
-      role={role}
-      onRoleChange={(next) => {
-        setRole(next)
-        if (next === 'USER') navigate({ to: '/users' })
-      }}
+      roleLabel={portalRole === 'USER' ? 'Department User' : 'Department Head'}
       onLogout={handleLogout}
       title={registry?.title ?? feature?.name ?? 'Head Panel'}
       subtitle={feature?.description}
