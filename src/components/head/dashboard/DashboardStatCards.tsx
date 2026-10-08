@@ -36,13 +36,18 @@ const DEFAULT_STATS: DashboardStatsData = {
 
 export interface DashboardStatCardsProps {
   stats?: Partial<DashboardStatsData>
+  /** Card titles for the last two cards (personal dashboards use days). */
+  attendanceLabels?: { present: string; absent: string }
 }
 
 /**
  * Top Stat Cards Grid (8 Cards + Hero Illustration Card).
  * Exactly matches the reference layout.
  */
-export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCardsProps) {
+export function DashboardStatCards({
+  stats = DEFAULT_STATS,
+  attendanceLabels = { present: 'Present Users', absent: 'Absent Users' },
+}: DashboardStatCardsProps) {
   const data = { ...DEFAULT_STATS, ...stats }
 
   return (
@@ -112,7 +117,7 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
         />
 
         <DashboardStatCard
-          label="Present Users"
+          label={attendanceLabels.present}
           value={data.presentUsers.value}
           subtext={data.presentUsers.sub}
           iconName="userPlus"
@@ -120,7 +125,7 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
         />
 
         <DashboardStatCard
-          label="Absent Users"
+          label={attendanceLabels.absent}
           value={data.absentUsers.value}
           subtext={data.absentUsers.sub}
           iconName="userOut"

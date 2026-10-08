@@ -1,3 +1,4 @@
+import { apiRequest } from './client'
 import { delay } from './mock/db'
 import {
   generateToken,
@@ -10,6 +11,7 @@ import type {
   AuthSession,
   AuthUser,
   IssuedLoginToken,
+  UserRole,
 } from '../features/auth/types/auth.types'
 import type { StoredUser } from './mock/auth.db'
 
@@ -35,23 +37,123 @@ export async function getUsers(): Promise<
   return storedUsers.map(toAuthUser)
 }
 
+interface LoginApiResponse {
+  success?: boolean
+  status?: string
+  message?: string
+  data?: Record<string, unknown> | null
+}
+
+function decodeJwtPayload(
+  token: string,
+): Record<string, unknown> {
+  try {
+    const part = token.split('.')[1]
+    const json = atob(
+      part.replace(/-/g, '+').replace(/_/g, '/'),
+    )
+
+    return JSON.parse(json) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+function pickString(
+  sources: Record<string, unknown>[],
+  keys: string[],
+): string | undefined {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source[key]
+
+      if (typeof value === 'string' && value) {
+        return value
+      }
+
+      if (typeof value === 'number') {
+        return String(value)
+      }
+    }
+  }
+
+  return undefined
+}
+
+function toUserRole(raw?: string): UserRole {
+  const value = (raw ?? '').toUpperCase()
+
+  if (value.includes('ADMIN')) {
+    return 'ADMIN'
+  }
+
+  if (value.includes('HEAD')) {
+    return 'HEAD'
+  }
+
+  return 'USER'
+}
+
 export async function loginWithCredentials(
   email: string,
   password: string,
 ): Promise<AuthSession> {
-  await delay(400)
+  const username = email.trim()
 
-  const user = storedUsers.find(
-    (item) =>
-      item.email.toLowerCase() ===
-      email.trim().toLowerCase(),
+  const response = await apiRequest<LoginApiResponse>(
+    '/api/auth/login',
+    {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    },
   )
 
-  if (!user || user.password !== password) {
-    throw new Error('Invalid email or password')
+  const data = response.data ?? {}
+  const nestedUser =
+    typeof data.user === 'object' && data.user
+      ? (data.user as Record<string, unknown>)
+      : {}
+
+  const token = pickString(
+    [data, response as Record<string, unknown>],
+    ['token', 'accessToken', 'access_token', 'jwt'],
+  )
+
+  if (!token) {
+    throw new Error(
+      response.message || 'Login response had no token',
+    )
   }
 
-  return createSession(user)
+  const claims = decodeJwtPayload(token)
+  const sources = [nestedUser, data, claims]
+
+  return {
+    token,
+    user: {
+      id:
+        pickString(sources, ['id', 'userId', 'sub']) ??
+        username,
+      name:
+        pickString(sources, ['name', 'fullName', 'username']) ??
+        username,
+      email:
+        pickString(sources, ['email', 'username', 'sub']) ??
+        username,
+      role: toUserRole(
+        pickString(sources, ['role', 'userRole', 'roles']),
+      ),
+      departmentId: pickString(sources, [
+        'departmentId',
+        'department_id',
+      ]),
+      departmentType: pickString(sources, [
+        'departmentType',
+        'department_type',
+      ]),
+    },
+    issuedAt: new Date().toISOString(),
+  }
 }
 
 /**

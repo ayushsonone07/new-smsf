@@ -28,6 +28,7 @@ export async function createDepartment(
   const department: Department = {
     id: nextDepartmentId(),
     name: data.name,
+    type: data.type,
     username: data.username,
     email: data.email,
     status: 'ACTIVE',

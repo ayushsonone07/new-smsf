@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import type {
-  CreateDepartmentRequest,
-  Department,
-  UpdateDepartmentRequest,
+import {
+  DEPARTMENT_TYPES,
+  type CreateDepartmentRequest,
+  type Department,
+  type DepartmentType,
+  type UpdateDepartmentRequest,
 } from '../types/department.types'
 
 interface DepartmentFormModalProps {
@@ -27,6 +29,7 @@ export function DepartmentFormModal({
   onUpdate,
 }: DepartmentFormModalProps) {
   const [name, setName] = useState('')
+  const [type, setType] = useState<DepartmentType | ''>('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,6 +42,7 @@ export function DepartmentFormModal({
 
     if (open) {
       setName(department?.name ?? '')
+      setType(department?.type ?? '')
       setUsername(department?.username ?? '')
       setEmail(department?.email ?? '')
       setPassword('')
@@ -57,6 +61,7 @@ export function DepartmentFormModal({
     if (isEdit) {
       onUpdate({
         name,
+        type: type || undefined,
         username,
         email,
       })
@@ -66,6 +71,7 @@ export function DepartmentFormModal({
 
     onCreate({
       name,
+      type: type || undefined,
       username,
       email,
       password,
@@ -119,6 +125,30 @@ export function DepartmentFormModal({
               }
               placeholder="e.g. Customer Support"
             />
+          </label>
+
+          <label>
+            Department Type
+
+            <select
+              required
+              value={type}
+              onChange={(event) =>
+                setType(
+                  event.target.value as DepartmentType,
+                )
+              }
+            >
+              <option value="" disabled>
+                Select department type
+              </option>
+
+              {DEPARTMENT_TYPES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label>

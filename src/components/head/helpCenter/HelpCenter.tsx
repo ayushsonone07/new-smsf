@@ -25,16 +25,6 @@ const listVariants: Variants = {
   visible: { transition: { staggerChildren: 0.05 } },
 }
 
-const cardVariants: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
-}
-
-const panelVariants: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
-}
-
 const placeholderVariants: Variants = {
   hidden: { opacity: 0, scale: 0.98 },
   visible: { opacity: 1, scale: 1, transition: { duration: 0.18 } },

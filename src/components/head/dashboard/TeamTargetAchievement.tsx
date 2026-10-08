@@ -3,6 +3,7 @@ export interface TeamTargetAchievementProps {
   target?: number
   achieved?: number
   remaining?: number
+  title?: string
 }
 
 /**
@@ -13,6 +14,7 @@ export function TeamTargetAchievement({
   target = 36,
   achieved = 33,
   remaining = 3,
+  title = 'Team Target Achievement',
 }: TeamTargetAchievementProps) {
   // Number of radial segments in the gauge
   const totalSegments = 36
@@ -53,7 +55,7 @@ export function TeamTargetAchievement({
   return (
     <div className="hdb-card">
       <div className="hdb-card__header">
-        <h3 className="hdb-card__title">Team Target Achievement</h3>
+        <h3 className="hdb-card__title">{title}</h3>
         <span className="hdb-card__badge hdb-card__badge--yellow">Today</span>
       </div>
 
