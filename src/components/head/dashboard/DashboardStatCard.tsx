@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import type { IconName } from '../shared/iconPaths'
+
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.28 } },
+}
 
 export type StatIconTone =
   | 'blue'
@@ -46,7 +52,7 @@ export function DashboardStatCard({
         : 'hdb-stat-card__value'
 
   return (
-    <div className="hdb-stat-card">
+    <motion.div className="hdb-stat-card" variants={statCardVariants}>
       <div className="hdb-stat-card__top">
         <span className="hdb-stat-card__label">{label}</span>
         <div className={`hdb-stat-card__icon hdb-stat-card__icon--${iconTone}`}>
@@ -67,6 +73,6 @@ export function DashboardStatCard({
         </div>
         <p className="hdb-stat-card__sub">{subtext}</p>
       </div>
-    </div>
+    </motion.div>
   )
 }

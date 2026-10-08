@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import { DashboardStatCards } from '../../../../components/head/dashboard/DashboardStatCards'
 import { OnboardingTrend } from '../../../../components/head/dashboard/OnboardingTrend'
@@ -15,6 +16,16 @@ import { PerformanceOverview } from '../../../../components/head/dashboard/Perfo
 import { TopPerformers } from '../../../../components/head/dashboard/TopPerformers'
 import { MemberDetailsModal } from '../../../../components/head/dashboard/MemberDetailsModal'
 import '../../../../components/head/dashboard/Dashboard.css'
+
+const containerVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06 } },
+}
+
+const sectionVariants: Variants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+}
 
 // ============================================================================
 // TEMPORARY MOCK DATA
@@ -151,51 +162,71 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="hdb-container" key={refreshKey}>
+    <motion.div
+      className="hdb-container"
+      key={refreshKey}
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
       {/* 1. Top Blue Welcome Header */}
-      <DashboardHeader
-        datePeriod={datePeriod}
-        onDatePeriodChange={setDatePeriod}
-        onRefresh={handleRefresh}
-      />
+      <motion.div variants={sectionVariants}>
+        <DashboardHeader
+          datePeriod={datePeriod}
+          onDatePeriodChange={setDatePeriod}
+          onRefresh={handleRefresh}
+        />
+      </motion.div>
 
       {/* 2. Top Stats Grid (8 Cards + 3D Hero Illustration) */}
-      <DashboardStatCards />
+      <motion.div variants={sectionVariants}>
+        <DashboardStatCards />
+      </motion.div>
 
       {/* 3. Middle Row 1: Onboarding Trend & Team Target Achievement */}
-      <div className="hdb-row-two-col">
-        <OnboardingTrend />
-        <TeamTargetAchievement />
-      </div>
+      <motion.div variants={sectionVariants}>
+        <div className="hdb-row-two-col">
+          <OnboardingTrend />
+          <TeamTargetAchievement />
+        </div>
+      </motion.div>
 
       {/* 4. Middle Row 2: Status Breakdown, Most Active Day & Delay Donut */}
-      <div className="hdb-row-three-col">
-        <StatusBreakdown />
-        <MostActiveDay />
-        <DelayWhoseSide />
-      </div>
+      <motion.div variants={sectionVariants}>
+        <div className="hdb-row-three-col">
+          <StatusBreakdown />
+          <MostActiveDay />
+          <DelayWhoseSide />
+        </div>
+      </motion.div>
 
       {/* 5. Team Target & Performance Full Table */}
-      <TeamTargetPerformance
-        members={MOCK_TEAM_MEMBERS}
-        onSelectMember={setSelectedMember}
-        onRefresh={handleRefresh}
-      />
+      <motion.div variants={sectionVariants}>
+        <TeamTargetPerformance
+          members={MOCK_TEAM_MEMBERS}
+          onSelectMember={setSelectedMember}
+          onRefresh={handleRefresh}
+        />
+      </motion.div>
 
       {/* 6. Lined-up Meetings Grid */}
-      <LinedUpMeetings />
+      <motion.div variants={sectionVariants}>
+        <LinedUpMeetings />
+      </motion.div>
 
       {/* 7. Bottom Row: Performance Overview & Top Performers */}
-      <div className="hdb-row-bottom">
-        <PerformanceOverview />
-        <TopPerformers />
-      </div>
+      <motion.div variants={sectionVariants}>
+        <div className="hdb-row-bottom">
+          <PerformanceOverview />
+          <TopPerformers />
+        </div>
+      </motion.div>
 
       {/* 8. Member Details Modal (Screenshot 4) */}
       <MemberDetailsModal
         member={selectedMember}
         onClose={() => setSelectedMember(null)}
       />
-    </div>
+    </motion.div>
   )
 }

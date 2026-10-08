@@ -1,5 +1,11 @@
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import './HelpCenterTicketCard.css'
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
 
 interface HelpCenterTicketCardProps {
   ticket: HelpCenterTicket
@@ -43,12 +49,14 @@ export function HelpCenterTicketCard({ ticket, isSelected, onClick }: HelpCenter
   }
 
   return (
-    <article
+    <motion.article
+      variants={cardVariants}
       className={`hc-ticket-card ${isSelected ? 'is-selected' : ''} ${priorityColors[ticket.priority]} ${statusColors[ticket.status]}`}
       onClick={onClick}
       role="listitem"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      whileTap={{ scale: 0.98 }}
     >
       <div className="hc-ticket-card__header">
         <span className={`hc-ticket-id ${priorityColors[ticket.priority]}`}>{ticket.ticketId}</span>
@@ -74,7 +82,7 @@ export function HelpCenterTicketCard({ ticket, isSelected, onClick }: HelpCenter
         <span className="hc-ticket-card__category">{ticket.category}</span>
         <span className="hc-ticket-card__date">{formatDate(ticket.date)}</span>
       </div>
-    </article>
+    </motion.article>
   )
 }
 

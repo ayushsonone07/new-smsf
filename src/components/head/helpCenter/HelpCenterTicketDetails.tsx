@@ -1,8 +1,14 @@
 import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Button } from '../../ui/Button'
 import { Pill } from '../../ui/Pill'
 import './HelpCenterTicketDetails.css'
+
+const panelVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
 
 interface HelpCenterTicketDetailsProps {
   ticket: HelpCenterTicket
@@ -68,7 +74,12 @@ export function HelpCenterTicketDetails({ ticket, onReply, onStatusChange }: Hel
   ]
 
   return (
-    <div className="hc-details__panel">
+    <motion.div
+      className="hc-details__panel"
+      initial="hidden"
+      animate="visible"
+      variants={panelVariants}
+    >
       <header className="hc-details__header">
         <div className="hc-details__header-left">
           <span className="hc-details__ticket-id">{ticket.ticketId}</span>
@@ -181,7 +192,7 @@ export function HelpCenterTicketDetails({ ticket, onReply, onStatusChange }: Hel
           </Button>
         </div>
       </form>
-    </div>
+    </motion.div>
   )
 }
 
