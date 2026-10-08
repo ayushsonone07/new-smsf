@@ -194,7 +194,7 @@ src/
                 ├── HeadScreenPage.tsx          # shared dynamic screen resolver
                 ├── DashboardPage.tsx           # placeholder body
                 ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
-                ├── CustomerListPage.tsx        # ✅ full (filters, column config, CRUD gated)
+                ├── CustomerListPage.tsx        # ✅ customers-list UI (composes components/head/customers-list)
                 ├── AttendancePage.tsx          # ✅ composed from user/attendance widgets (check-in + month calendar)
                 ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
                 ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
@@ -300,6 +300,12 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
   se 8 features seed: Dashboard, Department Users, Customer List, **Attendance**,
   15 Days Meeting, SOP, Help Center (enabled) + Reports (custom, disabled) + **6
   Customer columns + 8 User columns** (`kind: 'column'`, nav me kabhi nahi aate).
+- `db.ts` customers (11) ab **onboarding fields ke saath seed** hote hain —
+  `onboardingStatus` (pending/in-progress/completed), `callStatus`, `assigneeId`
+  (head.db users), `remark`, `updatedLabel`, `contactDate`, biz-relation pills
+  (`businessRelationType/businessCount/businessIndex/duplicateCount`). Purane kisi bhi
+  profile ke liye `CustomerListPage` fallback derive karta hai — customers array persist
+  nahi hota (load par code se fresh seed), isliye naye fields turant sabko dikhte hain.
 - `ensureTemplateScreens()` — persisted dept me template screen missing ho to add karke
   persist karta hai (naya built-in screen purane snapshots me bhi paucha, data wipe na).
 - Naya department → auto seed; delete → cascade.
@@ -337,17 +343,23 @@ npm run lint    # eslint
 ## Status (08 Oct 2026)
 
 **Build ✅ · Lint ✅ · tsc ✅**. Latest role-route/permission changes production build aur
-ESLint se verify hue. Pehle ka headless Chromium E2E (CDP, preview build) flow bhi pass tha:
+ESLint se verify hue. Naye E2E (CDP, preview build) me `smoke.mjs` sab steps pass:
 admin login → link issue → reload persistence → 3 category cards (6/8 rows) → Company
-column off → reload → head magic link → sidebar/ CUSTOMER table → Department Users
-headers → raw token paste login. Uske upar **Actions Role A → CAN_READ → customer table
-read-only** (ACTIONS column + Add Customer gayab) bhi E2E me verify hua, aur **Attendance**
-screen (sidebar item + `/head`/`/users` page render + check-out interaction) ka naya E2E
-(`attendance.mjs`) bhi pass hua. NOTE: source files kabhi kabhi external editor se overwrite
-ho rahe the (dot network) — is baar `screenRegistry.tsx` ka `customers` mapping `CustomerListPage`
-se `CustomerOnboardingPage` par revert hua aur `CustomerListPage.tsx` double-gate
+column off → reload → head magic link → sidebar → **customers-list UI** (`/head/customers`
+par `components/head/customers-list/`: SearchBar + tab/assignee/date Filters + table
+[#/Business/Contact/Status/Assign To/Internal Remark/Updated] + biz pill + drawer) →
+Department Users headers → raw token paste login. **Actions Role A → CAN_READ → customers-list
+read-only** (status/assign/phone-edit buttons disabled, remark read-only; drawer phir bhi
+khulta hai) bhi E2E verified. **Attendance** screen (`attendance.mjs`) pehle pass tha.
+NOTE: source files kabhi kabhi external editor se overwrite ho rahe the (dot network) —
+is baar `screenRegistry.tsx` ka `customers` mapping `CustomerListPage` se
+`CustomerOnboardingPage` par revert hua aur `CustomerListPage.tsx` double-gate
 (`screenPermission && canEdit`) par wapis gaya; dono dobara fix kiye. Aakhiri decided design:
-Actions column **single-gate** (Actions column hi manage-access decide karta hai).
+Actions column **single-gate** — `CustomerListPage` ab wahi `columnFeatures.canEdit('actions')`
+se `canEdit` leta hai aur customers-list components ko wired karta hai (updates `useUpdateCustomer`
+se persist; `CustomerOnboardingPage.tsx` local-only overrides wala aata hai, registered nahi).
+Dhyan rahe: Customer Columns config (admin card) ab customers-list table ka layout control
+nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Done
 - [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
@@ -382,14 +394,26 @@ Actions column **single-gate** (Actions column hi manage-access decide karta hai
       `components/user/attendance/`) + FEATURE_TEMPLATE seed; head & user console me
       sidebar item + `/head` `/users` par E2E render verified (check-in card, calendar,
       check-out interaction)
+- [x] **Customers-list UI on Customer List screen** — `CustomerListPage` ab
+      `components/head/customers-list/*` compose karta hai: SearchBar + tab/assignee/
+      date-range Filters + onboarding table (status/assign/remark inline edit, founder-
+      biz pill, duplicates, phone/call, updated, action icons) + detail drawer
+      (`CustomersListModal`, SAMPLE_FOUNDER_BUSINESSES cust-1/cust-2 ke liye extend).
+      `Customer` type/`UpdateCustomerRequest` onboard fields extend, `db.ts` 11 customers
+      seeded (onboardingStatus/callStatus/assigneeId/remark/updatedLabel/contactDate/
+      biz pills/duplicates), `createCustomer` defaults onboard fields. Edits
+      `useUpdateCustomer` se persist; access **single-gate** (`canEdit = canEdit('actions')`),
+      CAN_READ par disabled/read-only + drawer khulta hai — E2E verified.
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
    (abhi purane bigger styles par hai; shell compact 14px hai)
 2. `components/head/dashboard/` — KPI cards, trend chart, status breakdown, most active day,
    delay-side donut, team target & performance table + `DashboardPage`
-3. `components/head/customer/` — customer onboarding table, status/assignee filters, detail
-   drawer, duplicates, call log, booking + `CustomerListPage`
+3. ~~`components/head/customer/` — customer onboarding table, status/assignee filters, detail
+   drawer, duplicates, call log, booking + `CustomerListPage`~~ ✅ done — ~`components/head/
+   customer/`~ ab `components/head/customers-list/` (user ke dots se) + `CustomerListPage` wired.
+   Baaki: call-log/booking sections prototype ke saath aur match karna.
 4. 15 Days Meeting ke local mock interactions ko real API/persistence se connect karna
 5. SOP inline sequence editing ko real API/persistence se connect karna
 6. `components/head/help-center/` — tickets, assign (manual / round robin) + `HelpCenterPage`

@@ -1,71 +1,141 @@
 import { useMemo, useState } from 'react'
-import { SectionCard } from '../../../../components/head/shared/SectionCard'
-import { Button } from '../../../../components/ui/Button'
-import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
-import { CustomerTable } from '../../../../components/customers/CustomerTable'
-import { CustomerStats } from '../../../../components/customers/CustomerStats'
-import { CustomerFormModal } from '../../../../components/customers/CustomerFormModal'
-import { DeleteCustomerDialog } from '../../../../components/customers/DeleteCustomerDialog'
 import {
-  CustomerFilters,
-  type CustomerStatusFilter,
-} from '../../../../components/customers/CustomerFilters'
+  CustomersList,
+  type OnboardingAssignee,
+  type OnboardingCustomer,
+} from '../../../../components/head/customers-list/CustomersList'
+import {
+  CustomersListFilters,
+  type CustomerTab,
+} from '../../../../components/head/customers-list/CustomersListFilters'
+import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
+import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import '../../../../components/head/customers-list/CustomersList.css'
+import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
-import { useCreateCustomer } from '../../hooks/useCreateCustomer'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
-import { useDeleteCustomer } from '../../hooks/useDeleteCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import type { Customer } from '../../types/customer.types'
+import type { UpdateCustomerRequest } from '../../types/customer.types'
+
+const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
+  id: user.id,
+  name: user.name,
+}))
 
 /**
- * Head panel — Customer List. Which columns show up (and whether
- * this role may edit them) comes from the admin's column
- * features, so the table follows the permissions page live.
+ * Head panel — Customer List. Renders the customers-list UI
+ * composed from components/head/customers-list, wired to the
+ * customer API. Access follows the admin's Actions column
+ * permission (single-gate): CAN_READ → read-only.
  */
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
+  const customersQuery = useDepartmentCustomers(departmentId)
+  const updateMutation = useUpdateCustomer(departmentId)
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
-  const customersQuery = useDepartmentCustomers(departmentId)
-  const createMutation = useCreateCustomer(departmentId)
-  const updateMutation = useUpdateCustomer(departmentId)
-  const deleteMutation = useDeleteCustomer(departmentId)
-
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] =
-    useState<CustomerStatusFilter>('ALL')
-  const [showCreate, setShowCreate] = useState(false)
-  const [editing, setEditing] = useState<Customer | null>(null)
-  const [deleting, setDeleting] = useState<Customer | null>(null)
+  const [activeTab, setActiveTab] = useState<CustomerTab>('all')
+  const [selectedAssigneeId, setSelectedAssigneeId] =
+    useState<string | null | 'all'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<OnboardingCustomer | null>(null)
 
-// Whether this role may create/edit/delete customers is decided
-  // by the admin's Actions column permission — no separate screen
-  // gate, so setting Actions to CAN_READ really makes it read-only.
-  // (See department-users page for the same single-gate approach.)
-  const canManage =
-    columnFeatures.canEdit('actions')
+  const canEdit = columnFeatures.canEdit('actions')
 
-  const filtered = useMemo(() => {
-    const value = search.trim().toLowerCase()
+  const onboardingCustomers = useMemo<OnboardingCustomer[]>(
+    () =>
+      (customersQuery.data ?? []).map((customer, index) => ({
+        id: customer.id,
+        rowIndex: index + 1,
+        businessName: customer.company || customer.name,
+        contactName: customer.name,
+        contactDate:
+          customer.contactDate ??
+          new Date(customer.createdAt).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          }),
+        email: customer.email,
+        phone: customer.phone,
+        callStatus:
+          customer.callStatus ?? (index % 3 === 1 ? 'not-answered' : 'connected'),
+        status:
+          customer.onboardingStatus ??
+          (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
+        assigneeId: customer.assigneeId ?? null,
+        remark: customer.remark ?? '',
+        updatedLabel:
+          customer.updatedLabel ?? (index === 0 ? 'Just now' : `${index + 1}h ago`),
+        businessRelationType: customer.businessRelationType,
+        businessCount: customer.businessCount,
+        businessIndex: customer.businessIndex,
+        duplicateCount: customer.duplicateCount,
+      })),
+    [customersQuery.data],
+  )
 
-    return (customersQuery.data ?? []).filter((customer) => {
-      const matchesSearch =
-        !value ||
-        [customer.name, customer.email, customer.company]
-          .join(' ')
-          .toLowerCase()
-          .includes(value)
+  const tabCounts = useMemo(
+    () => ({
+      all: onboardingCustomers.length,
+      pending: onboardingCustomers.filter((item) => item.status === 'pending').length,
+      inProgress: onboardingCustomers.filter((item) => item.status === 'in-progress').length,
+      completed: onboardingCustomers.filter((item) => item.status === 'completed').length,
+    }),
+    [onboardingCustomers],
+  )
 
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        customer.status === statusFilter
-
-      return matchesSearch && matchesStatus
-    })
-  }, [customersQuery.data, search, statusFilter])
+  const filteredCustomers = useMemo(
+    () => {
+      const term = search.trim().toLowerCase()
+      return onboardingCustomers
+        .filter(
+          (customer) =>
+            activeTab === 'all' || customer.status === activeTab,
+        )
+        .filter(
+          (customer) =>
+            selectedAssigneeId === 'all' ||
+            customer.assigneeId === selectedAssigneeId,
+        )
+        .filter(
+          (customer) =>
+            !term ||
+            [
+              customer.businessName,
+              customer.contactName,
+              customer.email,
+              customer.phone,
+            ].some((value) => value.toLowerCase().includes(term)),
+        )
+        .filter((customer) => {
+          const source = customersQuery.data?.find(
+            (item) => item.id === customer.id,
+          )
+          if (!source) return false
+          const created = source.createdAt.slice(0, 10)
+          return (
+            (!dateFrom || created >= dateFrom) &&
+            (!dateTo || created <= dateTo)
+          )
+        })
+    },
+    [
+      activeTab,
+      customersQuery.data,
+      dateFrom,
+      dateTo,
+      onboardingCustomers,
+      search,
+      selectedAssigneeId,
+    ],
+  )
 
   if (customersQuery.isPending) {
     return <LoadingState message="Loading customers..." />
@@ -81,103 +151,62 @@ export function CustomerListPage() {
     )
   }
 
-  function closeModal() {
-    setShowCreate(false)
-    setEditing(null)
-    createMutation.reset()
-    updateMutation.reset()
+  function patchCustomer(id: string, patch: UpdateCustomerRequest) {
+    if (!canEdit) return
+    updateMutation.mutate({ id, data: patch })
   }
 
-  function handleDelete() {
-    if (!deleting) return
-
-    deleteMutation.mutate(deleting.id, {
-      onSuccess: () => setDeleting(null),
-    })
+  function resetFilters() {
+    setSearch('')
+    setActiveTab('all')
+    setSelectedAssigneeId('all')
+    setDateFrom('')
+    setDateTo('')
   }
-
-  const mutationError =
-    createMutation.error || updateMutation.error
 
   return (
     <>
-      <CustomerStats customers={customersQuery.data ?? []} />
-
-      <div className="head-toolbar">
-        <CustomerFilters
-          search={search}
-          statusFilter={statusFilter}
-          onSearchChange={setSearch}
-          onStatusFilterChange={setStatusFilter}
-        />
-
-        {canManage ? (
-          <Button
-            className="head-primary-button"
-            onClick={() => setShowCreate(true)}
-          >
-            ＋ Add Customer
-          </Button>
-        ) : null}
-      </div>
-
-      <SectionCard
-        title="Customer Onboarding"
-        meta={
-          <Pill tone="info" size="sm">
-            {filtered.length} customers
-          </Pill>
+      <CustomersListFilters
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabCounts={tabCounts}
+        searchSlot={
+          <CustomersListSearchBar
+            value={search}
+            onChange={setSearch}
+          />
         }
-        hint="Columns & access set by the admin"
-      >
-        <CustomerTable
-          customers={filtered}
-          canEdit={canManage}
-          hiddenColumns={columnFeatures.hiddenColumns}
-          onEdit={setEditing}
-          onDelete={setDeleting}
-        />
-      </SectionCard>
-
-      {canManage ? (
-        <>
-          <CustomerFormModal
-            open={showCreate || Boolean(editing)}
-            customer={editing}
-            isSubmitting={
-              createMutation.isPending ||
-              updateMutation.isPending
-            }
-            error={mutationError?.message}
-            onClose={closeModal}
-            onCreate={(data) =>
-              createMutation.mutate(
-                { departmentId, data },
-                { onSuccess: closeModal },
-              )
-            }
-            onUpdate={(data) => {
-              if (!editing) return
-
-              updateMutation.mutate(
-                { id: editing.id, data },
-                { onSuccess: closeModal },
-              )
-            }}
-          />
-
-          <DeleteCustomerDialog
-            customer={deleting}
-            isDeleting={deleteMutation.isPending}
-            error={deleteMutation.error?.message}
-            onClose={() => {
-              setDeleting(null)
-              deleteMutation.reset()
-            }}
-            onConfirm={handleDelete}
-          />
-        </>
-      ) : null}
+        assignees={ASSIGNEES}
+        selectedAssigneeId={selectedAssigneeId}
+        onAssigneeChange={setSelectedAssigneeId}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateChange={(from, to) => {
+          setDateFrom(from)
+          setDateTo(to)
+        }}
+        onReset={resetFilters}
+      />
+      <CustomersList
+        customers={filteredCustomers}
+        assignees={ASSIGNEES}
+        canEdit={canEdit}
+        onStatusChange={(id, status) =>
+          patchCustomer(id, { onboardingStatus: status })
+        }
+        onAssigneeChange={(id, assigneeId) =>
+          patchCustomer(id, { assigneeId })
+        }
+        onRemarkChange={(id, remark) =>
+          patchCustomer(id, { remark })
+        }
+        onOpenDetail={setSelectedCustomer}
+      />
+      <CustomersListModal
+        customer={selectedCustomer}
+        assignees={ASSIGNEES}
+        onClose={() => setSelectedCustomer(null)}
+      />
     </>
   )
 }
