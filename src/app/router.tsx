@@ -8,8 +8,11 @@ import {
 import {
   requireAuth,
   requireRole,
+  requireRoleDashboard,
+  redirectAuthenticatedUser,
 } from './middleware/auth.middleware'
 import {
+  clearSession,
   getSession,
   homeForRole,
 } from './auth/session'
@@ -28,16 +31,6 @@ import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
 import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
 import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
-
-function pendingPage(title: string) {
-  return (
-    <main className="page-content">
-      <div className="loading-state">
-        {title} — page coming soon
-      </div>
-    </main>
-  )
-}
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -77,14 +70,21 @@ const loginRoute = createRoute({
         ? search.token
         : undefined,
   }),
-  beforeLoad: () => {
+  beforeLoad: ({ search }) => {
     const session = getSession()
 
-    if (session) {
-      throw redirect({
-        to: homeForRole(session.user.role),
-      })
+    if (!session) return
+
+    // A magic link always wins over whoever is signed in
+    // right now — otherwise opening the generated link in
+    // the admin's own browser silently bounces back to
+    // /admin instead of signing the head/user in.
+    if (typeof search.token === 'string' && search.token) {
+      clearSession()
+      return
     }
+
+    redirectAuthenticatedUser()
   },
 })
 
@@ -123,8 +123,8 @@ const accessTokensRoute = createRoute({
 const headLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_head',
-  component: HeadConsoleLayout,
-  beforeLoad: requireRole('ADMIN', 'HEAD'),
+  component: () => <HeadConsoleLayout portalRole="HEAD" />,
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD'),
 })
 
 const headIndexRoute = createRoute({
@@ -140,15 +140,23 @@ const headScreenRoute = createRoute({
   component: HeadScreenPage,
 })
 
+const userLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_user',
+  component: () => <HeadConsoleLayout portalRole="USER" />,
+  beforeLoad: requireRoleDashboard('USER'),
+})
+
 const usersRoute = createRoute({
-  getParentRoute: () => authedLayoutRoute,
+  getParentRoute: () => userLayoutRoute,
   path: '/users',
-  component: () => pendingPage('Users'),
-  beforeLoad: requireRole(
-    'ADMIN',
-    'HEAD',
-    'USER',
-  ),
+  component: () => <HeadIndexPage portalRole="USER" />,
+})
+
+const userScreenRoute = createRoute({
+  getParentRoute: () => userLayoutRoute,
+  path: '/users/$screen',
+  component: HeadScreenPage,
 })
 
 const forbiddenRoute = createRoute({
@@ -188,11 +196,14 @@ const routeTree = rootRoute.addChildren([
     headIndexRoute,
     headScreenRoute,
   ]),
+  userLayoutRoute.addChildren([
+    usersRoute,
+    userScreenRoute,
+  ]),
   authedLayoutRoute.addChildren([
     adminRoute,
     departmentFeaturesRoute,
     accessTokensRoute,
-    usersRoute,
     forbiddenRoute,
   ]),
   departmentDashboardRoute,

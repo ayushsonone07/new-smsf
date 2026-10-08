@@ -3,6 +3,10 @@ import type {
   IssuedLoginToken,
   UserRole,
 } from '../../features/auth/types/auth.types'
+import {
+  readPersisted,
+  writePersisted,
+} from './persist'
 
 export interface StoredUser extends AuthUser {
   password?: string
@@ -32,7 +36,28 @@ export const storedUsers: StoredUser[] = [
   },
 ]
 
-export const issuedTokens: IssuedLoginToken[] = []
+const ISSUED_TOKENS_KEY = 'issued-tokens'
+const ISSUED_TOKENS_VERSION = 1
+
+/**
+ * Issued login links live in localStorage so they survive a page
+ * reload, a new tab or another session of the same browser — an
+ * in-memory list made every refresh look like "revoked token".
+ */
+export const issuedTokens: IssuedLoginToken[] =
+  readPersisted<IssuedLoginToken[]>(
+    ISSUED_TOKENS_KEY,
+    ISSUED_TOKENS_VERSION,
+  ) ?? []
+
+export function persistIssuedTokens(): void {
+  writePersisted(
+    ISSUED_TOKENS_KEY,
+    ISSUED_TOKENS_VERSION,
+    issuedTokens,
+  )
+}
+
 
 export function toAuthUser(
   user: StoredUser,

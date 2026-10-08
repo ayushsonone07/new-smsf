@@ -5,6 +5,7 @@ import { useDepartmentCustomers } from '../hooks/useDepartmentCustomers'
 import { useCreateCustomer } from '../hooks/useCreateCustomer'
 import { useUpdateCustomer } from '../hooks/useUpdateCustomer'
 import { useDeleteCustomer } from '../hooks/useDeleteCustomer'
+import { useColumnFeatures } from '../../permissions/hooks/useColumnFeatures'
 import type {
   CreateCustomerRequest,
   Customer,
@@ -70,6 +71,15 @@ export function DepartmentCustomersPage() {
   // Department heads can manage customers;
   // department users have read-only access.
   const canEdit = role === 'department-head'
+
+  const columnFeatures = useColumnFeatures(
+    departmentId,
+    'customers',
+  )
+  // Admin can switch the actions column (or its edit
+  // permission) off for this department.
+  const canManageCustomers =
+    canEdit && columnFeatures.canEdit('actions')
 
   const filteredCustomers = useMemo(() => {
     const value = search.trim().toLowerCase()
@@ -205,7 +215,7 @@ export function DepartmentCustomersPage() {
               </button>
             </div>
 
-            {canEdit && (
+            {canManageCustomers && (
               <Button
                 onClick={() =>
                   setShowCreateModal(true)
@@ -242,13 +252,14 @@ export function DepartmentCustomersPage() {
 
         <CustomerTable
           customers={filteredCustomers}
-          canEdit={canEdit}
+          canEdit={canManageCustomers}
+          hiddenColumns={columnFeatures.hiddenColumns}
           onEdit={setEditingCustomer}
           onDelete={setCustomerToDelete}
         />
       </Card>
 
-      {canEdit && (
+      {canManageCustomers && (
         <>
           <CustomerFormModal
             open={

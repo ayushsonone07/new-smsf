@@ -1,11 +1,13 @@
-# PROJECT.MD — SMSF Admin Portal + MBG Onboarding Console (Head Panel)
+# PROJECT.MD — SMSF Admin Portal + MBG Onboarding Console (Head/User Panels)
 
-Do hisse ek hi React app me:
+Teen role experiences ek hi React app me:
 
 1. **Admin Portal** (`/admin/*`) — departments banana, har department ke **features
    (= head panel ke menu items)** manage karna, Head/User ke liye login links issue karna.
 2. **Head Panel / MBG Onboarding Console** (`/head/*`) — department head ka console.
    Sidebar ke items **admin ke feature permissions se dynamically** aate hain.
+3. **User Panel** (`/users/*`) — department user ka console. Wahi reusable shell/screens
+   use karta hai, lekin Role B permissions aur USER session ke hisaab se read/edit access milta hai.
 
 Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
 `beforeLoad`** se.
@@ -35,7 +37,6 @@ Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
 | `/admin` | **ADMIN** | Department list + Add Department + stats/search | `DepartmentManagementPage` |
 | `/admin/departments/$departmentId` | **ADMIN** | **Head panel menu builder** — features add/edit/delete/reorder/toggle + Role A/B | `FeaturePermissionsPage` |
 | `/admin/tokens` | **ADMIN** | Head/User ke liye magic login link issue / revoke | `AccessTokensPage` |
-| `/users` | ADMIN, HEAD, USER | Stub — USER dashboard (pending) | `pendingPage('Users')` |
 | `/forbidden` | Logged-in | 403 | `ForbiddenPage` |
 | `/departments/$departmentId/{dashboard,customers,help-center,services}` | — | Purane department template pages | `Department*Page` |
 
@@ -49,22 +50,40 @@ Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
 > Sirf **2 routes** — naya menu item add karne par router me kuch nahi badalna.
 > Disabled / unknown slug → "Page not available" card.
 
-**Middleware** (`src/app/middleware/auth.middleware.ts`): `requireAuth` + `requireRole(...)`.
-`/login` par ulta check (logged-in → apne home). HEAD/USER session me `departmentId`
-hota hai (`AuthUser.departmentId`); admin preview ke liye fallback `dept-1`.
+### User Panel (`_user` layout → `HeadConsoleLayout`)
+
+| Path | Access | Kya hota hai |
+|---|---|---|
+| `/users` | **USER** | Pehle enabled feature par redirect; Role B permission apply hoti hai |
+| `/users/$screen` | **USER** | Admin-enabled feature ko same `SCREEN_REGISTRY` se render karta hai |
+
+Head aur User ke liye duplicated pages nahi hain: `HeadConsoleLayout`, `HeadIndexPage`,
+`HeadScreenPage`, User/Customer page compositions aur reusable components dono portals share
+karte hain. URL base session role ke hisaab se `/head` ya `/users` hota hai.
+
+**Middleware** (`src/app/middleware/auth.middleware.ts`):
+
+- `requireAuth()` — bina session `/login`
+- `requireRole(...)` — normal role guard
+- `requireRoleDashboard(...)` — wrong dashboard kholne par logged-in user ko uske apne
+  role home (`/admin`, `/head`, `/users`) par redirect
+- `redirectAuthenticatedUser()` — logged-in user ko guest login page se role home bhejta hai
+
+Magic-link token existing session par priority rakhta hai. HEAD/USER session me `departmentId`
+hota hai (`AuthUser.departmentId`); admin head-preview ke liye fallback `dept-1`.
 
 ---
 
 ## Dynamic Head Navbar (core design)
 
-**Feature permission == sidebar item.** Admin jo karega, head ko turant dikhega:
+**Feature permission == sidebar item.** Admin jo karega, Head/User console me turant dikhega:
 
 ```
 Admin: /admin/departments/$id  ──(create/update/delete/move/toggle)──▶  featurePermissions[]
                                                                              │
-Head:  useHeadNav(departmentId) ── enabled ∧ sort(order) ──▶ nav items ──▶ HeadShell sidebar
+Portal: useHeadNav(departmentId) ─ enabled ∧ screen ∧ sort(order) ─▶ HeadShell sidebar
                                                                              │
-       /head/$screen ── slug match ──▶ SCREEN_REGISTRY[screen].component ──▶ page body
+       /head/$screen or /users/$screen ─ slug match ─▶ SCREEN_REGISTRY component ─▶ page
 ```
 
 `FeaturePermission` fields:
@@ -73,15 +92,41 @@ Head:  useHeadNav(departmentId) ── enabled ∧ sort(order) ──▶ nav ite
 |---|---|
 | `name`, `description` | Sidebar label · topbar subtitle |
 | `screen` | `dashboard` \| `users` \| `customers` \| `meeting` \| `sop` \| `help-center` \| `custom` — kaunsa page component |
-| `slug` | URL segment: `/head/<slug>` (department me unique) |
+| `slug` | URL segment: `/head/<slug>` ya `/users/<slug>` (department me unique) |
 | `icon` | `IconName` (`components/head/shared/iconPaths.ts`) |
 | `order` | Sidebar position (admin ▲▼ se) |
 | `enabled` | Off → sidebar se gayab + route block |
-| `roleAPermission`, `roleBPermission` | `CAN_READ` / `CAN_EDIT` |
+| `roleAPermission`, `roleBPermission` | `CAN_READ` / `CAN_EDIT` (Role A = Head, Role B = User) |
+| `category` | `screens` \| `customers` \| `users` — admin page par **alag block** |
+| `kind` | `screen` (sidebar item) ya `column` (table column — nav me kabhi nahi aata) |
+| `columnKey` | Column features: table ka column id (`company`, `phone`, `actions` …) |
+
+### Category-wise column features (2nd admin block)
+
+`/admin/departments/$id` par **teen alag cards** khulte hain
+(`FEATURE_CATEGORIES`, `features/permissions/config/featureCategories.ts`):
+
+1. **Head Panel Menu** — purana feature table (reorder / toggle / Role A-B / edit / delete)
+2. **Customer List — Columns** — `CUSTOMER_COLUMN_TEMPLATE` ke 6 columns
+3. **Department Users — Columns** — `USER_COLUMN_TEMPLATE` ke 8 columns
+
+Har column row par **enable/disable toggle + Role A / Role B** permission.
+Head panel (`useColumnFeatures(departmentId, 'customers' | 'users')`):
+
+- `enabled: false` → column table me **bilkul render nahi hota**
+- `actions` column ka permission hi manage-access decide karta hai: `CAN_EDIT` →
+  edit/delete/Add buttons; `CAN_READ` → sirf view. (Screen-level ka alag gate nai.)
+- session role HEAD/ADMIN → `roleAPermission`, USER → `roleBPermission`
+- unknown column → fail-open (visible + editable), taaki missing seed table khaali na kare
+
+Isliye `useHeadNav` sirf `kind === 'screen' && enabled` leta hai — column rows
+sidebar me kabhi nahi aati.
 
 Naya screen type add karna ho: `permission.types.ts` me `HeadScreenKey` → page banao
 `features/departments/head/pages/` me → `screenRegistry.tsx` me map karo →
 `features/permissions/config/screenOptions.ts` me admin dropdown option.
+Naya **column** add karna ho: template array me entry daalo → `CustomerTable` /
+`DepartmentUsersTable` me `hiddenColumns` handling add karo.
 
 ---
 
@@ -90,8 +135,8 @@ Naya screen type add karna ho: `permission.types.ts` me `HeadScreenKey` → page
 ```
 src/
 ├── app/
-│   ├── router.tsx                      # saare routes + guards (admin + _head layout)
-│   ├── middleware/auth.middleware.ts   # requireAuth / requireRole
+│   ├── router.tsx                      # admin + _head + _user route trees
+│   ├── middleware/auth.middleware.ts   # auth/role guards + role-home redirects
 │   ├── auth/session.ts                 # localStorage session + homeForRole()
 │   ├── queryClient.ts / providers/QueryProvider.tsx
 ├── api/
@@ -100,8 +145,9 @@ src/
 │   ├── feature-permissions.api.ts      # get / create / update / delete / move (mock)
 │   ├── auth.api.ts, customers.api.ts, services.api.ts, help-center.api.ts, department-dashboard.api.ts
 │   └── mock/
-│       ├── db.ts                       # departments + FEATURE_TEMPLATE (7 screens) + seed
-│       ├── auth.db.ts                  # users (head/user → departmentId: 'dept-1')
+│       ├── db.ts                       # departments + FEATURE_TEMPLATE (7 screens) + COLUMN templates + seed
+│       ├── persist.ts                  # readPersisted/writePersisted (localStorage, versioned keys)
+│       ├── auth.db.ts                  # users (head/user → departmentId: 'dept-1') + issuedTokens (persisted)
 │       ├── head.db.ts                  # department users, work items, notifications
 │       └── staff-report.db.ts          # sample staff report items
 ├── styles/
@@ -110,6 +156,7 @@ src/
 │   ├── layout/   ui/   common/   departments/   customers/   dashboard/   services/   help-center/
 │   ├── permissions/
 │   │   ├── FeaturePermissionsTable.tsx # order ▲▼ · icon+path · toggle · Role A/B · edit/delete
+│   │   ├── ColumnFeaturesTable.tsx     # column rows: name · toggle · Role A/B
 │   │   ├── FeatureFormModal.tsx        # add/edit feature (screen → slug/icon auto-fill)
 │   │   └── PermissionToggle.tsx
 │   ├── reports/                        # StaffReportModal, WorkReportTable, workReportMeta
@@ -119,16 +166,18 @@ src/
 │       ├── users/                      # DepartmentUsersTable, UserFormModal, UserDetails, RolePill, MetricPill, roleMeta
 │       ├── dashboard/                  # (pending)
 │       ├── customer/                   # (pending)
-│       ├── meeting/                    # (pending — 15 Days Meeting)
-│       ├── sop/                        # (pending)
+│       ├── 15-days-meeting/            # meeting filters/list/search components
+│       ├── sop/                        # SOP search/modal components
 │       └── help-center/                # (pending)
 └── features/
     ├── auth/        # login, tokens, forbidden (types me AuthUser.departmentId add hua)
     ├── permissions/
-    │   ├── types/permission.types.ts   # FeaturePermission (+screen/slug/icon/order), HeadScreenKey
+    │   ├── types/permission.types.ts   # FeaturePermission (+screen/slug/icon/order/category/kind/columnKey), HeadScreenKey
     │   ├── config/screenOptions.ts     # admin dropdown: screens + ICON_OPTIONS
+    │   ├── config/featureCategories.ts # FEATURE_CATEGORIES + CUSTOMER/USER_COLUMN_TEMPLATE + categoryMeta
     │   ├── hooks/useDepartmentFeatures.ts, useUpdateFeaturePermission.ts, useFeatureMutations.ts (create/remove/move)
-    │   └── pages/FeaturePermissionsPage.tsx
+    │   ├── hooks/useColumnFeatures.ts  # hiddenColumns + canEdit (session role → Role A/B)
+    │   └── pages/FeaturePermissionsPage.tsx  # category-wise cards (menu · customer cols · user cols)
     ├── reports/types/staff-report.types.ts
     └── departments/
         ├── types/ hooks/ components/ pages/   # purane department template pages
@@ -138,14 +187,14 @@ src/
             ├── hooks/useHeadDepartmentId.ts
             ├── types/head.types.ts             # HeadNavItem, HeadAccount, HeadNotification, DepartmentUser…
             └── pages/
-                ├── HeadConsoleLayout.tsx       # _head layout (HeadShell + Outlet)
-                ├── HeadIndexPage.tsx           # /head → first enabled
-                ├── HeadScreenPage.tsx          # /head/$screen resolver
+            ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
+            ├── HeadIndexPage.tsx           # /head or /users → first enabled
+            ├── HeadScreenPage.tsx          # shared dynamic screen resolver
                 ├── DashboardPage.tsx           # placeholder body
                 ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
-                ├── CustomerListPage.tsx        # placeholder body
-                ├── MeetingPage.tsx             # placeholder body
-                ├── SopPage.tsx                 # placeholder body
+                ├── CustomerListPage.tsx        # ✅ full (filters, column config, CRUD gated)
+            ├── MeetingPage.tsx             # ✅ filters/search/status + local mock interactions
+            ├── SopPage.tsx                 # ✅ search + inline sequence editing (local mock)
                 ├── HelpCenterPage.tsx          # placeholder body
                 └── CustomFeaturePage.tsx       # admin ke custom features ke liye generic
 ```
@@ -169,9 +218,12 @@ pixel-match hai. Tokens `.hshell` par CSS variables me:
 | Font | Jost 14px (Google Fonts link `index.html` me) |
 | Sidebar | 236px open / 64px collapsed (`is-collapsed`) |
 
-Shell features: collapsible sidebar, yellow active bar, account card (email + role),
-Head/User `SegmentedControl` switch, logout, sticky blur topbar, bell + unread badge +
+Shell features: collapsible sidebar, yellow active bar, account card (email + actual session role),
+logout, sticky blur topbar, bell + unread badge +
 dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
+
+> Head/User preview switch ab route access decide nahi karta. Logged-in session role authoritative
+> hai; HEAD `/head/*` aur USER `/users/*` route tree me hi rehta hai.
 
 ---
 
@@ -198,6 +250,9 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
   mutation hooks wahi import karke `invalidateQueries`.
 - Head nav bhi **usi** `['department-features', id]` query par chalta hai → admin ke
   mutation ke baad head sidebar auto-refresh (same session).
+- `useHeadNav` session role se correct route base (`/head` / `/users`) banata hai.
+- `useColumnFeatures` Role A (HEAD/ADMIN) ya Role B (USER) select karke hidden columns aur
+  editable controls derive karta hai.
 - Mutations retry 0, queries retry 1, `staleTime: 30_000`.
 - UI side-effects (modal close) page se `.mutate(data, { onSuccess })`.
 
@@ -240,14 +295,22 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
 
 - `db.ts`: 2 departments (Finance, Operations); har department ko `FEATURE_TEMPLATE`
   se 7 features seed: Dashboard, Department Users, Customer List, 15 Days Meeting, SOP,
-  Help Center (enabled) + Reports (custom, disabled).
+  Help Center (enabled) + Reports (custom, disabled) + **6 Customer columns + 8 User
+  columns** (`kind: 'column'`, nav me kabhi nahi aate).
 - Naya department → auto seed; delete → cascade.
 - `head.db.ts`: 8 department users, Abhishek/Mohit ke work items, notifications.
 - `auth.db.ts`: `admin@smsf.test / admin123` (ADMIN) · `head@smsf.test` (HEAD, dept-1) ·
   `user@smsf.test` (USER, dept-1) — head/user magic link se login.
 - `delay()` 150–300 ms.
-- **In-memory hai** → page reload par admin ke feature changes reset. Real API aane par
-  sirf `src/api/*.api.ts` bodies `apiRequest(...)` se replace karni hain; hooks/pages same.
+- **Ab localStorage me persist** hota hai (versioned keys) — reload/new tab par bhi data
+  rehta hai:
+  - `smsf.mock.db` (v1) → departments + feature permissions
+  - `smsf.mock.issued-tokens` (v1) → magic links (taki admin ke banaye token reload/HMR/new
+    tab me bhi kaam kare)
+  - `smsf.auth.session` → login session (purana)
+  - Reset chahiye → browser me in keys ko delete kar do (profile wipe).
+  - Real API aane par sirf `src/api/*.api.ts` bodies `apiRequest(...)` se replace karni hain;
+    hooks/pages same.
 
 ---
 
@@ -263,7 +326,14 @@ npm run lint    # eslint
 
 ## Status (08 Oct 2026)
 
-**Build ✅ · Lint ✅ · tsc ✅** (verified headless Chromium me bhi: login → admin → head flows).
+**Build ✅ · Lint ✅ · tsc ✅**. Latest role-route/permission changes production build aur
+ESLint se verify hue. Pehle ka headless Chromium E2E (CDP, preview build) flow bhi pass tha:
+admin login → link issue → reload persistence → 3 category cards (6/8 rows) → Company
+column off → reload → head magic link → sidebar/ CUSTOMER table → Department Users
+headers → raw token paste login. Uske upar **Actions Role A → CAN_READ → customer table
+read-only** (ACTIONS column + Add Customer gayab) bhi E2E me verify hua. NOTE: source files
+kabhi kabhi external editor se overwrite ho rahe the (dot network), isliye page gates aakhiri
+sawaal yahan tayy karein (Actions column single-gate vs screen+actions double-gate).
 
 ### Done
 - [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
@@ -276,6 +346,21 @@ npm run lint    # eslint
 - [x] **Dynamic navbar** — admin feature CRUD + reorder + toggle → head sidebar/routes live
 - [x] Admin `FeatureFormModal`, table me order ▲▼ / icon / path / edit / delete
 - [x] `AuthUser.departmentId`
+- [x] **Role-aware dashboard middleware** — login/session role se ADMIN → `/admin`,
+      HEAD → `/head`, USER → `/users`; wrong dashboard access apne role home par redirect
+- [x] **USER console routes** — `_user` layout + `/users` + `/users/$screen`, shared
+      `HeadConsoleLayout`/registry/components, USER-specific sidebar URLs
+- [x] **Screen + column permission enforcement** — Role A = HEAD/ADMIN, Role B = USER;
+      `CAN_READ` read-only aur `CAN_EDIT` par Customer/User add-edit-delete/login-as actions
+- [x] **"Invalid or revoked access token" fix** — `issuedTokens` localStorage me persist +
+      `loginWithToken` raw token / `?token=` extract / `+`–space tolerant matching
+- [x] **Magic link wins over existing session** (`loginRoute.beforeLoad`) — koi doosra user
+      login hai to bhi link kholne par usi link wala banda login hota hai
+- [x] **Category-wise column features** — 3 admin cards + `kind/category/columnKey` model +
+      `useColumnFeatures` + `CustomerTable` / `DepartmentUsersTable` me `hiddenColumns` +
+      actions permission gating + head `CustomerListPage` full
+- [x] Mock persistence (departments, feature permissions, issued tokens) + pre-existing tsc
+      errors (`customer/dashboard.tsx`, `user/attendance/checkin.tsx`) fixed
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
@@ -284,11 +369,11 @@ npm run lint    # eslint
    delay-side donut, team target & performance table + `DashboardPage`
 3. `components/head/customer/` — customer onboarding table, status/assignee filters, detail
    drawer, duplicates, call log, booking + `CustomerListPage`
-4. `components/head/meeting/` — 15 Days Meeting + `MeetingPage`
-5. `components/head/sop/` — SOP step builder + `SopPage`
+4. 15 Days Meeting ke local mock interactions ko real API/persistence se connect karna
+5. SOP inline sequence editing ko real API/persistence se connect karna
 6. `components/head/help-center/` — tickets, assign (manual / round robin) + `HelpCenterPage`
-7. `/users` (USER role dashboard) — abhi stub; head ke `role switch` se `/users` jata hai
-8. Mock → real API (`src/api/*.api.ts` bodies)
+7. Mock → real API (`src/api/*.api.ts` bodies), including Department Users CRUD
+8. Role/permission flows ka browser E2E: ADMIN config → HEAD Role A → USER Role B
 9. Git: purana unmerged index / `stash@{0}` user khud resolve kare (AI commit nahi karega)
 
 ### Cleanup notes

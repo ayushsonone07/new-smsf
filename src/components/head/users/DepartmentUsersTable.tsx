@@ -6,6 +6,17 @@ import { AchievedPill, AttendancePills } from './MetricPill'
 import { Icon } from '../shared/Icon'
 import type { DepartmentUser } from '../../../features/departments/head/types/head.types'
 
+/** Column keys an admin can switch off from the permissions page. */
+export type DepartmentUserColumnKey =
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'role'
+  | 'target'
+  | 'achieved'
+  | 'attendance'
+  | 'actions'
+
 interface DepartmentUsersTableProps {
   users: DepartmentUser[]
   onView?: (user: DepartmentUser) => void
@@ -19,6 +30,13 @@ interface DepartmentUsersTableProps {
    */
   renderExpanded?: (user: DepartmentUser) => ReactNode
   emptyMessage?: string
+  /** Column keys disabled by the admin — rendered nowhere. */
+  hiddenColumns?: string[]
+  /**
+   * Read-only mode for the actions column: view stays,
+   * edit/delete disappear (Role B with CAN_READ).
+   */
+  canEditActions?: boolean
 }
 
 /**
@@ -35,17 +53,39 @@ export function DepartmentUsersTable({
   onLoginAs,
   renderExpanded,
   emptyMessage = 'No users found.',
+  hiddenColumns,
+  canEditActions = true,
 }: DepartmentUsersTableProps) {
   const [expandedId, setExpandedId] = useState<
     string | null
   >(null)
 
-  const showActions = Boolean(onView || onEdit || onDelete)
+  const visible = (key: DepartmentUserColumnKey) =>
+    !hiddenColumns?.includes(key)
+
+  const showActions =
+    visible('actions') &&
+    Boolean(onView || onEdit || onDelete)
+
+  const visibleColumnCount = (
+    [
+      'name',
+      'phone',
+      'email',
+      'role',
+      'target',
+      'achieved',
+      'attendance',
+    ] as DepartmentUserColumnKey[]
+  ).reduce(
+    (count, key) => (visible(key) ? count + 1 : count),
+    0,
+  )
+
   const columnCount =
-    6 +
+    visibleColumnCount +
     (renderExpanded ? 1 : 0) +
-    (showActions ? 1 : 0) +
-    1
+    (showActions ? 1 : 0)
 
   return (
     <div className="table-wrapper users-table">
@@ -53,13 +93,19 @@ export function DepartmentUsersTable({
         <thead>
           <tr>
             {renderExpanded ? <th aria-label="Expand" /> : null}
-            <th>Name</th>
-            <th>Number</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th className="is-right">Target</th>
-            <th className="is-center">Achieved</th>
-            <th className="is-center">P / A days</th>
+            {visible('name') ? <th>Name</th> : null}
+            {visible('phone') ? <th>Number</th> : null}
+            {visible('email') ? <th>Email</th> : null}
+            {visible('role') ? <th>Role</th> : null}
+            {visible('target') ? (
+              <th className="is-right">Target</th>
+            ) : null}
+            {visible('achieved') ? (
+              <th className="is-center">Achieved</th>
+            ) : null}
+            {visible('attendance') ? (
+              <th className="is-center">P / A days</th>
+            ) : null}
             {showActions ? (
               <th className="is-right users-table__actions-head">
                 Actions
@@ -88,6 +134,7 @@ export function DepartmentUsersTable({
                 key={user.id}
                 user={user}
                 expanded={expanded}
+                visible={visible}
                 onToggle={
                   renderExpanded
                     ? () =>
@@ -103,6 +150,7 @@ export function DepartmentUsersTable({
                 }
                 columnCount={columnCount}
                 showActions={showActions}
+                canEditActions={canEditActions}
                 onView={onView}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -119,10 +167,12 @@ export function DepartmentUsersTable({
 interface UserRowProps {
   user: DepartmentUser
   expanded: boolean
+  visible: (key: DepartmentUserColumnKey) => boolean
   onToggle?: () => void
   expandedContent: ReactNode
   columnCount: number
   showActions: boolean
+  canEditActions: boolean
   onView?: (user: DepartmentUser) => void
   onEdit?: (user: DepartmentUser) => void
   onDelete?: (user: DepartmentUser) => void
@@ -132,10 +182,12 @@ interface UserRowProps {
 function UserRow({
   user,
   expanded,
+  visible,
   onToggle,
   expandedContent,
   columnCount,
   showActions,
+  canEditActions,
   onView,
   onEdit,
   onDelete,
@@ -162,55 +214,69 @@ function UserRow({
           </td>
         ) : null}
 
-        <td>
-          <div className="user-cell">
-            <Avatar name={user.name} src={user.avatarSrc} />
+        {visible('name') ? (
+          <td>
+            <div className="user-cell">
+              <Avatar name={user.name} src={user.avatarSrc} />
 
-            <div className="user-cell__text">
-              <strong>{user.name}</strong>
-              <span>Joined {user.joinedLabel}</span>
+              <div className="user-cell__text">
+                <strong>{user.name}</strong>
+                <span>Joined {user.joinedLabel}</span>
+              </div>
+
+              {onLoginAs ? (
+                <button
+                  type="button"
+                  className={`login-as-button${
+                    user.isPresentToday ? ' is-online' : ''
+                  }`}
+                  title={`Login as ${user.name}`}
+                  aria-label={`Login as ${user.name}`}
+                  onClick={() => onLoginAs(user)}
+                >
+                  <Icon name="login" size={18} />
+                </button>
+              ) : null}
             </div>
+          </td>
+        ) : null}
 
-            {onLoginAs ? (
-              <button
-                type="button"
-                className={`login-as-button${
-                  user.isPresentToday ? ' is-online' : ''
-                }`}
-                title={`Login as ${user.name}`}
-                aria-label={`Login as ${user.name}`}
-                onClick={() => onLoginAs(user)}
-              >
-                <Icon name="login" size={18} />
-              </button>
-            ) : null}
-          </div>
-        </td>
+        {visible('phone') ? (
+          <td className="users-table__mono">{user.phone}</td>
+        ) : null}
 
-        <td className="users-table__mono">{user.phone}</td>
+        {visible('email') ? (
+          <td className="users-table__email" title={user.email}>
+            {user.email}
+          </td>
+        ) : null}
 
-        <td className="users-table__email" title={user.email}>
-          {user.email}
-        </td>
+        {visible('role') ? (
+          <td>
+            <RolePill role={user.role} />
+          </td>
+        ) : null}
 
-        <td>
-          <RolePill role={user.role} />
-        </td>
+        {visible('target') ? (
+          <td className="is-right users-table__target">
+            {user.target}
+          </td>
+        ) : null}
 
-        <td className="is-right users-table__target">
-          {user.target}
-        </td>
+        {visible('achieved') ? (
+          <td className="is-center">
+            <AchievedPill percent={user.achievedPercent} />
+          </td>
+        ) : null}
 
-        <td className="is-center">
-          <AchievedPill percent={user.achievedPercent} />
-        </td>
-
-        <td className="is-center">
-          <AttendancePills
-            present={user.presentDays}
-            absent={user.absentDays}
-          />
-        </td>
+        {visible('attendance') ? (
+          <td className="is-center">
+            <AttendancePills
+              present={user.presentDays}
+              absent={user.absentDays}
+            />
+          </td>
+        ) : null}
 
         {showActions ? (
           <td className="is-right">
@@ -227,7 +293,7 @@ function UserRow({
                 </button>
               ) : null}
 
-              {onEdit ? (
+              {canEditActions && onEdit ? (
                 <button
                   type="button"
                   className="icon-action icon-action--edit"
@@ -239,7 +305,7 @@ function UserRow({
                 </button>
               ) : null}
 
-              {onDelete ? (
+              {canEditActions && onDelete ? (
                 <button
                   type="button"
                   className="icon-action icon-action--delete"

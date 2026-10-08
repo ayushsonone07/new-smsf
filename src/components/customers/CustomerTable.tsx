@@ -4,11 +4,22 @@ import { DataTable } from '../ui/DataTable'
 import { EmptyState } from '../ui/EmptyState'
 import { StatusBadge } from '../common/StatusBadge'
 
+/** Column keys an admin can switch off from the permissions page. */
+export type CustomerColumnKey =
+  | 'customer'
+  | 'company'
+  | 'phone'
+  | 'status'
+  | 'created'
+  | 'actions'
+
 interface CustomerTableProps {
   customers: Customer[]
   canEdit: boolean
   onEdit: (customer: Customer) => void
   onDelete: (customer: Customer) => void
+  /** Column keys disabled by the admin — rendered nowhere. */
+  hiddenColumns?: string[]
 }
 
 export function CustomerTable({
@@ -16,7 +27,11 @@ export function CustomerTable({
   canEdit,
   onEdit,
   onDelete,
+  hiddenColumns,
 }: CustomerTableProps) {
+  const visible = (key: CustomerColumnKey) =>
+    !hiddenColumns?.includes(key)
+
   if (customers.length === 0) {
     return (
       <EmptyState
@@ -27,13 +42,25 @@ export function CustomerTable({
     )
   }
 
+  const showActions = visible('actions') && canEdit
+
   const columns = [
-    { key: 'customer', title: 'CUSTOMER' },
-    { key: 'company', title: 'COMPANY' },
-    { key: 'phone', title: 'PHONE' },
-    { key: 'status', title: 'STATUS' },
-    { key: 'created', title: 'CREATED' },
-    ...(canEdit
+    ...(visible('customer')
+      ? [{ key: 'customer', title: 'CUSTOMER' }]
+      : []),
+    ...(visible('company')
+      ? [{ key: 'company', title: 'COMPANY' }]
+      : []),
+    ...(visible('phone')
+      ? [{ key: 'phone', title: 'PHONE' }]
+      : []),
+    ...(visible('status')
+      ? [{ key: 'status', title: 'STATUS' }]
+      : []),
+    ...(visible('created')
+      ? [{ key: 'created', title: 'CREATED' }]
+      : []),
+    ...(showActions
       ? [
           {
             key: 'actions',
@@ -48,42 +75,52 @@ export function CustomerTable({
     <DataTable columns={columns}>
       {customers.map((customer) => (
         <tr key={customer.id}>
-          <td>
-            <div className="department-cell">
-              <div className="department-icon">
-                ♙
+          {visible('customer') ? (
+            <td>
+              <div className="department-cell">
+                <div className="department-icon">
+                  ♙
+                </div>
+
+                <div>
+                  <strong>{customer.name}</strong>
+
+                  <span>{customer.email}</span>
+                </div>
               </div>
+            </td>
+          ) : null}
 
-              <div>
-                <strong>{customer.name}</strong>
+          {visible('company') ? (
+            <td>{customer.company}</td>
+          ) : null}
 
-                <span>{customer.email}</span>
-              </div>
-            </div>
-          </td>
+          {visible('phone') ? (
+            <td>{customer.phone}</td>
+          ) : null}
 
-          <td>{customer.company}</td>
+          {visible('status') ? (
+            <td>
+              <StatusBadge
+                status={customer.status}
+                variant={
+                  customer.status === 'ACTIVE'
+                    ? 'active'
+                    : 'inactive'
+                }
+              />
+            </td>
+          ) : null}
 
-          <td>{customer.phone}</td>
+          {visible('created') ? (
+            <td>
+              {new Date(
+                customer.createdAt,
+              ).toLocaleDateString()}
+            </td>
+          ) : null}
 
-          <td>
-            <StatusBadge
-              status={customer.status}
-              variant={
-                customer.status === 'ACTIVE'
-                  ? 'active'
-                  : 'inactive'
-              }
-            />
-          </td>
-
-          <td>
-            {new Date(
-              customer.createdAt,
-            ).toLocaleDateString()}
-          </td>
-
-          {canEdit && (
+          {showActions ? (
             <td>
               <div className="row-actions">
                 <Button
@@ -107,7 +144,7 @@ export function CustomerTable({
                 </Button>
               </div>
             </td>
-          )}
+          ) : null}
         </tr>
       ))}
     </DataTable>

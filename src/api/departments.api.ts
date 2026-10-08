@@ -2,6 +2,7 @@ import {
   delay,
   departments,
   nextDepartmentId,
+  persistMockDb,
   removeFeaturePermissions,
   seedFeaturePermissions,
 } from './mock/db'
@@ -35,6 +36,7 @@ export async function createDepartment(
 
   departments.push(department)
   seedFeaturePermissions(department.id)
+  persistMockDb()
 
   return structuredClone(department)
 }
@@ -54,6 +56,7 @@ export async function updateDepartment(
   }
 
   Object.assign(department, data)
+  persistMockDb()
 
   return structuredClone(department)
 }
@@ -73,4 +76,5 @@ export async function deleteDepartment(
 
   departments.splice(index, 1)
   removeFeaturePermissions(id)
+  persistMockDb()
 }
