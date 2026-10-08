@@ -51,6 +51,11 @@ export interface FeaturePermission {
   name: string
   description: string
   enabled: boolean
+  /**
+   * Shown in the USER panel (sidebar item / table column).
+   * Undefined counts as visible. HEAD / ADMIN ignore it.
+   */
+  userVisible?: boolean
   roleAPermission: PermissionLevel
   roleBPermission: PermissionLevel
   screen: HeadScreenKey
@@ -77,6 +82,8 @@ export interface CreateFeaturePermissionRequest {
   category?: FeatureCategoryKey
   kind?: FeatureKind
   columnKey?: string
+  /** Shown in the USER panel (sidebar item / table column). */
+  userVisible?: boolean
 }
 
 export type UpdateFeaturePermissionRequest =

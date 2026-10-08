@@ -16,6 +16,8 @@ import { PerformanceOverview } from '../../../../components/head/dashboard/Perfo
 import { TopPerformers } from '../../../../components/head/dashboard/TopPerformers'
 import { MemberDetailsModal } from '../../../../components/head/dashboard/MemberDetailsModal'
 import '../../../../components/head/dashboard/Dashboard.css'
+import { getSession } from '../../../../app/auth/session'
+import { UserDashboardPage } from './UserDashboardPage'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -148,10 +150,22 @@ const MOCK_TEAM_MEMBERS: TeamMemberPerformance[] = [
 ]
 
 /**
+ * Dashboard screen — department USERs get their personal
+ * dashboard, HEAD / ADMIN get the team dashboard.
+ */
+export function DashboardPage() {
+  return getSession()?.user.role === 'USER' ? (
+    <UserDashboardPage />
+  ) : (
+    <HeadDashboard />
+  )
+}
+
+/**
  * Head Onboarding Dashboard Page.
  * Composes all the reusable dashboard widgets matching the reference screenshots.
  */
-export function DashboardPage() {
+function HeadDashboard() {
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')
