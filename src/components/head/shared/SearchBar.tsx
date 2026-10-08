@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes } from 'react'
+import { motion } from 'framer-motion'
 import { Icon } from './Icon'
 
 interface SearchBarProps
@@ -19,10 +20,13 @@ export function SearchBar({
   ...props
 }: SearchBarProps) {
   return (
-    <label
+    <motion.label
       className={['head-search', className]
         .filter(Boolean)
         .join(' ')}
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24 }}
     >
       <Icon name="search" className="head-search__icon" />
 
@@ -35,6 +39,6 @@ export function SearchBar({
         }
         {...props}
       />
-    </label>
+    </motion.label>
   )
 }

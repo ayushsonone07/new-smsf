@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import './MeetingFilters.css'
 
 export type MeetingStatus = 'all' | 'done' | 'not-done'
@@ -22,22 +23,24 @@ export function MeetingFilters({
   return (
     <div className="meeting-filters">
       <div className="meeting-filters__status-tabs">
-        <button
+        <motion.button
           type="button"
           className={`meeting-filters__status-tab ${status === 'done' ? 'is-active' : ''}`}
           onClick={() => onStatusChange('done')}
+          whileTap={{ scale: 0.95 }}
         >
           Meeting Done
           <span className="meeting-filters__status-count">{doneCount}</span>
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           type="button"
           className={`meeting-filters__status-tab ${status === 'not-done' ? 'is-active' : ''}`}
           onClick={() => onStatusChange('not-done')}
+          whileTap={{ scale: 0.95 }}
         >
           Meeting Not Done
           <span className="meeting-filters__status-count">{notDoneCount}</span>
-        </button>
+        </motion.button>
       </div>
     </div>
   )

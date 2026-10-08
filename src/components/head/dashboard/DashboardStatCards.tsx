@@ -1,5 +1,16 @@
+import { motion, type Variants } from 'framer-motion'
 import { DashboardStatCard } from './DashboardStatCard'
 import heroImg from '../../../assets/hero.png'
+
+const statsGridVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05 } },
+}
+
+const heroVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+}
 
 export interface DashboardStatsData {
   totalCustomers: { value: string; growth: string; sub: string }
@@ -36,7 +47,12 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
 
   return (
     <div className="hdb-stats-layout">
-      <div className="hdb-stats-grid">
+      <motion.div
+        className="hdb-stats-grid"
+        initial="hidden"
+        animate="visible"
+        variants={statsGridVariants}
+      >
         {/* Row 1 */}
         <DashboardStatCard
           label="Total Customers"
@@ -110,16 +126,21 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
           iconName="userOut"
           iconTone="gray"
         />
-      </div>
+      </motion.div>
 
       {/* Hero 3D Illustration Card */}
-      <div className="hdb-hero-card">
+      <motion.div
+        className="hdb-hero-card"
+        initial="hidden"
+        animate="visible"
+        variants={heroVariants}
+      >
         <img
           src={heroImg}
           alt="Team performance illustration"
           loading="eager"
         />
-      </div>
+      </motion.div>
     </div>
   )
 }

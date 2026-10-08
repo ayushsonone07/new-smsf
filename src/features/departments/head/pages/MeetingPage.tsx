@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect, type ChangeEvent } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { MeetingSearchBar } from '../../../../components/head/15-days-meeting/MeetingSearchBar'
 import { MeetingFilters, type MeetingStatus } from '../../../../components/head/15-days-meeting/MeetingFilters'
 import { MeetingList, type Meeting, type MeetingCustomer, type MeetingDepartment } from '../../../../components/head/15-days-meeting/MeetingList'
@@ -6,6 +7,16 @@ import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { Button } from '../../../../components/ui/Button'
 import './MeetingPage.css'
+
+const controlsVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
+
+const panelVariants: Variants = {
+  hidden: { opacity: 0, y: -5, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.14 } },
+}
 
 // ============================================================
 // TEMPORARY MEETING UI DATA
@@ -157,7 +168,12 @@ export function MeetingPage() {
 
   return (
     <>
-      <div className="meeting-page__controls">
+      <motion.div
+        className="meeting-page__controls"
+        initial="hidden"
+        animate="visible"
+        variants={controlsVariants}
+      >
         <div className="meeting-page__controls-left">
           <MeetingFilters
             status={statusFilter}
@@ -189,7 +205,14 @@ export function MeetingPage() {
             </button>
 
             {filterDropdownOpen && (
-              <div className="filter-dropdown__panel" role="dialog" aria-label="Meeting filters">
+              <motion.div
+                className="filter-dropdown__panel"
+                role="dialog"
+                aria-label="Meeting filters"
+                initial="hidden"
+                animate="visible"
+                variants={panelVariants}
+              >
                 <div className="filter-dropdown__panel-header">
                   <h3>Filters</h3>
                   <button type="button" className="filter-dropdown__panel-close" onClick={() => setFilterDropdownOpen(false)}>
@@ -242,7 +265,7 @@ export function MeetingPage() {
                     Reset
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
 
@@ -256,7 +279,7 @@ export function MeetingPage() {
             onClick={handleRefresh}
           />
         </div>
-      </div>
+      </motion.div>
 
       <MeetingList
         meetings={meetings}

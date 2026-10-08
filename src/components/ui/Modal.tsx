@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { motion } from 'framer-motion'
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
 
@@ -75,17 +76,23 @@ export function Modal({
     .join(' ')
 
   return (
-    <div
+    <motion.div
       className="modal-backdrop"
       onMouseDown={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18 }}
     >
-      <div
+      <motion.div
         className={classes}
         role="dialog"
         aria-modal="true"
         onMouseDown={(event) =>
           event.stopPropagation()
         }
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.18 }}
       >
         {title ? (
           <div className="modal-header">
@@ -111,7 +118,7 @@ export function Modal({
         ) : null}
 
         {children}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

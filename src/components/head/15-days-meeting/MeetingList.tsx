@@ -1,10 +1,26 @@
 import { useMemo } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Button } from '../../ui/Button'
 import { Pill } from '../../ui/Pill'
 import { Icon } from '../shared/Icon'
 import { IconButton } from '../shared/IconButton'
 import type { IconName } from '../shared/iconPaths'
 import './MeetingList.css'
+
+const tbodyVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.04 } },
+}
+
+const rowVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
+
+const emptyVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
 
 export interface MeetingCustomer {
   name: string
@@ -85,10 +101,15 @@ export function MeetingList({
 
   if (filteredMeetings.length === 0) {
     return (
-      <div className="meeting-list__empty">
+      <motion.div
+        className="meeting-list__empty"
+        initial="hidden"
+        animate="visible"
+        variants={emptyVariants}
+      >
         <Icon name="alert" size={32} strokeWidth={1.5} />
         <p>No meetings found</p>
-      </div>
+      </motion.div>
     )
   }
 
@@ -104,9 +125,17 @@ export function MeetingList({
             <th className="meeting-list__th meeting-list__th--actions" scope="col">ACTIONS</th>
           </tr>
         </thead>
-        <tbody>
+        <motion.tbody
+          initial="hidden"
+          animate="visible"
+          variants={tbodyVariants}
+        >
           {filteredMeetings.map(meeting => (
-            <tr key={meeting.id} className="meeting-list__row">
+            <motion.tr
+              key={meeting.id}
+              className="meeting-list__row"
+              variants={rowVariants}
+            >
               <td className="meeting-list__td meeting-list__td--created">
                 <div className="meeting-list__date-row">
                   <span className="meeting-list__date-label">{formatDate(meeting.createdAt)}</span>
@@ -172,9 +201,9 @@ export function MeetingList({
                   />
                 </div>
               </td>
-            </tr>
+            </motion.tr>
           ))}
-        </tbody>
+        </motion.tbody>
       </table>
     </div>
   )

@@ -1,9 +1,40 @@
 import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Button } from '../../../../components/ui/Button'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { SopSearchBar } from '../../../../components/head/sop/SopSearchBar'
 import type { DepartmentSopStep } from '../../../../components/head/sop/DepartmentSopModal'
 import './SopPage.css'
+
+const headerVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
+
+const gridVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07 } },
+}
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+}
+
+const stepsVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05 } },
+}
+
+const stepVariants: Variants = {
+  hidden: { opacity: 0, x: -6 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.2 } },
+}
+
+const emptyVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
 
 // ============================================================
 // TEMPORARY SOP UI DATA
@@ -149,12 +180,17 @@ export function SopPage() {
 
   return (
     <>
-      <div className="sop-page__header">
+      <motion.div
+        className="sop-page__header"
+        initial="hidden"
+        animate="visible"
+        variants={headerVariants}
+      >
         <h1 className="sop-page__title">SOP</h1>
         <p className="sop-page__description">
           Set the steps and statuses for each department — status updates follow the SOP
         </p>
-      </div>
+      </motion.div>
 
       <SopSearchBar
         value={search}
@@ -163,12 +199,22 @@ export function SopPage() {
       />
 
       {filteredSops.length === 0 ? (
-        <div className="sop-page__empty">
+        <motion.div
+          className="sop-page__empty"
+          initial="hidden"
+          animate="visible"
+          variants={emptyVariants}
+        >
           <Icon name="alert" size={32} strokeWidth={1.5} />
           <p>No SOPs found</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="sop-page__grid">
+        <motion.div
+          className="sop-page__grid"
+          initial="hidden"
+          animate="visible"
+          variants={gridVariants}
+        >
           {filteredSops.map((sop) => (
             <SopCard
               key={sop.id}
@@ -186,7 +232,7 @@ export function SopPage() {
               allKnownSteps={allKnownSteps}
             />
           ))}
-        </div>
+        </motion.div>
       )}
     </>
   )
@@ -224,7 +270,10 @@ function SopCard({
   const steps = isEditing && draftSteps ? draftSteps : sop.steps
 
   return (
-    <article className={`sop-card ${isEditing ? 'sop-card--editing' : ''}`}>
+    <motion.article
+      variants={cardVariants}
+      className={`sop-card ${isEditing ? 'sop-card--editing' : ''}`}
+    >
       <header className="sop-card__header">
         <div className="sop-card__icon-wrapper">
           <Icon name="flow" size={20} strokeWidth={2} className="sop-card__icon" />
@@ -244,9 +293,16 @@ function SopCard({
         )}
       </header>
 
-      <div className="sop-card__steps" role="list" aria-label={`${sop.name} steps`}>
+      <motion.div
+        className="sop-card__steps"
+        role="list"
+        aria-label={`${sop.name} steps`}
+        initial="hidden"
+        animate="visible"
+        variants={stepsVariants}
+      >
         {steps.map((step, index) => (
-          <div key={step.id} className="sop-step-container">
+          <motion.div key={step.id} className="sop-step-container" variants={stepVariants}>
             {isEditing ? (
               <div className="sop-step-edit">
                 <span className="sop-step-edit__number">{index + 1}</span>
@@ -303,9 +359,9 @@ function SopCard({
                 <Icon name="chevronDown" size={16} strokeWidth={2.5} className="sop-step-arrow__icon" />
               </span>
             )}
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {isEditing && (
         <div className="sop-card__add-step-row">
@@ -325,6 +381,6 @@ function SopCard({
           </button>
         </div>
       )}
-    </article>
+    </motion.article>
   )
 }
