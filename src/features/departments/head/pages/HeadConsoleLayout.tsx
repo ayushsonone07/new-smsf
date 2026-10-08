@@ -6,6 +6,7 @@ import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { clearSession, getSession } from '../../../../app/auth/session'
 import { sampleNotifications } from '../../../../api/mock/head.db'
+import { IconButton } from '../../../../components/head/shared/IconButton'
 import type { HeadNotification, HeadRole } from '../types/head.types'
 
 /**
@@ -54,6 +55,15 @@ export function HeadConsoleLayout() {
       onLogout={handleLogout}
       title={registry?.title ?? feature?.name ?? 'Head Panel'}
       subtitle={feature?.description}
+      topbarActions={
+        <IconButton
+          icon="refresh"
+          label="Refresh data"
+          variant="outline"
+          size={34}
+          iconSize={16}
+        />
+      }
       notifications={notifications}
       onMarkAllRead={() =>
         setNotifications((items) =>

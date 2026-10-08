@@ -7,7 +7,6 @@ import {
   CheckCircle2, 
   Clock, 
   Activity, 
-  AlertCircle,
   HelpCircle
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
