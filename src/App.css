@@ -1,0 +1,37 @@
+.loading-state {
+  min-height: 400px;
+  display: grid;
+  place-items: center;
+  color: #667085;
+  font-size: 13px;
+}
+
+.error-state {
+  margin: 40px;
+  padding: 30px;
+  background: #fff;
+  border: 1px solid #fecdca;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.error-state strong {
+  display: block;
+  color: #b42318;
+  font-size: 15px;
+}
+
+.error-state p {
+  color: #667085;
+  font-size: 12px;
+  margin: 8px 0 18px;
+}
+
+.form-error {
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  color: #b42318;
+  font-size: 11px;
+}
