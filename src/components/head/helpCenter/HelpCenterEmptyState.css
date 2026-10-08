@@ -1,0 +1,34 @@
+.hc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--head-muted);
+}
+
+.hc-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--head-yellow-soft);
+  color: var(--head-yellow);
+}
+
+.hc-empty__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--head-text);
+}
+
+.hc-empty__description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 280px;
+}
