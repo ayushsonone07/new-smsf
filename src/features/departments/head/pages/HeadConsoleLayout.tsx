@@ -60,6 +60,14 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
   return (
     <HeadShell
       navItems={nav.items}
+      secondaryNavItems={[
+        {
+          key: 'fetch-rc',
+          label: 'Fetch R/C',
+          icon: 'link',
+          to: '/admin/fetch-rc',
+        },
+      ]}
       activeKey={slug}
       onNavigate={(item) => {
         if (item.to) navigate({ to: item.to })
