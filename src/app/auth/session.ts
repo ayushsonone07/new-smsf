@@ -4,6 +4,8 @@ import type {
 } from '../../features/auth/types/auth.types'
 
 const SESSION_KEY = 'smsf.auth.session'
+/** Admin's own session, parked while they are "logged in as" a department. */
+const ADMIN_BACKUP_KEY = 'smsf.auth.admin-backup'
 
 export function getSession(): AuthSession | null {
   try {
@@ -30,6 +32,44 @@ export function setSession(
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem(ADMIN_BACKUP_KEY)
+}
+
+/** Parks the current (admin) session before switching to a department. */
+export function saveAdminBackup(
+  session: AuthSession,
+): void {
+  localStorage.setItem(
+    ADMIN_BACKUP_KEY,
+    JSON.stringify(session),
+  )
+}
+
+export function getAdminBackup(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(ADMIN_BACKUP_KEY)
+
+    return raw ? (JSON.parse(raw) as AuthSession) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Puts the parked admin session back as the active one.
+ * Returns false when there is nothing to restore.
+ */
+export function restoreAdminSession(): boolean {
+  const backup = getAdminBackup()
+
+  if (!backup) {
+    return false
+  }
+
+  setSession(backup)
+  localStorage.removeItem(ADMIN_BACKUP_KEY)
+
+  return true
 }
 
 export type HomeRoute =
