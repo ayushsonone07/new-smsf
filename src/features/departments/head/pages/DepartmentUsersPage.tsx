@@ -18,9 +18,16 @@ import {
 } from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
+import {
+  useDepartmentUsersList,
+  useOnboardingCustomersList,
+  useAuthOnboardingSummary,
+} from '../../hooks/useDepartmentUsersList'
+import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
+  DepartmentUserRole,
 } from '../types/head.types'
 
 type ModalState =
@@ -31,23 +38,88 @@ type ModalState =
   | { kind: 'report'; user: DepartmentUser }
 
 /**
- * Head panel — Department Users. Composes the
- * reusable head/* components with local mock state;
- * swap the useState for TanStack Query hooks when
- * the API is ready.
+ * Head panel — Department Users. Wired to:
+ * - GET /api/auth/department/users?page=0&size=10
+ * - GET /api/meetings/users/assigning-list?departmentType=ONBOARDING_DEPARTMENT
+ * - GET /api/auth/onboarding/customers?page=0&size=10
+ * - GET /api/auth/onboarding/summary
  */
 export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
-  // Manage access follows the admin's Actions column permission
-  // (Role A = head, Role B = user); Actions = CAN_READ → read-only.
   const canManageUsers = columnFeatures.canEdit('actions')
 
-  const [users, setUsers] = useState(sampleDepartmentUsers)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+
+  // 1. Department Users API
+  const departmentUsersQuery = useDepartmentUsersList({
+    page: 0,
+    size: 10,
+    search,
+  })
+
+  // 2. Assigning List API
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+
+  // 3. Onboarding Customers API
+  const onboardingCustomersQuery = useOnboardingCustomersList({
+    page: 0,
+    size: 10,
+  })
+
+  // 4. Onboarding Summary API
+  const authSummaryQuery = useAuthOnboardingSummary({
+    department: 'ONBOARDING_DEPARTMENT',
+  })
+
+  // Map API users to DepartmentUser table structure, with fallback to mock data
+  const apiUsersList = useMemo<DepartmentUser[]>(() => {
+    const list = departmentUsersQuery.data?.data
+    if (list && list.length > 0) {
+      return list.map((u, idx) => {
+        const isPresent =
+          u.isPresentToday ??
+          (u.presentDays ? u.presentDays > 0 : true)
+        const role = (
+          u.role === 'HEAD' || u.isHead
+            ? 'TEAM_LEAD'
+            : u.role === 'SENIOR_EXECUTIVE'
+              ? 'SENIOR_EXECUTIVE'
+              : 'ONBOARDING_EXECUTIVE'
+        ) as DepartmentUserRole
+
+        return {
+          id: String(u.id ?? u.username ?? `u-${idx}`),
+          name: u.username || u.email,
+          phone: u.contact || '+91 98765 00000',
+          email: u.email,
+          role,
+          joinedLabel: u.createdAt
+            ? new Date(u.createdAt).toLocaleDateString('en-IN', {
+                month: 'short',
+                year: 'numeric',
+              })
+            : 'Jan 2024',
+          target: u.target ?? 6,
+          achievedPercent:
+            u.achievedPercent ??
+            (u.completed && u.target
+              ? Math.round((u.completed / u.target) * 100)
+              : 100),
+          presentDays: u.presentDays ?? 1,
+          absentDays: u.absentDays ?? 0,
+          isPresentToday: isPresent,
+        }
+      })
+    }
+    return sampleDepartmentUsers
+  }, [departmentUsersQuery.data?.data])
+
+  const [localUsers, setLocalUsers] = useState<DepartmentUser[] | null>(null)
+  const users = localUsers ?? apiUsersList
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -72,8 +144,8 @@ export function DepartmentUsersPage() {
   }
 
   function handleCreate(values: DepartmentUserFormValues) {
-    setUsers((current) => [
-      ...current,
+    setLocalUsers([
+      ...users,
       {
         id: `u-${Date.now()}`,
         name: values.name,
@@ -98,8 +170,8 @@ export function DepartmentUsersPage() {
     user: DepartmentUser,
     values: DepartmentUserFormValues,
   ) {
-    setUsers((current) =>
-      current.map((item) =>
+    setLocalUsers(
+      users.map((item) =>
         item.id === user.id
           ? {
               ...item,
@@ -116,9 +188,7 @@ export function DepartmentUsersPage() {
   }
 
   function handleDelete(user: DepartmentUser) {
-    setUsers((current) =>
-      current.filter((item) => item.id !== user.id),
-    )
+    setLocalUsers(users.filter((item) => item.id !== user.id))
     closeModal()
   }
 
@@ -162,6 +232,25 @@ export function DepartmentUsersPage() {
             <Pill tone="success" size="sm">
               {presentToday} present today
             </Pill>
+
+            {assigningUsersQuery.data &&
+            assigningUsersQuery.data.length > 0 ? (
+              <Pill tone="neutral" size="sm">
+                {assigningUsersQuery.data.length} assignable
+              </Pill>
+            ) : null}
+
+            {authSummaryQuery.data?.totalCustomers !== undefined ? (
+              <Pill tone="neutral" size="sm">
+                {authSummaryQuery.data.totalCustomers} total customers
+              </Pill>
+            ) : null}
+
+            {onboardingCustomersQuery.data?.totalElements !== undefined ? (
+              <Pill tone="warning" size="sm">
+                {onboardingCustomersQuery.data.totalElements} onboarding queue
+              </Pill>
+            ) : null}
           </>
         }
         hint="Attendance & achievement · this month"
