@@ -57,7 +57,7 @@ export interface DynamicColumnResponse {
 export async function getDepartmentTypes(): Promise<string[]> {
   try {
     const res = await authedApiRequest<string[] | { data: string[] }>(
-      '/api/dynamic-permissions/departments',
+      '/api/dynamic-permission/departments',
     )
     if (Array.isArray(res)) return res
     if (res && Array.isArray(res.data)) return res.data
@@ -76,7 +76,7 @@ export async function createDynamicRoute(
 ): Promise<DynamicRouteResponse> {
   const res = await authedApiRequest<
     DynamicRouteResponse | { data: DynamicRouteResponse }
-  >('/api/dynamic-permissions/routes', {
+  >('/api/dynamic-permission/routes', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -92,7 +92,7 @@ export async function createDynamicRoute(
 export async function getDynamicRoutes(): Promise<DynamicRouteResponse[]> {
   const res = await authedApiRequest<
     DynamicRouteResponse[] | { data: DynamicRouteResponse[] }
-  >('/api/dynamic-permissions/routes')
+  >('/api/dynamic-permission/routes')
   if (Array.isArray(res)) return res
   if (res && Array.isArray(res.data)) return res.data
   return []
@@ -106,7 +106,7 @@ export async function createDynamicColumn(
 ): Promise<DynamicColumnResponse> {
   const res = await authedApiRequest<
     DynamicColumnResponse | { data: DynamicColumnResponse }
-  >('/api/dynamic-permissions/columns', {
+  >('/api/dynamic-permission/columns', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -122,7 +122,7 @@ export async function createDynamicColumn(
 export async function getDynamicColumns(): Promise<DynamicColumnResponse[]> {
   const res = await authedApiRequest<
     DynamicColumnResponse[] | { data: DynamicColumnResponse[] }
-  >('/api/dynamic-permissions/columns')
+  >('/api/dynamic-permission/columns')
   if (Array.isArray(res)) return res
   if (res && Array.isArray(res.data)) return res.data
   return []
