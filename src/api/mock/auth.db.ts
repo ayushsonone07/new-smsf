@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthUser,
   IssuedLoginToken,
   UserRole,
@@ -24,6 +24,7 @@ export const storedUsers: StoredUser[] = [
     id: 'usr-2',
     name: 'Ayesha Head',
     email: 'head@smsf.test',
+    password: 'head123',
     role: 'HEAD',
     departmentId: 'dept-1',
   },
@@ -31,6 +32,7 @@ export const storedUsers: StoredUser[] = [
     id: 'usr-3',
     name: 'Bilal User',
     email: 'user@smsf.test',
+    password: 'user123',
     role: 'USER',
     departmentId: 'dept-1',
   },
@@ -41,7 +43,7 @@ const ISSUED_TOKENS_VERSION = 1
 
 /**
  * Issued login links live in localStorage so they survive a page
- * reload, a new tab or another session of the same browser — an
+ * reload, a new tab or another session of the same browser â€” an
  * in-memory list made every refresh look like "revoked token".
  */
 export const issuedTokens: IssuedLoginToken[] =
