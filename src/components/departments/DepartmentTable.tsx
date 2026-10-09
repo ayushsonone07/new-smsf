@@ -10,6 +10,8 @@ interface DepartmentTableProps {
   onDelete: (department: Department) => void
   onViewFeatures: (department: Department) => void
   onViewDashboard: (department: Department) => void
+  /** Id of the department whose login token is being generated. */
+  loggingInId?: string | null
 }
 
 const columns = [
@@ -31,6 +33,7 @@ export function DepartmentTable({
   onDelete,
   onViewFeatures,
   onViewDashboard,
+  loggingInId = null,
 }: DepartmentTableProps) {
   if (departments.length === 0) {
     return (
@@ -95,13 +98,15 @@ export function DepartmentTable({
             <div className="row-actions">
               <Button
                 variant="action-dashboard"
+                disabled={loggingInId !== null}
                 onClick={(event) => {
                   event.stopPropagation()
                   onViewDashboard(department)
                 }}
-                title="View Dashboard"
+                title="Login as this department"
+                aria-label={`Login as ${department.name}`}
               >
-                ⌂
+                {loggingInId === department.id ? '…' : '⌂'}
               </Button>
 
               <Button

@@ -1,4 +1,5 @@
 import { apiRequest, ApiError } from './client'
+import { getSession } from '../app/auth/session'
 import { delay } from './mock/db'
 import {
   generateToken,
@@ -162,6 +163,131 @@ export async function loginWithCredentials(
   }
 
   return toSessionFromBackend(envelope.data)
+}
+
+/** Response of `POST /api/auth/generate-token?username=<email>`. */
+interface BackendTokenEnvelope {
+  success?: boolean
+  message?: string
+  data?: BackendLoginData | string | null
+  accessToken?: string
+  token?: string
+}
+
+function decodeJwtClaims(
+  token: string,
+): Record<string, unknown> {
+  try {
+    const payload = token.split('.')[1]
+
+    if (!payload) return {}
+
+    const base64 = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+
+    return JSON.parse(atob(base64)) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Admin -> department login.
+ *
+ * Calls `POST /api/auth/generate-token?username=<department email>`
+ * and turns the returned token into a normal session, so the
+ * admin lands on that department's dashboard without a password.
+ */
+export async function generateDepartmentSession(
+  email: string,
+): Promise<AuthSession> {
+  const username = email.trim()
+
+  if (!username) {
+    throw new Error('Department email is missing')
+  }
+
+  const adminSession = getSession()
+
+  const response = await apiRequest<
+    BackendTokenEnvelope | string
+  >(
+    `/api/auth/generate-token?username=${encodeURIComponent(username)}`,
+    {
+      method: 'POST',
+      headers: adminSession?.token
+        ? { Authorization: `Bearer ${adminSession.token}` }
+        : undefined,
+    },
+  )
+
+  if (
+    typeof response === 'object' &&
+    response !== null &&
+    response.success === false
+  ) {
+    throw new Error(
+      response.message || 'Unable to generate token',
+    )
+  }
+
+  // The token can come back as a bare string, as `data`,
+  // or inside `data.accessToken` / `data.token`.
+  const dataObject: BackendLoginData & { token?: string } =
+    typeof response === 'object' &&
+    response !== null &&
+    typeof response.data === 'object' &&
+    response.data !== null
+      ? response.data
+      : {}
+
+  const token =
+    (typeof response === 'string' ? response : undefined) ??
+    (typeof response === 'object' && response !== null
+      ? typeof response.data === 'string'
+        ? response.data
+        : undefined
+      : undefined) ??
+    dataObject.accessToken ??
+    dataObject.token ??
+    (typeof response === 'object' && response !== null
+      ? (response.accessToken ?? response.token)
+      : undefined)
+
+  if (!token) {
+    throw new Error('Server did not return a token')
+  }
+
+  const claims = decodeJwtClaims(token)
+
+  const claimEmail =
+    typeof claims.sub === 'string' ? claims.sub : undefined
+  const claimRole =
+    typeof claims.role === 'string' ? claims.role : undefined
+
+  return toSessionFromBackend({
+    ...dataObject,
+    accessToken: token,
+    email:
+      dataObject.email ||
+      dataObject.username ||
+      claimEmail ||
+      username,
+    // A department account opens the department console.
+    role: dataObject.role ?? claimRole ?? 'DEPARTMENT_HEAD',
+    isHead:
+      dataObject.isHead ??
+      (typeof claims.isHead === 'boolean'
+        ? claims.isHead
+        : undefined),
+    departmentType:
+      dataObject.departmentType ??
+      (typeof claims.departmentType === 'string'
+        ? claims.departmentType
+        : undefined),
+  })
 }
 
 export async function loginWithToken(
