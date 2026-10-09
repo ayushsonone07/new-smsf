@@ -5,13 +5,13 @@
 .sop-page__header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: 4px;
+  margin-bottom: 12px;
 }
 
 .sop-page__title {
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--head-text);
   letter-spacing: -0.02em;
@@ -19,44 +19,48 @@
 
 .sop-page__description {
   margin: 0;
-  font-size: 15px;
+  font-size: 12.5px;
   color: var(--head-muted);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .sop-page__search {
   width: 100%;
   max-width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-/* Make the shared SearchBar more compact for SOP page */
-.sop-page__search .head-search {
-  padding: 0 14px;
-  height: 44px;
-  border-radius: 12px;
+/* Make the shared SearchBar more compact for SOP page.
+   The page class is applied to the SearchBar root itself,
+   so these must be compound selectors (.x.head-search),
+   not descendant selectors. */
+.sop-page__search.head-search {
+  flex: none;
+  padding: 0 12px;
+  height: 38px;
+  border-radius: 10px;
   border-color: var(--head-border);
   background: #fff;
 }
 
 .sop-page__search .head-search__icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--head-muted);
 }
 
-.sop-page__search .head-search input {
-  padding: 10px 0;
-  font-size: 15px;
+.sop-page__search.head-search input {
+  padding: 8px 0;
+  font-size: 14px;
   font-weight: 400;
 }
 
-.sop-page__search .head-search input::placeholder {
+.sop-page__search.head-search input::placeholder {
   color: var(--head-muted);
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.sop-page__search .head-search:focus-within {
+.sop-page__search.head-search:focus-within {
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
 }
@@ -64,7 +68,7 @@
 .sop-page__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 @media (max-width: 900px) {

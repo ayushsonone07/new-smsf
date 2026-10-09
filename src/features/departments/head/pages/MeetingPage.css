@@ -2,28 +2,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .meeting-page__controls-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .meeting-page__controls-center {
   flex: 1;
-  min-width: 280px;
-  max-width: 480px;
+  min-width: 240px;
+  max-width: 420px;
 }
 
 .meeting-page__controls-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -40,15 +40,15 @@
 .filter-dropdown__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  height: 40px;
+  gap: 6px;
+  padding: 0 12px;
+  height: 34px;
   border: 1px solid var(--head-blue);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   color: var(--head-blue);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -177,33 +177,36 @@
   font-weight: 500;
 }
 
-/* Make the shared SearchBar more compact for Meeting page */
-.meeting-page__search .head-search {
-  padding: 0 14px;
-  height: 44px;
-  border-radius: 12px;
+/* Make the shared SearchBar more compact for Meeting page.
+   The page class is applied to the SearchBar root itself,
+   so these must be compound selectors (.x.head-search),
+   not descendant selectors. */
+.meeting-page__search.head-search {
+  padding: 0 10px;
+  height: 34px;
+  border-radius: 8px;
   border-color: var(--head-border);
   background: #fff;
 }
 
 .meeting-page__search .head-search__icon {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   color: var(--head-muted);
 }
 
-.meeting-page__search .head-search input {
-  padding: 10px 0;
-  font-size: 14px;
+.meeting-page__search.head-search input {
+  padding: 4px 0;
+  font-size: 13px;
   font-weight: 400;
 }
 
-.meeting-page__search .head-search input::placeholder {
+.meeting-page__search.head-search input::placeholder {
   color: var(--head-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.meeting-page__search .head-search:focus-within {
+.meeting-page__search.head-search:focus-within {
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
 }

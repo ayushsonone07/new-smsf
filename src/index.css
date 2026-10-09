@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "./styles/head.css";
 
+html {
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
 html,
 body,
 #root {
@@ -17,8 +22,11 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  font-size: 13.5px;
+  line-height: 1.4;
   background: #f1f5f9;
   color: #0f172a;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -34,7 +42,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 236px 1fr;
   min-height: 100vh;
   transition: grid-template-columns 0.2s ease;
 }
@@ -45,7 +53,7 @@ a {
 }
 
 .page-content {
-  padding: 28px 32px 48px;
+  padding: 16px 20px 32px;
 }
 
 .sidebar-backdrop {
