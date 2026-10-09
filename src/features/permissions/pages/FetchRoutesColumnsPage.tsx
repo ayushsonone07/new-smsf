@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { ProfileChip } from '../../../components/common/ProfileChip'
@@ -56,7 +56,13 @@ const TABLE_COLUMNS_COLUMNS = [
 ]
 
 export function FetchRoutesColumnsPage() {
-  const [selectedDept, setSelectedDept] = useState<string>('ALL')
+  const [selectedDept, setSelectedDept] = useState<string>(() => {
+    try {
+      return localStorage.getItem('smsf_selected_dept') || 'ALL'
+    } catch {
+      return 'ALL'
+    }
+  })
   const [activeTab, setActiveTab] = useState<ActiveTab>('routes')
   const [search, setSearch] = useState('')
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
@@ -84,12 +90,52 @@ export function FetchRoutesColumnsPage() {
   // Department switch handler
   const handleSelectDepartment = (dept: string) => {
     setSelectedDept(dept)
+    try {
+      localStorage.setItem('smsf_selected_dept', dept)
+    } catch {}
     setRoutesUiState({})
     setColumnsUiState({})
     setRoutesOrder([])
     setColumnsOrder([])
     setSearch('')
   }
+
+  // Synchronize toggle UI state whenever database query returns fresh data
+  useEffect(() => {
+    if (routesQuery.data) {
+      setRoutesUiState((prev) => {
+        const next = { ...prev }
+        routesQuery.data.forEach((r) => {
+          next[r.routeId] = {
+            enableHead: r.enableHead ?? true,
+            enableUser: r.enableUser ?? true,
+            readWriteHead: prev[r.routeId]?.readWriteHead ?? '1',
+            readWriteUser: prev[r.routeId]?.readWriteUser ?? '1',
+          }
+        })
+        return next
+      })
+    }
+  }, [routesQuery.data])
+
+  useEffect(() => {
+    if (columnsQuery.data) {
+      setColumnsUiState((prev) => {
+        const next = { ...prev }
+        columnsQuery.data.forEach((c) => {
+          next[c.columnId] = {
+            enableHead: c.enableHead ?? true,
+            enableUser: c.enableUser ?? true,
+            readWriteHead:
+              prev[c.columnId]?.readWriteHead ?? (c.roleAPermission === '1' ? '1' : '12'),
+            readWriteUser:
+              prev[c.columnId]?.readWriteUser ?? (c.roleBPermission === '12' ? '12' : '1'),
+          }
+        })
+        return next
+      })
+    }
+  }, [columnsQuery.data])
 
   // Initialize order when fetched
   const orderedRoutes = useMemo(() => {
