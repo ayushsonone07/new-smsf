@@ -6,6 +6,23 @@ const API_BASE_URL =
 interface ApiErrorResponse {
   message?: string
   error?: string
+  details?: string | Record<string, string>
+}
+
+function getApiErrorMessage(
+  errorData: ApiErrorResponse,
+  fallback: string,
+): string {
+  if (errorData.message) return errorData.message
+  if (errorData.error) return errorData.error
+  if (typeof errorData.details === 'string') return errorData.details
+
+  if (errorData.details && typeof errorData.details === 'object') {
+    const detail = Object.values(errorData.details).find(Boolean)
+    if (detail) return detail
+  }
+
+  return fallback
 }
 
 export class ApiError extends Error {
@@ -41,10 +58,7 @@ export async function apiRequest<T>(
     try {
       const errorData = (await response.json()) as ApiErrorResponse
 
-      message =
-        errorData.message ||
-        errorData.error ||
-        message
+      message = getApiErrorMessage(errorData, message)
     } catch {
       // Response wasn't JSON.
     }
@@ -63,8 +77,9 @@ export async function apiRequest<T>(
  * Session-bound variant of `apiRequest`.
  *
  * The backend's department APIs expect the login JWT plus a
- * `username` header that must equal the token's `sub` claim
- * (the account email), see OnboardingDashboardService.
+ * `username` header that must equal the token's `sub` claim.
+ * The backend username can differ from the account email, so preserve and
+ * prefer the exact identity returned by login.
  */
 export async function authedApiRequest<T>(
   endpoint: string,
@@ -80,7 +95,7 @@ export async function authedApiRequest<T>(
     ...options,
     headers: {
       Authorization: `Bearer ${session.token}`,
-      username: session.user.email,
+      username: session.user.username || session.user.email,
       ...options.headers,
     },
   })

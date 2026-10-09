@@ -140,7 +140,8 @@ export function LoginPage() {
               onChange={(event) =>
                 setEmail(event.target.value)
               }
-              placeholder="admin@smsf.test"
+              placeholder="name@company.com"
+              autoComplete="username"
             />
           </label>
 
@@ -150,11 +151,13 @@ export function LoginPage() {
             <input
               required
               type="password"
+              minLength={6}
               value={password}
               onChange={(event) =>
                 setPassword(event.target.value)
               }
               placeholder="••••••••"
+              autoComplete="current-password"
             />
           </label>
 

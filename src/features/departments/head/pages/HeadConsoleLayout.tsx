@@ -4,7 +4,13 @@ import { HeadShell } from '../../../../components/head/layout/HeadShell'
 import { useHeadNav } from '../hooks/useHeadNav'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
-import { clearSession, getSession } from '../../../../app/auth/session'
+import {
+  clearSession,
+  getAdminBackup,
+  getSession,
+  homeForRole,
+  restoreAdminSession,
+} from '../../../../app/auth/session'
 import { sampleNotifications } from '../../../../api/mock/head.db'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import type { HeadNotification, HeadRole } from '../types/head.types'
@@ -36,6 +42,16 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
   const [notifications, setNotifications] =
     useState<HeadNotification[]>(sampleNotifications)
 
+  const isImpersonating = getAdminBackup() !== null
+
+  function handleExitImpersonation() {
+    if (restoreAdminSession()) {
+      navigate({ to: homeForRole('ADMIN') as never })
+    } else {
+      handleLogout()
+    }
+  }
+
   function handleLogout() {
     clearSession()
     navigate({ to: '/login' })
@@ -55,6 +71,14 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
       }}
       roleLabel={portalRole === 'USER' ? 'Department User' : 'Department Head'}
       onLogout={handleLogout}
+      impersonating={
+        isImpersonating
+          ? {
+              name: session?.user.email ?? 'department',
+              onExit: handleExitImpersonation,
+            }
+          : null
+      }
       title={registry?.title ?? feature?.name ?? 'Head Panel'}
       subtitle={feature?.description}
       topbarActions={
