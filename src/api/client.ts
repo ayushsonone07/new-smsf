@@ -22,7 +22,11 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `${API_BASE_URL}${normalizedEndpoint}`
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

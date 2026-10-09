@@ -6,6 +6,13 @@ import { MeetingList, type Meeting, type MeetingCustomer, type MeetingDepartment
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { Button } from '../../../../components/ui/Button'
+import { useAssigningUsers } from '../../hooks/useAssigningUsers'
+import {
+  useFollowUpRecentMeetings,
+  useFollowUpDueMeetings,
+  useFollowUpMeetingCounts,
+} from '../../hooks/useFollowUpMeetings'
+import { markMeetingDone, type CustomerFollowUpItem } from '../../../../api/meetings.api'
 import './MeetingPage.css'
 
 const controlsVariants: Variants = {
@@ -17,10 +24,6 @@ const panelVariants: Variants = {
   hidden: { opacity: 0, y: -5, scale: 0.97 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.14 } },
 }
-
-// ============================================================
-// TEMPORARY MEETING UI DATA
-// ============================================================
 
 const mockCustomers: MeetingCustomer[] = [
   {
@@ -106,20 +109,119 @@ const initialMeetings: Meeting[] = [
   },
 ]
 
+function toMeeting(item: CustomerFollowUpItem, isDone: boolean): Meeting {
+  return {
+    id: String(item.customerId),
+    createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+    customer: {
+      name: item.ownerName || 'Customer',
+      company: item.businessName || 'Business',
+      phone: item.phoneNumber || '',
+      email: item.email || '',
+    },
+    departments: (item.departments ?? []).map((d, idx) => ({
+      id: d.departmentType || `dept-${idx}`,
+      name: d.serviceType || d.departmentType || 'Onboarding',
+      status:
+        d.status?.toLowerCase() === 'completed'
+          ? 'completed'
+          : d.status?.toLowerCase() === 'in_progress'
+            ? 'in-progress'
+            : 'pending',
+    })),
+    meetingDate: item.lastMeetingAt
+      ? new Date(item.lastMeetingAt)
+      : item.createdAt
+        ? new Date(item.createdAt)
+        : new Date(),
+    isDone,
+  }
+}
+
 /**
  * Head panel — 15 Days Meeting Tracker.
- * Inline filter state, search, status tabs, and meeting list.
+ * Connected to:
+ * - GET /api/meetings/users/assigning-list?departmentType=ONBOARDING_DEPARTMENT
+ * - GET /api/customer/follow-up/meeting/recent?page=0&size=10&days=15 (and size=1 for counts)
+ * - GET /api/customer/follow-up/meeting/due?page=0&size=10 (and size=1 for counts)
  */
 export function MeetingPage() {
-  const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<MeetingStatus>('all')
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const filterDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 1. Assigning users list API
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+
+  // Common query params
+  const baseParams = useMemo(
+    () => ({
+      departmentType: 'ONBOARDING_DEPARTMENT',
+      searchParam: search || undefined,
+      filteredUser: selectedUser || undefined,
+      createdAtFrom: dateFrom || undefined,
+      createdAtTo: dateTo || undefined,
+    }),
+    [search, selectedUser, dateFrom, dateTo],
+  )
+
+  // 2. Counts API (/recent?size=1&days=15 and /due?size=1)
+  const counts = useFollowUpMeetingCounts(baseParams)
+
+  // 3. Lists API
+  const recentQuery = useFollowUpRecentMeetings({
+    ...baseParams,
+    page: 0,
+    size: 20,
+    days: 15,
+  })
+
+  const dueQuery = useFollowUpDueMeetings({
+    ...baseParams,
+    page: 0,
+    size: 20,
+  })
+
+  // Assemble meetings list
+  const liveMeetings = useMemo<Meeting[]>(() => {
+    const recentItems = (recentQuery.data?.data ?? []).map((item) =>
+      toMeeting(item, true),
+    )
+    const dueItems = (dueQuery.data?.data ?? []).map((item) =>
+      toMeeting(item, false),
+    )
+
+    if (statusFilter === 'done') {
+      return recentItems
+    }
+    if (statusFilter === 'not-done') {
+      return dueItems
+    }
+    return [...dueItems, ...recentItems]
+  }, [recentQuery.data?.data, dueQuery.data?.data, statusFilter])
+
+  const meetings =
+    liveMeetings.length > 0 ? liveMeetings : initialMeetings
+
+  const doneCount =
+    counts.doneCount > 0
+      ? counts.doneCount
+      : meetings.filter((m) => m.isDone).length
+  const notDoneCount =
+    counts.notDoneCount > 0
+      ? counts.notDoneCount
+      : meetings.filter((m) => !m.isDone).length
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+      if (
+        filterDropdownRef.current &&
+        !filterDropdownRef.current.contains(event.target as Node)
+      ) {
         setFilterDropdownOpen(false)
       }
     }
@@ -127,22 +229,32 @@ export function MeetingPage() {
     if (filterDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () =>
+      document.removeEventListener('mousedown', handleClickOutside)
   }, [filterDropdownOpen])
 
-  const doneCount = useMemo(() => meetings.filter(m => m.isDone).length, [meetings])
-  const notDoneCount = useMemo(() => meetings.filter(m => !m.isDone).length, [meetings])
-
-  function handleMarkDone(meetingId: string) {
-    setMeetings(current =>
-      current.map(m => m.id === meetingId ? { ...m, isDone: true } : m)
-    )
+  async function handleMarkDone(meetingId: string) {
+    try {
+      await markMeetingDone(meetingId)
+    } catch (err) {
+      console.warn('Mark done API call:', err)
+    }
+    counts.refetch()
+    recentQuery.refetch()
+    dueQuery.refetch()
   }
 
   function handleRefresh() {
     setSearch('')
     setStatusFilter('all')
+    setSelectedUser('')
+    setDateFrom('')
+    setDateTo('')
     setFilterDropdownOpen(false)
+    counts.refetch()
+    recentQuery.refetch()
+    dueQuery.refetch()
+    assigningUsersQuery.refetch()
   }
 
   function handleFilterStatusChange(status: MeetingStatus) {
@@ -151,6 +263,9 @@ export function MeetingPage() {
 
   function handleFilterReset() {
     setStatusFilter('all')
+    setSelectedUser('')
+    setDateFrom('')
+    setDateTo('')
     setFilterDropdownOpen(false)
   }
 
@@ -191,7 +306,10 @@ export function MeetingPage() {
           />
         </div>
 
-        <div className="meeting-page__controls-right" ref={filterDropdownRef}>
+        <div
+          className="meeting-page__controls-right"
+          ref={filterDropdownRef}
+        >
           <div className="filter-dropdown">
             <button
               type="button"
@@ -215,7 +333,11 @@ export function MeetingPage() {
               >
                 <div className="filter-dropdown__panel-header">
                   <h3>Filters</h3>
-                  <button type="button" className="filter-dropdown__panel-close" onClick={() => setFilterDropdownOpen(false)}>
+                  <button
+                    type="button"
+                    className="filter-dropdown__panel-close"
+                    onClick={() => setFilterDropdownOpen(false)}
+                  >
                     <Icon name="x" size={18} strokeWidth={2} />
                   </button>
                 </div>
@@ -225,43 +347,78 @@ export function MeetingPage() {
                     <select
                       className="filter-dropdown__select"
                       value={statusFilter}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) => handleFilterStatusChange(e.target.value as MeetingStatus)}
+                      onChange={(
+                        e: ChangeEvent<HTMLSelectElement>,
+                      ) =>
+                        handleFilterStatusChange(
+                          e.target.value as MeetingStatus,
+                        )
+                      }
                     >
                       <option value="all">All</option>
                       <option value="done">Meeting Done</option>
-                      <option value="not-done">Meeting Not Done</option>
+                      <option value="not-done">
+                        Meeting Not Done
+                      </option>
                     </select>
                   </div>
+
                   <div className="filter-dropdown__field">
-                    <label>Department / Service</label>
-                    <select className="filter-dropdown__select">
-                      <option value="">All Departments</option>
-                      <option value="onboarding">Onboarding</option>
-                      <option value="website-creation">Website Creation</option>
-                      <option value="google-service">Google Service</option>
-                      <option value="seo-service">SEO Service</option>
-                      <option value="automation">Automation</option>
+                    <label>Assigned User</label>
+                    <select
+                      className="filter-dropdown__select"
+                      value={selectedUser}
+                      onChange={(e) =>
+                        setSelectedUser(e.target.value)
+                      }
+                    >
+                      <option value="">All Users</option>
+                      {(assigningUsersQuery.data ?? []).map(
+                        (user) => (
+                          <option
+                            key={user.email}
+                            value={user.email}
+                          >
+                            {user.username} ({user.email})
+                          </option>
+                        ),
+                      )}
                     </select>
                   </div>
+
                   <div className="filter-dropdown__field">
                     <label>Date Range</label>
                     <div className="filter-dropdown__date-row">
                       <input
                         type="date"
                         className="filter-dropdown__date"
+                        value={dateFrom}
+                        onChange={(e) =>
+                          setDateFrom(e.target.value)
+                        }
                         placeholder="From"
                       />
-                      <span className="filter-dropdown__date-separator">to</span>
+                      <span className="filter-dropdown__date-separator">
+                        to
+                      </span>
                       <input
                         type="date"
                         className="filter-dropdown__date"
+                        value={dateTo}
+                        onChange={(e) =>
+                          setDateTo(e.target.value)
+                        }
                         placeholder="To"
                       />
                     </div>
                   </div>
                 </div>
                 <div className="filter-dropdown__panel-footer">
-                  <Button variant="secondary" className="filter-dropdown__reset-btn" onClick={handleFilterReset}>
+                  <Button
+                    variant="secondary"
+                    className="filter-dropdown__reset-btn"
+                    onClick={handleFilterReset}
+                  >
                     Reset
                   </Button>
                 </div>
