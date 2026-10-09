@@ -1,5 +1,7 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+import { getSession } from '../app/auth/session'
+
+const API_BASE_URL = 
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002'
 
 interface ApiErrorResponse {
   message?: string
@@ -20,7 +22,11 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `${API_BASE_URL}${normalizedEndpoint}`
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -51,4 +57,31 @@ export async function apiRequest<T>(
   }
 
   return response.json() as Promise<T>
+}
+
+/**
+ * Session-bound variant of `apiRequest`.
+ *
+ * The backend's department APIs expect the login JWT plus a
+ * `username` header that must equal the token's `sub` claim
+ * (the account email), see OnboardingDashboardService.
+ */
+export async function authedApiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const session = getSession()
+
+  if (!session) {
+    throw new ApiError('Not signed in', 401)
+  }
+
+  return apiRequest<T>(endpoint, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${session.token}`,
+      username: session.user.email,
+      ...options.headers,
+    },
+  })
 }

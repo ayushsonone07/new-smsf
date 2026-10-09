@@ -1,0 +1,242 @@
+.sop-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sop-modal__icon-wrapper {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--head-blue-soft);
+  color: var(--head-blue);
+  flex-shrink: 0;
+}
+.sop-modal__icon {
+  color: var(--head-blue);
+}
+.sop-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--head-text);
+}
+.sop-modal__subtitle {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--head-muted);
+}
+.sop-modal__body {
+  padding: 8px 4px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sop-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+.sop-modal__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sop-step-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sop-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--head-border);
+  border-radius: 12px;
+  background: var(--head-blue-soft);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sop-step-row:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
+}
+.sop-step-row__number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--head-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sop-step-row__input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--head-text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sop-step-row__input::placeholder {
+  color: var(--head-muted);
+}
+.sop-step-row__input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
+}
+.sop-step-row__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sop-step-row__action-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--head-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sop-step-row__action-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: var(--head-text);
+}
+.sop-step-row__action-btn:focus-visible {
+  outline: 2px solid var(--head-blue);
+  outline-offset: 2px;
+}
+.sop-step-row__action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sop-step-row__action-btn--up {
+  transform: rotate(180deg);
+}
+.sop-step-row__action-btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.sop-step-arrow {
+  display: flex;
+  justify-content: center;
+  padding-left: 40px;
+  color: var(--head-yellow);
+}
+.sop-step-arrow__icon {
+  transform: rotate(-90deg);
+  display: block;
+}
+.sop-modal__add-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px 16px;
+  border: 1px dashed var(--head-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--head-blue);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sop-modal__add-step:hover:not(:disabled) {
+  background: var(--head-blue-soft);
+  border-color: var(--head-blue);
+  color: var(--head-blue-dark);
+}
+.sop-modal__add-step:focus-visible {
+  outline: 2px solid var(--head-blue);
+  outline-offset: 2px;
+}
+.sop-modal__add-step:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sop-modal__max-steps {
+  margin-top: 4px;
+  padding-left: 40px;
+  font-size: 13px;
+  color: var(--head-muted);
+}
+.sop-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--head-border);
+  margin-top: 4px;
+}
+.sop-modal__cancel-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sop-modal__save-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* =============================================================
+   RESPONSIVE — DepartmentSopModal
+   ============================================================= */
+@media (max-width: 768px) {
+  .sop-modal__overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .sop-modal__box {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 12px 12px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .sop-modal__footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sop-modal__cancel-btn,
+  .sop-modal__save-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .sop-modal__header {
+    padding: 12px 14px;
+  }
+  .sop-modal__body {
+    padding: 14px;
+  }
+}

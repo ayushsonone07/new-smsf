@@ -1,9 +1,5 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { DepartmentStats } from '../components/DepartmentStats'
-import { DepartmentTable } from '../components/DepartmentTable'
-import { DepartmentFormModal } from '../components/DepartmentFormModal'
-import { DeleteDepartmentDialog } from '../components/DeleteDepartmentDialog'
 import { useDepartments } from '../hooks/useDepartments'
 import { useCreateDepartment } from '../hooks/useCreateDepartment'
 import { useUpdateDepartment } from '../hooks/useUpdateDepartment'
@@ -13,6 +9,20 @@ import type {
   Department,
   UpdateDepartmentRequest,
 } from '../types/department.types'
+import { DepartmentStats } from '../../../components/departments/DepartmentStats'
+import { DepartmentTable } from '../../../components/departments/DepartmentTable'
+import { DepartmentFormModal } from '../../../components/departments/DepartmentFormModal'
+import { DeleteDepartmentDialog } from '../../../components/departments/DeleteDepartmentDialog'
+import { DepartmentFilters } from '../../../components/departments/DepartmentFilters'
+import { PageHeader } from '../../../components/layout/PageHeader'
+import { PageLayout } from '../../../components/layout/PageLayout'
+import { ProfileChip } from '../../../components/common/ProfileChip'
+import { Button } from '../../../components/ui/Button'
+import { Card } from '../../../components/ui/Card'
+import { ErrorState } from '../../../components/ui/ErrorState'
+import { LoadingState } from '../../../components/ui/LoadingState'
+import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 
 export function DepartmentManagementPage() {
   const navigate = useNavigate()
@@ -23,6 +33,8 @@ export function DepartmentManagementPage() {
     useState<Department | null>(null)
   const [showCreateModal, setShowCreateModal] =
     useState(false)
+  const [showRouteModal, setShowRouteModal] = useState(false)
+  const [showColumnModal, setShowColumnModal] = useState(false)
 
   const departmentsQuery = useDepartments()
   const createMutation = useCreateDepartment()
@@ -91,6 +103,15 @@ export function DepartmentManagementPage() {
     })
   }
 
+  function handleViewDashboard(
+    department: Department,
+  ) {
+    navigate({
+      to: '/departments/$departmentId/dashboard',
+      params: { departmentId: department.id },
+    })
+  }
+
   function handleDelete() {
     if (!departmentToDelete) return
 
@@ -111,80 +132,47 @@ export function DepartmentManagementPage() {
 
   if (departmentsQuery.isPending) {
     return (
-      <main className="page-content">
-        <div className="loading-state">
-          Loading departments...
-        </div>
-      </main>
+      <PageLayout>
+        <LoadingState message="Loading departments..." />
+      </PageLayout>
     )
   }
 
   if (departmentsQuery.isError) {
     return (
-      <main className="page-content">
-        <div className="error-state">
-          <strong>
-            Unable to load departments
-          </strong>
-
-          <p>
-            {departmentsQuery.error.message}
-          </p>
-
-          <button
-            className="primary-button"
-            onClick={() =>
-              departmentsQuery.refetch()
-            }
-          >
-            Try Again
-          </button>
-        </div>
-      </main>
+      <PageLayout>
+        <ErrorState
+          title="Unable to load departments"
+          message={departmentsQuery.error.message}
+          onRetry={() => departmentsQuery.refetch()}
+        />
+      </PageLayout>
     )
   }
 
   return (
-    <main className="page-content">
-      <header className="topbar">
-        <div>
-          <p className="breadcrumb">
-            Administration / Departments
-          </p>
+    <PageLayout>
+      <PageHeader
+        breadcrumb="Administration / Departments"
+        title="Department Management"
+        description="Create and manage department login accounts."
+        actions={
+          <>
+            <Button
+              variant="icon"
+              aria-label="Notifications"
+            >
+              ♢
+            </Button>
 
-          <h1>Department Management</h1>
-
-          <p className="page-description">
-            Create and manage department login accounts.
-          </p>
-        </div>
-
-        <div className="topbar-actions">
-          <button
-            className="icon-button"
-            aria-label="Notifications"
-          >
-            ♢
-          </button>
-
-          <div className="profile-chip">
-            <div className="admin-avatar small">
-              A
-            </div>
-
-            <div>
-              <strong>Admin</strong>
-              <span>Super Admin</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <DepartmentStats
-        departments={departments}
+            <ProfileChip />
+          </>
+        }
       />
 
-      <section className="content-card">
+      <DepartmentStats departments={departments} />
+
+      <Card>
         <div className="table-toolbar">
           <div>
             <h2>Department Accounts</h2>
@@ -195,38 +183,40 @@ export function DepartmentManagementPage() {
             </p>
           </div>
 
-          <button
-            className="primary-button"
-            onClick={() =>
-              setShowCreateModal(true)
-            }
-          >
-            <span>＋</span>
-            Create Department Login
-          </button>
-        </div>
-
-        <div className="filter-row">
-          <div className="search-box">
-            <span>⌕</span>
-
-            <input
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Search departments, username or email..."
-            />
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRouteModal(true)}
+            >
+              <span>＋</span> Add Dynamic Route
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowColumnModal(true)}
+            >
+              <span>＋</span> Add Dynamic Column
+            </Button>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+            >
+              <span>＋</span> Create Department Login
+            </Button>
           </div>
         </div>
+
+        <DepartmentFilters
+          search={search}
+          onSearchChange={setSearch}
+        />
 
         <DepartmentTable
           departments={filteredDepartments}
           onEdit={setEditingDepartment}
           onDelete={setDepartmentToDelete}
           onViewFeatures={handleViewFeatures}
+          onViewDashboard={handleViewDashboard}
         />
-      </section>
+      </Card>
 
       <DepartmentFormModal
         open={
@@ -261,6 +251,16 @@ export function DepartmentManagementPage() {
         }}
         onConfirm={handleDelete}
       />
-    </main>
+
+      <CreateRouteModal
+        open={showRouteModal}
+        onClose={() => setShowRouteModal(false)}
+      />
+
+      <CreateColumnModal
+        open={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
+      />
+    </PageLayout>
   )
 }

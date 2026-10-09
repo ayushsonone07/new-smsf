@@ -1,16 +1,35 @@
+import { useState } from 'react'
 import {
   Link,
   useParams,
 } from '@tanstack/react-router'
-import { FeaturePermissionsTable } from '../components/FeaturePermissionsTable'
 import { useDepartmentFeatures } from '../hooks/useDepartmentFeatures'
 import { useUpdateFeaturePermission } from '../hooks/useUpdateFeaturePermission'
+import { useFeatureMutations } from '../hooks/useFeatureMutations'
 import { useDepartments } from '../../departments/hooks/useDepartments'
-import type { UpdateFeaturePermissionRequest } from '../types/permission.types'
+import type {
+  CreateFeaturePermissionRequest,
+  FeaturePermission,
+  UpdateFeaturePermissionRequest,
+} from '../types/permission.types'
+import { FeaturePermissionsTable } from '../../../components/permissions/FeaturePermissionsTable'
+import { ColumnFeaturesTable } from '../../../components/permissions/ColumnFeaturesTable'
+import { FeatureFormModal } from '../../../components/permissions/FeatureFormModal'
+import { FEATURE_CATEGORIES } from '../config/featureCategories'
+import { Button } from '../../../components/ui/Button'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
+import { PageHeader } from '../../../components/layout/PageHeader'
+import { PageLayout } from '../../../components/layout/PageLayout'
+import { ProfileChip } from '../../../components/common/ProfileChip'
+import { Card } from '../../../components/ui/Card'
+import { ErrorState } from '../../../components/ui/ErrorState'
+import { LoadingState } from '../../../components/ui/LoadingState'
+import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
-    from: '/admin/departments/$departmentId',
+    from: '/_authed/admin/departments/$departmentId',
   })
 
   const departmentsQuery = useDepartments()
@@ -18,6 +37,19 @@ export function FeaturePermissionsPage() {
     useDepartmentFeatures(departmentId)
   const updateMutation =
     useUpdateFeaturePermission(departmentId)
+  const { create, remove, move } =
+    useFeatureMutations(departmentId)
+
+  const [modal, setModal] = useState<
+    | { kind: 'none' }
+    | { kind: 'create' }
+    | { kind: 'edit'; feature: FeaturePermission }
+    | { kind: 'delete'; feature: FeaturePermission }
+  >({ kind: 'none' })
+  const [showRouteModal, setShowRouteModal] = useState(false)
+  const [showColumnModal, setShowColumnModal] = useState(false)
+
+  const closeModal = () => setModal({ kind: 'none' })
 
   const department = departmentsQuery.data?.find(
     (item) => item.id === departmentId,
@@ -32,42 +64,38 @@ export function FeaturePermissionsPage() {
 
   if (featuresQuery.isPending) {
     return (
-      <main className="page-content">
-        <div className="loading-state">
-          Loading features...
-        </div>
-      </main>
+      <PageLayout>
+        <LoadingState message="Loading features..." />
+      </PageLayout>
     )
   }
 
   if (featuresQuery.isError) {
     return (
-      <main className="page-content">
-        <div className="error-state">
-          <strong>
-            Unable to load features
-          </strong>
-
-          <p>{featuresQuery.error.message}</p>
-
-          <button
-            className="primary-button"
-            onClick={() => featuresQuery.refetch()}
-          >
-            Try Again
-          </button>
-        </div>
-      </main>
+      <PageLayout>
+        <ErrorState
+          title="Unable to load features"
+          message={featuresQuery.error.message}
+          onRetry={() => featuresQuery.refetch()}
+        />
+      </PageLayout>
     )
   }
 
   const features = featuresQuery.data
 
+  const grouped = FEATURE_CATEGORIES.map((meta) => ({
+    meta,
+    items: features.filter(
+      (feature) => feature.category === meta.key,
+    ),
+  }))
+
   return (
-    <main className="page-content">
-      <header className="topbar">
-        <div>
-          <p className="breadcrumb">
+    <PageLayout>
+      <PageHeader
+        breadcrumb={
+          <>
             <Link to="/admin">
               Administration
             </Link>
@@ -77,69 +105,163 @@ export function FeaturePermissionsPage() {
             </Link>
             {' / '}
             {department?.name ?? 'Features'}
-          </p>
+          </>
+        }
+        title={`${department?.name ?? 'Department'} Features`}
+        description="Manage this department category by category — head panel menu items plus the columns of the Customer List and Department Users tables."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRouteModal(true)}
+            >
+              ＋ Add Dynamic Route
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowColumnModal(true)}
+            >
+              ＋ Add Dynamic Column
+            </Button>
 
-          <h1>
-            {department?.name ?? 'Department'}{' '}
-            Features
-          </h1>
+            <Link
+              to="/admin"
+              className="secondary-button back-link"
+            >
+              ← Back to Departments
+            </Link>
 
-          <p className="page-description">
-            Enable or disable features and set
-            role permissions for this department.
-          </p>
-        </div>
+            <ProfileChip />
+          </>
+        }
+      />
 
-        <div className="topbar-actions">
-          <Link
-            to="/admin"
-            className="secondary-button back-link"
-          >
-            ← Back to Departments
-          </Link>
+      {updateMutation.isError && (
+        <p className="form-error">
+          {updateMutation.error.message}
+        </p>
+      )}
 
-          <div className="profile-chip">
-            <div className="admin-avatar small">
-              A
-            </div>
-
+      {grouped.map(({ meta, items }) => (
+        <Card key={meta.key}>
+          <div className="table-toolbar">
             <div>
-              <strong>Admin</strong>
-              <span>Super Admin</span>
+              <h2>{meta.label}</h2>
+
+              <p>{meta.description}</p>
             </div>
+
+            {meta.key === 'screens' ? (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRouteModal(true)}
+                >
+                  ＋ Add Dynamic Route
+                </Button>
+                <Button
+                  onClick={() => setModal({ kind: 'create' })}
+                >
+                  + Add feature
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => setShowColumnModal(true)}
+              >
+                ＋ Add Dynamic Column
+              </Button>
+            )}
           </div>
-        </div>
-      </header>
 
-      <section className="content-card">
-        <div className="table-toolbar">
-          <div>
-            <h2>Feature Access</h2>
+          {meta.key === 'screens' ? (
+            <FeaturePermissionsTable
+              features={items}
+              updatingFeatureId={
+                updateMutation.isPending
+                  ? updateMutation.variables?.id
+                  : undefined
+              }
+              onUpdate={handleUpdate}
+              onEdit={(feature) =>
+                setModal({ kind: 'edit', feature })
+              }
+              onDelete={(feature) =>
+                setModal({ kind: 'delete', feature })
+              }
+              onMove={(feature, direction) =>
+                move.mutate({ id: feature.id, direction })
+              }
+            />
+          ) : (
+            <ColumnFeaturesTable
+              features={items}
+              updatingFeatureId={
+                updateMutation.isPending
+                  ? updateMutation.variables?.id
+                  : undefined
+              }
+              onUpdate={handleUpdate}
+            />
+          )}
+        </Card>
+      ))}
 
-            <p>
-              Three controls per row: enable or
-              disable the feature, then pick a
-              permission for Role A and Role B.
-            </p>
-          </div>
-        </div>
+      <FeatureFormModal
+        open={modal.kind === 'create'}
+        mode="create"
+        onClose={closeModal}
+        isSubmitting={create.isPending}
+        error={create.error?.message}
+        onSubmit={(values: CreateFeaturePermissionRequest) =>
+          create.mutate(values, { onSuccess: closeModal })
+        }
+      />
 
-        {updateMutation.isError && (
-          <p className="form-error">
-            {updateMutation.error.message}
-          </p>
-        )}
-
-        <FeaturePermissionsTable
-          features={features}
-          updatingFeatureId={
-            updateMutation.isPending
-              ? updateMutation.variables?.id
-              : undefined
+      {modal.kind === 'edit' ? (
+        <FeatureFormModal
+          open
+          mode="edit"
+          initialValues={modal.feature}
+          onClose={closeModal}
+          isSubmitting={updateMutation.isPending}
+          error={updateMutation.error?.message}
+          onSubmit={(values) =>
+            updateMutation.mutate(
+              { id: modal.feature.id, data: values },
+              { onSuccess: closeModal },
+            )
           }
-          onUpdate={handleUpdate}
         />
-      </section>
-    </main>
+      ) : null}
+
+      {modal.kind === 'delete' ? (
+        <ConfirmDialog
+          open
+          title="Remove this menu item?"
+          message={`"${modal.feature.name}" will disappear from the head panel sidebar.`}
+          confirmLabel="Remove"
+          isLoading={remove.isPending}
+          error={remove.error?.message}
+          onClose={closeModal}
+          onConfirm={() =>
+            remove.mutate(modal.feature.id, { onSuccess: closeModal })
+          }
+        />
+      ) : null}
+
+      <CreateRouteModal
+        open={showRouteModal}
+        onClose={() => setShowRouteModal(false)}
+        initialDepartmentType={department?.username || department?.name}
+      />
+
+      <CreateColumnModal
+        open={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
+        initialDepartmentType={department?.username || department?.name}
+      />
+    </PageLayout>
   )
 }

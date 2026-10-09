@@ -1,0 +1,240 @@
+.meeting-page__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.meeting-page__controls-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.meeting-page__controls-center {
+  flex: 1;
+  min-width: 280px;
+  max-width: 480px;
+}
+
+.meeting-page__controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.meeting-page__refresh-btn {
+  border-color: var(--head-border-2);
+}
+
+/* Filter dropdown */
+.filter-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.filter-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 40px;
+  border: 1px solid var(--head-blue);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--head-blue);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.filter-dropdown__trigger:hover {
+  background: var(--head-blue-soft);
+  border-color: var(--head-blue);
+  color: var(--head-blue-dark);
+}
+
+.filter-dropdown__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 280px;
+  border: 1px solid var(--head-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 12%);
+  animation: hin 0.15s ease-out;
+}
+
+.filter-dropdown__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--head-border);
+}
+
+.filter-dropdown__panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.filter-dropdown__panel-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--head-muted);
+  cursor: pointer;
+}
+
+.filter-dropdown__panel-close:hover {
+  background: #f1f5f9;
+  color: var(--head-text);
+}
+
+.filter-dropdown__panel-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.filter-dropdown__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-dropdown__field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.filter-dropdown__select {
+  padding: 9px 11px;
+  border: 1px solid var(--head-border);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--head-text);
+  outline: none;
+}
+
+.filter-dropdown__select:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
+}
+
+.filter-dropdown__date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-dropdown__date {
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid var(--head-border);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--head-text);
+  outline: none;
+}
+
+.filter-dropdown__date-separator {
+  color: var(--head-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.filter-dropdown__panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--head-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.filter-dropdown__reset-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Make the shared SearchBar more compact for Meeting page */
+.meeting-page__search .head-search {
+  padding: 0 14px;
+  height: 44px;
+  border-radius: 12px;
+  border-color: var(--head-border);
+  background: #fff;
+}
+
+.meeting-page__search .head-search__icon {
+  width: 18px;
+  height: 18px;
+  color: var(--head-muted);
+}
+
+.meeting-page__search .head-search input {
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.meeting-page__search .head-search input::placeholder {
+  color: var(--head-muted);
+  font-size: 14px;
+}
+
+.meeting-page__search .head-search:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
+}
+
+/* =============================================================
+   RESPONSIVE — MeetingPage
+   ============================================================= */
+@media (max-width: 768px) {
+  .meeting-page__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .meeting-page__controls-center {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .meeting-page__controls-left,
+  .meeting-page__controls-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .filter-dropdown__panel {
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .meeting-page__controls-left {
+    flex-wrap: wrap;
+  }
+}
