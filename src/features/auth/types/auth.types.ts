@@ -4,6 +4,8 @@ export interface AuthUser {
   id: string
   name: string
   email: string
+  /** Exact backend login identity/JWT subject used by the `username` header. */
+  username?: string
   role: UserRole
   /** Department this HEAD / USER belongs to. */
   departmentId?: string

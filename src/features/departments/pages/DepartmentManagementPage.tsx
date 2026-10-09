@@ -4,6 +4,13 @@ import { useDepartments } from '../hooks/useDepartments'
 import { useCreateDepartment } from '../hooks/useCreateDepartment'
 import { useUpdateDepartment } from '../hooks/useUpdateDepartment'
 import { useDeleteDepartment } from '../hooks/useDeleteDepartment'
+import { useLoginAsDepartment } from '../../auth/hooks/useLoginAsDepartment'
+import {
+  getSession,
+  homeForRole,
+  saveAdminBackup,
+  setSession,
+} from '../../../app/auth/session'
 import type {
   CreateDepartmentRequest,
   Department,
@@ -40,6 +47,7 @@ export function DepartmentManagementPage() {
   const createMutation = useCreateDepartment()
   const updateMutation = useUpdateDepartment()
   const deleteMutation = useDeleteDepartment()
+  const loginAsMutation = useLoginAsDepartment()
 
   const departments = useMemo(
     () => departmentsQuery.data ?? [],
@@ -103,12 +111,31 @@ export function DepartmentManagementPage() {
     })
   }
 
-  function handleViewDashboard(
+  /**
+   * Home button: generate a token for the department's email
+   * (GET /api/auth/generate-token?username=<email>) and sign
+   * the admin in as that department.
+   */
+  function handleLoginAsDepartment(
     department: Department,
   ) {
-    navigate({
-      to: '/departments/$departmentId/dashboard',
-      params: { departmentId: department.id },
+    loginAsMutation.reset()
+
+    loginAsMutation.mutate(department.email, {
+      onSuccess: (session) => {
+        const adminSession = getSession()
+
+        // Keep the admin session so "Back to my account" works.
+        if (adminSession?.user.role === 'ADMIN') {
+          saveAdminBackup(adminSession)
+        }
+
+        setSession(session)
+
+        navigate({
+          to: homeForRole(session.user.role) as never,
+        })
+      },
     })
   }
 
@@ -172,6 +199,13 @@ export function DepartmentManagementPage() {
 
       <DepartmentStats departments={departments} />
 
+      {loginAsMutation.isError ? (
+        <p className="auth-error" role="alert">
+          Could not log in as department:{' '}
+          {loginAsMutation.error.message}
+        </p>
+      ) : null}
+
       <Card>
         <div className="table-toolbar">
           <div>
@@ -214,7 +248,15 @@ export function DepartmentManagementPage() {
           onEdit={setEditingDepartment}
           onDelete={setDepartmentToDelete}
           onViewFeatures={handleViewFeatures}
-          onViewDashboard={handleViewDashboard}
+          onViewDashboard={handleLoginAsDepartment}
+          loggingInId={
+            loginAsMutation.isPending
+              ? (departments.find(
+                  (item) =>
+                    item.email === loginAsMutation.variables,
+                )?.id ?? '')
+              : null
+          }
         />
       </Card>
 
