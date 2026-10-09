@@ -25,6 +25,7 @@ import { DepartmentCustomersPage } from '../features/departments/pages/Departmen
 import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
 import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
 import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
+import { FinanceFeaturesPage } from '../features/departments/pages/FinanceFeaturesPage'
 import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
 import { FetchRoutesColumnsPage } from '../features/permissions/pages/FetchRoutesColumnsPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
@@ -114,6 +115,13 @@ const departmentFeaturesRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/departments/$departmentId',
   component: FeaturePermissionsPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const departmentFinanceRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/departments/$departmentId/finance',
+  component: FinanceFeaturesPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -242,6 +250,7 @@ const routeTree = rootRoute.addChildren([
   authedLayoutRoute.addChildren([
     adminRoute,
     departmentFeaturesRoute,
+    departmentFinanceRoute,
     accessTokensRoute,
     fetchRcRoute,
     forbiddenRoute,

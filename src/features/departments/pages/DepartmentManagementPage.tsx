@@ -49,10 +49,27 @@ export function DepartmentManagementPage() {
   const deleteMutation = useDeleteDepartment()
   const loginAsMutation = useLoginAsDepartment()
 
-  const departments = useMemo(
+  const allDepartments = useMemo(
     () => departmentsQuery.data ?? [],
     [departmentsQuery.data],
   )
+
+  // Deduplicate: only show department heads, grouped by department type
+  const departments = useMemo(() => {
+    const headMap = new Map<string, Department>()
+    
+    for (const dept of allDepartments) {
+      if (dept.role === 'DEPARTMENT_HEAD') {
+        // Use department type as key to deduplicate
+        const typeKey = dept.type || 'unknown'
+        if (!headMap.has(typeKey)) {
+          headMap.set(typeKey, dept)
+        }
+      }
+    }
+    
+    return Array.from(headMap.values())
+  }, [allDepartments])
 
   const filteredDepartments = useMemo(() => {
     const value = search.trim().toLowerCase()
@@ -63,6 +80,7 @@ export function DepartmentManagementPage() {
 
     return departments.filter((department) =>
       [
+        department.type || '',
         department.name,
         department.username,
         department.email,
