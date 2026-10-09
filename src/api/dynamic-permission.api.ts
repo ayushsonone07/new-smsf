@@ -31,7 +31,9 @@ export interface CreateDynamicRoutePayload {
 export interface DynamicRouteResponse {
   routeId: string
   routeName: string
-  departmentType: string
+  departmentType?: string
+  departmentId?: number
+  assignedRoles?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -45,10 +47,23 @@ export interface CreateDynamicColumnPayload {
 export interface DynamicColumnResponse {
   columnId: string
   columnName: string
-  departmentType: string
+  departmentType?: string
+  departmentId?: number
   readWriteAccess?: string
+  roleAPermission?: string
+  roleBPermission?: string
+  isConfigured?: boolean
   createdAt?: string
   updatedAt?: string
+}
+
+export interface DepartmentDetailsResponse {
+  departmentType: string
+  departmentId: number | null
+  totalRoutes: number
+  totalColumns: number
+  routes: DynamicRouteResponse[]
+  columns: DynamicColumnResponse[]
 }
 
 /**
@@ -87,11 +102,16 @@ export async function createDynamicRoute(
 }
 
 /**
- * Get all routes from access_routes
+ * Get routes from access_routes (optionally filtered by departmentType)
  */
-export async function getDynamicRoutes(): Promise<DynamicRouteResponse[]> {
+export async function getDynamicRoutes(
+  departmentType?: string,
+): Promise<DynamicRouteResponse[]> {
   try {
-    const res = await authedApiRequest<any>('/api/dynamic-permission/routes')
+    const url = departmentType && departmentType !== 'ALL'
+      ? `/api/dynamic-permission/routes?departmentType=${encodeURIComponent(departmentType)}`
+      : '/api/dynamic-permission/routes'
+    const res = await authedApiRequest<any>(url)
     if (Array.isArray(res)) return res
     if (res && Array.isArray(res.data)) return res.data
     if (res && res.data && Array.isArray(res.data.data)) return res.data.data
@@ -121,11 +141,16 @@ export async function createDynamicColumn(
 }
 
 /**
- * Get all columns from access_customer_columns
+ * Get columns from access_customer_columns (optionally filtered with department role permissions)
  */
-export async function getDynamicColumns(): Promise<DynamicColumnResponse[]> {
+export async function getDynamicColumns(
+  departmentType?: string,
+): Promise<DynamicColumnResponse[]> {
   try {
-    const res = await authedApiRequest<any>('/api/dynamic-permission/columns')
+    const url = departmentType && departmentType !== 'ALL'
+      ? `/api/dynamic-permission/columns?departmentType=${encodeURIComponent(departmentType)}`
+      : '/api/dynamic-permission/columns'
+    const res = await authedApiRequest<any>(url)
     if (Array.isArray(res)) return res
     if (res && Array.isArray(res.data)) return res.data
     if (res && res.data && Array.isArray(res.data.data)) return res.data.data
@@ -136,11 +161,31 @@ export async function getDynamicColumns(): Promise<DynamicColumnResponse[]> {
   }
 }
 
+/**
+ * Get department details including ID, mapped routes count, and columns count
+ */
+export async function getDepartmentDetails(
+  departmentType: string,
+): Promise<DepartmentDetailsResponse | null> {
+  try {
+    const res = await authedApiRequest<any>(
+      `/api/dynamic-permission/department-details?departmentType=${encodeURIComponent(departmentType)}`,
+    )
+    if (res && res.data) return res.data
+    return res as DepartmentDetailsResponse
+  } catch (err) {
+    console.error('Failed to fetch department details:', err)
+    return null
+  }
+}
+
 export interface UpdateColumnPermissionPayload {
-  columnId: string
+  columnId?: string
+  columnName?: string
   roleName: string
   departmentType: string
-  readWriteAccess: '1' | '2' | '12'
+  readWriteAccess: '1' | '2' | '12' | 'CAN_READ' | 'CAN_EDIT'
+  assignedRoles?: string[]
 }
 
 export interface ColumnPermissionUpdateResponse {
@@ -150,6 +195,7 @@ export interface ColumnPermissionUpdateResponse {
   departmentId: number | string
   departmentType: string
   readWriteAccess: string
+  assignedRoles?: string[]
 }
 
 /**
