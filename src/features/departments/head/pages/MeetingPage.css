@@ -40,15 +40,15 @@
 .filter-dropdown__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 34px;
+  gap: 5px;
+  padding: 0 10px;
+  height: 31px;
   border: 1px solid var(--head-blue);
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fff;
   color: var(--head-blue);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -183,8 +183,8 @@
    not descendant selectors. */
 .meeting-page__search.head-search {
   padding: 0 10px;
-  height: 34px;
-  border-radius: 8px;
+  height: 31px;
+  border-radius: 7px;
   border-color: var(--head-border);
   background: #fff;
 }

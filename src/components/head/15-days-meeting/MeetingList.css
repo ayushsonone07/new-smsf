@@ -13,9 +13,9 @@
 }
 
 .meeting-list__th {
-  padding: 7px 12px;
+  padding: 6px 10px;
   text-align: left;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -32,7 +32,7 @@
 .meeting-list__th--actions { width: 210px; }
 
 .meeting-list__td {
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }

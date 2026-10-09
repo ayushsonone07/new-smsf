@@ -80,13 +80,12 @@
   color: var(--head-text);
 }
 
-/* Toolbar: filters + search + actions - Grid layout to prevent overlap */
 .hc-toolbar {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
-  padding: 10px 0 8px;
+  padding: 8px 0 6px;
 }
 
 .hc-toolbar__left {
@@ -96,7 +95,7 @@
 .hc-toolbar__right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -104,28 +103,28 @@
    so these must be compound selectors (.hc-search.head-search),
    not descendant selectors. */
 .hc-search.head-search {
-  padding: 0 12px;
-  height: 38px;
-  border-radius: 10px;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: 9px;
   border-color: var(--head-border);
   background: #fff;
 }
 
 .hc-search .head-search__icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: var(--head-muted);
 }
 
 .hc-search.head-search input {
-  padding: 8px 0;
-  font-size: 14px;
+  padding: 6px 0;
+  font-size: 13px;
   font-weight: 400;
 }
 
 .hc-search.head-search input::placeholder {
   color: var(--head-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .hc-search.head-search:focus-within {
@@ -133,26 +132,25 @@
   box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
 }
 
-/* Status tabs */
 .hc-status-tabs {
   display: inline-flex;
-  gap: 4px;
+  gap: 3px;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #f1f5f9;
 }
 
 .hc-status-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 5px;
+  padding: 5px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: #334155;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -172,13 +170,13 @@
 .hc-status-tab__count {
   display: inline-grid;
   place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 999px;
   background: #e2e8f0;
   color: #475569;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -191,12 +189,12 @@
 .hc-round-robin-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
-  height: 40px;
+  height: 36px;
   background: #16a34a;
   border-color: #16a34a;
   color: #fff;
@@ -374,9 +372,9 @@
   flex-direction: column;
   min-height: 0;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid var(--head-border);
-  padding: 16px 20px;
+  padding: 14px 16px;
   overflow-y: auto;
 }
 
@@ -385,24 +383,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
   min-height: 320px;
-  padding: 32px 20px;
+  padding: 24px 16px;
   text-align: center;
   color: var(--head-muted);
 }
 
 .hc-details__placeholder h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--head-text);
 }
 
 .hc-details__placeholder p {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -411,8 +409,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--head-border);
   flex-shrink: 0;
 }
@@ -420,13 +418,13 @@
 .hc-details__header-left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   flex: 1;
   min-width: 0;
 }
 
 .hc-details__ticket-id {
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--head-blue);
@@ -434,7 +432,7 @@
 
 .hc-details__subject {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--head-text);
   line-height: 1.2;
@@ -445,17 +443,17 @@
 }
 
 .hc-details__status-select {
-  padding: 6px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--head-border);
   border-radius: 6px;
   background: #fff;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--head-text);
   outline: none;
   cursor: pointer;
-  min-width: 160px;
+  min-width: 140px;
 }
 
 .hc-details__status-select:focus {
@@ -466,9 +464,9 @@
 /* Meta grid */
 .hc-details__meta-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px 14px;
-  padding: 12px 0;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 12px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--head-border);
   flex-shrink: 0;
 }
@@ -480,7 +478,7 @@
 }
 
 .hc-details__meta-item label {
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -488,7 +486,7 @@
 }
 
 .hc-details__meta-value {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--head-text);
 }
@@ -496,7 +494,7 @@
 .hc-details__meta-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   color: var(--head-blue);
   text-decoration: none;
   font-weight: 500;
@@ -508,8 +506,8 @@
 
 /* Section title */
 .hc-details__section-title {
-  margin: 0 0 10px;
-  font-size: 13px;
+  margin: 0 0 8px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--head-text);
 }
@@ -517,7 +515,7 @@
 /* Conversation */
 .hc-details__conversation {
   flex: 1;
-  min-height: 180px;
+  min-height: 160px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -525,16 +523,16 @@
 .hc-details__messages {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 260px;
+  gap: 8px;
+  max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .hc-details__message {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--head-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fafbfd;
 }
 
@@ -542,9 +540,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 4px;
-  font-size: 11px;
+  gap: 8px;
+  margin-bottom: 3px;
+  font-size: 10px;
 }
 
 .hc-details__message-header strong {
@@ -559,7 +557,7 @@
 
 .hc-details__message-body {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--head-text);
   line-height: 1.4;
 }
@@ -568,19 +566,19 @@
 .hc-details__reply-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .hc-details__reply-input {
   width: 100%;
-  min-height: 70px;
-  padding: 10px 12px;
+  min-height: 60px;
+  padding: 8px 10px;
   border: 1px solid var(--head-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fff;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--head-text);
   outline: none;
   resize: vertical;
@@ -607,9 +605,9 @@
 }
 
 .hc-details__reply-actions .primary-button {
-  padding: 8px 18px;
-  border-radius: 7px;
-  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 

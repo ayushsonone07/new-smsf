@@ -1,8 +1,8 @@
 .hc-ticket-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 5px;
+  padding: 8px 10px;
   border: 1px solid var(--head-border);
   border-radius: 8px;
   background: #fff;
