@@ -6,6 +6,7 @@ import {
   getDepartmentTypes,
   getDynamicColumns,
   getDynamicRoutes,
+  getUserDynamicPermissions,
   updateColumnPermission,
   type CreateDynamicColumnPayload,
   type CreateDynamicRoutePayload,
@@ -39,6 +40,16 @@ export function useDepartmentDetails(departmentType: string) {
     queryKey: ['dynamic-permissions', 'department-details', departmentType],
     queryFn: () => getDepartmentDetails(departmentType),
     enabled: Boolean(departmentType && departmentType !== 'ALL'),
+  })
+}
+
+export function useUserDynamicPermissions(params?: {
+  username?: string
+  departmentType?: string
+}) {
+  return useQuery({
+    queryKey: ['dynamic-permissions', 'user-permissions', params?.username, params?.departmentType],
+    queryFn: () => getUserDynamicPermissions(params),
   })
 }
 

@@ -216,3 +216,46 @@ export async function updateColumnPermission(
   }
   return res as ColumnPermissionUpdateResponse
 }
+
+export interface UserDynamicPermissionsResponse {
+  username: string
+  roleName: string
+  departmentType: string
+  departmentId: number
+  totalRoutes: number
+  totalColumns: number
+  routes: Array<{
+    routeId: string
+    routeName: string
+  }>
+  columnPermissions: Array<{
+    columnId: string
+    columnName: string
+    readWriteAccess: string
+    canRead: boolean
+    canEdit: boolean
+  }>
+}
+
+/**
+ * Get all allowed routes and column permissions based on username and departmentType
+ */
+export async function getUserDynamicPermissions(params?: {
+  username?: string
+  departmentType?: string
+}): Promise<UserDynamicPermissionsResponse | null> {
+  try {
+    const query = new URLSearchParams()
+    if (params?.username) query.append('username', params.username)
+    if (params?.departmentType) query.append('departmentType', params.departmentType)
+    const queryString = query.toString() ? `?${query.toString()}` : ''
+    const res = await authedApiRequest<any>(
+      `/api/dynamic-permission/user-permissions${queryString}`,
+    )
+    if (res && res.data) return res.data
+    return res as UserDynamicPermissionsResponse
+  } catch (err) {
+    console.error('Failed to fetch user dynamic permissions:', err)
+    return null
+  }
+}
