@@ -27,6 +27,7 @@ import { DepartmentServicesPage } from '../features/departments/pages/Department
 import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
 import { FinanceFeaturesPage } from '../features/departments/pages/FinanceFeaturesPage'
 import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
+import { FetchRoutesColumnsPage } from '../features/permissions/pages/FetchRoutesColumnsPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
@@ -128,6 +129,13 @@ const accessTokensRoute = createRoute({
   beforeLoad: requireRole('ADMIN'),
 })
 
+const fetchRcRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/fetch-rc',
+  component: FetchRoutesColumnsPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
 const headLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_head',
@@ -213,6 +221,7 @@ const routeTree = rootRoute.addChildren([
     departmentFeaturesRoute,
     departmentFinanceRoute,
     accessTokensRoute,
+    fetchRcRoute,
     forbiddenRoute,
   ]),
   departmentDashboardRoute,

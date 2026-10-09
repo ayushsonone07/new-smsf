@@ -26,6 +26,8 @@ import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
 import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
+import { MyAccessPanel } from '../../../components/permissions/MyAccessPanel'
+import { AllDepartmentsPanel } from '../../../components/permissions/AllDepartmentsPanel'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
@@ -207,6 +209,38 @@ export function FeaturePermissionsPage() {
           )}
         </Card>
       ))}
+
+      <Card>
+        <div className="table-toolbar">
+          <div>
+            <h2>Show all (R/C) — My Access</h2>
+
+            <p>
+              Routes and columns visible to your own role,
+              read live from the backend session APIs
+              (SUPERADMIN sees everything). Switch tabs to
+              see each list separately.
+            </p>
+          </div>
+        </div>
+
+        <MyAccessPanel />
+      </Card>
+
+      <Card>
+        <div className="table-toolbar">
+          <div>
+            <h2>Show all Department</h2>
+
+            <p>
+              Every department user from the backend admin API,
+              with head/member tabs and pagination.
+            </p>
+          </div>
+        </div>
+
+        <AllDepartmentsPanel />
+      </Card>
 
       <FeatureFormModal
         open={modal.kind === 'create'}

@@ -7,6 +7,7 @@ import type { UserRole } from '../../features/auth/types/auth.types'
 
 type NavPath =
   | '/admin'
+  | '/admin/fetch-rc'
   | '/admin/tokens'
   | '/head'
   | '/users'
@@ -28,6 +29,14 @@ const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) =>
       pathname === '/admin' ||
       pathname.startsWith('/admin/departments'),
+  },
+  {
+    to: '/admin/fetch-rc',
+    label: 'Fetch R/C',
+    icon: '⇄',
+    roles: ['ADMIN', 'HEAD'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/fetch-rc'),
   },
   {
     to: '/admin/tokens',

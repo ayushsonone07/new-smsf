@@ -90,12 +90,16 @@ export async function createDynamicRoute(
  * Get all routes from access_routes
  */
 export async function getDynamicRoutes(): Promise<DynamicRouteResponse[]> {
-  const res = await authedApiRequest<
-    DynamicRouteResponse[] | { data: DynamicRouteResponse[] }
-  >('/api/dynamic-permission/routes')
-  if (Array.isArray(res)) return res
-  if (res && Array.isArray(res.data)) return res.data
-  return []
+  try {
+    const res = await authedApiRequest<any>('/api/dynamic-permission/routes')
+    if (Array.isArray(res)) return res
+    if (res && Array.isArray(res.data)) return res.data
+    if (res && res.data && Array.isArray(res.data.data)) return res.data.data
+    return []
+  } catch (err) {
+    console.error('Failed to fetch dynamic routes:', err)
+    return []
+  }
 }
 
 /**
@@ -120,10 +124,49 @@ export async function createDynamicColumn(
  * Get all columns from access_customer_columns
  */
 export async function getDynamicColumns(): Promise<DynamicColumnResponse[]> {
+  try {
+    const res = await authedApiRequest<any>('/api/dynamic-permission/columns')
+    if (Array.isArray(res)) return res
+    if (res && Array.isArray(res.data)) return res.data
+    if (res && res.data && Array.isArray(res.data.data)) return res.data.data
+    return []
+  } catch (err) {
+    console.error('Failed to fetch dynamic columns:', err)
+    return []
+  }
+}
+
+export interface UpdateColumnPermissionPayload {
+  columnId: string
+  roleName: string
+  departmentType: string
+  readWriteAccess: '1' | '2' | '12'
+}
+
+export interface ColumnPermissionUpdateResponse {
+  columnId: string
+  columnName: string
+  roleName: string
+  departmentId: number | string
+  departmentType: string
+  readWriteAccess: string
+}
+
+/**
+ * Update read/write permission for a specific (role, department, column)
+ * in the database (access_controls table).
+ */
+export async function updateColumnPermission(
+  payload: UpdateColumnPermissionPayload,
+): Promise<ColumnPermissionUpdateResponse> {
   const res = await authedApiRequest<
-    DynamicColumnResponse[] | { data: DynamicColumnResponse[] }
-  >('/api/dynamic-permission/columns')
-  if (Array.isArray(res)) return res
-  if (res && Array.isArray(res.data)) return res.data
-  return []
+    ColumnPermissionUpdateResponse | { data: ColumnPermissionUpdateResponse }
+  >('/api/dynamic-permission/columns/permission', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  if (res && 'data' in res && res.data) {
+    return res.data
+  }
+  return res as ColumnPermissionUpdateResponse
 }
