@@ -74,7 +74,7 @@ export function ForbiddenPage() {
             onClick={() =>
               navigate({
                 to: session
-                  ? homeForRole(session.user.role)
+                  ? homeForRole(session.user.role as never) as never
                   : '/login',
               })
             }
@@ -86,3 +86,9 @@ export function ForbiddenPage() {
     </main>
   )
 }
+
+
+
+
+
+
