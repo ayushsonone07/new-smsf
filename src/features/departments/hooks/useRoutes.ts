@@ -4,8 +4,7 @@ import { getRoutes, type RouteInfo } from '../../../api/routes.api'
 export const routesQueryKey = ['routes'] as const
 
 export function useRoutes() {
-  console.log('🔍 useRoutes hook called')
-  const query = useQuery({
+  return useQuery({
     queryKey: routesQueryKey,
     queryFn: async () => {
       console.log('🔍 getRoutes queryFn executing...')
@@ -13,9 +12,11 @@ export function useRoutes() {
       console.log('🔍 getRoutes result:', result)
       return result
     },
+    // Force fresh fetch on window focus / component mount
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   })
-  console.log('🔍 useRoutes query state:', { isPending: query.isPending, isError: query.isError, data: query.data })
-  return query
 }
 
 export type { RouteInfo }

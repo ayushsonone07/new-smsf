@@ -15,12 +15,8 @@ export function FinanceFeaturesPage() {
     from: '/_authed/admin/departments/$departmentId/finance',
   })
 
-  console.log('🔍 FinanceFeaturesPage rendering, departmentId:', departmentId)
-
   const departmentsQuery = useDepartments()
   const routesQuery = useRoutes()
-  
-  console.log('🔍 routesQuery:', { isPending: routesQuery.isPending, isError: routesQuery.isError, isSuccess: routesQuery.isSuccess, dataLength: routesQuery.data?.length })
 
   const department = departmentsQuery.data?.find(
     (item) => item.id === departmentId,

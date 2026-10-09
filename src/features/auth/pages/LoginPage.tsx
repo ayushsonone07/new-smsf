@@ -33,7 +33,7 @@ export function LoginPage() {
     (session: AuthSession) => {
       setSession(session)
       navigate({
-        to: homeForRole(session.user.role),
+        to: homeForRole(session.user.role as never) as never,
       })
     },
     [navigate],
@@ -178,3 +178,9 @@ export function LoginPage() {
     </main>
   )
 }
+
+
+
+
+
+

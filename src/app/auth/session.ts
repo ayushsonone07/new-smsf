@@ -36,6 +36,7 @@ export type HomeRoute =
   | '/admin'
   | '/head'
   | '/users'
+  | '/customers'
   | '/forbidden'
 
 export function homeForRole(
@@ -51,6 +52,10 @@ export function homeForRole(
 
   if (role === 'USER') {
     return '/users'
+  }
+
+  if (role === 'CUSTOMER') {
+    return '/customers'
   }
 
   return '/forbidden'
