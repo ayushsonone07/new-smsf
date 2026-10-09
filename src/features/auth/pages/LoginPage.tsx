@@ -23,8 +23,6 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [accessToken, setAccessToken] =
-    useState('')
 
   const credentialsMutation =
     useLoginWithCredentials()
@@ -35,7 +33,7 @@ export function LoginPage() {
     (session: AuthSession) => {
       setSession(session)
       navigate({
-        to: homeForRole(session.user.role),
+        to: homeForRole(session.user.role as never) as never,
       })
     },
     [navigate],
@@ -68,16 +66,6 @@ export function LoginPage() {
         onSuccess: handleSessionCreated,
       },
     )
-  }
-
-  function handleTokenSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault()
-
-    tokenMutation.mutate(accessToken, {
-      onSuccess: handleSessionCreated,
-    })
   }
 
   const credentialsError =
@@ -186,54 +174,13 @@ export function LoginPage() {
               : 'Sign in as Admin'}
           </button>
         </form>
-
-        <div className="auth-divider">
-          <span>or sign in with access token</span>
-        </div>
-
-        <form
-          className="auth-form"
-          onSubmit={handleTokenSubmit}
-        >
-          <label>
-            Access Token
-
-            <input
-              required
-              value={accessToken}
-              onChange={(event) =>
-                setAccessToken(
-                  event.target.value,
-                )
-              }
-              placeholder="Paste token issued by admin"
-            />
-          </label>
-
-          {!tokenParam && tokenError && (
-            <p className="auth-error">
-              {tokenError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            className="secondary-button auth-submit"
-            disabled={tokenMutation.isPending}
-          >
-            {tokenMutation.isPending
-              ? 'Verifying...'
-              : 'Sign in with Token'}
-          </button>
-        </form>
-
-        <p className="auth-hint">
-          Demo admin — email: admin@smsf.test,
-          password: admin123. Head/User access
-          links generate from Admin → Access
-          Tokens.
-        </p>
       </div>
     </main>
   )
 }
+
+
+
+
+
+

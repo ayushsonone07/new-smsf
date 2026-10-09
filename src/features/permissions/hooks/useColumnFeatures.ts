@@ -31,10 +31,10 @@ export function useColumnFeatures(
 ): ColumnFeaturesState {
   const query = useDepartmentFeatures(departmentId)
 
-  const permissionKey =
-    getSession()?.user.role === 'USER'
-      ? 'roleBPermission'
-      : 'roleAPermission'
+  const isUser = getSession()?.user.role === 'USER'
+  const permissionKey = isUser
+    ? 'roleBPermission'
+    : 'roleAPermission'
 
   const columns = useMemo(
     () =>
@@ -60,9 +60,13 @@ export function useColumnFeatures(
   const hiddenColumns = useMemo(
     () =>
       columns
-        .filter((feature) => !feature.enabled)
+        .filter(
+          (feature) =>
+            !feature.enabled ||
+            (isUser && feature.userVisible === false),
+        )
         .map((feature) => feature.columnKey as string),
-    [columns],
+    [columns, isUser],
   )
 
   function canEdit(columnKey: string): boolean {
@@ -70,6 +74,7 @@ export function useColumnFeatures(
 
     if (!feature) return true
     if (!feature.enabled) return false
+    if (isUser && feature.userVisible === false) return false
 
     return feature[permissionKey] === 'CAN_EDIT'
   }

@@ -28,6 +28,7 @@ const PERMISSION_OPTIONS: Array<{
 const columns = [
   { key: 'column', title: 'COLUMN' },
   { key: 'enabled', title: 'ENABLE / DISABLE' },
+  { key: 'userVisible', title: 'SHOW TO USER' },
   { key: 'roleA', title: 'ROLE A (HEAD)' },
   { key: 'roleB', title: 'ROLE B (USER)' },
 ]
@@ -81,6 +82,17 @@ export function ColumnFeaturesTable({
                 label={`Toggle ${feature.name} column`}
                 onChange={(checked) =>
                   onUpdate(feature.id, { enabled: checked })
+                }
+              />
+            </td>
+
+            <td>
+              <PermissionToggle
+                checked={feature.userVisible !== false}
+                disabled={isUpdating || !feature.enabled}
+                label={`Show ${feature.name} column to user`}
+                onChange={(checked) =>
+                  onUpdate(feature.id, { userVisible: checked })
                 }
               />
             </td>

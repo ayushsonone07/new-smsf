@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'HEAD' | 'USER'
+export type UserRole = 'ADMIN' | 'HEAD' | 'USER' | 'CUSTOMER'
 
 export interface AuthUser {
   id: string
@@ -7,6 +7,12 @@ export interface AuthUser {
   role: UserRole
   /** Department this HEAD / USER belongs to. */
   departmentId?: string
+  /**
+   * Backend department enum, e.g. `ONBOARDING_DEPARTMENT`
+   * (login response `departmentType`). Used as the
+   * `department` query param of the onboarding APIs.
+   */
+  departmentType?: string
 }
 
 export interface AuthSession {

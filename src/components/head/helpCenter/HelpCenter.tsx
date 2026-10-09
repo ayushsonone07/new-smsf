@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { SearchBar } from '../shared/SearchBar'
 import { Icon } from '../shared/Icon'
 import { Button } from '../../ui/Button'
@@ -8,6 +9,26 @@ import { HelpCenterEmptyState } from './HelpCenterEmptyState'
 import { HelpCenterStats } from './HelpCenterStats'
 import type { HelpCenterTicket } from './HelpCenterTicketCard'
 import './HelpCenter.css'
+
+const toolbarVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
+
+const toolbarItemVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
+
+const listVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05 } },
+}
+
+const placeholderVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.98 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.18 } },
+}
 
 interface HelpCenterProps {
   tickets: HelpCenterTicket[]
@@ -119,8 +140,13 @@ export function HelpCenter({ tickets: initialTickets }: HelpCenterProps) {
       <HelpCenterStats stats={stats} />
 
       {/* Filters & Search - Grid layout to prevent overlap */}
-      <div className="hc-toolbar">
-        <div className="hc-toolbar__left">
+      <motion.div
+        className="hc-toolbar"
+        initial="hidden"
+        animate="visible"
+        variants={toolbarVariants}
+      >
+        <motion.div className="hc-toolbar__left" variants={toolbarItemVariants}>
           <div className="hc-status-tabs">
             {[
               { value: 'all', label: 'All' },
@@ -129,22 +155,23 @@ export function HelpCenter({ tickets: initialTickets }: HelpCenterProps) {
               { value: 'in-progress', label: 'In Progress' },
               { value: 'completed', label: 'Completed' },
             ].map((tab) => (
-              <button
+              <motion.button
                 key={tab.value}
                 type="button"
                 className={`hc-status-tab ${statusFilter === tab.value ? 'is-active' : ''}`}
                 onClick={() => setStatusFilter(tab.value as typeof statusFilter)}
+                whileTap={{ scale: 0.95 }}
               >
                 {tab.label}
                 <span className="hc-status-tab__count">
                   {tickets.filter((t) => tab.value === 'all' || t.status === tab.value).length}
                 </span>
-              </button>
+              </motion.button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="hc-toolbar__right">
+        <motion.div className="hc-toolbar__right" variants={toolbarItemVariants}>
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -155,8 +182,8 @@ export function HelpCenter({ tickets: initialTickets }: HelpCenterProps) {
             <Icon name="refresh" size={14} strokeWidth={2} />
             <span>Round robin on</span>
           </Button>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Ticket List + Details - Two panel layout */}
       <div className="hc-main">
@@ -164,7 +191,14 @@ export function HelpCenter({ tickets: initialTickets }: HelpCenterProps) {
           {filteredTickets.length === 0 ? (
             <HelpCenterEmptyState />
           ) : (
-            <div className="hc-ticket-list" role="list" aria-label="Tickets">
+            <motion.div
+            className="hc-ticket-list"
+            role="list"
+            aria-label="Tickets"
+            initial="hidden"
+            animate="visible"
+            variants={listVariants}
+          >
               {filteredTickets.map((ticket) => (
                 <HelpCenterTicketCard
                   key={ticket.id}
@@ -173,23 +207,29 @@ export function HelpCenter({ tickets: initialTickets }: HelpCenterProps) {
                   onClick={() => setSelectedTicket(ticket)}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
         </aside>
 
         <section className="hc-details" aria-label="Ticket details">
           {selectedTicket ? (
             <HelpCenterTicketDetails
+              key={selectedTicket.id}
               ticket={selectedTicket}
               onReply={handleReply}
               onStatusChange={handleStatusChange}
             />
           ) : (
-            <div className="hc-details__placeholder">
+            <motion.div
+              className="hc-details__placeholder"
+              initial="hidden"
+              animate="visible"
+              variants={placeholderVariants}
+            >
               <Icon name="help" size={48} strokeWidth={1.5} />
               <h3>Select a ticket</h3>
               <p>Choose a ticket from the list to view details and reply.</p>
-            </div>
+            </motion.div>
           )}
         </section>
       </div>

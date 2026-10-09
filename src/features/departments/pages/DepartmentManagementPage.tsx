@@ -21,6 +21,8 @@ import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 
 export function DepartmentManagementPage() {
   const navigate = useNavigate()
@@ -31,6 +33,8 @@ export function DepartmentManagementPage() {
     useState<Department | null>(null)
   const [showCreateModal, setShowCreateModal] =
     useState(false)
+  const [showRouteModal, setShowRouteModal] = useState(false)
+  const [showColumnModal, setShowColumnModal] = useState(false)
 
   const departmentsQuery = useDepartments()
   const createMutation = useCreateDepartment()
@@ -179,11 +183,25 @@ export function DepartmentManagementPage() {
             </p>
           </div>
 
-          <Button
-            onClick={() => setShowCreateModal(true)}
-          >
-            <span>＋</span> Create Department Login
-          </Button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRouteModal(true)}
+            >
+              <span>＋</span> Add Dynamic Route
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowColumnModal(true)}
+            >
+              <span>＋</span> Add Dynamic Column
+            </Button>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+            >
+              <span>＋</span> Create Department Login
+            </Button>
+          </div>
         </div>
 
         <DepartmentFilters
@@ -232,6 +250,16 @@ export function DepartmentManagementPage() {
           deleteMutation.reset()
         }}
         onConfirm={handleDelete}
+      />
+
+      <CreateRouteModal
+        open={showRouteModal}
+        onClose={() => setShowRouteModal(false)}
+      />
+
+      <CreateColumnModal
+        open={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
       />
     </PageLayout>
   )

@@ -7,6 +7,10 @@ export interface DashboardHeaderProps {
   onToggleNotifications?: () => void
   datePeriod?: string
   onDatePeriodChange?: (period: string) => void
+  /** Name after "Welcome back,". */
+  greetingName?: string
+  /** Line under the greeting — defaults to "Showing <period> · <today>". */
+  subtitle?: string
 }
 
 const PERIOD_OPTIONS = [
@@ -27,9 +31,20 @@ export function DashboardHeader({
   onToggleNotifications,
   datePeriod = 'Today',
   onDatePeriodChange,
+  greetingName = 'Onboarding Department',
+  subtitle,
 }: DashboardHeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const todayLabel = new Date().toLocaleDateString(
+    'en-GB',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    },
+  )
 
   useEffect(() => {
     if (!dropdownOpen) return
@@ -52,8 +67,11 @@ export function DashboardHeader({
           <Icon name="bar" size={22} strokeWidth={2.2} />
         </div>
         <div className="hdb-banner__text">
-          <h1>Welcome back, Onboarding Department</h1>
-          <p>Showing today · 28 Sep 2026</p>
+          <h1>Welcome back, {greetingName}</h1>
+          <p>
+            {subtitle ??
+              `Showing ${datePeriod.toLowerCase()} · ${todayLabel}`}
+          </p>
         </div>
       </div>
 

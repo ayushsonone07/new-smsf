@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import type {
   OnboardingCustomer,
@@ -135,6 +136,45 @@ const SAMPLE_FOUNDER_BUSINESSES: Record<string, BusinessItem[]> = {
  * Matches the reference screenshot with founder businesses,
  * stats summary, meeting details, and package info.
  */
+
+const overlayVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+}
+
+const drawerVariants: Variants = {
+  hidden: { x: '100%' },
+  visible: {
+    x: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 32, mass: 0.9 },
+  },
+}
+
+const fadeUpVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
+
+const bizCardsVariants: Variants = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.15, staggerChildren: 0.05 } },
+}
+
+const bizCardVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+}
+
+const statsRowVariants: Variants = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.2, staggerChildren: 0.06 } },
+}
+
+const statItemVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+}
+
 export function CustomersListModal({
   customer,
   assignees,
@@ -142,12 +182,18 @@ export function CustomersListModal({
 }: CustomersListModalProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview')
   const [activeBizIndex, setActiveBizIndex] = useState(0)
+  const [closing, setClosing] = useState(false)
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
     setPrevCustomerId(customer?.id)
     setActiveTab('overview')
     setActiveBizIndex(0)
+    setClosing(false)
+  }
+
+  function startClose() {
+    setClosing(true)
   }
 
   // Close on Escape key
@@ -155,7 +201,7 @@ export function CustomersListModal({
     if (!customer) return
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') startClose()
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -203,38 +249,59 @@ export function CustomersListModal({
 
   return (
     <>
-      <div
+      <motion.div
         className="cl-drawer-overlay"
-        onClick={onClose}
+        onClick={startClose}
         role="presentation"
+        variants={overlayVariants}
+        initial="hidden"
+        animate={closing ? 'hidden' : 'visible'}
       />
 
-      <div
+      <motion.div
         className="cl-drawer"
         role="dialog"
         aria-modal="true"
         aria-label={`Customer details for ${customer.contactName}`}
+        variants={drawerVariants}
+        initial="hidden"
+        animate={closing ? 'hidden' : 'visible'}
+        onAnimationComplete={(definition) => {
+          if (closing && definition === 'hidden') onClose()
+        }}
       >
         {/* Drawer Header */}
         <div className="cl-drawer__header">
           <button
             type="button"
             className="cl-drawer__close"
-            onClick={onClose}
+            onClick={startClose}
             aria-label="Close drawer"
           >
             ×
           </button>
 
-          <div className="cl-drawer__name-row">
+          <motion.div
+            className="cl-drawer__name-row"
+            variants={fadeUpVariants}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.16 }}
+          >
             <div className="cl-drawer__avatar">{initialLetter}</div>
             <div className="cl-drawer__name-text">
               <h2>{customer.contactName}</h2>
               <span>{customer.businessName}</span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="cl-drawer__status-pills">
+          <motion.div
+            className="cl-drawer__status-pills"
+            variants={fadeUpVariants}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.22 }}
+          >
             <span className="cl-drawer__spill cl-drawer__spill--status">
               <Icon name="hourglass" size={12} strokeWidth={2} />
               {statusLabel}
@@ -251,7 +318,7 @@ export function CustomersListModal({
             <span className="cl-drawer__spill cl-drawer__spill--info">
               Since {customer.contactDate || '18 Sep 2026'}
             </span>
-          </div>
+          </motion.div>
         </div>
 
         {/* Drawer Body */}
@@ -269,9 +336,14 @@ export function CustomersListModal({
                 </span>
               </div>
 
-              <div className="cl-drawer__biz-cards">
+              <motion.div
+                className="cl-drawer__biz-cards"
+                variants={bizCardsVariants}
+                initial="hidden"
+                animate="visible"
+              >
                 {founderBusinesses.map((biz, idx) => (
-                  <button
+                  <motion.button
                     key={biz.id}
                     type="button"
                     className={`cl-drawer__biz-card ${
@@ -279,6 +351,7 @@ export function CustomersListModal({
                         ? 'cl-drawer__biz-card--active'
                         : ''
                     }`}
+                    variants={bizCardVariants}
                     onClick={() => setActiveBizIndex(idx)}
                   >
                     <div className="cl-drawer__biz-card-dot" />
@@ -288,9 +361,9 @@ export function CustomersListModal({
                     <div className="cl-drawer__biz-card-sub">
                       {biz.status} · form by {biz.submittedBy}
                     </div>
-                  </button>
+                  </motion.button>
                 ))}
-              </div>
+              </motion.div>
 
               <div className="cl-drawer__founder-note">
                 Founder name, phone, email, GST and logo are pre-filled from the
@@ -302,25 +375,30 @@ export function CustomersListModal({
           )}
 
           {/* Stats summary row */}
-          <div className="cl-drawer__stats">
-            <div className="cl-drawer__stat">
+          <motion.div
+            className="cl-drawer__stats"
+            variants={statsRowVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
               <div className="cl-drawer__stat-label">Service steps</div>
               <div className="cl-drawer__stat-value">1/8</div>
               <div className="cl-drawer__stat-sub">completed</div>
-            </div>
+            </motion.div>
 
-            <div className="cl-drawer__stat">
+            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
               <div className="cl-drawer__stat-label">Activity</div>
               <div className="cl-drawer__stat-value">5</div>
               <div className="cl-drawer__stat-sub">recorded updates</div>
-            </div>
+            </motion.div>
 
-            <div className="cl-drawer__stat">
+            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
               <div className="cl-drawer__stat-label">Remarks</div>
               <div className="cl-drawer__stat-value">3</div>
               <div className="cl-drawer__stat-sub">2 customer · 1 internal</div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Drawer tab navigation */}
           <div className="cl-drawer__tabs" role="tablist">
@@ -387,7 +465,11 @@ export function CustomersListModal({
 
           {/* Tab Content */}
           {activeTab === 'overview' && (
-            <>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               {/* Meeting card */}
               <div className="cl-drawer__meeting-card">
                 <div className="cl-drawer__meeting-icon">
@@ -414,34 +496,46 @@ export function CustomersListModal({
                   ₹18,500 · 6 month package · renews Mar 2027
                 </div>
               </div>
-            </>
+            </motion.div>
           )}
 
           {activeTab === 'remarks' && (
-            <div className="cl-drawer__package">
-              <div className="cl-drawer__pkg-header">
-                <strong>Internal Remark</strong>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__package">
+                <div className="cl-drawer__pkg-header">
+                  <strong>Internal Remark</strong>
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: '#334155' }}>
+                  {customer.remark || 'No internal remarks added yet.'}
+                </p>
               </div>
-              <p style={{ margin: 0, fontSize: 13, color: '#334155' }}>
-                {customer.remark || 'No internal remarks added yet.'}
-              </p>
-            </div>
+            </motion.div>
           )}
 
           {activeTab !== 'overview' && activeTab !== 'remarks' && (
-            <div className="cl-drawer__coming-soon">
-              <Icon name="clock" size={28} strokeWidth={1.5} />
-              <p>
-                {activeTab === 'deliverables'
-                  ? 'Deliverables checklist and files will appear here.'
-                  : activeTab === 'business-form'
-                    ? 'Customer submitted onboarding form responses.'
-                    : 'Activity logs and status change timeline.'}
-              </p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__coming-soon">
+                <Icon name="clock" size={28} strokeWidth={1.5} />
+                <p>
+                  {activeTab === 'deliverables'
+                    ? 'Deliverables checklist and files will appear here.'
+                    : activeTab === 'business-form'
+                      ? 'Customer submitted onboarding form responses.'
+                      : 'Activity logs and status change timeline.'}
+                </p>
+              </div>
+            </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
     </>
   )
 }

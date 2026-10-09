@@ -55,7 +55,7 @@ const indexRoute = createRoute({
 
     throw redirect({
       to: session
-        ? homeForRole(session.user.role)
+        ? homeForRole(session.user.role as never) as never
         : '/login',
     })
   },
@@ -257,3 +257,9 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+
+
+
+
+

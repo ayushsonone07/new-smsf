@@ -24,6 +24,8 @@ import { ProfileChip } from '../../../components/common/ProfileChip'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
@@ -44,6 +46,8 @@ export function FeaturePermissionsPage() {
     | { kind: 'edit'; feature: FeaturePermission }
     | { kind: 'delete'; feature: FeaturePermission }
   >({ kind: 'none' })
+  const [showRouteModal, setShowRouteModal] = useState(false)
+  const [showColumnModal, setShowColumnModal] = useState(false)
 
   const closeModal = () => setModal({ kind: 'none' })
 
@@ -107,6 +111,19 @@ export function FeaturePermissionsPage() {
         description="Manage this department category by category — head panel menu items plus the columns of the Customer List and Department Users tables."
         actions={
           <>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRouteModal(true)}
+            >
+              ＋ Add Dynamic Route
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowColumnModal(true)}
+            >
+              ＋ Add Dynamic Column
+            </Button>
+
             <Link
               to="/admin"
               className="secondary-button back-link"
@@ -135,12 +152,27 @@ export function FeaturePermissionsPage() {
             </div>
 
             {meta.key === 'screens' ? (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRouteModal(true)}
+                >
+                  ＋ Add Dynamic Route
+                </Button>
+                <Button
+                  onClick={() => setModal({ kind: 'create' })}
+                >
+                  + Add feature
+                </Button>
+              </div>
+            ) : (
               <Button
-                onClick={() => setModal({ kind: 'create' })}
+                variant="secondary"
+                onClick={() => setShowColumnModal(true)}
               >
-                + Add feature
+                ＋ Add Dynamic Column
               </Button>
-            ) : null}
+            )}
           </div>
 
           {meta.key === 'screens' ? (
@@ -218,6 +250,18 @@ export function FeaturePermissionsPage() {
           }
         />
       ) : null}
+
+      <CreateRouteModal
+        open={showRouteModal}
+        onClose={() => setShowRouteModal(false)}
+        initialDepartmentType={department?.username || department?.name}
+      />
+
+      <CreateColumnModal
+        open={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
+        initialDepartmentType={department?.username || department?.name}
+      />
     </PageLayout>
   )
 }

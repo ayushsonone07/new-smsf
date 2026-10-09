@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Avatar } from '../shared/Avatar'
 import { RolePill } from './RolePill'
 import { AchievedPill, AttendancePills } from './MetricPill'
@@ -16,6 +17,21 @@ export type DepartmentUserColumnKey =
   | 'achieved'
   | 'attendance'
   | 'actions'
+
+const tbodyVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.035 } },
+}
+
+const rowVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
+
+const expandedRowVariants: Variants = {
+  hidden: { opacity: 0, y: 4 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+}
 
 interface DepartmentUsersTableProps {
   users: DepartmentUser[]
@@ -114,7 +130,11 @@ export function DepartmentUsersTable({
           </tr>
         </thead>
 
-        <tbody>
+        <motion.tbody
+          initial="hidden"
+          animate="visible"
+          variants={tbodyVariants}
+        >
           {users.length === 0 ? (
             <tr>
               <td
@@ -158,7 +178,7 @@ export function DepartmentUsersTable({
               />
             )
           })}
-        </tbody>
+        </motion.tbody>
       </table>
     </div>
   )
@@ -195,7 +215,10 @@ function UserRow({
 }: UserRowProps) {
   return (
     <>
-      <tr className={expanded ? 'is-expanded' : undefined}>
+      <motion.tr
+        variants={rowVariants}
+        className={expanded ? 'is-expanded' : undefined}
+      >
         {onToggle ? (
           <td className="users-table__chevron">
             <button
@@ -319,12 +342,15 @@ function UserRow({
             </div>
           </td>
         ) : null}
-      </tr>
+      </motion.tr>
 
       {expanded && expandedContent ? (
-        <tr className="users-table__expanded-row">
+        <motion.tr
+          variants={expandedRowVariants}
+          className="users-table__expanded-row"
+        >
           <td colSpan={columnCount}>{expandedContent}</td>
-        </tr>
+        </motion.tr>
       ) : null}
     </>
   )

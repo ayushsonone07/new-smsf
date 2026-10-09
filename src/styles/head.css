@@ -1133,18 +1133,22 @@
 
 /* --- Users table --------------------------------------------- */
 
+.users-table table {
+  table-layout: auto;
+}
+
 .users-table th {
-  padding: 14px 16px;
-  font-size: 14px;
+  padding: 10px 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #475569;
 }
 
 .users-table td {
-  padding: 12px 16px;
-  font-size: 17px;
+  padding: 10px 10px;
+  font-size: 14px;
 }
 
 .users-table .is-right {
@@ -1178,14 +1182,14 @@
 }
 
 .users-table__expanded-row td {
-  padding: 0 16px 16px 60px;
+  padding: 0 10px 14px 46px;
   background: #f8fafc;
 }
 
 .user-cell {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .head-avatar {
@@ -1203,14 +1207,14 @@
 
 .user-cell__text strong {
   display: block;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .user-cell__text span {
   display: block;
-  font-size: 14px;
+  font-size: 12px;
   color: #94a3b8;
 }
 
@@ -1218,9 +1222,9 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  margin-left: 14px;
+  width: 32px;
+  height: 32px;
+  margin-left: 6px;
   border: 1px solid #bfdbfe;
   border-radius: 10px;
   background: var(--head-blue-soft);
@@ -1249,7 +1253,7 @@
 }
 
 .users-table__email {
-  max-width: 260px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1257,12 +1261,12 @@
 }
 
 .users-table__target {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
 }
 
 .role-pill {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1278,8 +1282,8 @@
 }
 
 .metric-pill {
-  padding: 3px 11px;
-  font-size: 15px;
+  padding: 2px 9px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1300,8 +1304,8 @@
 .icon-action {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 8px;
   background: transparent;

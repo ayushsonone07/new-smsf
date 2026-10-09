@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import type { IconName } from '../shared/iconPaths'
@@ -79,6 +80,28 @@ const STATUS_OPTIONS: OnboardingStatus[] = [
   'completed',
 ]
 
+/* ── Motion variants ──────────────────────────────────────── */
+
+const tbodyVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.035 } },
+}
+
+const rowVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
+}
+
+const menuVariants: Variants = {
+  hidden: { opacity: 0, y: -5, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.14 },
+  },
+}
+
 /* ── CustomersList (exported table) ──────────────────────── */
 
 /**
@@ -96,14 +119,19 @@ export function CustomersList({
   onOpenDetail,
   canEdit = true,
 }: CustomersListProps) {
-  if (customers.length === 0) {
+if (customers.length === 0) {
     return (
-      <div className="cl-table-wrapper">
+      <motion.div
+        className="cl-table-wrapper"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.2 }}
+      >
         <div className="cl-empty">
           <Icon name="users" size={32} strokeWidth={1.4} />
           <p>No customers found</p>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
@@ -121,7 +149,11 @@ export function CustomersList({
             <th className="cl-th">Updated</th>
           </tr>
         </thead>
-        <tbody>
+        <motion.tbody
+          variants={tbodyVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {customers.map((customer) => (
             <CustomerRow
               key={customer.id}
@@ -140,7 +172,7 @@ export function CustomersList({
               canEdit={canEdit}
             />
           ))}
-        </tbody>
+        </motion.tbody>
       </table>
     </div>
   )
@@ -225,7 +257,7 @@ function CustomerRow({
   }
 
   return (
-    <tr className="cl-row">
+    <motion.tr className="cl-row" variants={rowVariants}>
 
       {/* # */}
       <td className="cl-td cl-td--num">{customer.rowIndex}</td>
@@ -313,8 +345,14 @@ function CustomerRow({
             <Icon name="chevronDown" size={12} strokeWidth={2.5} />
           </button>
 
-          {canEdit && statusOpen && (
-            <div className="cl-status-menu" role="listbox">
+{canEdit && statusOpen && (
+            <motion.div
+              className="cl-status-menu"
+              role="listbox"
+              variants={menuVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {STATUS_OPTIONS.map((opt) => (
                 <button
                   key={opt}
@@ -335,7 +373,7 @@ function CustomerRow({
                   {STATUS_META[opt].label}
                 </button>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </td>
@@ -362,8 +400,14 @@ function CustomerRow({
             <Icon name="chevronDown" size={12} strokeWidth={2.5} />
           </button>
 
-          {canEdit && assignOpen && (
-            <div className="cl-assign-menu" role="listbox">
+{canEdit && assignOpen && (
+            <motion.div
+              className="cl-assign-menu"
+              role="listbox"
+              variants={menuVariants}
+              initial="hidden"
+              animate="visible"
+            >
               <button
                 type="button"
                 role="option"
@@ -394,7 +438,7 @@ function CustomerRow({
                   {a.name}
                 </button>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </td>
@@ -470,6 +514,6 @@ function CustomerRow({
           </div>
         </div>
       </td>
-    </tr>
+    </motion.tr>
   )
 }

@@ -22,6 +22,7 @@ Routing **TanStack Router**, data **TanStack Query**, auth/role check **router
 | Routing | `@tanstack/react-router` (code-based, `src/app/router.tsx`) |
 | Server state | `@tanstack/react-query` v5 |
 | Data layer | `src/api/*` — abhi **mock in-memory store**, real API ke liye `apiRequest` (fetch) ready |
+| Animation | `framer-motion` v14 — customers-list UI me (row stagger, dropdowns, drawer slide/fade, tab stagger) |
 | Styling | Admin: plain CSS (`src/index.css`) · Head panel: plain CSS (`src/styles/head.css`, font **Jost**) · Tailwind v4 available |
 
 ---
@@ -96,6 +97,7 @@ Portal: useHeadNav(departmentId) ─ enabled ∧ screen ∧ sort(order) ─▶ H
 | `icon` | `IconName` (`components/head/shared/iconPaths.ts`) |
 | `order` | Sidebar position (admin ▲▼ se) |
 | `enabled` | Off → sidebar se gayab + route block |
+| `userVisible` | Off → **USER panel** se gayab (sidebar item / table column). HEAD/ADMIN ko hamesha dikhta hai; undefined = visible |
 | `roleAPermission`, `roleBPermission` | `CAN_READ` / `CAN_EDIT` (Role A = Head, Role B = User) |
 | `category` | `screens` \| `customers` \| `users` — admin page par **alag block** |
 | `kind` | `screen` (sidebar item) ya `column` (table column — nav me kabhi nahi aata) |
@@ -110,7 +112,9 @@ Portal: useHeadNav(departmentId) ─ enabled ∧ screen ∧ sort(order) ─▶ H
 2. **Customer List — Columns** — `CUSTOMER_COLUMN_TEMPLATE` ke 6 columns
 3. **Department Users — Columns** — `USER_COLUMN_TEMPLATE` ke 8 columns
 
-Har column row par **enable/disable toggle + Role A / Role B** permission.
+Har column row par **enable/disable toggle + SHOW TO USER toggle + Role A / Role B**
+permission. "Show to user" off → USER panel me wo nav item / column gayab, HEAD/ADMIN
+ko dikhta rehta hai (add/remove sirf USER ke liye).
 Head panel (`useColumnFeatures(departmentId, 'customers' | 'users')`):
 
 - `enabled: false` → column table me **bilkul render nahi hota**
@@ -144,6 +148,7 @@ src/
 │   ├── departments.api.ts              # mock CRUD
 │   ├── feature-permissions.api.ts      # get / create / update / delete / move (mock)
 │   ├── auth.api.ts, customers.api.ts, services.api.ts, help-center.api.ts, department-dashboard.api.ts
+│   ├── onboarding-dashboard.api.ts     # GET /api/onboarding/dashboard/summary (session auth: Bearer + username)
 │   └── mock/
 │       ├── db.ts                       # departments + FEATURE_TEMPLATE (8 built-in screens) + COLUMN templates + seed + template reconciliation
 │       ├── persist.ts                  # readPersisted/writePersisted (localStorage, versioned keys)
@@ -192,7 +197,8 @@ src/
                 ├── HeadConsoleLayout.tsx       # shared _head/_user layout (HeadShell + Outlet)
                 ├── HeadIndexPage.tsx           # /head or /users → first enabled
                 ├── HeadScreenPage.tsx          # shared dynamic screen resolver
-                ├── DashboardPage.tsx           # placeholder body
+                ├── DashboardPage.tsx           # USER → UserDashboardPage, HEAD/ADMIN → team dashboard
+                ├── UserDashboardPage.tsx       # ✅ personal dashboard, counts from /api/onboarding/dashboard/summary
                 ├── DepartmentUsersPage.tsx     # ✅ full (table, add/edit/delete, login-as, staff report)
                 ├── CustomerListPage.tsx        # ✅ customers-list UI (composes components/head/customers-list)
                 ├── AttendancePage.tsx          # ✅ composed from user/attendance widgets (check-in + month calendar)
@@ -340,7 +346,30 @@ npm run lint    # eslint
 
 ---
 
-## Status (08 Oct 2026)
+## Status (09 Oct 2026)
+
+**Build ✅ · Lint ✅ · tsc ✅** (09 Oct — user dashboard + SHOW TO USER toggle baad).
+
+### Done (09 Oct)
+- [x] **USER personal dashboard** — `UserDashboardPage.tsx` (session role USER par
+      `DashboardPage` se render) — same widgets as head (header / 8 stat cards / trend /
+      target gauge / status breakdown / most active day / delay donut / lined-up meetings)
+      lekin counts **real API** se: `GET /api/onboarding/dashboard/summary`
+      (`department` + `startDate`/`endDate`, headers `Authorization: Bearer <token>` +
+      `username: <email>` — dono `authedApiRequest` lagata hai). Backend requester ko
+      scope karta hai: department USER → apne numbers. Files:
+      `api/onboarding-dashboard.api.ts`, `features/departments/types/onboarding-dashboard.types.ts`,
+      `features/departments/hooks/useOnboardingDashboardSummary.ts`. Period dropdown
+      (Today / Yesterday / Last 7 days / This month) → date range mapping, refresh →
+      `refetch`. Session me ab `user.departmentType` bhi save hota hai (login response se)
+      — wahi `department` param ka default (`ONBOARDING_DEPARTMENT` fallback).
+- [x] **SHOW TO USER toggle (admin)** — `FeaturePermission.userVisible` + dono admin
+      tables (`FeaturePermissionsTable`, `ColumnFeaturesTable`) me toggle; USER sidebar
+      (`useHeadNav`) aur USER table columns (`useColumnFeatures`) filter karte hain.
+- [x] `DashboardHeader` me `greetingName` + `subtitle` props (default ab live date hai,
+      purana hardcoded "28 Sep 2026" hata).
+- [x] Blocker fixes: `userVisible` ka TS type (Update request), `HelpCenter.tsx` unused
+      variants.
 
 **Build ✅ · Lint ✅ · tsc ✅**. Latest role-route/permission changes production build aur
 ESLint se verify hue. Naye E2E (CDP, preview build) me `smoke.mjs` sab steps pass:
@@ -404,6 +433,13 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
       biz pills/duplicates), `createCustomer` defaults onboard fields. Edits
       `useUpdateCustomer` se persist; access **single-gate** (`canEdit = canEdit('actions')`),
       CAN_READ par disabled/read-only + drawer khulta hai — E2E verified.
+- [x] **Framer Motion animations (customers-list UI)** — `framer-motion@14` install; drawer
+      overlay fade + right-to-left spring slide + **close slide-out** (`startClose` →
+      `onAnimationComplete('hidden')` → `onClose`), header/pills fade-up stagger, founder-biz
+      cards + stats stagger, tab content fade-slide; table rows stagger entrance (`motion.tbody`
+      staggerChildren), status/assign/assignee/date menus fade+scale, controls bar fade-down,
+      tab buttons `whileTap`, green reset `whileTap` rotate. E2E verified: rows settle opacity 1,
+      menu animates, drawer spring translate + overlay fade-in + close unmounts.
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna

@@ -1,5 +1,16 @@
+import { motion, type Variants } from 'framer-motion'
 import { DashboardStatCard } from './DashboardStatCard'
 import heroImg from '../../../assets/hero.png'
+
+const statsGridVariants: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05 } },
+}
+
+const heroVariants: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+}
 
 export interface DashboardStatsData {
   totalCustomers: { value: string; growth: string; sub: string }
@@ -25,18 +36,28 @@ const DEFAULT_STATS: DashboardStatsData = {
 
 export interface DashboardStatCardsProps {
   stats?: Partial<DashboardStatsData>
+  /** Card titles for the last two cards (personal dashboards use days). */
+  attendanceLabels?: { present: string; absent: string }
 }
 
 /**
  * Top Stat Cards Grid (8 Cards + Hero Illustration Card).
  * Exactly matches the reference layout.
  */
-export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCardsProps) {
+export function DashboardStatCards({
+  stats = DEFAULT_STATS,
+  attendanceLabels = { present: 'Present Users', absent: 'Absent Users' },
+}: DashboardStatCardsProps) {
   const data = { ...DEFAULT_STATS, ...stats }
 
   return (
     <div className="hdb-stats-layout">
-      <div className="hdb-stats-grid">
+      <motion.div
+        className="hdb-stats-grid"
+        initial="hidden"
+        animate="visible"
+        variants={statsGridVariants}
+      >
         {/* Row 1 */}
         <DashboardStatCard
           label="Total Customers"
@@ -96,7 +117,7 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
         />
 
         <DashboardStatCard
-          label="Present Users"
+          label={attendanceLabels.present}
           value={data.presentUsers.value}
           subtext={data.presentUsers.sub}
           iconName="userPlus"
@@ -104,22 +125,27 @@ export function DashboardStatCards({ stats = DEFAULT_STATS }: DashboardStatCards
         />
 
         <DashboardStatCard
-          label="Absent Users"
+          label={attendanceLabels.absent}
           value={data.absentUsers.value}
           subtext={data.absentUsers.sub}
           iconName="userOut"
           iconTone="gray"
         />
-      </div>
+      </motion.div>
 
       {/* Hero 3D Illustration Card */}
-      <div className="hdb-hero-card">
+      <motion.div
+        className="hdb-hero-card"
+        initial="hidden"
+        animate="visible"
+        variants={heroVariants}
+      >
         <img
           src={heroImg}
           alt="Team performance illustration"
           loading="eager"
         />
-      </div>
+      </motion.div>
     </div>
   )
 }

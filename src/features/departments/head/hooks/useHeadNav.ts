@@ -22,10 +22,12 @@ export function useHeadNav(departmentId: string) {
       (query.data ?? [])
         .filter(
           (feature) =>
-            feature.kind === 'screen' && feature.enabled,
+            feature.kind === 'screen' &&
+            feature.enabled &&
+            (role !== 'USER' || feature.userVisible !== false),
         )
         .sort((a, b) => a.order - b.order),
-    [query.data],
+    [query.data, role],
   )
 
   const items = useMemo<HeadNavItem[]>(

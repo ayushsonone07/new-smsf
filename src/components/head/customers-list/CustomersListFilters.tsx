@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 
@@ -46,6 +47,21 @@ const TABS: { key: CustomerTab; label: string }[] = [
   { key: 'in-progress', label: 'In progress' },
   { key: 'completed',  label: 'Completed' },
 ]
+
+const controlsVariants: Variants = {
+  hidden: { opacity: 0, y: -8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+}
+
+const menuVariants: Variants = {
+  hidden: { opacity: 0, y: -5, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.14 },
+  },
+}
 
 /**
  * Customer Onboarding filter controls.
@@ -136,22 +152,28 @@ export function CustomersListFilters({
   }
 
   return (
-    <div className="cl-controls">
+    <motion.div
+      className="cl-controls"
+      variants={controlsVariants}
+      initial="hidden"
+      animate="visible"
+    >
 
       {/* ── Status tabs ── */}
       <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
         {TABS.map((tab) => (
-          <button
+          <motion.button
             key={tab.key}
             type="button"
             role="tab"
             aria-selected={activeTab === tab.key}
             className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
             onClick={() => onTabChange(tab.key)}
+            whileTap={{ scale: 0.95 }}
           >
             {tab.label}
             <span className="cl-tab__count">{countFor(tab.key)}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
 
@@ -160,19 +182,27 @@ export function CustomersListFilters({
 
       {/* ── Assignee dropdown ── */}
       <div className="cl-assignee-wrap" ref={assigneeRef}>
-        <button
+        <motion.button
           type="button"
           className="cl-assignee-btn"
           onClick={() => setAssigneeOpen((o) => !o)}
           aria-expanded={assigneeOpen}
           aria-haspopup="listbox"
+          whileTap={{ scale: 0.96 }}
         >
           {assigneeLabel}
           <Icon name="chevronDown" size={14} strokeWidth={2.5} />
-        </button>
+        </motion.button>
 
         {assigneeOpen && (
-          <div className="cl-assignee-menu" role="listbox" aria-label="Filter by assignee">
+          <motion.div
+            className="cl-assignee-menu"
+            role="listbox"
+            aria-label="Filter by assignee"
+            variants={menuVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <button
               type="button"
               role="option"
@@ -207,13 +237,13 @@ export function CustomersListFilters({
               <Avatar name="?" size={20} tone="muted" />
               Unassigned
             </button>
-          </div>
+          </motion.div>
         )}
       </div>
 
       {/* ── Date filter ── */}
       <div className="cl-date-wrap" ref={dateRef}>
-        <button
+        <motion.button
           type="button"
           className={`cl-date-btn${hasDateFilter ? ' is-active' : ''}`}
           onClick={() => {
@@ -224,13 +254,21 @@ export function CustomersListFilters({
             setDateOpen((o) => !o)
           }}
           aria-expanded={dateOpen}
+          whileTap={{ scale: 0.96 }}
         >
           <Icon name="flow" size={14} strokeWidth={2} />
           Date filters
-        </button>
+        </motion.button>
 
         {dateOpen && (
-          <div className="cl-date-panel" role="dialog" aria-label="Date filter">
+          <motion.div
+            className="cl-date-panel"
+            role="dialog"
+            aria-label="Date filter"
+            variants={menuVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <div className="cl-date-field">
               <label htmlFor="cl-date-from">From</label>
               <input
@@ -257,20 +295,22 @@ export function CustomersListFilters({
                 Apply
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 
       {/* ── Green reset / shuffle button ── */}
-      <button
+      <motion.button
         type="button"
         className="cl-green-btn"
         title="Reset all filters"
         aria-label="Reset all filters"
         onClick={onReset}
+        whileTap={{ scale: 0.88, rotate: 15 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 18 }}
       >
         <Icon name="shuffle" size={16} strokeWidth={2} />
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   )
 }

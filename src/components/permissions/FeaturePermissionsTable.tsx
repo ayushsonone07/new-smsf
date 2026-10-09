@@ -27,6 +27,7 @@ const columns = [
   { key: 'order', title: 'ORDER' },
   { key: 'feature', title: 'MENU ITEM' },
   { key: 'enabled', title: 'ENABLE / DISABLE' },
+  { key: 'userVisible', title: 'SHOW TO USER' },
   { key: 'roleA', title: 'ROLE A' },
   { key: 'roleB', title: 'ROLE B' },
   { key: 'actions', title: 'ACTIONS', className: 'actions-heading' },
@@ -105,6 +106,17 @@ export function FeaturePermissionsTable({
                 disabled={isUpdating}
                 label={`Toggle ${feature.name}`}
                 onChange={(checked) => onUpdate(feature.id, { enabled: checked })}
+              />
+            </td>
+
+            <td>
+              <PermissionToggle
+                checked={feature.userVisible !== false}
+                disabled={isUpdating || !feature.enabled}
+                label={`Show ${feature.name} to user`}
+                onChange={(checked) =>
+                  onUpdate(feature.id, { userVisible: checked })
+                }
               />
             </td>
 
