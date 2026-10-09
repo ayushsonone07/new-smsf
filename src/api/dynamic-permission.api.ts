@@ -33,6 +33,8 @@ export interface DynamicRouteResponse {
   routeName: string
   departmentType?: string
   departmentId?: number
+  enableHead?: boolean
+  enableUser?: boolean
   assignedRoles?: string[]
   createdAt?: string
   updatedAt?: string
@@ -52,6 +54,8 @@ export interface DynamicColumnResponse {
   readWriteAccess?: string
   roleAPermission?: string
   roleBPermission?: string
+  enableHead?: boolean
+  enableUser?: boolean
   isConfigured?: boolean
   createdAt?: string
   updatedAt?: string
@@ -215,6 +219,80 @@ export async function updateColumnPermission(
     return res.data
   }
   return res as ColumnPermissionUpdateResponse
+}
+
+export interface UpdateColumnStatusPayload {
+  columnId?: string
+  columnName?: string
+  roleName: string
+  departmentType: string
+  enable: boolean
+}
+
+export interface ColumnStatusUpdateResponse {
+  columnId: string
+  columnName: string
+  roleName: string
+  departmentId: number | string
+  departmentType: string
+  enable: boolean
+  disable: boolean
+  assignedRoles?: string[]
+}
+
+/**
+ * Update enable/disable status for a column for a specific role and department
+ */
+export async function updateColumnStatus(
+  payload: UpdateColumnStatusPayload,
+): Promise<ColumnStatusUpdateResponse> {
+  const res = await authedApiRequest<
+    ColumnStatusUpdateResponse | { data: ColumnStatusUpdateResponse }
+  >('/api/dynamic-permission/columns/status', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  if (res && 'data' in res && res.data) {
+    return res.data
+  }
+  return res as ColumnStatusUpdateResponse
+}
+
+export interface UpdateRouteStatusPayload {
+  routeId?: string
+  routeName?: string
+  roleName: string
+  departmentType: string
+  enable: boolean
+}
+
+export interface RouteStatusUpdateResponse {
+  routeId: string
+  routeName: string
+  roleName: string
+  departmentId: number | string
+  departmentType: string
+  enable: boolean
+  disable: boolean
+  assignedRoles?: string[]
+}
+
+/**
+ * Update enable/disable status for a route for a specific role and department
+ */
+export async function updateRouteStatus(
+  payload: UpdateRouteStatusPayload,
+): Promise<RouteStatusUpdateResponse> {
+  const res = await authedApiRequest<
+    RouteStatusUpdateResponse | { data: RouteStatusUpdateResponse }
+  >('/api/dynamic-permission/routes/status', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  if (res && 'data' in res && res.data) {
+    return res.data
+  }
+  return res as RouteStatusUpdateResponse
 }
 
 export interface UserDynamicPermissionsResponse {

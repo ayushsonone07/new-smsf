@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
+import { ScrollableSelect } from '../ui/ScrollableSelect'
 import {
   useDepartmentTypes,
   useCreateDynamicColumn,
@@ -104,26 +105,15 @@ export function CreateColumnModal({
           <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-color, #334155)' }}>
             Department Type (from DepartmentType.java)
           </label>
-          <select
+          <ScrollableSelect
             value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
+            onChange={(val) => setSelectedDept(val)}
+            options={departmentTypes}
             disabled={isLoadingDepts || createColumnMutation.isPending}
-            style={{
-              padding: '0.625rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color, #cbd5e1)',
-              backgroundColor: 'var(--bg-surface, #ffffff)',
-              color: 'var(--text-color, #1e293b)',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            {departmentTypes.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
-            ))}
-          </select>
+            searchable={true}
+            maxHeight={200}
+            width="100%"
+          />
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
             Select the department enum this column will be registered under.
           </span>

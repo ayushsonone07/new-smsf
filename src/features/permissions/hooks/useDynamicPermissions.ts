@@ -8,9 +8,13 @@ import {
   getDynamicRoutes,
   getUserDynamicPermissions,
   updateColumnPermission,
+  updateColumnStatus,
+  updateRouteStatus,
   type CreateDynamicColumnPayload,
   type CreateDynamicRoutePayload,
   type UpdateColumnPermissionPayload,
+  type UpdateColumnStatusPayload,
+  type UpdateRouteStatusPayload,
 } from '../../../api/dynamic-permission.api'
 
 export function useDepartmentTypes() {
@@ -91,4 +95,31 @@ export function useUpdateColumnPermission() {
     },
   })
 }
+
+export function useUpdateColumnStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateColumnStatusPayload) =>
+      updateColumnStatus(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+    },
+  })
+}
+
+export function useUpdateRouteStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateRouteStatusPayload) =>
+      updateRouteStatus(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes'],
+      })
+    },
+  })
+}
+
 
