@@ -19,5 +19,7 @@ export function useOnboardingDashboardSummary(
     queryKey: onboardingSummaryQueryKey(params),
     queryFn: () =>
       getOnboardingDashboardSummary(params),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }

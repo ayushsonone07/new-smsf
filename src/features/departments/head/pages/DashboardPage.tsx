@@ -27,7 +27,10 @@ import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
+import { LoadingState } from '../../../../components/ui/LoadingState'
+import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryParams } from '../../../../api/onboarding-dashboard.api'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -39,120 +42,7 @@ const sectionVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
 
-const MOCK_TEAM_MEMBERS: TeamMemberPerformance[] = [
-  {
-    id: 'u-1',
-    name: 'Abhishek Sahu',
-    email: 'abhishekmbg261@gmail.com',
-    allTimeCustomers: 311,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 8,
-    completed: 6,
-    delayed: 2,
-    target: 6,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-2',
-    name: 'Mahima',
-    email: 'mahimambg12@gmail.com',
-    allTimeCustomers: 287,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 7,
-    completed: 4,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 80,
-  },
-  {
-    id: 'u-3',
-    name: 'Mohit',
-    email: 'mohitmbgcard19@gmail.com',
-    allTimeCustomers: 240,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 6,
-    completed: 4,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 80,
-  },
-  {
-    id: 'u-4',
-    name: 'Bhupinder',
-    email: 'bhupinder.mbg@gmail.com',
-    allTimeCustomers: 198,
-    attendance: 'Absent',
-    presentDays: 0,
-    absentDays: 1,
-    assigned: 6,
-    completed: 5,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-5',
-    name: 'Gungun',
-    email: 'gungunmbg@gmail.com',
-    allTimeCustomers: 176,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 5,
-    completed: 4,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-6',
-    name: 'Afreen',
-    email: 'sheikhafreenmbg786@gmail.com',
-    allTimeCustomers: 150,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 5,
-    completed: 4,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-7',
-    name: 'Ayushi',
-    email: 'ayushimbg@gmail.com',
-    allTimeCustomers: 122,
-    attendance: 'Absent',
-    presentDays: 0,
-    absentDays: 1,
-    assigned: 5,
-    completed: 3,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 75,
-  },
-  {
-    id: 'u-8',
-    name: 'Nikita',
-    email: 'nikitambg@gmail.com',
-    allTimeCustomers: 96,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 4,
-    completed: 3,
-    delayed: 1,
-    target: 3,
-    achievedPercent: 100,
-  },
-]
+
 
 function toIsoDate(date: Date): string {
   const year = date.getFullYear()
@@ -246,56 +136,10 @@ function HeadDashboard() {
 
   const membersQuery = useOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const { isColumnEnabled, refetch: refetchPermissions } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
-  function handleRefresh() {
-    setRefreshKey((k) => k + 1)
-    summaryQuery.refetch()
-    membersQuery.refetch()
-    assigningUsersQuery.refetch()
-  }
-
-  const kpis = summaryQuery.data?.kpis
-  const statsData: Partial<DashboardStatsData> | undefined = kpis
-    ? {
-        totalCustomers: {
-          value: num(kpis.totalCustomers),
-          growth: '▲ 4.7%',
-          sub: '+45 this period',
-        },
-        onboarded: {
-          value: num(kpis.totalOnboarded),
-          sub: `${Math.round(
-            (kpis.totalOnboarded / (kpis.totalCustomers || 1)) * 100,
-          )}% of all customers`,
-        },
-        completed: {
-          value: num(kpis.totalCompleted),
-          growth: '▲ 13.8%',
-          sub: 'vs last period',
-        },
-        inProgress: {
-          value: num(kpis.totalInProgress),
-          sub: 'Currently processing',
-        },
-        pending: {
-          value: num(kpis.totalPending),
-          sub: 'Awaiting processing',
-        },
-        delayed: {
-          value: num(kpis.totalDelayed),
-          growth: '▲ 0%',
-          sub: 'vs last period',
-        },
-        presentUsers: {
-          value: num(kpis.presentUsers),
-          sub: 'Active today',
-        },
-        absentUsers: {
-          value: num(kpis.absentUsers),
-          sub: 'Not active today',
-        },
-      }
-    : undefined
+  const isStatusVisible = isColumnEnabled('Status')
 
   const teamMembers = useMemo<TeamMemberPerformance[]>(() => {
     const list = membersQuery.data?.teamMembers
@@ -325,7 +169,7 @@ function HeadDashboard() {
         }
       })
     }
-    return MOCK_TEAM_MEMBERS
+    return []
   }, [membersQuery.data?.teamMembers])
 
   const topPerformers = useMemo<TopPerformerItem[]>(() => {
@@ -339,6 +183,69 @@ function HeadDashboard() {
     }))
   }, [teamMembers])
 
+  function handleRefresh() {
+    setRefreshKey((k) => k + 1)
+    summaryQuery.refetch()
+    membersQuery.refetch()
+    assigningUsersQuery.refetch()
+    refetchPermissions()
+  }
+
+  if (summaryQuery.isPending || membersQuery.isPending) {
+    return <LoadingState message="Loading dashboard..." />
+  }
+
+  if (summaryQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load dashboard"
+        message={summaryQuery.error.message}
+        onRetry={handleRefresh}
+      />
+    )
+  }
+
+  const kpis = summaryQuery.data?.kpis
+  const statsData: Partial<DashboardStatsData> = {
+    totalCustomers: {
+      value: num(kpis?.totalCustomers ?? 0),
+      growth: '',
+      sub: `${num(kpis?.totalCustomers ?? 0)} total customers`,
+    },
+    onboarded: {
+      value: num(kpis?.totalOnboarded ?? 0),
+      sub: `${Math.round(
+        ((kpis?.totalOnboarded ?? 0) / (kpis?.totalCustomers || 1)) * 100,
+      )}% of all customers`,
+    },
+    completed: {
+      value: num(kpis?.totalCompleted ?? 0),
+      growth: '',
+      sub: 'Completed customers',
+    },
+    inProgress: {
+      value: num(kpis?.totalInProgress ?? 0),
+      sub: 'Currently processing',
+    },
+    pending: {
+      value: num(kpis?.totalPending ?? 0),
+      sub: 'Awaiting processing',
+    },
+    delayed: {
+      value: num(kpis?.totalDelayed ?? 0),
+      growth: '',
+      sub: 'Needs follow-up',
+    },
+    presentUsers: {
+      value: num(kpis?.presentUsers ?? 0),
+      sub: 'Active today',
+    },
+    absentUsers: {
+      value: num(kpis?.absentUsers ?? 0),
+      sub: 'Not active today',
+    },
+  }
+
   const activeDays = summaryQuery.data?.mostActiveDay?.map((d) => ({
     day: d.day,
     value: d.count,
@@ -347,7 +254,7 @@ function HeadDashboard() {
 
   const delayBreakdown = summaryQuery.data?.delayBreakdown
   const totalDelayed =
-    summaryQuery.data?.totalDelayed ?? kpis?.totalDelayed ?? 9
+    summaryQuery.data?.totalDelayed ?? kpis?.totalDelayed ?? 0
 
   return (
     <motion.div
@@ -394,37 +301,39 @@ function HeadDashboard() {
 
       {/* 4. Middle Row 2: Status Breakdown, Most Active Day & Delay Donut */}
       <motion.div variants={sectionVariants}>
-        <div className="hdb-row-three-col">
-          <StatusBreakdown
-            pendingCount={
-              summaryQuery.data?.statusBreakdown?.pending?.count ??
-              kpis?.totalPending
-            }
-            pendingPercent={
-              summaryQuery.data?.statusBreakdown?.pending?.percentage
-            }
-            inProgressCount={
-              summaryQuery.data?.statusBreakdown?.inProgress?.count ??
-              kpis?.totalInProgress
-            }
-            inProgressPercent={
-              summaryQuery.data?.statusBreakdown?.inProgress?.percentage
-            }
-            completedCount={
-              summaryQuery.data?.statusBreakdown?.completed?.count ??
-              kpis?.totalCompleted
-            }
-            completedPercent={
-              summaryQuery.data?.statusBreakdown?.completed?.percentage
-            }
-            delayedCount={
-              summaryQuery.data?.statusBreakdown?.delayed?.count ??
-              kpis?.totalDelayed
-            }
-            delayedPercent={
-              summaryQuery.data?.statusBreakdown?.delayed?.percentage
-            }
-          />
+        <div className={isStatusVisible ? 'hdb-row-three-col' : 'hdb-row-two-col-equal'}>
+          {isStatusVisible && (
+            <StatusBreakdown
+              pendingCount={
+                summaryQuery.data?.statusBreakdown?.pending?.count ??
+                kpis?.totalPending
+              }
+              pendingPercent={
+                summaryQuery.data?.statusBreakdown?.pending?.percentage
+              }
+              inProgressCount={
+                summaryQuery.data?.statusBreakdown?.inProgress?.count ??
+                kpis?.totalInProgress
+              }
+              inProgressPercent={
+                summaryQuery.data?.statusBreakdown?.inProgress?.percentage
+              }
+              completedCount={
+                summaryQuery.data?.statusBreakdown?.completed?.count ??
+                kpis?.totalCompleted
+              }
+              completedPercent={
+                summaryQuery.data?.statusBreakdown?.completed?.percentage
+              }
+              delayedCount={
+                summaryQuery.data?.statusBreakdown?.delayed?.count ??
+                kpis?.totalDelayed
+              }
+              delayedPercent={
+                summaryQuery.data?.statusBreakdown?.delayed?.percentage
+              }
+            />
+          )}
           <MostActiveDay days={activeDays} />
           <DelayWhoseSide
             totalDelayed={totalDelayed}

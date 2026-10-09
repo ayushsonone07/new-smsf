@@ -52,7 +52,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: '♙',
     roles: ['ADMIN', 'HEAD'],
     isActive: (pathname) =>
-      pathname.startsWith('/head'),
+      pathname.startsWith('/head') || pathname.startsWith('/onboarding'),
   },
   {
     to: '/users',
@@ -60,7 +60,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: '☰',
     roles: ['ADMIN', 'HEAD', 'USER'],
     isActive: (pathname) =>
-      pathname.startsWith('/users'),
+      pathname.startsWith('/users') || pathname.startsWith('/onboarding'),
   },
 ]
 
@@ -113,25 +113,33 @@ export function AdminSidebar({
       <nav className="navigation">
         <p className="nav-label">MAIN MENU</p>
 
-        {visibleItems.map((item) => (
-          <a
-            key={item.to}
-            href={item.to}
-            className={`nav-item ${
-              item.isActive(location.pathname)
-                ? 'active'
-                : ''
-            }`}
-            onClick={(event) => {
-              event.preventDefault()
-              onNavigate?.()
-              navigate({ to: item.to })
-            }}
-          >
-            <span>{item.icon}</span>
-            {item.label}
-          </a>
-        ))}
+        {visibleItems.map((item) => {
+          const targetTo =
+            (item.to === '/head' || item.to === '/users') &&
+            session?.user.departmentType?.toUpperCase().includes('ONBOARDING')
+              ? '/onboarding'
+              : item.to
+
+          return (
+            <a
+              key={item.to}
+              href={targetTo}
+              className={`nav-item ${
+                item.isActive(location.pathname)
+                  ? 'active'
+                  : ''
+              }`}
+              onClick={(event) => {
+                event.preventDefault()
+                onNavigate?.()
+                navigate({ to: targetTo as never })
+              }}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </a>
+          )
+        })}
       </nav>
 
       <div className="sidebar-footer">

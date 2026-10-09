@@ -29,6 +29,8 @@ export function useDynamicRoutes(departmentType?: string) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -36,6 +38,8 @@ export function useDynamicColumns(departmentType?: string) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'columns', departmentType],
     queryFn: () => getDynamicColumns(departmentType),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -54,6 +58,8 @@ export function useUserDynamicPermissions(params?: {
   return useQuery({
     queryKey: ['dynamic-permissions', 'user-permissions', params?.username, params?.departmentType],
     queryFn: () => getUserDynamicPermissions(params),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

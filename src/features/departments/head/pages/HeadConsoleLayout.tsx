@@ -15,12 +15,14 @@ import { sampleNotifications } from '../../../../api/mock/head.db'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import type { HeadNotification, HeadRole } from '../types/head.types'
 
+import { resolveSlugFromPath } from '../utils/routeUtils'
+
 interface HeadConsoleLayoutProps {
   portalRole: HeadRole
 }
 
 /**
- * Frame for every /head/* route. Sidebar items come
+ * Frame for every /head/* and /onboarding* route. Sidebar items come
  * from the admin-managed feature permissions; the
  * topbar title follows the current slug.
  */
@@ -32,10 +34,7 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
 
   const nav = useHeadNav(departmentId)
 
-  const basePath = portalRole === 'USER' ? '/users' : '/head'
-  const slug = location.pathname
-    .replace(new RegExp(`^${basePath}/?`), '')
-    .split('/')[0]
+  const slug = resolveSlugFromPath(location.pathname, portalRole)
   const feature = nav.bySlug(slug)
   const registry = feature ? SCREEN_REGISTRY[feature.screen] : undefined
 

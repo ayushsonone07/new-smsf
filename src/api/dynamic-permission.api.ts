@@ -312,6 +312,7 @@ export interface UserDynamicPermissionsResponse {
     readWriteAccess: string
     canRead: boolean
     canEdit: boolean
+    enabled?: boolean
   }>
 }
 

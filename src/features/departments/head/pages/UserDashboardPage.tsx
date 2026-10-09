@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { getSession } from '../../../../app/auth/session'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
+import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
+import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import { DashboardStatCards } from '../../../../components/head/dashboard/DashboardStatCards'
 import { OnboardingTrend } from '../../../../components/head/dashboard/OnboardingTrend'
@@ -13,6 +15,7 @@ import { LinedUpMeetings } from '../../../../components/head/dashboard/LinedUpMe
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryKpis } from '../../types/onboarding-dashboard.types'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import '../../../../components/head/dashboard/Dashboard.css'
 
 const containerVariants: Variants = {
@@ -125,9 +128,33 @@ export function UserDashboardPage() {
     () => rangeFor(datePeriod),
     [datePeriod],
   )
-  const query = useOnboardingDashboardSummary(range)
+  const summaryParams = useMemo(
+    () => ({
+      department: 'ONBOARDING_DEPARTMENT',
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    [range],
+  )
+  const query = useOnboardingDashboardSummary(summaryParams)
 
-  if (query.isPending) {
+  const membersParams = useMemo(
+    () => ({
+      department: 'ONBOARDING_DEPARTMENT',
+      page: 0,
+      size: 10,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    [range],
+  )
+  const membersQuery = useOnboardingDashboardMembers(membersParams)
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const { isColumnEnabled, refetch: refetchPermissions } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+  const isStatusVisible = isColumnEnabled('Status')
+
+  if (query.isPending || membersQuery.isPending) {
     return (
       <LoadingState message="Loading your dashboard..." />
     )
@@ -138,24 +165,29 @@ export function UserDashboardPage() {
       <ErrorState
         title="Unable to load dashboard"
         message={query.error.message}
-        onRetry={() => query.refetch()}
+        onRetry={() => {
+          void query.refetch()
+          void membersQuery.refetch()
+          void assigningUsersQuery.refetch()
+          void refetchPermissions()
+        }}
       />
     )
   }
 
   const summary = query.data
-  const kpis = summary.kpis ?? EMPTY_KPIS
-  const trend = summary.trend
-  const target = summary.teamTarget
-  const breakdown = summary.statusBreakdown
-  const delay = summary.delayBreakdown
+  const kpis = summary?.kpis ?? EMPTY_KPIS
+  const trend = summary?.trend
+  const target = summary?.teamTarget
+  const breakdown = summary?.statusBreakdown
+  const delay = summary?.delayBreakdown
 
   const newTotal = sum(trend?.newCustomers ?? [])
   const previousTotal = sum(trend?.previousPeriod ?? [])
   const growth =
     growthLabel(newTotal, previousTotal) || '—'
 
-  const activeDays = (summary.mostActiveDay ?? []).map(
+  const activeDays = (summary?.mostActiveDay ?? []).map(
     (item) => ({ day: item.day, value: item.count }),
   )
   const busiestDay = activeDays.reduce(
@@ -166,6 +198,8 @@ export function UserDashboardPage() {
 
   function handleRefresh() {
     void query.refetch()
+    void membersQuery.refetch()
+    void assigningUsersQuery.refetch()
     setRefreshKey((key) => key + 1)
   }
 
@@ -256,29 +290,31 @@ export function UserDashboardPage() {
       </motion.div>
 
       <motion.div variants={sectionVariants}>
-        <div className="hdb-row-three-col">
-          <StatusBreakdown
-            pendingCount={breakdown?.pending?.count ?? 0}
-            pendingPercent={Math.round(
-              breakdown?.pending?.percentage ?? 0,
-            )}
-            inProgressCount={
-              breakdown?.inProgress?.count ?? 0
-            }
-            inProgressPercent={Math.round(
-              breakdown?.inProgress?.percentage ?? 0,
-            )}
-            completedCount={
-              breakdown?.completed?.count ?? 0
-            }
-            completedPercent={Math.round(
-              breakdown?.completed?.percentage ?? 0,
-            )}
-            delayedCount={breakdown?.delayed?.count ?? 0}
-            delayedPercent={Math.round(
-              breakdown?.delayed?.percentage ?? 0,
-            )}
-          />
+        <div className={isStatusVisible ? 'hdb-row-three-col' : 'hdb-row-two-col-equal'}>
+          {isStatusVisible && (
+            <StatusBreakdown
+              pendingCount={breakdown?.pending?.count ?? 0}
+              pendingPercent={Math.round(
+                breakdown?.pending?.percentage ?? 0,
+              )}
+              inProgressCount={
+                breakdown?.inProgress?.count ?? 0
+              }
+              inProgressPercent={Math.round(
+                breakdown?.inProgress?.percentage ?? 0,
+              )}
+              completedCount={
+                breakdown?.completed?.count ?? 0
+              }
+              completedPercent={Math.round(
+                breakdown?.completed?.percentage ?? 0,
+              )}
+              delayedCount={breakdown?.delayed?.count ?? 0}
+              delayedPercent={Math.round(
+                breakdown?.delayed?.percentage ?? 0,
+              )}
+            />
+          )}
           <MostActiveDay
             days={activeDays.map((item) => ({
               ...item,

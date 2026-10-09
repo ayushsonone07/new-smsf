@@ -3,6 +3,10 @@ import { useDepartmentFeatures } from '../../../permissions/hooks/useDepartmentF
 import type { HeadNavItem } from '../types/head.types'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import { getSession } from '../../../../app/auth/session'
+import {
+  buildOnboardingRoute,
+  isUserOnboarding,
+} from '../utils/routeUtils'
 
 /**
  * Sidebar items for a department = its enabled feature
@@ -14,7 +18,9 @@ import { getSession } from '../../../../app/auth/session'
  */
 export function useHeadNav(departmentId: string) {
   const query = useDepartmentFeatures(departmentId)
-  const role = getSession()?.user.role
+  const session = getSession()
+  const role = session?.user.role
+  const isOnboarding = isUserOnboarding(session?.user.departmentType)
   const basePath = role === 'USER' ? '/users' : '/head'
 
   const features = useMemo(
@@ -36,13 +42,23 @@ export function useHeadNav(departmentId: string) {
         key: feature.slug,
         label: feature.name,
         icon: feature.icon,
-        to: `${basePath}/${feature.slug}`,
+        to: isOnboarding
+          ? buildOnboardingRoute(feature.slug, role)
+          : `${basePath}/${feature.slug}`,
       })),
-    [features, basePath],
+    [features, basePath, isOnboarding, role],
   )
 
-  const bySlug = (slug: string): FeaturePermission | undefined =>
-    features.find((feature) => feature.slug === slug)
+  const bySlug = (slug: string): FeaturePermission | undefined => {
+    const s = slug === 'customer-list' ? 'customers' : slug
+    return features.find(
+      (feature) =>
+        feature.slug === s ||
+        feature.screen === s ||
+        (s === 'customers' && feature.slug === 'customer-list') ||
+        (s === 'customer-list' && feature.slug === 'customers'),
+    )
+  }
 
   return { ...query, features, items, bySlug }
 }
