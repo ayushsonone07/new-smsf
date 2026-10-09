@@ -19,6 +19,7 @@ export interface Department {
   email: string
   status: DepartmentStatus
   createdAt: string
+  role?: string
 }
 
 export interface CreateDepartmentRequest {

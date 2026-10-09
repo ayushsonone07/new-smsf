@@ -2,7 +2,6 @@ import type { Department } from '../../features/departments/types/department.typ
 import { Button } from '../ui/Button'
 import { DataTable } from '../ui/DataTable'
 import { EmptyState } from '../ui/EmptyState'
-import { StatusBadge } from '../common/StatusBadge'
 
 interface DepartmentTableProps {
   departments: Department[]
@@ -18,6 +17,7 @@ const columns = [
   { key: 'department', title: 'DEPARTMENT' },
   { key: 'username', title: 'LOGIN USERNAME' },
   { key: 'email', title: 'EMAIL' },
+  { key: 'role', title: 'ROLE' },
   { key: 'status', title: 'STATUS' },
   { key: 'created', title: 'CREATED' },
   {
@@ -62,9 +62,9 @@ export function DepartmentTable({
               </div>
 
               <div>
-                <strong>{department.name}</strong>
+                <strong>{department.type || 'Unknown'}</strong>
 
-                <span>Department account</span>
+                <span>{department.name}</span>
               </div>
             </div>
           </td>
@@ -78,14 +78,13 @@ export function DepartmentTable({
           <td>{department.email}</td>
 
           <td>
-            <StatusBadge
-              status={department.status}
-              variant={
-                department.status === 'ACTIVE'
-                  ? 'active'
-                  : 'inactive'
-              }
-            />
+            {department.role ? (
+              <span className="role-badge">
+                {department.role}
+              </span>
+            ) : (
+              <span className="text-muted">—</span>
+            )}
           </td>
 
           <td>
