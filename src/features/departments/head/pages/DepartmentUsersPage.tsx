@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -56,6 +57,7 @@ function belongsToRoute(
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
+ * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
 export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
   const departmentId = useHeadDepartmentId()
@@ -108,6 +110,30 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
+  async function handleLoginAs(targetUser: DepartmentUser) {
+    const email = targetUser.email?.trim()
+    if (!email) {
+      alert('This user does not have a valid email.')
+      return
+    }
+
+    try {
+      const currentSession = getSession()
+      if (currentSession) {
+        saveAdminBackup(currentSession)
+      }
+
+      const newSession = await generateDepartmentSession(email)
+      setSession(newSession)
+
+      navigate({ to: '/onboarding-user' as never })
+    } catch (err: unknown) {
+      console.error('Failed to log in as department user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to log in as user'
+      alert(`Login failed: ${msg}`)
+    }
+  }
+
   // Reset to page 0 when search changes
   const handleSearchChange = (value: string) => {
     setSearch(value)
@@ -120,6 +146,96 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
     size,
     search,
   })
+
+  // Get today's date range in ISO format for the member details API
+  const todayStart = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString().slice(0, 19)
+  }, [])
+  const todayEnd = useMemo(() => {
+    const d = new Date()
+    d.setHours(23, 59, 59, 0)
+    return d.toISOString().slice(0, 19)
+  }, [])
+
+  // Member details query - triggered when modal.kind === 'report'
+  const memberDetailsQuery = useMemberDetails({
+    userId: modal.kind === 'report' ? Number(modal.user.id) : 0,
+    department: 'ONBOARDING_DEPARTMENT',
+    startDate: todayStart,
+    endDate: todayEnd,
+    page: 0,
+    size: 50,
+  })
+
+  // Convert backend member details to frontend WorkReportItem format
+  const convertToWorkReportItems = (customers: OnboardingDashboardCustomerDTO[] = []): WorkReportItem[] => {
+    return customers.map((c) => {
+      const status = c.status === 'COMPLETED' ? 'COMPLETED' : c.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PENDING'
+      const delaySide = c.delaySide === 'CLIENT' ? 'CLIENT' : c.delaySide === 'OURS' ? 'OURS' : c.delaySide === 'TECH' ? 'TECH' : undefined
+      
+      return {
+        id: String(c.customerId ?? Math.random()),
+        customerName: c.customerName ?? c.ownerName ?? 'Customer',
+        contactName: c.ownerName,
+        city: c.city,
+        status: status as WorkItemStatus,
+        delayDays: c.delayDays ?? 0,
+        delaySide: delaySide as DelaySide | undefined,
+        reason: c.delayReason,
+        remark: c.remark,
+      }
+    })
+  }
+
+  // Build person info from member details or fallback to modal user
+  const person = useMemo(() => {
+    if (memberDetailsQuery.data?.member) {
+      return {
+        name: memberDetailsQuery.data.member.name,
+        email: memberDetailsQuery.data.member.email,
+        dateLabel: 'Today',
+        attendance: (memberDetailsQuery.data.statistics?.attendance === 'Present' ? 'PRESENT' : 'ABSENT') as Attendance,
+        avatarText: memberDetailsQuery.data.member.name?.charAt(0).toUpperCase(),
+        avatarSrc: memberDetailsQuery.data.member.avatar,
+      }
+    }
+    // Fallback to modal user data
+    if (modal.kind === 'report' && modal.user) {
+      return {
+        name: modal.user.name,
+        email: modal.user.email,
+        dateLabel: 'Today',
+        attendance: (modal.user.isPresentToday ? 'PRESENT' : 'ABSENT') as Attendance,
+        avatarText: modal.user.name?.charAt(0).toUpperCase(),
+      }
+    }
+    return null
+  }, [memberDetailsQuery.data, modal])
+
+  // Get items from member details or fallback to mock
+  const items = useMemo(() => {
+    if (memberDetailsQuery.data?.customers?.length) {
+      return convertToWorkReportItems(memberDetailsQuery.data.customers)
+    }
+    // Fallback to mock data
+    if (modal.kind === 'report' && modal.user) {
+      return sampleWorkItemsByUser[modal.user.id] ?? []
+    }
+    return []
+  }, [memberDetailsQuery.data, modal])
+
+  // Get target from member details or fallback
+  const target = useMemo(() => {
+    if (memberDetailsQuery.data?.statistics?.target) {
+      return memberDetailsQuery.data.statistics.target
+    }
+    if (modal.kind === 'report' && modal.user) {
+      return sampleDailyTargetByUser[modal.user.id] ?? 0
+    }
+    return 0
+  }, [memberDetailsQuery.data, modal])
 
   // Map API users to DepartmentUser table structure, with fallback to mock data
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
@@ -299,7 +415,7 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
           onDelete={(user) =>
             setModal({ kind: 'delete', user })
           }
-          onLoginAs={canManageUsers ? (user) => setViewingAs(user) : undefined}
+          onLoginAs={handleLoginAs}
           renderExpanded={(user) => (
             <UserDetails user={user} />
           )}
@@ -367,20 +483,13 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
         />
       ) : null}
 
-      {modal.kind === 'report' ? (
+      {modal.kind === 'report' && person ? (
         <StaffReportModal
           open
           onClose={closeModal}
-          person={{
-            name: modal.user.name,
-            email: modal.user.email,
-            dateLabel: 'Today',
-            attendance: modal.user.isPresentToday
-              ? 'PRESENT'
-              : 'ABSENT',
-          }}
-          items={sampleWorkItemsByUser[modal.user.id] ?? []}
-          target={sampleDailyTargetByUser[modal.user.id] ?? 0}
+          person={person}
+          items={items}
+          target={target}
         />
       ) : null}
     </>

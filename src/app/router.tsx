@@ -263,6 +263,12 @@ const onboardingHeadDashboardRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="dashboard" />,
 })
 
+const onboardingUserRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-user',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
 const onboardingUserDashboardRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding-dashboard-head-departmentUser',
@@ -353,6 +359,18 @@ const onboardingUserHelpCenterRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="help-center" />,
 })
 
+const onboardingHeadHistoryRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
+const onboardingUserHistoryRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
 const onboardingDynamicScreenRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding/$screen',
@@ -364,6 +382,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   onboardingLayoutRoute.addChildren([
     onboardingIndexRoute,
+    onboardingUserRoute,
     onboardingHeadDashboardRoute,
     onboardingUserDashboardRoute,
     onboardingHeadCustomersRoute,
@@ -380,6 +399,8 @@ const routeTree = rootRoute.addChildren([
     onboardingUserAttendanceRoute,
     onboardingHeadHelpCenterRoute,
     onboardingUserHelpCenterRoute,
+    onboardingHeadHistoryRoute,
+    onboardingUserHistoryRoute,
     onboardingDynamicScreenRoute,
   ]),
   headLayoutRoute.addChildren([

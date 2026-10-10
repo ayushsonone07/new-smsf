@@ -62,6 +62,13 @@ export interface CustomersListProps {
   canEdit?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
+  showAssignTo?: boolean
+  canEditAssignTo?: boolean
+  showRemark?: boolean
+  canEditRemark?: boolean
+  showContact?: boolean
+  showBusiness?: boolean
+  showUpdated?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -499,10 +506,37 @@ function CustomerRow({
               className="cl-remark-textarea"
               value={remarkDraft}
               onChange={(e) => setRemarkDraft(e.target.value)}
+              onBlur={saveRemark}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  saveRemark()
+                } else if (e.key === 'Escape') {
+                  cancelRemark()
+                }
+              }}
               autoFocus
               aria-label="Edit internal remark"
             />
             <div className="cl-remark-actions">
+              <button
+                type="button"
+                className="cl-action"
+                title="Save remark"
+                aria-label="Save remark"
+                onClick={saveRemark}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="cl-action"
+                title="Cancel editing remark"
+                aria-label="Cancel editing remark"
+                onClick={cancelRemark}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 className="cl-action"

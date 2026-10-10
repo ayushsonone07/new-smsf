@@ -20,7 +20,9 @@ import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useOnboardingCustomersList } from '../../hooks/useDepartmentUsersList'
+import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { getSession } from '../../../../app/auth/session'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -50,6 +52,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
@@ -94,10 +97,24 @@ export function CustomerListPage() {
     }
   }, [isStatusVisible, activeTab])
 
-  // 1. Assigning users API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const session = getSession()
+  const isUser = session?.user?.role === 'USER'
+  const userEmail = session?.user?.email || session?.user?.username || ''
+
+  // 1. Assigning users API - disabled for department users
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT', {
+    enabled: !isUser,
+  })
 
   const assignees: OnboardingAssignee[] = useMemo(() => {
+    if (isUser) {
+      return [
+        {
+          id: userEmail,
+          name: session?.user?.name || userEmail,
+        },
+      ]
+    }
     const list = assigningUsersQuery.data
     if (list && list.length > 0) {
       return list.map((u) => ({
@@ -106,7 +123,7 @@ export function CustomerListPage() {
       }))
     }
     return FALLBACK_ASSIGNEES
-  }, [assigningUsersQuery.data])
+  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {
@@ -135,6 +152,9 @@ export function CustomerListPage() {
     setPage(0)
   }
 
+  // Keep the all-status summary available while the customer list is filtered.
+  const onboardingSummaryQuery = useOnboardingCustomersList({ page: 0, size })
+
   // 3. Onboarding customers live API
   const onboardingApiQuery = useOnboardingCustomersList({
     page,
@@ -142,7 +162,12 @@ export function CustomerListPage() {
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
-    status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+    status:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
   })
 
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
@@ -162,6 +187,7 @@ export function CustomerListPage() {
           : 'Recent',
         email: c.email || '',
         phone: c.phoneNumber || '',
+        formUrl: c.onboardingLink,
         callStatus: 'connected',
         status:
           c.onboardingStatus?.toLowerCase() === 'completed'
@@ -209,12 +235,12 @@ export function CustomerListPage() {
 
   const tabCounts = useMemo(
     () => ({
-      all: onboardingApiQuery.data?.summary?.total,
-      pending: onboardingApiQuery.data?.summary?.pending,
-      inProgress: onboardingApiQuery.data?.summary?.inProgress,
-      completed: onboardingApiQuery.data?.summary?.completed,
+      all: onboardingSummaryQuery.data?.summary?.total,
+      pending: onboardingSummaryQuery.data?.summary?.pending,
+      inProgress: onboardingSummaryQuery.data?.summary?.inProgress,
+      completed: onboardingSummaryQuery.data?.summary?.completed,
     }),
-    [onboardingApiQuery.data?.summary],
+    [onboardingSummaryQuery.data?.summary],
   )
 
   const filteredCustomers = useMemo(() => {
@@ -342,6 +368,7 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
