@@ -5,6 +5,7 @@ import {
   CustomersList,
   type OnboardingAssignee,
   type OnboardingCustomer,
+  type OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
 import {
   CustomersListFilters,
@@ -16,6 +17,7 @@ import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
+import { useUpdateOnboardingCustomerStatus } from '../../hooks/useUpdateOnboardingCustomerStatus'
 import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
@@ -27,6 +29,7 @@ import {
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
+import type { OnboardingStatusUpdate } from '../../../../api/department-users.api'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -46,7 +49,10 @@ export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
   const customersQuery = useDepartmentCustomers(departmentId)
   const updateMutation = useUpdateCustomer(departmentId)
+  const statusUpdateMutation = useUpdateOnboardingCustomerStatus()
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
+  const session = getSession()
+  const isUser = session?.user?.role === 'USER'
 
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<CustomerTab>('all')
@@ -54,6 +60,8 @@ export function CustomerListPage() {
     useState<string | null | 'all'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [completedFrom, setCompletedFrom] = useState('')
+  const [completedTo, setCompletedTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
   const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
@@ -68,13 +76,15 @@ export function CustomerListPage() {
   const canEditStatus = canEditColumn('Status')
 
   const isAssignToVisible =
-    isColumnEnabled('Assign To') ||
-    isColumnEnabled('Assign') ||
-    isColumnEnabled('Assignee')
+    !isUser &&
+    (isColumnEnabled('Assign To') ||
+      isColumnEnabled('Assign') ||
+      isColumnEnabled('Assignee'))
   const canEditAssignTo =
-    canEditColumn('Assign To') ||
-    canEditColumn('Assign') ||
-    canEditColumn('Assignee')
+    !isUser &&
+    (canEditColumn('Assign To') ||
+      canEditColumn('Assign') ||
+      canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
@@ -101,11 +111,9 @@ export function CustomerListPage() {
     }
   }, [isStatusVisible, activeTab])
 
-  const session = getSession()
   const currentDepartment =
     session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
   const isGoogle = currentDepartment.toUpperCase().includes('GOOGLE')
-  const isUser = session?.user?.role === 'USER'
   const userEmail = session?.user?.email || session?.user?.username || ''
 
   // 1. Assigning users API - for Onboarding: ONBOARDING_DEPARTMENT, for Google: GOOGLE_DEPARTMENT
@@ -150,12 +158,19 @@ export function CustomerListPage() {
     setDateTo(to)
     setPage(0)
   }
+  const handleCompletedDateChange = (from: string, to: string) => {
+    setCompletedFrom(from)
+    setCompletedTo(to)
+    setPage(0)
+  }
   const handleResetFilters = () => {
     setSearch('')
     setActiveTab('all')
     setSelectedAssigneeId('all')
     setDateFrom('')
     setDateTo('')
+    setCompletedFrom('')
+    setCompletedTo('')
     setPage(0)
   }
 
@@ -174,6 +189,8 @@ export function CustomerListPage() {
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
+    completionStartDate: completedFrom || undefined,
+    completionEndDate: completedTo || undefined,
     status:
       activeTab === 'all'
         ? undefined
@@ -412,6 +429,24 @@ export function CustomerListPage() {
     updateMutation.mutate({ id, data: patch })
   }
 
+  function updateCustomerStatus(id: string, status: OnboardingStatus) {
+    if (!canEditStatus) return
+    const customer = onboardingApiQuery.data?.customers.find(
+      (item) => String(item.id ?? item.customerId) === id,
+    )
+    const statusMap: Record<OnboardingStatus, OnboardingStatusUpdate> = {
+      pending: 'PENDING',
+      'in-progress': 'IN_PROGRESS',
+      completed: 'COMPLETED',
+    }
+
+    statusUpdateMutation.mutate({
+      customerId: id,
+      status: statusMap[status],
+      onboardingLink: customer?.onboardingLink,
+    })
+  }
+
   return (
     <>
       <CustomersListFilters
@@ -430,15 +465,24 @@ export function CustomerListPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
         onDateChange={handleDateChange}
+        completedFrom={completedFrom}
+        completedTo={completedTo}
+        onCompletedChange={isGoogle ? undefined : handleCompletedDateChange}
         onReset={handleResetFilters}
       />
+
+      {statusUpdateMutation.error && (
+        <div className="cl-status-update-error" role="alert">
+          Status update failed: {statusUpdateMutation.error.message}
+        </div>
+      )}
 
       <CustomersList
         customers={filteredCustomers}
         assignees={assignees}
         canEdit={canEdit}
         showStatus={isStatusVisible}
-        canEditStatus={canEditStatus}
+        canEditStatus={canEditStatus && !statusUpdateMutation.isPending}
         showAssignTo={isAssignToVisible}
         canEditAssignTo={canEditAssignTo}
         showRemark={isRemarkVisible}
@@ -447,9 +491,7 @@ export function CustomerListPage() {
         showBusiness={isBusinessVisible}
         showUpdated={isUpdatedVisible}
         onOpenDetail={setSelectedCustomer}
-        onStatusChange={(id, status) =>
-          patchCustomer(id, { onboardingStatus: status })
-        }
+        onStatusChange={updateCustomerStatus}
         onAssigneeChange={(id, assigneeId) =>
           patchCustomer(id, { assigneeId: assigneeId ?? undefined })
         }

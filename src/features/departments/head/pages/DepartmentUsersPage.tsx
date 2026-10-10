@@ -15,12 +15,6 @@ import {
   sampleDailyTargetByUser,
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
-import { generateDepartmentSession } from '../../../../api/auth.api'
-import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
-import {
-  saveAdminBackup,
-  setSession,
-} from '../../../../app/auth/session'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
@@ -40,12 +34,6 @@ import {
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
-import type {
-  Attendance,
-  DelaySide,
-  WorkItemStatus,
-  WorkReportItem,
-} from '../../../../features/reports/types/staff-report.types'
 import type {
   Attendance,
   DelaySide,

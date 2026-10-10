@@ -139,6 +139,7 @@ export function CustomersList({
   onOpenDetail,
   canEdit = true,
   showStatus = true,
+  showAssignTo = true,
   canEditStatus,
 }: CustomersListProps) {
 if (customers.length === 0) {
@@ -166,7 +167,7 @@ if (customers.length === 0) {
             <th className="cl-th cl-th--biz">Business</th>
             <th className="cl-th cl-th--contact">Contact</th>
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
-            <th className="cl-th cl-th--assign">Assign To</th>
+            {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             <th className="cl-th cl-th--remark">Internal Remark</th>
             <th className="cl-th">Updated</th>
           </tr>
@@ -193,6 +194,7 @@ if (customers.length === 0) {
               onOpenDetail={() => onOpenDetail(customer)}
               canEdit={canEdit}
               showStatus={showStatus}
+              showAssignTo={showAssignTo}
               canEditStatus={canEditStatus}
             />
           ))}
@@ -213,6 +215,7 @@ interface CustomerRowProps {
   onOpenDetail: () => void
   canEdit: boolean
   showStatus?: boolean
+  showAssignTo?: boolean
   canEditStatus?: boolean
 }
 
@@ -225,6 +228,7 @@ function CustomerRow({
   onOpenDetail,
   canEdit,
   showStatus = true,
+  showAssignTo = true,
   canEditStatus,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
@@ -434,8 +438,9 @@ function CustomerRow({
       )}
 
       {/* Assign To */}
-      <td className="cl-td" data-label="Assign To">
-        <div className="cl-assign-wrap" ref={assignRef}>
+      {showAssignTo && (
+        <td className="cl-td" data-label="Assign To">
+          <div className="cl-assign-wrap" ref={assignRef}>
           <button
             type="button"
             className="cl-assign-btn"
@@ -495,8 +500,9 @@ function CustomerRow({
                 ))}
             </motion.div>
             )}
-        </div>
-      </td>
+          </div>
+        </td>
+      )}
 
       {/* Internal Remark */}
       <td className="cl-td" data-label="Internal Remark">

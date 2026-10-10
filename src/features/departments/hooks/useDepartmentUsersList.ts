@@ -32,6 +32,8 @@ export function useOnboardingCustomersList(params: {
   searchParam?: string
   startDate?: string
   endDate?: string
+  completionStartDate?: string
+  completionEndDate?: string
   status?: string
   filteredUser?: string
 } = {}) {
@@ -70,4 +72,3 @@ export function useDepartmentCustomerRows(
     staleTime: 30_000,
   })
 }
-
