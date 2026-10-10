@@ -19,10 +19,8 @@ import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
-import {
-  useOnboardingCustomersList,
-  useAuthOnboardingSummary,
-} from '../../hooks/useDepartmentUsersList'
+import { useOnboardingCustomersList } from '../../hooks/useDepartmentUsersList'
+import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
@@ -54,6 +52,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
@@ -153,27 +152,22 @@ export function CustomerListPage() {
     setPage(0)
   }
 
-  // 2. Summary counts: /api/auth/onboarding/summary
-  const authSummaryQuery = useAuthOnboardingSummary({
-    department: 'ONBOARDING_DEPARTMENT',
-    startDate: dateFrom || undefined,
-    endDate: dateTo || undefined,
-    allTime: !dateFrom && !dateTo,
-  })
+  // Keep the all-status summary available while the customer list is filtered.
+  const onboardingSummaryQuery = useOnboardingCustomersList({ page: 0, size })
 
-  // 3. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
+  // 3. Onboarding customers live API
   const onboardingApiQuery = useOnboardingCustomersList({
     page,
     size,
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
-    status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
-    filteredUser: isUser
-      ? userEmail
-      : selectedAssigneeId !== 'all'
-        ? selectedAssigneeId ?? undefined
-        : undefined,
+    status:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
   })
 
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
@@ -193,6 +187,7 @@ export function CustomerListPage() {
           : 'Recent',
         email: c.email || '',
         phone: c.phoneNumber || '',
+        formUrl: c.onboardingLink,
         callStatus: 'connected',
         status:
           c.onboardingStatus?.toLowerCase() === 'completed'
@@ -238,42 +233,15 @@ export function CustomerListPage() {
     }))
   }, [onboardingApiQuery.data?.customers, customersQuery.data])
 
-  const tabCounts = useMemo(() => {
-    const authData = authSummaryQuery.data
-    const apiSummary = onboardingApiQuery.data?.summary
-
-    const all =
-      authData?.totalCustomers ??
-      authData?.total ??
-      authData?.summary?.total ??
-      apiSummary?.total
-
-    const pending =
-      authData?.totalPendingOnboarding ??
-      authData?.pending ??
-      authData?.summary?.pending ??
-      apiSummary?.pending
-
-    const inProgress =
-      authData?.totalInProgressOnboarding ??
-      authData?.inProgress ??
-      authData?.summary?.inProgress ??
-      apiSummary?.inProgress
-
-    const completed =
-      authData?.totalCompletedOnboarding ??
-      authData?.totalOnboardedCustomers ??
-      authData?.completed ??
-      authData?.summary?.completed ??
-      apiSummary?.completed
-
-    return {
-      all,
-      pending,
-      inProgress,
-      completed,
-    }
-  }, [authSummaryQuery.data, onboardingApiQuery.data?.summary])
+  const tabCounts = useMemo(
+    () => ({
+      all: onboardingSummaryQuery.data?.summary?.total,
+      pending: onboardingSummaryQuery.data?.summary?.pending,
+      inProgress: onboardingSummaryQuery.data?.summary?.inProgress,
+      completed: onboardingSummaryQuery.data?.summary?.completed,
+    }),
+    [onboardingSummaryQuery.data?.summary],
+  )
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -400,6 +368,7 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
