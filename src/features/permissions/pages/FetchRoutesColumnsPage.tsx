@@ -16,6 +16,7 @@ import {
   useDynamicRoutes,
   useDynamicColumns,
   useDepartmentTypes,
+  useDepartmentDetails,
   useUpdateColumnPermission,
 } from '../hooks/useDynamicPermissions'
 import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
@@ -51,15 +52,17 @@ const TABLE_COLUMNS = [
 ]
 
 export function FetchRoutesColumnsPage() {
-  const routesQuery = useDynamicRoutes()
-  const columnsQuery = useDynamicColumns()
-  const deptsQuery = useDepartmentTypes()
-  const updateColumnPermissionMutation = useUpdateColumnPermission()
-
-  const [activeTab, setActiveTab] = useState<ActiveTab>('routes')
   const [selectedDept, setSelectedDept] = useState<string>('ONBOARDING_DEPARTMENT')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('routes')
   const [search, setSearch] = useState('')
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  // React Query hooks with department filtering (real DB data)
+  const routesQuery = useDynamicRoutes(selectedDept)
+  const columnsQuery = useDynamicColumns(selectedDept)
+  const deptsQuery = useDepartmentTypes()
+  const deptDetailsQuery = useDepartmentDetails(selectedDept)
+  const updateColumnPermissionMutation = useUpdateColumnPermission()
 
   const [showCreateRouteModal, setShowCreateRouteModal] = useState(false)
   const [showCreateColumnModal, setShowCreateColumnModal] = useState(false)
@@ -74,6 +77,16 @@ export function FetchRoutesColumnsPage() {
 
   const rawRoutes = routesQuery.data ?? []
   const rawColumns = columnsQuery.data ?? []
+
+  // Department switch handler
+  const handleSelectDepartment = (dept: string) => {
+    setSelectedDept(dept)
+    setRoutesUiState({})
+    setColumnsUiState({})
+    setRoutesOrder([])
+    setColumnsOrder([])
+    setSearch('')
+  }
 
   // Initialize order when fetched
   const orderedRoutes = useMemo(() => {
@@ -151,7 +164,7 @@ export function FetchRoutesColumnsPage() {
     setColumnsOrder(ids)
   }
 
-  // Pure UI state toggles
+  // Pure UI state toggles (no backend call per instruction)
   const handleToggleRoute = (id: string, key: 'enabled' | 'userVisible', val: boolean) => {
     setRoutesUiState((prev) => ({
       ...prev,
@@ -176,7 +189,7 @@ export function FetchRoutesColumnsPage() {
     }))
   }
 
-  // Real backend read/write permission update for Columns
+  // Real backend read/write permission update for Columns into access_controls table
   const handleColumnPermissionChange = (
     column: DynamicColumnResponse,
     roleName: 'DEPARTMENT_HEAD' | 'DEPARTMENT_USER',
@@ -193,11 +206,13 @@ export function FetchRoutesColumnsPage() {
         roleAPermission:
           roleName === 'DEPARTMENT_HEAD'
             ? permission
-            : prev[column.columnId]?.roleAPermission ?? 'CAN_READ',
+            : prev[column.columnId]?.roleAPermission ??
+              (column.roleAPermission === '1' ? 'CAN_READ' : 'CAN_EDIT'),
         roleBPermission:
           roleName === 'DEPARTMENT_USER'
             ? permission
-            : prev[column.columnId]?.roleBPermission ?? 'CAN_READ',
+            : prev[column.columnId]?.roleBPermission ??
+              (column.roleBPermission === '12' ? 'CAN_EDIT' : 'CAN_READ'),
       },
     }))
 
@@ -205,15 +220,16 @@ export function FetchRoutesColumnsPage() {
     updateColumnPermissionMutation.mutate(
       {
         columnId: column.columnId,
+        columnName: column.columnName,
         roleName,
-        departmentType: selectedDept,
+        departmentType: selectedDept === 'ALL' ? 'ONBOARDING_DEPARTMENT' : selectedDept,
         readWriteAccess: accessCode,
       },
       {
         onSuccess: () => {
           setStatusMessage({
             type: 'success',
-            text: `Permission updated for column "${column.columnName}" (${roleName} -> ${permission === 'CAN_EDIT' ? 'Can Edit' : 'Can Read'}) in access_controls table!`,
+            text: `Permission updated for column "${column.columnName}" (${roleName} -> ${permission === 'CAN_EDIT' ? 'Can Edit' : 'Can Read'}) for ${selectedDept}!`,
           })
           setTimeout(() => setStatusMessage(null), 4000)
         },
@@ -228,7 +244,7 @@ export function FetchRoutesColumnsPage() {
     )
   }
 
-  // Route permission change (pure UI or local state)
+  // Route permission change (pure UI state)
   const handleRoutePermissionChange = (
     routeId: string,
     role: 'roleAPermission' | 'roleBPermission',
@@ -245,7 +261,7 @@ export function FetchRoutesColumnsPage() {
     }))
     setStatusMessage({
       type: 'success',
-      text: `Route permission updated in UI state!`,
+      text: `Route permission toggle updated in UI!`,
     })
     setTimeout(() => setStatusMessage(null), 2500)
   }
@@ -254,6 +270,8 @@ export function FetchRoutesColumnsPage() {
     const cleaned = str.replace(/^\/head\//, '').replace(/^\//, '').replace(/[-_]/g, ' ')
     return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
   }
+
+  const allDepts = deptsQuery.data ?? ['ONBOARDING_DEPARTMENT']
 
   return (
     <PageLayout>
@@ -264,11 +282,11 @@ export function FetchRoutesColumnsPage() {
             {' / '}
             <span>Permissions</span>
             {' / '}
-            <span>Fetch R/C</span>
+            <span>Department Routes & Columns</span>
           </>
         }
-        title="Dynamic Routes & Columns Permission Manager"
-        description="Inspect routes and table columns in the exact head menu format. Toggles are managed in UI; Read/Write dropdowns persist directly to access_controls."
+        title="Department Dynamic Permission Manager"
+        description="Select a department to view its mapped routes from access_summary and column permissions from access_controls. Real DB data only."
         actions={
           <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
             <Button
@@ -276,6 +294,7 @@ export function FetchRoutesColumnsPage() {
               onClick={() => {
                 routesQuery.refetch()
                 columnsQuery.refetch()
+                if (selectedDept !== 'ALL') deptDetailsQuery.refetch()
               }}
               disabled={routesQuery.isFetching || columnsQuery.isFetching}
             >
@@ -298,6 +317,7 @@ export function FetchRoutesColumnsPage() {
         }
       />
 
+      {/* Status Alert Banner */}
       {statusMessage && (
         <div
           style={{
@@ -319,7 +339,180 @@ export function FetchRoutesColumnsPage() {
         </div>
       )}
 
-      {/* Main Card with Table Toolbar */}
+      {/* 1. Interactive Department Selection Pills (Clickable) */}
+      <Card style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Select Department to Filter
+            </span>
+            <div style={{ fontSize: '0.875rem', color: '#334155' }}>
+              Click any department below to view its specific routes and column permissions from MySQL.
+            </div>
+          </div>
+          {/* Quick Dropdown Fallback */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
+              Dropdown:
+            </span>
+            <Select
+              value={selectedDept}
+              onChange={(e) => handleSelectDepartment(e.target.value)}
+              style={{ minWidth: '220px', padding: '0.35rem 0.6rem', fontSize: '0.8125rem' }}
+            >
+              <option value="ALL">🏢 ALL DEPARTMENTS (Master View)</option>
+              {allDepts.map((d) => (
+                <option key={d} value={d}>
+                  🏢 {d}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* Horizontal Clickable Department Chips */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            overflowX: 'auto',
+            paddingBottom: '0.25rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleSelectDepartment('ALL')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem 0.9rem',
+              borderRadius: '20px',
+              fontSize: '0.8125rem',
+              fontWeight: selectedDept === 'ALL' ? 700 : 500,
+              backgroundColor: selectedDept === 'ALL' ? '#4f46e5' : '#f1f5f9',
+              color: selectedDept === 'ALL' ? '#ffffff' : '#475569',
+              border: selectedDept === 'ALL' ? '1px solid #4338ca' : '1px solid #e2e8f0',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: selectedDept === 'ALL' ? '0 2px 4px rgba(79, 70, 229, 0.25)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🌐</span>
+            <span>All Master</span>
+          </button>
+
+          {allDepts.map((d) => {
+            const isSelected = selectedDept === d
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => handleSelectDepartment(d)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '20px',
+                  fontSize: '0.8125rem',
+                  fontWeight: isSelected ? 700 : 500,
+                  backgroundColor: isSelected ? '#4f46e5' : '#f1f5f9',
+                  color: isSelected ? '#ffffff' : '#475569',
+                  border: isSelected ? '1px solid #4338ca' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 2px 4px rgba(79, 70, 229, 0.25)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span>🏢</span>
+                <span>{d.replace(/_DEPARTMENT$/, '')}</span>
+              </button>
+            )
+          })}
+        </div>
+      </Card>
+
+      {/* 2. Department Details Info Banner */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.85rem 1.25rem',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          marginBottom: '1.25rem',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              backgroundColor: '#eff6ff',
+              color: '#2563eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.25rem',
+              fontWeight: 700,
+            }}
+          >
+            🏢
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a' }}>
+                {selectedDept === 'ALL' ? 'All Departments Master Catalog' : selectedDept}
+              </span>
+              {selectedDept !== 'ALL' && deptDetailsQuery.data?.departmentId && (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '4px',
+                    backgroundColor: '#e0e7ff',
+                    color: '#4338ca',
+                  }}
+                >
+                  Service ID: {deptDetailsQuery.data.departmentId}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: '#64748b' }}>
+              {selectedDept === 'ALL'
+                ? 'Showing all routes and master columns across all departments.'
+                : `Active filter: showing mapped routes and column permissions for ${selectedDept}.`}
+            </div>
+          </div>
+        </div>
+
+        {/* Real counts from MySQL */}
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Mapped Routes</span>
+            <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#4f46e5' }}>
+              {routesQuery.isLoading ? '...' : rawRoutes.length}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Customer Columns</span>
+            <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0284c7' }}>
+              {columnsQuery.isLoading ? '...' : rawColumns.length}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Main Card with Tabs & Data Table */}
       <Card>
         <div
           className="table-toolbar"
@@ -378,31 +571,13 @@ export function FetchRoutesColumnsPage() {
                 Customer Columns ({rawColumns.length})
               </button>
             </div>
-
-            {/* Department Selector for Permissions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
-                Target Dept:
-              </span>
-              <Select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                style={{ minWidth: '220px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
-              >
-                {(deptsQuery.data ?? ['ONBOARDING_DEPARTMENT']).map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </Select>
-            </div>
           </div>
 
           {/* Right: Search Input */}
           <div style={{ position: 'relative', minWidth: '260px' }}>
             <input
               type="text"
-              placeholder={`Search ${activeTab}...`}
+              placeholder={`Search ${activeTab} in ${selectedDept === 'ALL' ? 'all' : selectedDept}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -431,7 +606,7 @@ export function FetchRoutesColumnsPage() {
 
         {/* Loading / Error states */}
         {(routesQuery.isLoading || columnsQuery.isLoading) && (
-          <LoadingState message="Fetching data from MySQL..." />
+          <LoadingState message={`Fetching real data for ${selectedDept} from database...`} />
         )}
 
         {routesQuery.isError && activeTab === 'routes' && (
@@ -450,7 +625,7 @@ export function FetchRoutesColumnsPage() {
           />
         )}
 
-        {/* 1. Routes Table (Exact Screenshot Style) */}
+        {/* 1. Routes Table (Filtered by Department from access_summary) */}
         {activeTab === 'routes' && !routesQuery.isLoading && (
           <DataTable columns={TABLE_COLUMNS}>
             {filteredRoutes.length === 0 ? (
@@ -458,8 +633,8 @@ export function FetchRoutesColumnsPage() {
                 <td colSpan={7} className="table-empty-cell">
                   <EmptyState
                     icon="⌗"
-                    title="No routes found"
-                    description="No routes match the current filter or table is empty."
+                    title={`No routes mapped for ${selectedDept}`}
+                    description={`No routes were found in the access_summary table for ${selectedDept}. Click '+ Add Route' to create and assign one.`}
                   />
                 </td>
               </tr>
@@ -510,9 +685,30 @@ export function FetchRoutesColumnsPage() {
                         </span>
                         <div>
                           <strong>{formatItemName(route.routeName)}</strong>
-                          <span style={{ fontSize: '12px', color: '#64748b' }}>
-                            UUID: {route.routeId.slice(0, 8)}...{route.routeId.slice(-4)}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>
+                              UUID: {route.routeId.slice(0, 8)}...{route.routeId.slice(-4)}
+                            </span>
+                            {route.assignedRoles && route.assignedRoles.length > 0 && (
+                              <span style={{ display: 'flex', gap: '0.25rem' }}>
+                                {route.assignedRoles.map((role) => (
+                                  <span
+                                    key={role}
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                      padding: '0.1rem 0.35rem',
+                                      borderRadius: '3px',
+                                      backgroundColor: role.includes('HEAD') ? '#eff6ff' : '#f0fdf4',
+                                      color: role.includes('HEAD') ? '#1d4ed8' : '#15803d',
+                                    }}
+                                  >
+                                    {role.replace('DEPARTMENT_', '')}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </div>
                           <code className="feature-path">{route.routeName}</code>
                         </div>
                       </div>
@@ -591,7 +787,7 @@ export function FetchRoutesColumnsPage() {
                         <button
                           type="button"
                           className="action-button edit"
-                          title="Edit Route"
+                          title="Copy UUID"
                           onClick={() => {
                             navigator.clipboard.writeText(route.routeId)
                             setStatusMessage({
@@ -626,7 +822,7 @@ export function FetchRoutesColumnsPage() {
           </DataTable>
         )}
 
-        {/* 2. Customer Columns Table (Exact Screenshot Style with Backend Permission Updates) */}
+        {/* 2. Customer Columns Table (Loaded from access_controls for this department) */}
         {activeTab === 'columns' && !columnsQuery.isLoading && (
           <DataTable columns={TABLE_COLUMNS}>
             {filteredColumns.length === 0 ? (
@@ -634,8 +830,8 @@ export function FetchRoutesColumnsPage() {
                 <td colSpan={7} className="table-empty-cell">
                   <EmptyState
                     icon="⌗"
-                    title="No columns found"
-                    description="No customer columns match the current filter or table is empty."
+                    title={`No columns found for ${selectedDept}`}
+                    description={`No customer columns match the current filter or table is empty in MySQL.`}
                   />
                 </td>
               </tr>
@@ -644,8 +840,8 @@ export function FetchRoutesColumnsPage() {
                 const ui = columnsUiState[col.columnId] || {
                   enabled: true,
                   userVisible: true,
-                  roleAPermission: col.readWriteAccess === '1' ? 'CAN_READ' : 'CAN_EDIT',
-                  roleBPermission: col.readWriteAccess === '1' ? 'CAN_READ' : 'CAN_EDIT',
+                  roleAPermission: col.roleAPermission === '1' ? 'CAN_READ' : 'CAN_EDIT',
+                  roleBPermission: col.roleBPermission === '12' ? 'CAN_EDIT' : 'CAN_READ',
                 }
 
                 const isUpdating =
@@ -690,9 +886,25 @@ export function FetchRoutesColumnsPage() {
                         </span>
                         <div>
                           <strong>{formatItemName(col.columnName)}</strong>
-                          <span style={{ fontSize: '12px', color: '#64748b' }}>
-                            UUID: {col.columnId.slice(0, 8)}...{col.columnId.slice(-4)}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>
+                              UUID: {col.columnId.slice(0, 8)}...{col.columnId.slice(-4)}
+                            </span>
+                            {col.isConfigured && (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '3px',
+                                  backgroundColor: '#f0fdf4',
+                                  color: '#15803d',
+                                }}
+                              >
+                                Saved in DB
+                              </span>
+                            )}
+                          </div>
                           <code className="feature-path">{col.columnName}</code>
                         </div>
                       </div>
@@ -786,7 +998,7 @@ export function FetchRoutesColumnsPage() {
                         <button
                           type="button"
                           className="action-button delete"
-                          title="Delete column"
+                          title="Delete Column"
                           onClick={() => {
                             if (window.confirm(`Delete column "${col.columnName}" from UI view?`)) {
                               setColumnsOrder((prev) =>
@@ -807,18 +1019,28 @@ export function FetchRoutesColumnsPage() {
         )}
       </Card>
 
-      {/* Creation Modals */}
-      <CreateRouteModal
-        open={showCreateRouteModal}
-        onClose={() => setShowCreateRouteModal(false)}
-        initialDepartmentType={selectedDept}
-      />
+      {/* Modals for Create Route / Column */}
+      {showCreateRouteModal && (
+        <CreateRouteModal
+          open={showCreateRouteModal}
+          onClose={() => {
+            setShowCreateRouteModal(false)
+            routesQuery.refetch()
+          }}
+          initialDepartmentType={selectedDept === 'ALL' ? 'ONBOARDING_DEPARTMENT' : selectedDept}
+        />
+      )}
 
-      <CreateColumnModal
-        open={showCreateColumnModal}
-        onClose={() => setShowCreateColumnModal(false)}
-        initialDepartmentType={selectedDept}
-      />
+      {showCreateColumnModal && (
+        <CreateColumnModal
+          open={showCreateColumnModal}
+          onClose={() => {
+            setShowCreateColumnModal(false)
+            columnsQuery.refetch()
+          }}
+          initialDepartmentType={selectedDept === 'ALL' ? 'ONBOARDING_DEPARTMENT' : selectedDept}
+        />
+      )}
     </PageLayout>
   )
 }

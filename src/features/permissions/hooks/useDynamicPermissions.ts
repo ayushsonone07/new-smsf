@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createDynamicColumn,
   createDynamicRoute,
+  getDepartmentDetails,
   getDepartmentTypes,
   getDynamicColumns,
   getDynamicRoutes,
@@ -19,17 +20,25 @@ export function useDepartmentTypes() {
   })
 }
 
-export function useDynamicRoutes() {
+export function useDynamicRoutes(departmentType?: string) {
   return useQuery({
-    queryKey: ['dynamic-permissions', 'routes'],
-    queryFn: getDynamicRoutes,
+    queryKey: ['dynamic-permissions', 'routes', departmentType],
+    queryFn: () => getDynamicRoutes(departmentType),
   })
 }
 
-export function useDynamicColumns() {
+export function useDynamicColumns(departmentType?: string) {
   return useQuery({
-    queryKey: ['dynamic-permissions', 'columns'],
-    queryFn: getDynamicColumns,
+    queryKey: ['dynamic-permissions', 'columns', departmentType],
+    queryFn: () => getDynamicColumns(departmentType),
+  })
+}
+
+export function useDepartmentDetails(departmentType: string) {
+  return useQuery({
+    queryKey: ['dynamic-permissions', 'department-details', departmentType],
+    queryFn: () => getDepartmentDetails(departmentType),
+    enabled: Boolean(departmentType && departmentType !== 'ALL'),
   })
 }
 
