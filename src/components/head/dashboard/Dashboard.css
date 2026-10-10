@@ -549,13 +549,6 @@
   min-width: 0;
 }
 
-.hdb-row-two-col-equal {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  min-width: 0;
-}
-
 /* ── Status Breakdown ─────────────────────────────────────── */
 
 .hdb-breakdown-list {

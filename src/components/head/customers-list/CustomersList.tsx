@@ -39,6 +39,17 @@ export interface OnboardingCustomer {
   remark: string
   /** Updated column */
   updatedLabel: string
+  /** Client form link — the Form button opens it in a new tab */
+  formUrl?: string
+  /** Optional detail-drawer fields (shown as "—" when missing) */
+  address?: string
+  gstNumber?: string
+  packageName?: string
+  serviceMonths?: string
+  salesPerson?: string
+  services?: { name: string; status: OnboardingStatus }[]
+  activityCount?: number
+  remarkCount?: number
 }
 
 export interface CustomersListProps {
@@ -51,13 +62,6 @@ export interface CustomersListProps {
   canEdit?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
-  showAssignTo?: boolean
-  canEditAssignTo?: boolean
-  showRemark?: boolean
-  canEditRemark?: boolean
-  showContact?: boolean
-  showBusiness?: boolean
-  showUpdated?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -129,13 +133,6 @@ export function CustomersList({
   canEdit = true,
   showStatus = true,
   canEditStatus,
-  showAssignTo = true,
-  canEditAssignTo,
-  showRemark = true,
-  canEditRemark,
-  showContact = true,
-  showBusiness = true,
-  showUpdated = true,
 }: CustomersListProps) {
 if (customers.length === 0) {
     return (
@@ -159,12 +156,12 @@ if (customers.length === 0) {
         <thead>
           <tr>
             <th className="cl-th cl-th--num">#</th>
-            {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
-            {showContact && <th className="cl-th cl-th--contact">Contact</th>}
+            <th className="cl-th cl-th--biz">Business</th>
+            <th className="cl-th cl-th--contact">Contact</th>
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
-            {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
-            {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
-            {showUpdated && <th className="cl-th">Updated</th>}
+            <th className="cl-th cl-th--assign">Assign To</th>
+            <th className="cl-th cl-th--remark">Internal Remark</th>
+            <th className="cl-th">Updated</th>
           </tr>
         </thead>
         <motion.tbody
@@ -190,13 +187,6 @@ if (customers.length === 0) {
               canEdit={canEdit}
               showStatus={showStatus}
               canEditStatus={canEditStatus}
-              showAssignTo={showAssignTo}
-              canEditAssignTo={canEditAssignTo}
-              showRemark={showRemark}
-              canEditRemark={canEditRemark}
-              showContact={showContact}
-              showBusiness={showBusiness}
-              showUpdated={showUpdated}
             />
           ))}
         </motion.tbody>
@@ -217,13 +207,6 @@ interface CustomerRowProps {
   canEdit: boolean
   showStatus?: boolean
   canEditStatus?: boolean
-  showAssignTo?: boolean
-  canEditAssignTo?: boolean
-  showRemark?: boolean
-  canEditRemark?: boolean
-  showContact?: boolean
-  showBusiness?: boolean
-  showUpdated?: boolean
 }
 
 function CustomerRow({
@@ -236,13 +219,6 @@ function CustomerRow({
   canEdit,
   showStatus = true,
   canEditStatus,
-  showAssignTo = true,
-  canEditAssignTo,
-  showRemark = true,
-  canEditRemark,
-  showContact = true,
-  showBusiness = true,
-  showUpdated = true,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -280,12 +256,6 @@ function CustomerRow({
 
   const statusMeta = STATUS_META[customer.status]
 
-  const hasBizPill = customer.businessRelationType !== undefined
-  const bizPillText =
-    customer.businessRelationType === 'main'
-      ? `Main · ${customer.businessCount} businesses`
-      : `Business ${customer.businessIndex} of ${customer.businessCount}`
-
   function startEditing() {
     if (!canEdit) return
     setRemarkDraft(customer.remark)
@@ -301,23 +271,55 @@ function CustomerRow({
     setRemarkEditing(false)
   }
 
+  /** Opens the client form in a new tab; falls back to the drawer until a link exists */
+  function openForm() {
+    if (!customer.formUrl) return
+    window.open(customer.formUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <motion.tr className="cl-row" variants={rowVariants}>
 
       {/* # */}
-      <td className="cl-td cl-td--num">{customer.rowIndex}</td>
+      <td className="cl-td cl-td--num" data-label="#">{customer.rowIndex}</td>
 
       {/* Business */}
-      {showBusiness && (
-        <td className="cl-td">
-          <div className="cl-biz-name">{customer.businessName}</div>
+      <td className="cl-td" data-label="Business">
+        <div className="cl-biz-line">
+          <button
+            type="button"
+            className="cl-biz-name cl-biz-name--link"
+            onClick={onOpenDetail}
+            title="View customer detail"
+          >
+            {customer.businessName}
+          </button>
 
-          {hasBizPill && (
-            <div className="cl-biz-pills">
-              <span className="cl-biz-pill">
-                <Icon name="link" size={11} strokeWidth={2} />
-                {bizPillText}
-              </span>
+          <button
+            type="button"
+            className="cl-biz-eye"
+            title="View customer detail"
+            aria-label="View customer detail"
+            onClick={onOpenDetail}
+          >
+            <Icon name="eye" size={14} strokeWidth={1.8} />
+          </button>
+
+          <button
+            type="button"
+            className="cl-form-pill"
+            title="Open client form"
+            onClick={openForm}
+          >
+            <Icon
+              d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+              name="eye"
+              size={12}
+              strokeWidth={2}
+            />
+            Form
+          </button>
+        </div>
 
               {customer.duplicateCount ? (
                 <span className="cl-dup-pill">
@@ -336,30 +338,29 @@ function CustomerRow({
       )}
 
       {/* Contact */}
-      {showContact && (
-        <td className="cl-td">
-          <div className="cl-email">{customer.email}</div>
+      <td className="cl-td" data-label="Contact">
+        <div className="cl-email">{customer.email}</div>
 
-          <div className="cl-phone-row">
-            <span className="cl-phone-text">{customer.phone}</span>
-            <button
-              type="button"
-              className="cl-icon-micro"
-              title="Edit phone"
-              aria-label="Edit phone number"
-              disabled={!canEdit}
-            >
-              <Icon name="pencil" size={12} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className="cl-call-icon"
-              title="Call customer"
-              aria-label="Call customer"
-            >
-              <Icon name="phone" size={13} strokeWidth={2} />
-            </button>
-          </div>
+        <div className="cl-phone-row">
+          <span className="cl-phone-text">{customer.phone}</span>
+          <button
+            type="button"
+            className="cl-icon-micro"
+            title="Edit phone"
+            aria-label="Edit phone number"
+            disabled={!canEdit}
+          >
+            <Icon name="pencil" size={12} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="cl-call-icon"
+            title="Call customer"
+            aria-label="Call customer"
+          >
+            <Icon name="phone" size={13} strokeWidth={2} />
+          </button>
+        </div>
 
           <span
             className={`cl-contact-pill cl-contact-pill--${
@@ -380,7 +381,7 @@ function CustomerRow({
 
       {/* Status */}
       {showStatus && (
-        <td className="cl-td">
+        <td className="cl-td" data-label="Status">
           <div className="cl-status-wrap" ref={statusRef}>
             <button
               type="button"
@@ -424,6 +425,26 @@ function CustomerRow({
                   </button>
                 ))}
               </motion.div>
+            )}
+          </div>
+        </td>
+      )}
+
+      {/* Assign To */}
+      <td className="cl-td" data-label="Assign To">
+        <div className="cl-assign-wrap" ref={assignRef}>
+          <button
+            type="button"
+            className="cl-assign-btn"
+            onClick={() => setAssignOpen((o) => !o)}
+            disabled={!canEdit}
+            aria-expanded={assignOpen}
+            aria-haspopup="listbox"
+          >
+            {assignee ? (
+              <Avatar name={assignee.name} size={20} tone="brand" />
+            ) : (
+              <Avatar name="?" size={20} tone="muted" />
             )}
           </div>
         </td>
@@ -497,61 +518,17 @@ function CustomerRow({
       )}
 
       {/* Internal Remark */}
-      {showRemark && (
-        <td className="cl-td">
-          {remarkEditing ? (
-            <div className="cl-remark-editor">
-              <textarea
-                className="cl-remark-textarea"
-                value={remarkDraft}
-                onChange={(e) => setRemarkDraft(e.target.value)}
-                autoFocus
-                aria-label="Edit internal remark"
-              />
-              <div className="cl-remark-actions">
-                <button
-                  type="button"
-                  className="cl-remark-save"
-                  onClick={saveRemark}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className="cl-remark-cancel"
-                  onClick={cancelRemark}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <span
-              className={`cl-remark${
-                !customer.remark ? ' cl-remark--placeholder' : ''
-              }`}
-              role="button"
-              tabIndex={(canEditRemark !== undefined ? canEditRemark : canEdit) ? 0 : -1}
-              onClick={(canEditRemark !== undefined ? canEditRemark : canEdit) ? startEditing : undefined}
-              onKeyDown={(e) => {
-                if ((canEditRemark !== undefined ? canEditRemark : canEdit) && (e.key === 'Enter' || e.key === ' ')) {
-                  startEditing()
-                }
-              }}
-              title={(canEditRemark !== undefined ? canEditRemark : canEdit) ? 'Click to edit remark' : 'Read-only remark'}
-            >
-              {customer.remark || 'Add remark...'}
-            </span>
-          )}
-        </td>
-      )}
-
-      {/* Updated */}
-      {showUpdated && (
-        <td className="cl-td cl-td--updated">
-          <div className="cl-updated-cell">
-            <span className="cl-updated-text">{customer.updatedLabel}</span>
-            <div className="cl-row-actions">
+      <td className="cl-td" data-label="Internal Remark">
+        {remarkEditing ? (
+          <div className="cl-remark-editor">
+            <textarea
+              className="cl-remark-textarea"
+              value={remarkDraft}
+              onChange={(e) => setRemarkDraft(e.target.value)}
+              autoFocus
+              aria-label="Edit internal remark"
+            />
+            <div className="cl-remark-actions">
               <button
                 type="button"
                 className="cl-action"
@@ -571,8 +548,30 @@ function CustomerRow({
               </button>
             </div>
           </div>
-        </td>
-      )}
+        ) : (
+          <span
+            className={`cl-remark${
+              !customer.remark ? ' cl-remark--placeholder' : ''
+            }`}
+            role="button"
+            tabIndex={canEdit ? 0 : -1}
+            onClick={startEditing}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') startEditing()
+            }}
+            title={canEdit ? 'Click to edit remark' : 'Read-only remark'}
+          >
+            {customer.remark || 'Add remark...'}
+          </span>
+        )}
+      </td>
+
+      {/* Updated */}
+      <td className="cl-td cl-td--updated" data-label="Updated">
+        <div className="cl-updated-cell">
+          <span className="cl-updated-text">{customer.updatedLabel}</span>
+        </div>
+      </td>
     </motion.tr>
   )
 }
