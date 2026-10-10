@@ -23,9 +23,9 @@ import {
 } from '../../../../app/auth/session'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
-import { getSession } from '../../../../app/auth/session'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useMemberDetails } from '../../hooks/useMemberDetails'
 import { generateDepartmentSession } from '../../../../api/auth.api'
 import {
   getSession,
@@ -33,6 +33,19 @@ import {
   homeForRole,
   openSessionInNewTab,
 } from '../../../../app/auth/session'
+import {
+  resolveUserColumnKey,
+  USER_TABLE_COLUMN_KEYS,
+} from '../utils/userColumnMatch'
+import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
+import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
+import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
+import type {
+  Attendance,
+  DelaySide,
+  WorkItemStatus,
+  WorkReportItem,
+} from '../../../../features/reports/types/staff-report.types'
 import type {
   Attendance,
   DelaySide,
@@ -71,7 +84,7 @@ function belongsToRoute(
  * - GET /api/auth/department/users?page=0&size=10
  * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
-export function DepartmentUsersPage() {
+export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -257,7 +270,8 @@ export function DepartmentUsersPage() {
     const list = departmentUsersQuery.data?.data ?? []
     return list.map((u, idx) => {
         const isPresent =
-          u.isPresentToday ?? true
+          u.isPresentToday ??
+          (u.absentDays === undefined ? true : u.absentDays === 0)
         const role = (
           u.role === 'HEAD' || u.isHead
             ? 'TEAM_LEAD'
