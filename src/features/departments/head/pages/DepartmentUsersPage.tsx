@@ -20,6 +20,7 @@ import {
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useMemberDetails } from '../../hooks/useMemberDetails'
 import { generateDepartmentSession } from '../../../../api/auth.api'
 import { getSession, saveAdminBackup, setSession } from '../../../../app/auth/session'
 import type {
