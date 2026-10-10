@@ -11,7 +11,7 @@ export function buildOnboardingRoute(slug: string, role?: string): string {
 
   if (normalizedSlug === 'dashboard') {
     return isUser
-      ? '/onboarding-dashboard-head-departmentUser'
+      ? '/onboarding-user'
       : '/onboarding-dashboard-head'
   }
 
@@ -29,9 +29,15 @@ export function resolveSlugFromPath(
   if (
     p === '/onboarding' ||
     p === '/onboarding-dashboard-head' ||
-    p === '/onboarding-dashboard-head-departmentUser'
+    p === '/onboarding-dashboard-head-departmentUser' ||
+    p === '/onboarding-user'
   ) {
     return 'dashboard'
+  }
+
+  if (p.startsWith('/onboarding-user/')) {
+    const s = p.replace('/onboarding-user/', '')
+    return s === 'customer-list' ? 'customers' : s
   }
 
   if (p.startsWith('/onboarding-dashboard-head-departmentUser-')) {

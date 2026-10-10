@@ -10,6 +10,7 @@ import { AttendancePage } from '../pages/AttendancePage'
 import { MeetingPage } from '../pages/MeetingPage'
 import { SopPage } from '../pages/SopPage'
 import { HelpCenterPage } from '../pages/HelpCenterPage'
+import { HistoryPage } from '../pages/HistoryPage'
 import { CustomFeaturePage } from '../pages/CustomFeaturePage'
 
 interface ScreenEntry {
@@ -32,5 +33,6 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   meeting: { component: MeetingPage, title: '15 Days Meeting' },
   sop: { component: SopPage, title: 'SOP' },
   'help-center': { component: HelpCenterPage, title: 'Help Center' },
+  history: { component: HistoryPage as ComponentType<{ feature: FeaturePermission }>, title: 'Task History' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>
