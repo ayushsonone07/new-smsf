@@ -451,6 +451,7 @@ function CustomerRow({
             />
             {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
           </span>
+        </span>
         </td>
       )}
 
