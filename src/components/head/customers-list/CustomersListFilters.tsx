@@ -6,10 +6,10 @@ import { Avatar } from '../shared/Avatar'
 export type CustomerTab = 'all' | 'pending' | 'in-progress' | 'completed'
 
 export interface TabCounts {
-  all: number
-  pending: number
-  inProgress: number
-  completed: number
+  all?: number
+  pending?: number
+  inProgress?: number
+  completed?: number
 }
 
 export interface AssigneeOption {
@@ -164,24 +164,22 @@ export function CustomersListFilters({
     >
 
       {/* ── Status tabs ── */}
-      {showStatusTabs && (
-        <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
-          {TABS.map((tab) => (
-            <motion.button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
-              onClick={() => onTabChange(tab.key)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {tab.label}
-              <span className="cl-tab__count">{countFor(tab.key)}</span>
-            </motion.button>
-          ))}
-        </div>
-      )}
+      <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+        {TABS.map((tab) => (
+          <motion.button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
+            onClick={() => onTabChange(tab.key)}
+            whileTap={{ scale: 0.95 }}
+          >
+            {tab.label}
+            <span className="cl-tab__count">{countFor(tab.key) ?? '—'}</span>
+          </motion.button>
+        ))}
+      </div>
 
       {/* ── Search (injected from parent) ── */}
       {searchSlot}

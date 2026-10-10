@@ -50,6 +50,8 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const [page, setPage] = useState(0)
+  const [size] = useState(10)
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -106,10 +108,37 @@ export function CustomerListPage() {
     return FALLBACK_ASSIGNEES
   }, [assigningUsersQuery.data])
 
-  // 2. Onboarding customers live API
+  // Reset page when filters/search change
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(0)
+  }
+  const handleTabChange = (tab: CustomerTab) => {
+    setActiveTab(tab)
+    setPage(0)
+  }
+  const handleAssigneeChange = (id: string | null | 'all') => {
+    setSelectedAssigneeId(id)
+    setPage(0)
+  }
+  const handleDateChange = (from: string, to: string) => {
+    setDateFrom(from)
+    setDateTo(to)
+    setPage(0)
+  }
+  const handleResetFilters = () => {
+    setSearch('')
+    setActiveTab('all')
+    setSelectedAssigneeId('all')
+    setDateFrom('')
+    setDateTo('')
+    setPage(0)
+  }
+
+  // 3. Onboarding customers live API
   const onboardingApiQuery = useOnboardingCustomersList({
-    page: 0,
-    size: 50,
+    page,
+    size,
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
@@ -180,18 +209,12 @@ export function CustomerListPage() {
 
   const tabCounts = useMemo(
     () => ({
-      all: onboardingCustomers.length,
-      pending: onboardingCustomers.filter(
-        (item) => item.status === 'pending',
-      ).length,
-      inProgress: onboardingCustomers.filter(
-        (item) => item.status === 'in-progress',
-      ).length,
-      completed: onboardingCustomers.filter(
-        (item) => item.status === 'completed',
-      ).length,
+      all: onboardingApiQuery.data?.summary?.total,
+      pending: onboardingApiQuery.data?.summary?.pending,
+      inProgress: onboardingApiQuery.data?.summary?.inProgress,
+      completed: onboardingApiQuery.data?.summary?.completed,
     }),
-    [onboardingCustomers],
+    [onboardingApiQuery.data?.summary],
   )
 
   const filteredCustomers = useMemo(() => {
@@ -244,37 +267,25 @@ export function CustomerListPage() {
     updateMutation.mutate({ id, data: patch })
   }
 
-  function resetFilters() {
-    setSearch('')
-    setActiveTab('all')
-    setSelectedAssigneeId('all')
-    setDateFrom('')
-    setDateTo('')
-  }
-
   return (
     <>
       <CustomersListFilters
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         tabCounts={tabCounts}
         searchSlot={
           <CustomersListSearchBar
             value={search}
-            onChange={setSearch}
+            onChange={handleSearchChange}
           />
         }
         assignees={assignees}
         selectedAssigneeId={selectedAssigneeId}
-        onAssigneeChange={setSelectedAssigneeId}
+        onAssigneeChange={handleAssigneeChange}
         dateFrom={dateFrom}
         dateTo={dateTo}
-        onDateChange={(from, to) => {
-          setDateFrom(from)
-          setDateTo(to)
-        }}
-        onReset={resetFilters}
-        showStatusTabs={isStatusVisible}
+        onDateChange={handleDateChange}
+        onReset={handleResetFilters}
       />
 
       <CustomersList
@@ -301,6 +312,32 @@ export function CustomerListPage() {
           patchCustomer(id, { remark })
         }
       />
+
+      {/* Pagination */}
+      {onboardingApiQuery.data && onboardingApiQuery.data.totalPage > 1 && (
+        <div className="clist-pagination">
+          <button
+            className="clist-page-btn"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || onboardingApiQuery.isFetching}
+          >
+            Previous
+          </button>
+          <span className="clist-page-info">
+            Page {page + 1} of {onboardingApiQuery.data.totalPage}
+            {onboardingApiQuery.data.totalElements !== undefined && (
+              <span> · {onboardingApiQuery.data.totalElements} total</span>
+            )}
+          </span>
+          <button
+            className="clist-page-btn"
+            onClick={() => setPage((p) => Math.min(onboardingApiQuery.data.totalPage - 1, p + 1))}
+            disabled={page >= onboardingApiQuery.data.totalPage - 1 || onboardingApiQuery.isFetching}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       <CustomersListModal
         customer={selectedCustomer}

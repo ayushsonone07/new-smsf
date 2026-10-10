@@ -4,6 +4,20 @@
    All classes prefixed .cl- to avoid collisions.
    ============================================================= */
 
+/* ── Stats Bar ────────────────────────────────────────────── */
+
+.clist-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
 /* ── Controls row ─────────────────────────────────────────── */
 
 .cl-controls {
@@ -1355,6 +1369,69 @@
   .cl-page-header-actions {
     flex-wrap: wrap;
     gap: 6px;
+  }
+}
+
+/* ── Pagination ────────────────────────────────────────────── */
+
+.clist-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 8px 0;
+}
+
+.clist-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.clist-page-btn:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.clist-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clist-page-info {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .clist-stats-bar {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  .clist-stats-bar .pill {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  .clist-page-info {
+    font-size: 12px;
+  }
+  .clist-page-btn {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 }
 
