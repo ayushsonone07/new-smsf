@@ -64,6 +64,7 @@ export interface CustomersListProps {
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
+  /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
   showContact?: boolean
@@ -141,8 +142,10 @@ export function CustomersList({
   showStatus = true,
   showAssignTo = true,
   canEditStatus,
+  showAssignTo = true,
+  canEditAssignTo,
 }: CustomersListProps) {
-if (customers.length === 0) {
+  if (customers.length === 0) {
     return (
       <motion.div
         className="cl-table-wrapper"
@@ -196,6 +199,8 @@ if (customers.length === 0) {
               showStatus={showStatus}
               showAssignTo={showAssignTo}
               canEditStatus={canEditStatus}
+              showAssignTo={showAssignTo}
+              canEditAssignTo={canEditAssignTo}
             />
           ))}
         </motion.tbody>
@@ -217,6 +222,8 @@ interface CustomerRowProps {
   showStatus?: boolean
   showAssignTo?: boolean
   canEditStatus?: boolean
+  showAssignTo?: boolean
+  canEditAssignTo?: boolean
 }
 
 function CustomerRow({
@@ -230,6 +237,8 @@ function CustomerRow({
   showStatus = true,
   showAssignTo = true,
   canEditStatus,
+  showAssignTo = true,
+  canEditAssignTo,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -332,18 +341,18 @@ function CustomerRow({
           </button>
         </div>
 
-              {customer.duplicateCount ? (
-                <span className="cl-dup-pill">
-                  <Icon name="copy" size={11} strokeWidth={2} />
-                  {customer.duplicateCount}{' '}
-                  {customer.duplicateCount === 1 ? 'duplicate' : 'duplicates'}
-                </span>
-              ) : null}
+        {customer.duplicateCount ? (
+          <span className="cl-dup-pill">
+            <Icon name="copy" size={11} strokeWidth={2} />
+            {customer.duplicateCount}{' '}
+            {customer.duplicateCount === 1 ? 'duplicate' : 'duplicates'}
+          </span>
+        ) : null}
 
-          <div className="cl-biz-meta">
-            {customer.contactName} · {customer.contactDate}
-          </div>
-        </td>
+        <div className="cl-biz-meta">
+          {customer.contactName} · {customer.contactDate}
+        </div>
+      </td>
 
       {/* Contact */}
       <td className="cl-td" data-label="Contact">
@@ -370,21 +379,21 @@ function CustomerRow({
           </button>
         </div>
 
+        <span
+          className={`cl-contact-pill cl-contact-pill--${
+            customer.callStatus === 'connected' ? 'connected' : 'not-answered'
+          }`}
+        >
           <span
-            className={`cl-contact-pill cl-contact-pill--${
-              customer.callStatus === 'connected' ? 'connected' : 'not-answered'
+            className={`cl-contact-dot cl-contact-dot--${
+              customer.callStatus === 'connected'
+                ? 'connected'
+                : 'not-answered'
             }`}
-          >
-            <span
-              className={`cl-contact-dot cl-contact-dot--${
-                customer.callStatus === 'connected'
-                  ? 'connected'
-                  : 'not-answered'
-              }`}
-            />
-            {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
-          </span>
-        </td>
+          />
+          {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
+        </span>
+      </td>
 
       {/* Status */}
       {showStatus && (
@@ -524,6 +533,7 @@ function CustomerRow({
               autoFocus
               aria-label="Edit internal remark"
             />
+
             <div className="cl-remark-actions">
               <button
                 type="button"
@@ -551,6 +561,7 @@ function CustomerRow({
               >
                 <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
               </button>
+
               <button
                 type="button"
                 className="cl-action"
@@ -559,6 +570,26 @@ function CustomerRow({
                 onClick={onOpenDetail}
               >
                 <Icon name="eye" size={14} strokeWidth={1.8} />
+              </button>
+
+              <button
+                type="button"
+                className="cl-action"
+                title="Save remark"
+                aria-label="Save remark"
+                onClick={saveRemark}
+              >
+                <Icon name="check" size={14} strokeWidth={1.8} />
+              </button>
+
+              <button
+                type="button"
+                className="cl-action"
+                title="Cancel editing"
+                aria-label="Cancel editing"
+                onClick={cancelRemark}
+              >
+                <Icon name="x" size={14} strokeWidth={1.8} />
               </button>
             </div>
           </div>
