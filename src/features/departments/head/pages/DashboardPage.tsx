@@ -28,7 +28,7 @@ import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDe
 import { getSession } from '../../../../app/auth/session'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
-import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
+import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useAuthOnboardingSummary } from '../../hooks/useAuthOnboardingSummary'
 import type { OnboardingSummaryParams, AuthOnboardingSummaryParams } from '../../../../api/onboarding-dashboard.api'
@@ -160,8 +160,14 @@ export function DashboardPage() {
 
 function HeadDashboard() {
   const session = getSession()
-  const currentDepartment =
-    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const rawDepartment = session?.user.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.startsWith('/google-head') ||
+      window.location.pathname.startsWith('/google')
+    ))
+  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT')
 
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
@@ -199,7 +205,6 @@ function HeadDashboard() {
   const membersParams = useMemo(
     () => ({
       department: currentDepartment,
-      page: 0,
       size: 10,
       startDate: range.startDate,
       endDate: range.endDate,
@@ -208,7 +213,7 @@ function HeadDashboard() {
     [currentDepartment, range],
   )
 
-  const membersQuery = useOnboardingDashboardMembers(membersParams)
+  const infiniteMembersQuery = useInfiniteOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers(currentDepartment)
   const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions(currentDepartment)
@@ -216,7 +221,7 @@ function HeadDashboard() {
   function handleRefresh() {
     setRefreshKey((k) => k + 1)
     summaryQuery.refetch()
-    membersQuery.refetch()
+    infiniteMembersQuery.refetch()
     assigningUsersQuery.refetch()
     authSummaryQuery.refetch()
     refetchPermissions()
@@ -279,11 +284,29 @@ function HeadDashboard() {
     : undefined
 
   const teamMembers = useMemo<TeamMemberPerformance[]>(() => {
-    const list = membersQuery.data?.teamMembers
-    // Also consider auth summary team members
+    const rawPages = infiniteMembersQuery.data?.pages ?? []
+    const allMembers: typeof rawPages[0]['teamMembers'] = []
+    const seen = new Set<string>()
+
+    for (const page of rawPages) {
+      for (const m of page.teamMembers ?? []) {
+        const key = String(m.userId ?? m.email ?? m.name)
+        if (!seen.has(key)) {
+          seen.add(key)
+          allMembers.push(m)
+        }
+      }
+    }
+
+    // Fallback to auth summary team members if infiniteMembersQuery returned 0 items
     const authMembers = authSummaryQuery.data?.teamMembers
-    const sourceList = (list && list.length > 0) ? list : (authMembers && authMembers.length > 0 ? authMembers : null)
-    
+    const sourceList =
+      allMembers.length > 0
+        ? allMembers
+        : authMembers && authMembers.length > 0
+          ? authMembers
+          : null
+
     if (sourceList) {
       return sourceList.map((m) => {
         const target = m.target ?? 0
@@ -292,7 +315,7 @@ function HeadDashboard() {
           m.attendance === 'Present' || (m.presentDays ?? 0) > 0
 
         return {
-          id: String(m.userId),
+          id: String(m.userId ?? m.email ?? m.name),
           name: m.name || m.email,
           email: m.email,
           allTimeCustomers: m.allTimeCustomers ?? 0,
@@ -311,7 +334,9 @@ function HeadDashboard() {
       })
     }
     return []
-  }, [membersQuery.data?.teamMembers, authSummaryQuery.data?.teamMembers])
+  }, [infiniteMembersQuery.data, authSummaryQuery.data?.teamMembers])
+
+  const totalMembers = infiniteMembersQuery.data?.pages?.[0]?.totalMembers
 
   const topPerformers = useMemo<TopPerformerItem[]>(() => {
     const sorted = [...teamMembers].sort(
@@ -324,7 +349,7 @@ function HeadDashboard() {
     }))
   }, [teamMembers])
 
-  if (summaryQuery.isPending || membersQuery.isPending) {
+  if (summaryQuery.isPending || infiniteMembersQuery.isPending) {
     return <LoadingState message="Loading dashboard..." />
   }
 
@@ -453,6 +478,14 @@ function HeadDashboard() {
           members={teamMembers}
           onSelectMember={setSelectedMember}
           onRefresh={handleRefresh}
+          hasNextPage={Boolean(infiniteMembersQuery.hasNextPage)}
+          isFetchingNextPage={Boolean(infiniteMembersQuery.isFetchingNextPage)}
+          onLoadMore={() => {
+            if (infiniteMembersQuery.hasNextPage && !infiniteMembersQuery.isFetchingNextPage) {
+              void infiniteMembersQuery.fetchNextPage()
+            }
+          }}
+          totalMembers={totalMembers}
         />
       </motion.div>
 

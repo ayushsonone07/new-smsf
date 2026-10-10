@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Avatar } from '../shared/Avatar'
@@ -54,6 +54,10 @@ interface DepartmentUsersTableProps {
    */
   canEditActions?: boolean
   dynamicColumns?: Array<{ key: string; label: string }>
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  onLoadMore?: () => void
+  totalUsers?: number
 }
 
 /**
@@ -73,10 +77,68 @@ export function DepartmentUsersTable({
   hiddenColumns,
   canEditActions = true,
   dynamicColumns = [],
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  totalUsers,
 }: DepartmentUsersTableProps) {
   const [expandedId, setExpandedId] = useState<
     string | null
   >(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLTableRowElement>(null)
+
+  // 1. IntersectionObserver on sentinel row at table bottom
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMore()
+        }
+      },
+      {
+        root: null,
+        rootMargin: '250px',
+        threshold: 0,
+      },
+    )
+
+    const el = sentinelRef.current
+    if (el) observer.observe(el)
+
+    return () => {
+      if (el) observer.unobserve(el)
+      observer.disconnect()
+    }
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+
+  // 2. Container scroll listener on table wrapper
+  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      if (hasNextPage && !isFetchingNextPage && onLoadMore) {
+        onLoadMore()
+      }
+    }
+  }
+
+  // 3. Window scroll listener when scrolling down the page
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
+
+    const handleWindowScroll = () => {
+      if (!sentinelRef.current) return
+      const rect = sentinelRef.current.getBoundingClientRect()
+      if (rect.top <= window.innerHeight + 250) {
+        onLoadMore()
+      }
+    }
+
+    window.addEventListener('scroll', handleWindowScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleWindowScroll)
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
 
   const visible = (key: DepartmentUserColumnKey) =>
     !hiddenColumns?.includes(key)
@@ -107,7 +169,12 @@ export function DepartmentUsersTable({
     (showActions ? 1 : 0)
 
   return (
-    <div className="table-wrapper users-table">
+    <div
+      className="table-wrapper users-table"
+      ref={containerRef}
+      onScroll={handleContainerScroll}
+      style={{ maxHeight: '720px', overflowY: 'auto' }}
+    >
       <table>
         <thead>
           <tr>
@@ -185,8 +252,95 @@ export function DepartmentUsersTable({
               />
             )
           })}
+
+          {/* Sentinel row for IntersectionObserver */}
+          {hasNextPage && (
+            <tr ref={sentinelRef} style={{ height: 1 }}>
+              <td colSpan={columnCount} style={{ padding: 0, height: 1, border: 'none', background: 'transparent' }} />
+            </tr>
+          )}
+
+          {/* Loading indicator when fetching next 10 users */}
+          {isFetchingNextPage && (
+            <tr>
+              <td
+                colSpan={columnCount}
+                style={{
+                  textAlign: 'center',
+                  padding: '14px',
+                  color: '#2563eb',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  background: '#f8fafc',
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 14,
+                      height: 14,
+                      border: '2px solid #93c5fd',
+                      borderTopColor: '#2563eb',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
+                  <span>Loading more users...</span>
+                </div>
+              </td>
+            </tr>
+          )}
         </motion.tbody>
       </table>
+
+      {/* Footer bar with user count & pagination state */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 18px',
+          borderTop: '1px solid var(--border-color, #e2e8f0)',
+          background: 'var(--surface-color, #ffffff)',
+          fontSize: '13px',
+          color: 'var(--text-secondary, #64748b)',
+        }}
+      >
+        <span>
+          Showing <strong>{users.length}</strong>
+          {totalUsers && totalUsers > users.length ? ` of ${totalUsers}` : ''} users
+        </span>
+
+        {hasNextPage ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>
+              Scroll down to load more
+            </span>
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={isFetchingNextPage}
+              style={{
+                background: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: isFetchingNextPage ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isFetchingNextPage ? 'Loading...' : 'Load more 10'}
+            </button>
+          </div>
+        ) : users.length > 0 ? (
+          <span style={{ color: '#16a34a', fontSize: 12, fontWeight: 500 }}>
+            ✓ All {users.length} users loaded
+          </span>
+        ) : null}
+      </div>
     </div>
   )
 }

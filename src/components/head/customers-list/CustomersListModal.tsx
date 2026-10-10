@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { Icon } from '../shared/Icon'
+import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
 import type {
   OnboardingCustomer,
   OnboardingAssignee,
@@ -19,6 +21,7 @@ export interface CustomersListModalProps {
   apiDetails?: CustomerDrawerApiDetails
   showStatus?: boolean
   showAssignTo?: boolean
+  departmentType?: string
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
@@ -34,6 +37,7 @@ const EMPTY_API_DETAILS: CustomerDrawerApiDetails = {
 
 type DrawerTab =
   | 'overview'
+  | 'duplicates'
   | 'deliverables'
   | 'business-form'
   | 'remarks'
@@ -223,18 +227,27 @@ export function CustomersListModal({
   customer,
   assignees,
   apiDetails = EMPTY_API_DETAILS,
+  showStatus = true,
+  showAssignTo = true,
+  departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
   onOpenFullPage,
 }: CustomersListModalProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview')
   const [closing, setClosing] = useState(false)
+  const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
     setPrevCustomerId(customer?.id)
+    setActiveCustomer(customer)
     setActiveTab('overview')
     setClosing(false)
   }
+
+  useEffect(() => {
+    setActiveCustomer(customer)
+  }, [customer])
 
   function startClose() {
     setClosing(true)
@@ -254,12 +267,63 @@ export function CustomersListModal({
 
   if (!customer) return null
 
+  const duplicatesQuery = useQuery({
+    queryKey: ['duplicate-customer-summaries', customer.id, departmentType],
+    queryFn: () => getDuplicateCustomerSummaries(customer.id, departmentType),
+    enabled: Boolean(
+      customer &&
+        (customer.hasDuplicateCustomer ||
+          (customer.duplicateCount && customer.duplicateCount > 0)),
+    ),
+    staleTime: 60_000,
+  })
+
+  const duplicateItems = useMemo(() => {
+    const fromApi = duplicatesQuery.data ?? []
+    if (fromApi.length > 0) return fromApi
+    return customer.duplicateCustomers ?? []
+  }, [duplicatesQuery.data, customer.duplicateCustomers])
+
+  const allBusinesses = useMemo(() => {
+    if (!customer) return []
+    const mainId = String(customer.id)
+    const main = {
+      ...customer,
+      isMainBusiness: true,
+    }
+    if (!duplicateItems.length) return [main]
+    const others = duplicateItems
+      .filter((d: any) => String(d.customerId || d.id || '') !== mainId)
+      .map((d: any, index: number) => ({
+        ...d,
+        id: String(d.duplicateCustomerId || d.customerId || d.id || `${customer.id}-dup-${index}`),
+        businessName: d.businessName || d.customerDetails?.businessName || d.brandName || 'Business',
+        contactName: d.ownerName || d.customerDetails?.ownerName || customer.contactName,
+        contactDate: d.createdAt || customer.contactDate,
+        phone: d.phoneNumber || d.phone || d.contact || d.customerDetails?.phoneNumber || customer.phone,
+        email: d.email || d.customerDetails?.email || customer.email,
+        status: toOnboardingStatus(d.onboardingStatus || d.completeServiceStatus || d.status) || 'pending',
+        gstNumber: d.gstNumber || d.customerDetails?.gstNumber,
+        isMainBusiness: false,
+      }))
+    return [main, ...others]
+  }, [customer, duplicateItems])
+
+  const completedBusinessesCount = useMemo(() => {
+    return allBusinesses.filter((b) => {
+      const st = b.status || (b as any).onboardingStatus
+      return st === 'completed' || String(st).toUpperCase() === 'COMPLETED'
+    }).length
+  }, [allBusinesses])
+
+  const current = activeCustomer ?? customer
+
   const assignee =
-    assignees.find((a) => a.id === customer.assigneeId) ?? null
+    assignees.find((a) => a.id === current.assigneeId) ?? null
 
   const serviceRow =
     apiDetails.serviceRows.find(
-      (row) => String(row.customerId) === customer.id,
+      (row) => String(row.customerId) === String(current.id),
     ) ?? apiDetails.serviceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
@@ -278,11 +342,11 @@ export function CustomersListModal({
       Boolean(rowDetails?.remark || serviceRow?.internalRemark),
     )
   const contactName =
-    apiDetails.profile?.ownerName || rowDetails?.ownerName || customer.contactName
+    apiDetails.profile?.ownerName || rowDetails?.ownerName || current.contactName
   const businessName =
     apiDetails.profile?.businessName ||
     rowDetails?.businessName ||
-    customer.businessName
+    current.businessName
   const fullAddress =
     apiDetails.profile?.address ||
     apiDetails.profile?.billingAddress ||
@@ -300,7 +364,7 @@ export function CustomersListModal({
     {
       title: 'Customer registered',
       detail: businessName,
-      timestamp: customer.contactDate,
+      timestamp: current.contactDate,
     },
     ...apiDetails.reviewReplies.map((reply) => ({
       title: 'Review reply added',
@@ -331,6 +395,15 @@ export function CustomersListModal({
 
   const tabs: { id: DrawerTab; label: string; count?: number }[] = [
     { id: 'overview', label: 'Overview' },
+    ...(duplicateItems.length > 0
+      ? [
+          {
+            id: 'duplicates' as DrawerTab,
+            label: 'Duplicate businesses',
+            count: duplicateItems.length,
+          },
+        ]
+      : []),
     {
       id: 'deliverables',
       label: 'Deliverables',
@@ -396,23 +469,27 @@ export function CustomersListModal({
             animate="visible"
             transition={{ delay: 0.22 }}
           >
-            <span
-              className={`cl-drawer__spill cl-drawer__spill--status cl-drawer__spill--${customer.status}`}
-            >
-              {STATUS_LABEL[customer.status]}
-            </span>
+            {showStatus && (
+              <span
+                className={`cl-drawer__spill cl-drawer__spill--status cl-drawer__spill--${current.status}`}
+              >
+                {STATUS_LABEL[current.status]}
+              </span>
+            )}
             <span className="cl-drawer__spill cl-drawer__spill--info">
-              Dept: Onboarding
+              Dept: {departmentType.replace('_DEPARTMENT', '').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}
             </span>
+            {showAssignTo && (
+              <span className="cl-drawer__spill cl-drawer__spill--info">
+                Service user:{' '}
+                {serviceRow?.assignedUserEmail ||
+                  serviceRow?.assignedUserName ||
+                  assignee?.name ||
+                  'Unassigned'}
+              </span>
+            )}
             <span className="cl-drawer__spill cl-drawer__spill--info">
-              Service user:{' '}
-              {serviceRow?.assignedUserEmail ||
-                serviceRow?.assignedUserName ||
-                assignee?.name ||
-                'Unassigned'}
-            </span>
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Since {customer.contactDate}
+              Since {current.contactDate}
             </span>
           </motion.div>
         </div>
@@ -435,6 +512,91 @@ export function CustomersListModal({
                   </ul>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Duplicate businesses switcher */}
+          {(allBusinesses.length > 1 || duplicatesQuery.isLoading) && (
+            <div className="cl-drawer__dup-banner">
+              <div className="cl-drawer__dup-head">
+                <div className="cl-drawer__dup-title">
+                  <Icon name="link" size={14} />
+                  <span>
+                    Same founder · {allBusinesses.length}{' '}
+                    {allBusinesses.length === 1 ? 'business' : 'businesses'}
+                  </span>
+                </div>
+                <div className="cl-drawer__dup-sub">
+                  {completedBusinessesCount} of {allBusinesses.length} completed
+                </div>
+              </div>
+
+              {duplicatesQuery.isLoading && allBusinesses.length <= 1 ? (
+                <div className="cl-drawer__dup-loading">
+                  Checking duplicate businesses…
+                </div>
+              ) : (
+                <div className="cl-drawer__dup-scroll">
+                  {allBusinesses.map((biz) => {
+                    const isSelected =
+                      String(biz.id) === String(activeCustomer?.id)
+                    const bizStatus = biz.status || 'pending'
+                    const dotColor =
+                      bizStatus === 'completed'
+                        ? '#16a34a'
+                        : bizStatus === 'in-progress'
+                          ? '#2459e0'
+                          : '#ffc629'
+                    const statusText =
+                      bizStatus === 'completed'
+                        ? 'Completed'
+                        : bizStatus === 'in-progress'
+                          ? 'In progress'
+                          : 'Pending'
+                    const rawTitle = biz.businessName || 'Business'
+                    const title = biz.isMainBusiness
+                      ? `Main · ${rawTitle}`
+                      : rawTitle
+                    const subtitle = `${statusText} · form by ${biz.isMainBusiness ? 'Founder' : 'Branch manager'}`
+
+                    return (
+                      <button
+                        key={String(biz.id)}
+                        type="button"
+                        onClick={() => setActiveCustomer(biz as any)}
+                        className={`cl-drawer__dup-btn${isSelected ? ' is-selected' : ''}`}
+                      >
+                        <div className="cl-drawer__dup-btn-head">
+                          <span
+                            className="cl-drawer__dup-dot"
+                            style={{
+                              background:
+                                isSelected && dotColor === '#2459e0'
+                                  ? '#93c5fd'
+                                  : dotColor,
+                            }}
+                          />
+                          <span
+                            className="cl-drawer__dup-btn-title"
+                            title={title}
+                          >
+                            {title}
+                          </span>
+                        </div>
+                        <div className="cl-drawer__dup-btn-sub">
+                          {subtitle}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="cl-drawer__dup-footer">
+                Founder name, phone, email, GST and logo are pre-filled from
+                the main business. Each business has its own package and
+                onboarding. New businesses on {activeCustomer?.phone || customer.phone || 'founder phone'} go straight to {assignee?.name || 'Assigned user'} — round robin is skipped.
+              </div>
             </div>
           )}
 
@@ -863,6 +1025,200 @@ export function CustomersListModal({
               ) : (
                 <p className="cl-drawer__empty">No updates have been recorded.</p>
               )}
+            </motion.div>
+          )}
+
+          {/* Duplicate businesses */}
+          {activeTab === 'duplicates' && (
+            <motion.div
+              className="cl-drawer__stack"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__card">
+                <div className="cl-drawer__card-head">
+                  <div>
+                    <h3>Duplicate businesses ({duplicateItems.length})</h3>
+                    <p className="cl-drawer__card-meta">
+                      Other businesses registered under the same founder or phone number.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="cl-drawer__dup-list">
+                  {duplicateItems.map((duplicate: any, dupIndex: number) => {
+                    const dupId = String(
+                      duplicate?.duplicateCustomerId ||
+                        duplicate?.customerId ||
+                        duplicate?.id ||
+                        `${customer.id}-dup-${dupIndex}`,
+                    )
+                    const name =
+                      duplicate?.businessName ||
+                      duplicate?.customerDetails?.businessName ||
+                      duplicate?.brandName ||
+                      'Business'
+                    const owner =
+                      duplicate?.ownerName ||
+                      duplicate?.customerDetails?.ownerName ||
+                      customer.contactName ||
+                      '—'
+                    const email =
+                      duplicate?.email ||
+                      duplicate?.customerDetails?.email ||
+                      '—'
+                    const phone =
+                      duplicate?.phoneNumber ||
+                      duplicate?.contact ||
+                      duplicate?.phone ||
+                      duplicate?.customerDetails?.phoneNumber ||
+                      '—'
+                    const gst =
+                      duplicate?.gstNumber ||
+                      duplicate?.customerDetails?.gstNumber ||
+                      '—'
+                    const address =
+                      duplicate?.address ||
+                      duplicate?.customerDetails?.address ||
+                      [
+                        duplicate?.customerDetails?.area,
+                        duplicate?.customerDetails?.city,
+                        duplicate?.customerDetails?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ') ||
+                      '—'
+                    const rawStatus =
+                      duplicate?.completeServiceStatus ||
+                      duplicate?.onboardingStatus ||
+                      duplicate?.status ||
+                      'pending'
+                    const status = toOnboardingStatus(rawStatus) || 'pending'
+                    const services = Array.isArray(duplicate?.services)
+                      ? duplicate.services
+                      : duplicate?.serviceType
+                        ? [
+                            {
+                              serviceType: duplicate.serviceType,
+                              status: rawStatus,
+                            },
+                          ]
+                        : []
+
+                    const isCurrentlyActive =
+                      String(activeCustomer?.id) === dupId
+
+                    return (
+                      <div key={dupId} className="cl-drawer__dup-card">
+                        <div className="cl-drawer__dup-card-head">
+                          <div className="cl-drawer__dup-card-badges">
+                            <span className="cl-drawer__dup-badge">
+                              Other Business {dupIndex + 1}
+                            </span>
+                            <span
+                              className={`cl-drawer__service-pill cl-drawer__service-pill--${status}`}
+                            >
+                              {STATUS_LABEL[status]}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="cl-drawer__outline-btn"
+                            onClick={() => {
+                              const matched = allBusinesses.find(
+                                (b) => String(b.id) === dupId,
+                              )
+                              if (matched) {
+                                setActiveCustomer(matched as any)
+                                setActiveTab('overview')
+                              }
+                            }}
+                          >
+                            <Icon
+                              name="eye"
+                              d={EXTERNAL_ICON}
+                              size={13}
+                              strokeWidth={2}
+                            />
+                            {isCurrentlyActive ? 'Viewing now' : 'View details'}
+                          </button>
+                        </div>
+
+                        <h4 className="cl-drawer__dup-card-name">{name}</h4>
+
+                        <div className="cl-drawer__dup-card-rows">
+                          <div className="cl-drawer__dup-card-row">
+                            <span className="cl-drawer__dup-card-label">
+                              Owner
+                            </span>
+                            <span className="cl-drawer__dup-card-value">
+                              {owner}
+                            </span>
+                          </div>
+                          <div className="cl-drawer__dup-card-row">
+                            <span className="cl-drawer__dup-card-label">
+                              Phone
+                            </span>
+                            <span className="cl-drawer__dup-card-value">
+                              {phone}
+                            </span>
+                          </div>
+                          <div className="cl-drawer__dup-card-row">
+                            <span className="cl-drawer__dup-card-label">
+                              Email
+                            </span>
+                            <span className="cl-drawer__dup-card-value">
+                              {email}
+                            </span>
+                          </div>
+                          <div className="cl-drawer__dup-card-row">
+                            <span className="cl-drawer__dup-card-label">
+                              GST
+                            </span>
+                            <span className="cl-drawer__dup-card-value">
+                              {gst}
+                            </span>
+                          </div>
+                          <div className="cl-drawer__dup-card-row">
+                            <span className="cl-drawer__dup-card-label">
+                              Address
+                            </span>
+                            <span className="cl-drawer__dup-card-value">
+                              {address}
+                            </span>
+                          </div>
+                        </div>
+
+                        {services.length > 0 && (
+                          <div className="cl-drawer__dup-services">
+                            <span className="cl-drawer__dup-services-title">
+                              Services
+                            </span>
+                            <div className="cl-drawer__dup-services-list">
+                              {services.map((s: any, sIdx: number) => {
+                                const sName = formatServiceName(
+                                  s?.serviceType || s?.name,
+                                )
+                                const sStatus =
+                                  toOnboardingStatus(s?.status) || 'pending'
+                                return (
+                                  <span
+                                    key={`${sName}-${sIdx}`}
+                                    className={`cl-drawer__service-pill cl-drawer__service-pill--${sStatus}`}
+                                  >
+                                    {sName} · {STATUS_LABEL[sStatus]}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </motion.div>
           )}
         </div>

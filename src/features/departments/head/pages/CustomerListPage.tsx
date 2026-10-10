@@ -27,6 +27,8 @@ import {
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
+import { assignCustomerUser } from '../../../../api/department-users.api'
+import { TablePagination } from '../../../../components/ui/TablePagination'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -65,7 +67,8 @@ export function CustomerListPage() {
     useState<OnboardingCustomer | null>(null)
   const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
-  const [size] = useState(10)
+  const [size, setSize] = useState(10)
+  const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -98,9 +101,6 @@ export function CustomerListPage() {
   const isBusinessVisible =
     isColumnEnabled('Business') ||
     isColumnEnabled('Company')
-
-  const isUpdatedVisible =
-    isColumnEnabled('Updated')
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
@@ -233,9 +233,27 @@ export function CustomerListPage() {
             ? 'in-progress'
             : 'pending'
 
+        const hasDuplicates =
+          Boolean(c.hasDuplicate) ||
+          Boolean(c.hasDuplicateCustomer) ||
+          Boolean(c.hasDuplicateCustomers) ||
+          Boolean(c.customerDetails?.hasDuplicate) ||
+          Boolean(c.customerDetails?.hasDuplicateCustomer) ||
+          Number(c.duplicateCount ?? c.customerDetails?.duplicateCount ?? 0) > 0 ||
+          (Array.isArray(c.duplicateCustomers) && c.duplicateCustomers.length > 0)
+
+        const dupCount =
+          Number(c.duplicateCount ?? c.customerDetails?.duplicateCount ?? (c.duplicateCustomers?.length || 0)) ||
+          (hasDuplicates ? 1 : 0)
+
+        const assigned =
+          localAssigneeMap[id] !== undefined
+            ? localAssigneeMap[id]
+            : c.assignedUserEmail || c.assignedUserName || c.assignedTo || null
+
         return {
           id,
-          rowIndex: index + 1,
+          rowIndex: page * size + index + 1,
           businessName: bName,
           contactName: cName,
           contactDate: c.createdAt
@@ -249,46 +267,71 @@ export function CustomerListPage() {
           phone,
           callStatus: 'connected',
           status,
-          assigneeId: c.assignedUserEmail ?? null,
+          assigneeId: assigned,
           remark: c.remark ?? '',
-          updatedLabel: 'Just now',
+          hasDuplicateCustomer: hasDuplicates,
+          duplicateCount: dupCount,
+          duplicateCustomers: c.duplicateCustomers || [],
         }
       })
     }
 
     const apiCustomers = onboardingApiQuery.data?.customers
     if (apiCustomers && apiCustomers.length > 0) {
-      return apiCustomers.map((c, index) => ({
-        id: String(c.id ?? c.customerId ?? `c-${index}`),
-        rowIndex: index + 1,
-        businessName: c.businessName || c.ownerName || 'Customer',
-        contactName: c.ownerName || 'Customer',
-        contactDate: c.createdAt
-          ? new Date(c.createdAt).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-          : 'Recent',
-        email: c.email || '',
-        phone: c.phoneNumber || '',
-        formUrl: c.onboardingLink,
-        callStatus: 'connected',
-        status:
-          c.onboardingStatus?.toLowerCase() === 'completed'
-            ? 'completed'
-            : c.onboardingStatus?.toLowerCase() === 'in_progress'
-              ? 'in-progress'
-              : 'pending',
-        assigneeId: c.assignedUser ?? null,
-        remark: '',
-        updatedLabel: 'Just now',
-      }))
+      return apiCustomers.map((c, index) => {
+        const id = String(c.id ?? c.customerId ?? `c-${index}`)
+        const hasDuplicates =
+          Boolean(c.hasDuplicate) ||
+          Boolean(c.hasDuplicateCustomer) ||
+          Boolean(c.hasDuplicateCustomers) ||
+          Boolean(c.customerDetails?.hasDuplicate) ||
+          Boolean(c.customerDetails?.hasDuplicateCustomer) ||
+          Number(c.duplicateCount ?? c.customerDetails?.duplicateCount ?? 0) > 0 ||
+          (Array.isArray(c.duplicateCustomers) && c.duplicateCustomers.length > 0)
+
+        const dupCount =
+          Number(c.duplicateCount ?? c.customerDetails?.duplicateCount ?? (c.duplicateCustomers?.length || 0)) ||
+          (hasDuplicates ? 1 : 0)
+
+        const assigned =
+          localAssigneeMap[id] !== undefined
+            ? localAssigneeMap[id]
+            : c.assignedUserEmail || c.assignedUserName || c.assignedUser || c.assignedTo || null
+
+        return {
+          id,
+          rowIndex: page * size + index + 1,
+          businessName: c.businessName || c.ownerName || 'Customer',
+          contactName: c.ownerName || 'Customer',
+          contactDate: c.createdAt
+            ? new Date(c.createdAt).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })
+            : 'Recent',
+          email: c.email || '',
+          phone: c.phoneNumber || c.contact || '',
+          formUrl: c.onboardingLink,
+          callStatus: 'connected',
+          status:
+            c.onboardingStatus?.toLowerCase() === 'completed'
+              ? 'completed'
+              : c.onboardingStatus?.toLowerCase() === 'in_progress'
+                ? 'in-progress'
+                : 'pending',
+          assigneeId: assigned,
+          remark: c.remark ?? c.internalRemark ?? '',
+          hasDuplicateCustomer: hasDuplicates,
+          duplicateCount: dupCount,
+          duplicateCustomers: c.duplicateCustomers || [],
+        }
+      })
     }
 
     return (customersQuery.data ?? []).map((customer, index) => ({
       id: customer.id,
-      rowIndex: index + 1,
+      rowIndex: page * size + index + 1,
       businessName: customer.company || customer.name,
       contactName: customer.name,
       contactDate:
@@ -306,17 +349,23 @@ export function CustomerListPage() {
       status:
         customer.onboardingStatus ??
         (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
-      assigneeId: customer.assigneeId ?? null,
+      assigneeId: localAssigneeMap[customer.id] ?? customer.assigneeId ?? null,
       remark: customer.remark ?? '',
-      updatedLabel:
-        customer.updatedLabel ??
-        (index === 0 ? 'Just now' : `${index + 1}h ago`),
       businessRelationType: customer.businessRelationType,
       businessCount: customer.businessCount,
       businessIndex: customer.businessIndex,
       duplicateCount: customer.duplicateCount,
+      hasDuplicateCustomer: (customer.duplicateCount ?? 0) > 0,
     }))
-  }, [isGoogle, googleCustomerRowsQuery.data?.customers, onboardingApiQuery.data?.customers, customersQuery.data])
+  }, [
+    isGoogle,
+    googleCustomerRowsQuery.data?.customers,
+    onboardingApiQuery.data?.customers,
+    customersQuery.data,
+    localAssigneeMap,
+    page,
+    size,
+  ])
 
   const tabCounts = useMemo(() => {
     if (isGoogle) {
@@ -419,6 +468,28 @@ export function CustomerListPage() {
     )
   }
 
+  async function handleAssignUser(customerId: string, assigneeId: string | null) {
+    if (!assigneeId) return
+    setLocalAssigneeMap((prev) => ({ ...prev, [customerId]: assigneeId }))
+    try {
+      await assignCustomerUser({
+        customerId,
+        assignedUserEmail: assigneeId,
+        departmentType: currentDepartment,
+      })
+      await activeCustomerQuery.refetch()
+    } catch (err: unknown) {
+      console.error('Failed to assign user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to assign customer'
+      alert(`Assignment failed: ${msg}`)
+      setLocalAssigneeMap((prev) => {
+        const next = { ...prev }
+        delete next[customerId]
+        return next
+      })
+    }
+  }
+
   function patchCustomer(id: string, patch: UpdateCustomerRequest) {
     if (!canEdit) return
     updateMutation.mutate({ id, data: patch })
@@ -457,44 +528,31 @@ export function CustomerListPage() {
         canEditRemark={canEditRemark}
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
-        showUpdated={isUpdatedVisible}
+        showUpdated={false}
         onOpenDetail={setSelectedCustomer}
+        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
         onStatusChange={(id, status) =>
           patchCustomer(id, { onboardingStatus: status })
         }
-        onAssigneeChange={(id, assigneeId) =>
-          patchCustomer(id, { assigneeId: assigneeId ?? undefined })
-        }
+        onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) =>
           patchCustomer(id, { remark })
         }
       />
 
-      {/* Pagination */}
-      {activeCustomerQuery.data && activeCustomerQuery.data.totalPage > 1 && (
-        <div className="clist-pagination">
-          <button
-            className="clist-page-btn"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0 || activeCustomerQuery.isFetching}
-          >
-            Previous
-          </button>
-          <span className="clist-page-info">
-            Page {page + 1} of {activeCustomerQuery.data.totalPage}
-            {activeCustomerQuery.data.totalElements !== undefined && (
-              <span> · {activeCustomerQuery.data.totalElements} total</span>
-            )}
-          </span>
-          <button
-            className="clist-page-btn"
-            onClick={() => setPage((p) => Math.min(activeCustomerQuery.data.totalPage - 1, p + 1))}
-            disabled={page >= activeCustomerQuery.data.totalPage - 1 || activeCustomerQuery.isFetching}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      {/* Table Pagination */}
+      <TablePagination
+        page={page}
+        pageSize={size}
+        totalResults={activeCustomerQuery.data?.totalElements ?? onboardingCustomers.length}
+        onPageChange={(newPage) => setPage(newPage)}
+        onPageSizeChange={(newSize) => {
+          setSize(newSize)
+          setPage(0)
+        }}
+        pageSizeOptions={[10, 20, 50, 100]}
+        disabled={activeCustomerQuery.isFetching}
+      />
 
       <CustomersListModal
         customer={selectedCustomer}
@@ -502,6 +560,7 @@ export function CustomerListPage() {
         apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
+        departmentType={currentDepartment}
         onClose={() => setSelectedCustomer(null)}
       />
     </>

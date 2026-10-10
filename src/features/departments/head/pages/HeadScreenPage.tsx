@@ -36,9 +36,6 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   }
 
   const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
-  const isGoogle =
-    location.pathname.startsWith('/google-head') ||
-    location.pathname.startsWith('/google')
 
   const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
 

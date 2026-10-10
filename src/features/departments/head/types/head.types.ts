@@ -58,4 +58,7 @@ export interface DepartmentUserFormValues {
   email: string
   role: DepartmentUserRole
   temporaryPassword: string
+  username?: string
+  password?: string
+  phoneNumber?: string
 }

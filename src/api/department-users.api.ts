@@ -1,4 +1,5 @@
 import { authedApiRequest } from './client'
+import { getSession } from '../app/auth/session'
 
 export interface DepartmentUserApiItem {
   id?: number | string
@@ -52,14 +53,27 @@ export interface OnboardedCustomerItem {
   id?: number | string
   customerId?: number | string
   businessName?: string
+  customerName?: string
   ownerName?: string
   phoneNumber?: string
+  contact?: string
   email?: string
   onboardingStatus?: string
   onboardingLink?: string
   createdAt?: string
   assignedUser?: string
+  assignedUserEmail?: string
+  assignedUserName?: string
+  assignedTo?: string
   status?: string
+  hasDuplicate?: boolean
+  hasDuplicateCustomer?: boolean
+  hasDuplicateCustomers?: boolean
+  duplicateCount?: number
+  duplicateCustomers?: any[]
+  customerDetails?: any
+  remark?: string
+  internalRemark?: string
 }
 
 export interface OnboardedCustomersPageResponse {
@@ -89,8 +103,11 @@ export interface AuthOnboardingSummary {
 interface CustomPageResponseRaw<T> {
   data?: T[]
   customers?: T[]
+  content?: T[]
   totalElements?: number
+  total?: number
   totalPage?: number
+  totalPages?: number
   pageNumber?: number
   elementSize?: number
   summary?: OnboardedCustomersSummary
@@ -168,22 +185,46 @@ export async function getOnboardingCustomers(params: {
   if (params.status) search.set('status', params.status)
   if (params.filteredUser) search.set('filteredUser', params.filteredUser)
 
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+
   const res = await authedApiRequest<
     CustomPageResponseRaw<OnboardedCustomerItem>
-  >(`/api/auth/onboarding/customers?${search.toString()}`)
+  >(`/api/auth/onboarding/customers?${search.toString()}`, {
+    headers: {
+      username,
+    },
+  })
 
-  const items = Array.isArray(res?.data)
-    ? res.data
-    : Array.isArray(res?.customers)
-      ? res.customers
-      : []
+  const raw: any = res
+  const items = Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw?.customers)
+      ? raw.customers
+      : Array.isArray(raw?.content)
+        ? raw.content
+        : []
+
+  const total =
+    raw?.totalElements ??
+    raw?.total ??
+    raw?.data?.totalElements ??
+    raw?.data?.total ??
+    items.length
+
+  const totalPage =
+    raw?.totalPage ??
+    raw?.totalPages ??
+    raw?.data?.totalPage ??
+    raw?.data?.totalPages ??
+    Math.max(1, Math.ceil(total / (params.size ?? 10)))
 
   return {
     customers: items,
-    totalElements: res?.totalElements ?? items.length,
-    totalPage: res?.totalPage ?? 1,
-    pageNumber: res?.pageNumber ?? 0,
-    summary: res?.summary,
+    totalElements: total,
+    totalPage,
+    pageNumber: raw?.pageNumber ?? (params.page ?? 0),
+    summary: raw?.summary,
   }
 }
 
@@ -224,15 +265,24 @@ export interface DepartmentCustomerRowItem {
     gstNumber?: string
     address?: string
     zipCode?: string
+    duplicateCount?: number
+    hasDuplicate?: boolean
+    hasDuplicateCustomer?: boolean
   }
   assignedUserEmail?: string
   assignedUserName?: string
+  assignedTo?: string
   remark?: string
   onboardingStatus?: string
   businessName?: string
   ownerName?: string
   email?: string
   phoneNumber?: string
+  hasDuplicate?: boolean
+  hasDuplicateCustomer?: boolean
+  hasDuplicateCustomers?: boolean
+  duplicateCount?: number
+  duplicateCustomers?: any[]
   [key: string]: unknown
 }
 
@@ -266,8 +316,16 @@ export async function getDepartmentCustomerRows(params: {
   if (params.startDate) search.set('startDate', params.startDate)
   if (params.endDate) search.set('endDate', params.endDate)
 
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+
   const res = await authedApiRequest<any>(
     `/api/auth/department/customer/rows?${search.toString()}`,
+    {
+      headers: {
+        username,
+      },
+    },
   )
 
   const items: DepartmentCustomerRowItem[] = Array.isArray(res)
@@ -311,3 +369,162 @@ export async function getDepartmentCustomerRows(params: {
     pageNumber: res?.pageNumber ?? res?.data?.pageNumber ?? (params.page ?? 0),
   }
 }
+
+export interface CreateDepartmentUserRequest {
+  username: string
+  email: string
+  password: string
+  phoneNumber?: string
+  contact?: string
+  departmentType?: string
+  role?: string
+  isHead?: boolean
+  headUser?: string
+  calendlyLink?: string | null
+}
+
+/**
+ * `POST /api/auth/department/register`
+ * Registers a new department user under the current department head.
+ * Follows SMSF reference structure.
+ */
+export async function createDepartmentUser(
+  data: CreateDepartmentUserRequest,
+): Promise<any> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+  const rawDepartment = session?.user?.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google'))
+  const departmentType =
+    data.departmentType || (isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT'))
+
+  const body = {
+    username: data.username.trim(),
+    email: data.email.trim(),
+    password: data.password,
+    contact: data.phoneNumber || data.contact || null,
+    departmentType,
+    role: data.role || 'DEPARTMENT_USER',
+    isHead: false,
+    headUser: headEmail,
+    calendlyLink: data.calendlyLink || null,
+  }
+
+  return authedApiRequest<any>('/api/auth/department/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      username: headEmail,
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+export interface AssignCustomerRequest {
+  customerId: number | string
+  assignedUserEmail: string
+  departmentType?: string
+}
+
+/**
+ * `POST /api/auth/customer-service/assign-user`
+ * Assigns customer to a department user. Follows SMSF reference structure.
+ */
+export async function assignCustomerUser(params: AssignCustomerRequest): Promise<any> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const departmentType =
+    params.departmentType || session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const idNum = Number(params.customerId)
+  const cid = !isNaN(idNum) ? idNum : params.customerId
+
+  const body = {
+    customerIds: [cid],
+    departmentType,
+    assignedUserEmail: params.assignedUserEmail,
+    assignedFrom: username,
+    isSelectAll: false,
+    isRoundRobin: false,
+  }
+
+  return authedApiRequest<any>('/api/auth/customer-service/assign-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      username,
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+export interface DuplicateCustomerSummaryItem {
+  customerId?: number | string
+  id?: number | string
+  businessName?: string
+  customerName?: string
+  ownerName?: string
+  email?: string
+  phone?: string
+  phoneNumber?: string
+  contact?: string
+  status?: string
+  onboardingStatus?: string
+  completeServiceStatus?: string
+  createdAt?: string
+  isMainBusiness?: boolean
+  customerDetails?: {
+    ownerName?: string
+    businessName?: string
+    phoneNumber?: string
+    email?: string
+    status?: string
+    address?: string
+    gstNumber?: string
+    city?: string
+    state?: string
+    zipCode?: string
+    duplicateCount?: number
+  }
+  services?: Array<{ serviceType?: string; status?: string }>
+}
+
+/**
+ * `GET /api/auth/duplicate-customers/customer/{customerId}/summaries`
+ * Fetches other businesses associated with the same customer / phone.
+ */
+export async function getDuplicateCustomerSummaries(
+  customerId: number | string,
+  departmentType: string = 'ONBOARDING_DEPARTMENT',
+): Promise<DuplicateCustomerSummaryItem[]> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const search = new URLSearchParams()
+  search.set('page', '0')
+  search.set('size', '20')
+  search.set('departmentType', departmentType)
+
+  try {
+    const res = await authedApiRequest<any>(
+      `/api/auth/duplicate-customers/customer/${encodeURIComponent(String(customerId))}/summaries?${search.toString()}`,
+      {
+        headers: {
+          username,
+        },
+      },
+    )
+
+    const raw = res?.data ?? res
+    if (Array.isArray(raw)) return raw
+    if (Array.isArray(raw?.data)) return raw.data
+    if (Array.isArray(raw?.duplicateCustomers)) return raw.duplicateCustomers
+    if (Array.isArray(raw?.content)) return raw.content
+    if (Array.isArray(raw?.customers)) return raw.customers
+    return []
+  } catch (err) {
+    console.warn('Could not fetch duplicate summaries:', err)
+    return []
+  }
+}
+

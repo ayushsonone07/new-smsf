@@ -279,17 +279,53 @@ export async function getOnboardingDashboardMembers(
   if (params.endDate) search.set('endDate', params.endDate)
   if (params.allTime) search.set('allTime', 'true')
 
-  const res = await authedApiRequest<
-    ApiDataWrapper<OnboardingMembersResponse> & OnboardingMembersResponse
-  >(`/api/onboarding/dashboard/members?${search.toString()}`)
+  const res = await authedApiRequest<any>(
+    `/api/onboarding/dashboard/members?${search.toString()}`,
+  )
 
-  const payload = (res?.data ?? res) as OnboardingMembersResponse
+  const payload = (res?.data ?? res) as any
+
+  const rawMembers: OnboardingMemberPerformanceDTO[] = Array.isArray(payload?.teamMembers)
+    ? payload.teamMembers
+    : Array.isArray(payload?.members)
+      ? payload.members
+      : Array.isArray(payload?.content)
+        ? payload.content
+        : Array.isArray(res?.teamMembers)
+          ? res.teamMembers
+          : Array.isArray(res?.data?.teamMembers)
+            ? res.data.teamMembers
+            : Array.isArray(res?.data?.content)
+              ? res.data.content
+              : Array.isArray(payload)
+                ? payload
+                : []
+
+  const totalMembers =
+    payload?.totalMembers ??
+    payload?.totalElements ??
+    payload?.total ??
+    res?.totalMembers ??
+    res?.totalElements ??
+    res?.total ??
+    rawMembers.length
+
+  const page = payload?.page ?? payload?.pageNumber ?? res?.page ?? (params.page ?? 0)
+  const size = payload?.size ?? payload?.pageSize ?? res?.size ?? (params.size ?? 10)
+
+  const totalPages =
+    payload?.totalPages ??
+    payload?.totalPage ??
+    res?.totalPages ??
+    res?.totalPage ??
+    Math.max(1, Math.ceil(totalMembers / size))
+
   return {
-    totalMembers: payload?.totalMembers ?? payload?.teamMembers?.length ?? 0,
-    teamMembers: Array.isArray(payload?.teamMembers) ? payload.teamMembers : [],
-    page: payload?.page ?? 0,
-    size: payload?.size ?? 10,
-    totalPages: payload?.totalPages ?? 1,
+    totalMembers,
+    teamMembers: rawMembers,
+    page,
+    size,
+    totalPages,
   }
 }
 
