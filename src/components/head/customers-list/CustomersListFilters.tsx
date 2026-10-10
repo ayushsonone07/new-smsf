@@ -39,6 +39,9 @@ export interface CustomersListFiltersProps {
 
   /** Green button: reset all filters */
   onReset: () => void
+
+  /** Whether to show the status filter tabs (hidden if Status column disabled) */
+  showStatusTabs?: boolean
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [
@@ -86,6 +89,7 @@ export function CustomersListFilters({
   dateTo,
   onDateChange,
   onReset,
+  showStatusTabs = true,
 }: CustomersListFiltersProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)

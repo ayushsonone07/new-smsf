@@ -40,120 +40,7 @@ const sectionVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
 
-const MOCK_TEAM_MEMBERS: TeamMemberPerformance[] = [
-  {
-    id: 'u-1',
-    name: 'Abhishek Sahu',
-    email: 'abhishekmbg261@gmail.com',
-    allTimeCustomers: 311,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 8,
-    completed: 6,
-    delayed: 2,
-    target: 6,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-2',
-    name: 'Mahima',
-    email: 'mahimambg12@gmail.com',
-    allTimeCustomers: 287,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 7,
-    completed: 4,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 80,
-  },
-  {
-    id: 'u-3',
-    name: 'Mohit',
-    email: 'mohitmbgcard19@gmail.com',
-    allTimeCustomers: 240,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 6,
-    completed: 4,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 80,
-  },
-  {
-    id: 'u-4',
-    name: 'Bhupinder',
-    email: 'bhupinder.mbg@gmail.com',
-    allTimeCustomers: 198,
-    attendance: 'Absent',
-    presentDays: 0,
-    absentDays: 1,
-    assigned: 6,
-    completed: 5,
-    delayed: 1,
-    target: 5,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-5',
-    name: 'Gungun',
-    email: 'gungunmbg@gmail.com',
-    allTimeCustomers: 176,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 5,
-    completed: 4,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-6',
-    name: 'Afreen',
-    email: 'sheikhafreenmbg786@gmail.com',
-    allTimeCustomers: 150,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 5,
-    completed: 4,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 100,
-  },
-  {
-    id: 'u-7',
-    name: 'Ayushi',
-    email: 'ayushimbg@gmail.com',
-    allTimeCustomers: 122,
-    attendance: 'Absent',
-    presentDays: 0,
-    absentDays: 1,
-    assigned: 5,
-    completed: 3,
-    delayed: 1,
-    target: 4,
-    achievedPercent: 75,
-  },
-  {
-    id: 'u-8',
-    name: 'Nikita',
-    email: 'nikitambg@gmail.com',
-    allTimeCustomers: 96,
-    attendance: 'Present',
-    presentDays: 1,
-    absentDays: 0,
-    assigned: 4,
-    completed: 3,
-    delayed: 1,
-    target: 3,
-    achievedPercent: 100,
-  },
-]
+
 
 function toIsoDate(date: Date): string {
   const year = date.getFullYear()
@@ -316,6 +203,8 @@ function HeadDashboard() {
 
   const membersQuery = useOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const { isColumnEnabled, refetch: refetchPermissions } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1)
@@ -426,6 +315,69 @@ function HeadDashboard() {
       score: item.completed,
     }))
   }, [teamMembers])
+
+  function handleRefresh() {
+    setRefreshKey((k) => k + 1)
+    summaryQuery.refetch()
+    membersQuery.refetch()
+    assigningUsersQuery.refetch()
+    refetchPermissions()
+  }
+
+  if (summaryQuery.isPending || membersQuery.isPending) {
+    return <LoadingState message="Loading dashboard..." />
+  }
+
+  if (summaryQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load dashboard"
+        message={summaryQuery.error.message}
+        onRetry={handleRefresh}
+      />
+    )
+  }
+
+  const kpis = summaryQuery.data?.kpis
+  const statsData: Partial<DashboardStatsData> = {
+    totalCustomers: {
+      value: num(kpis?.totalCustomers ?? 0),
+      growth: '',
+      sub: `${num(kpis?.totalCustomers ?? 0)} total customers`,
+    },
+    onboarded: {
+      value: num(kpis?.totalOnboarded ?? 0),
+      sub: `${Math.round(
+        ((kpis?.totalOnboarded ?? 0) / (kpis?.totalCustomers || 1)) * 100,
+      )}% of all customers`,
+    },
+    completed: {
+      value: num(kpis?.totalCompleted ?? 0),
+      growth: '',
+      sub: 'Completed customers',
+    },
+    inProgress: {
+      value: num(kpis?.totalInProgress ?? 0),
+      sub: 'Currently processing',
+    },
+    pending: {
+      value: num(kpis?.totalPending ?? 0),
+      sub: 'Awaiting processing',
+    },
+    delayed: {
+      value: num(kpis?.totalDelayed ?? 0),
+      growth: '',
+      sub: 'Needs follow-up',
+    },
+    presentUsers: {
+      value: num(kpis?.presentUsers ?? 0),
+      sub: 'Active today',
+    },
+    absentUsers: {
+      value: num(kpis?.absentUsers ?? 0),
+      sub: 'Not active today',
+    },
+  }
 
   const activeDays = summaryQuery.data?.mostActiveDay?.map((d) => ({
     day: d.day,

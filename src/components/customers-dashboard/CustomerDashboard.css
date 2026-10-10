@@ -1,0 +1,1184 @@
+/* =============================================================
+   MBG Card Customer Dashboard — Component Styles
+   Namespace prefix: .cdb-
+   ============================================================= */
+
+.cdb-shell {
+  display: flex;
+  min-height: 100vh;
+  font-family: Jost, Inter, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #0f172a;
+  background: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+}
+
+.cdb-shell *,
+.cdb-shell *::before,
+.cdb-shell *::after {
+  box-sizing: border-box;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+
+.cdb-sidebar-backdrop {
+  display: none;
+}
+
+.cdb-sidebar {
+  width: 236px;
+  flex: flex-shrink-0;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  transition: width 0.2s ease, transform 0.2s ease;
+}
+
+.cdb-sidebar.is-collapsed {
+  width: 64px;
+}
+
+.cdb-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  height: 64px;
+}
+
+.cdb-brand-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cdb-brand-logo {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cdb-brand-logo b {
+  color: #ffc629;
+}
+
+.cdb-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cdb-brand-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.cdb-brand-subtitle {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #2563eb;
+}
+
+.cdb-brand-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.cdb-brand-toggle:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.cdb-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cdb-nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 14px 12px 6px;
+}
+
+.cdb-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-decoration: none;
+}
+
+.cdb-nav-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.cdb-nav-item.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.cdb-nav-accent-bar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3.5px;
+  border-radius: 0 4px 4px 0;
+  background: #ffc629;
+}
+
+.cdb-nav-icon {
+  display: grid;
+  place-items: center;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.cdb-nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar Footer Account */
+.cdb-account {
+  padding: 12px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #ffffff;
+}
+
+.cdb-account-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cdb-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cdb-account-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cdb-account-email {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cdb-account-role {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.cdb-role-switch {
+  display: flex;
+  background: #f1f5f9;
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+}
+
+.cdb-role-btn {
+  flex: 1;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  text-align: center;
+}
+
+.cdb-role-btn.is-active {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.cdb-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: #dc2626;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.cdb-logout-btn:hover {
+  background: #fef2f2;
+}
+
+/* ── Main Layout ─────────────────────────────────────────── */
+
+.cdb-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cdb-topbar {
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.cdb-topbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.cdb-topbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cdb-topbar-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.cdb-topbar-notif {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.cdb-topbar-notif:hover {
+  background: #f8fafc;
+}
+
+.cdb-topbar-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #ffc629;
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Page Body */
+.cdb-body {
+  padding: 16px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Customer Preview Line */
+.cdb-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.cdb-preview-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: #64748b;
+}
+
+/* ── Welcome Banner ──────────────────────────────────────── */
+
+.cdb-welcome-banner {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  border-radius: 12px;
+  padding: 16px 20px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  box-shadow: 0 4px 16px rgba(29, 78, 216, 0.18);
+}
+
+.cdb-wb-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cdb-wb-greeting {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.cdb-wb-company {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.cdb-wb-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cdb-wb-status-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #d97706;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.cdb-wb-pkg-pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* Center Progress */
+.cdb-wb-center {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 280px;
+}
+
+.cdb-wb-progress-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cdb-wb-percent {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.cdb-wb-progress-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.cdb-wb-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.cdb-wb-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #ffc629;
+}
+
+/* Right Executive Box */
+.cdb-wb-exec-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.cdb-wb-exec-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #ffc629;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cdb-wb-exec-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.cdb-wb-exec-role {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.cdb-wb-exec-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.cdb-wb-exec-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.cdb-wb-btn-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2563eb;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.12s;
+}
+
+.cdb-wb-btn-icon:hover {
+  transform: translateY(-1px);
+  background: #f8fafc;
+}
+
+.cdb-wb-btn-icon.is-whatsapp {
+  color: #16a34a;
+}
+
+/* ── Upcoming Meeting Banner ─────────────────────────────── */
+
+.cdb-meeting-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #fefce8;
+  border: 1px solid #fde047;
+}
+
+.cdb-mb-date-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 48px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
+  flex-shrink: 0;
+}
+
+.cdb-mb-month {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.cdb-mb-day {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cdb-mb-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cdb-mb-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d97706;
+}
+
+.cdb-mb-time {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cdb-mb-details {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+/* ── Services Section ────────────────────────────────────── */
+
+.cdb-services-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cdb-services-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cdb-services-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cdb-services-count-badge {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.cdb-services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Service Card */
+.cdb-svc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.cdb-svc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cdb-svc-name-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cdb-svc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.cdb-svc-dot.dot-green {
+  background: #16a34a;
+}
+
+.cdb-svc-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cdb-svc-status-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cdb-svc-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cdb-svc-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.cdb-svc-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.cdb-svc-fraction {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.cdb-svc-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.cdb-svc-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.cdb-svc-task-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+}
+
+.cdb-task-icon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.cdb-task-icon.is-completed {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.cdb-task-icon.is-progress {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.cdb-task-icon.is-pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.cdb-task-status-txt {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cdb-task-status-txt.txt-completed {
+  color: #94a3b8;
+}
+
+.cdb-task-status-txt.txt-progress {
+  color: #94a3b8;
+}
+
+.cdb-task-status-txt.txt-pending {
+  color: #94a3b8;
+}
+
+/* ── Lower Two-Column Grid ───────────────────────────────── */
+
+.cdb-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Card Container */
+.cdb-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.cdb-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cdb-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cdb-card-icon-box {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.cdb-card-icon-box.is-yellow {
+  background: #fff5d6;
+  color: #d97706;
+}
+
+.cdb-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* ── Latest Updates List ─────────────────────────────────── */
+
+.cdb-updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cdb-update-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cdb-update-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cdb-update-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cdb-update-icon.is-help {
+  background: #fff5d6;
+  color: #d97706;
+}
+
+.cdb-update-icon.is-check {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.cdb-update-icon.is-pulse {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.cdb-update-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cdb-update-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cdb-update-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ── Help Center Card ────────────────────────────────────── */
+
+.cdb-raise-ticket-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffc629;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.12s;
+}
+
+.cdb-raise-ticket-btn:hover {
+  background: #f5b800;
+  transform: translateY(-1px);
+}
+
+/* Ticket Form Box */
+.cdb-ticket-form-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: cdb-fade-in 0.15s ease-out;
+}
+
+@keyframes cdb-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cdb-input,
+.cdb-select,
+.cdb-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.cdb-input:focus,
+.cdb-select:focus,
+.cdb-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.cdb-form-row-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cdb-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.cdb-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cdb-btn-secondary {
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cdb-btn-secondary:hover {
+  background: #f1f5f9;
+}
+
+.cdb-btn-primary {
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cdb-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+/* Ticket List */
+.cdb-ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cdb-ticket-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cdb-ticket-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cdb-ticket-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cdb-ticket-num {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.cdb-ticket-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cdb-ticket-status.status-pending {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.cdb-ticket-status.status-completed {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.cdb-ticket-time {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.cdb-ticket-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 2px 0 0;
+}
+
+.cdb-ticket-message {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* ── Responsive Breakpoints ──────────────────────────────── */
+
+@media (max-width: 1280px) {
+  .cdb-services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .cdb-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(2px);
+  }
+
+  .cdb-welcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cdb-wb-center {
+    width: 100%;
+  }
+
+  .cdb-wb-exec-card {
+    width: 100%;
+  }
+
+  .cdb-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .cdb-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+  }
+
+  .cdb-sidebar.is-collapsed {
+    transform: translateX(-100%);
+  }
+
+  .cdb-services-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cdb-topbar {
+    padding: 0 16px;
+  }
+
+  .cdb-body {
+    padding: 16px;
+  }
+
+  .cdb-topbar-subtitle {
+    display: none;
+  }
+
+  .cdb-form-row-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .cdb-welcome-banner {
+    padding: 16px;
+  }
+
+  .cdb-wb-company {
+    font-size: 20px;
+  }
+
+  .cdb-meeting-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -26,10 +26,11 @@ interface ScreenEntry {
 export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   dashboard: { component: DashboardPage, title: 'Onboarding Dashboard' },
   users: { component: DepartmentUsersPage, title: 'Department Management' },
-customers: { component: CustomerListPage, title: 'Customer List' },
+  customers: { component: CustomerListPage, title: 'Customer List' },
+  'customer-list': { component: CustomerListPage, title: 'Customer List' },
   attendance: { component: AttendancePage, title: 'Attendance' },
   meeting: { component: MeetingPage, title: '15 Days Meeting' },
   sop: { component: SopPage, title: 'SOP' },
   'help-center': { component: HelpCenterPage, title: 'Help Center' },
   custom: { component: CustomFeaturePage },
-}
+} as Record<string, ScreenEntry>

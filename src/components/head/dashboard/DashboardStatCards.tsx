@@ -24,14 +24,14 @@ export interface DashboardStatsData {
 }
 
 const DEFAULT_STATS: DashboardStatsData = {
-  totalCustomers: { value: '6,972', growth: '▲ 4.7%', sub: '+45 this period' },
-  onboarded: { value: '6,818', sub: '98% of all customers' },
-  completed: { value: '33', growth: '▲ 13.8%', sub: 'vs 29 last period' },
-  inProgress: { value: '7', sub: 'Currently processing' },
-  pending: { value: '5', sub: 'Awaiting processing' },
-  delayed: { value: '9', growth: '▲ 0%', sub: 'vs 9 last period' },
-  presentUsers: { value: '6', sub: 'Active today' },
-  absentUsers: { value: '2', sub: 'Not active today' },
+  totalCustomers: { value: '0', growth: '', sub: 'Total customers' },
+  onboarded: { value: '0', sub: '0% of all customers' },
+  completed: { value: '0', growth: '', sub: 'Completed' },
+  inProgress: { value: '0', sub: 'Currently processing' },
+  pending: { value: '0', sub: 'Awaiting processing' },
+  delayed: { value: '0', growth: '', sub: 'Needs follow-up' },
+  presentUsers: { value: '0', sub: 'Active today' },
+  absentUsers: { value: '0', sub: 'Not active today' },
 }
 
 export interface DashboardStatCardsProps {

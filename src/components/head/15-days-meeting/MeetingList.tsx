@@ -178,24 +178,24 @@ export function MeetingList({
                   <IconButton
                     icon="phone"
                     label="Call customer"
-                    size={34}
-                    iconSize={16}
+                    size={28}
+                    iconSize={14}
                     variant="outline"
                     onClick={() => onPhoneClick(meeting)}
                   />
                   <IconButton
                     icon="mail"
                     label="Message customer"
-                    size={34}
-                    iconSize={16}
+                    size={28}
+                    iconSize={14}
                     variant="outline"
                     onClick={() => onMessageClick(meeting)}
                   />
                   <IconButton
                     icon="history"
                     label="View history"
-                    size={34}
-                    iconSize={16}
+                    size={28}
+                    iconSize={14}
                     variant="outline"
                     onClick={() => onHistoryClick(meeting)}
                   />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -20,6 +20,7 @@ import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useOnboardingCustomersList } from '../../hooks/useDepartmentUsersList'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -53,6 +54,45 @@ export function CustomerListPage() {
   const [size] = useState(10)
 
   const canEdit = columnFeatures.canEdit('actions')
+
+  const { isColumnEnabled, canEditColumn } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+  const isStatusVisible = isColumnEnabled('Status')
+  const canEditStatus = canEditColumn('Status')
+
+  const isAssignToVisible =
+    isColumnEnabled('Assign To') ||
+    isColumnEnabled('Assign') ||
+    isColumnEnabled('Assignee')
+  const canEditAssignTo =
+    canEditColumn('Assign To') ||
+    canEditColumn('Assign') ||
+    canEditColumn('Assignee')
+
+  const isRemarkVisible =
+    isColumnEnabled('Internal Remark') ||
+    isColumnEnabled('Remark')
+  const canEditRemark =
+    canEditColumn('Internal Remark') ||
+    canEditColumn('Remark')
+
+  const isContactVisible =
+    isColumnEnabled('Contact') ||
+    isColumnEnabled('Phone') ||
+    isColumnEnabled('Email')
+
+  const isBusinessVisible =
+    isColumnEnabled('Business') ||
+    isColumnEnabled('Company')
+
+  const isUpdatedVisible =
+    isColumnEnabled('Updated')
+
+  useEffect(() => {
+    if (!isStatusVisible && activeTab !== 'all') {
+      setActiveTab('all')
+    }
+  }, [isStatusVisible, activeTab])
 
   // 1. Assigning users API
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
@@ -252,6 +292,15 @@ export function CustomerListPage() {
         customers={filteredCustomers}
         assignees={assignees}
         canEdit={canEdit}
+        showStatus={isStatusVisible}
+        canEditStatus={canEditStatus}
+        showAssignTo={isAssignToVisible}
+        canEditAssignTo={canEditAssignTo}
+        showRemark={isRemarkVisible}
+        canEditRemark={canEditRemark}
+        showContact={isContactVisible}
+        showBusiness={isBusinessVisible}
+        showUpdated={isUpdatedVisible}
         onOpenDetail={setSelectedCustomer}
         onStatusChange={(id, status) =>
           patchCustomer(id, { onboardingStatus: status })
@@ -293,6 +342,8 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        showStatus={isStatusVisible}
+        showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
       />
     </>

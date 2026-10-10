@@ -11,7 +11,8 @@ export function useOnboardingDashboardMembers(
   return useQuery<OnboardingMembersResponse>({
     queryKey: ['onboarding-dashboard-members', params],
     queryFn: () => getOnboardingDashboardMembers(params),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
