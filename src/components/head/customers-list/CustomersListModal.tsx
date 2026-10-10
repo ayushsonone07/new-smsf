@@ -3,6 +3,7 @@ import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { Icon } from '../shared/Icon'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
+import { useCustomerDrawerDetails } from '../../../features/departments/hooks/useCustomerDrawerDetails'
 import type {
   OnboardingCustomer,
   OnboardingAssignee,
@@ -18,21 +19,13 @@ import type {
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
   assignees: OnboardingAssignee[]
-  apiDetails?: CustomerDrawerApiDetails
   showStatus?: boolean
   showAssignTo?: boolean
   departmentType?: string
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
-}
-
-const EMPTY_API_DETAILS: CustomerDrawerApiDetails = {
-  serviceRows: [],
-  serviceRowsLoading: false,
-  reviewReplies: [],
-  isLoading: false,
-  errors: [],
+  initialTab?: DrawerTab
 }
 
 type DrawerTab =
@@ -226,22 +219,25 @@ function Field({
 export function CustomersListModal({
   customer,
   assignees,
-  apiDetails = EMPTY_API_DETAILS,
   showStatus = true,
   showAssignTo = true,
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
   onOpenFullPage,
+  initialTab,
 }: CustomersListModalProps) {
-  const [activeTab, setActiveTab] = useState<DrawerTab>('overview')
+  const [activeTab, setActiveTab] = useState<DrawerTab>(initialTab ?? 'overview')
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
+
+  const current = activeCustomer ?? customer
+  const apiDetails = useCustomerDrawerDetails(current)
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
     setPrevCustomerId(customer?.id)
     setActiveCustomer(customer)
-    setActiveTab('overview')
+    setActiveTab(initialTab ?? 'overview')
     setClosing(false)
   }
 
@@ -265,11 +261,9 @@ export function CustomersListModal({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [customer, onClose])
 
-  if (!customer) return null
-
   const duplicatesQuery = useQuery({
-    queryKey: ['duplicate-customer-summaries', customer.id, departmentType],
-    queryFn: () => getDuplicateCustomerSummaries(customer.id, departmentType),
+    queryKey: ['duplicate-customer-summaries', customer?.id ?? 0, departmentType],
+    queryFn: () => getDuplicateCustomerSummaries(customer?.id ?? 0, departmentType),
     enabled: Boolean(
       customer &&
         (customer.hasDuplicateCustomer ||
@@ -281,8 +275,8 @@ export function CustomersListModal({
   const duplicateItems = useMemo(() => {
     const fromApi = duplicatesQuery.data ?? []
     if (fromApi.length > 0) return fromApi
-    return customer.duplicateCustomers ?? []
-  }, [duplicatesQuery.data, customer.duplicateCustomers])
+    return customer?.duplicateCustomers ?? []
+  }, [duplicatesQuery.data, customer?.duplicateCustomers])
 
   const allBusinesses = useMemo(() => {
     if (!customer) return []
@@ -316,7 +310,7 @@ export function CustomersListModal({
     }).length
   }, [allBusinesses])
 
-  const current = activeCustomer ?? customer
+  if (!customer || !current) return null
 
   const assignee =
     assignees.find((a) => a.id === current.assigneeId) ?? null
@@ -329,7 +323,7 @@ export function CustomersListModal({
   const profile = apiDetails.profile
   const services = getCustomerServices(apiDetails.serviceRows)
   const doneCount = services.filter((s) => s.status === 'completed').length
-  const remarkEntries = getRemarkEntries(apiDetails.remarks)
+  const remarkEntries = getRemarkEntries(apiDetails)
   const customerRemarks = remarkEntries.filter(
     ({ category }) => category === 'Client',
   )
@@ -368,8 +362,8 @@ export function CustomersListModal({
     },
     ...apiDetails.reviewReplies.map((reply) => ({
       title: 'Review reply added',
-      detail: formatRecord(reply.data ?? {}),
-      timestamp: stringValue(reply.data?.dateTime),
+      detail: reply.reply,
+      timestamp: reply.timestamp,
     })),
     ...remarkEntries.map(({ category, remark }) => ({
       title: `${category} remark added`,
@@ -1243,7 +1237,7 @@ function getCustomerServices(rows: CustomerServiceRow[]) {
   }))
 }
 
-function stringValue(value: unknown): string {
+export function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
@@ -1467,15 +1461,22 @@ function RemarkGroup({
 }
 
 function getRemarkEntries(
-  remarks?: CustomerDrawerApiDetails['remarks'],
+  apiDetails: CustomerDrawerApiDetails,
 ): { category: string; remark: CustomerRemark }[] {
-  if (!remarks) return []
+  const remarks = apiDetails.remarks
+  const internalList = apiDetails.internalRemarks ?? []
+  const clientReplies = (apiDetails.reviewReplies ?? []).map((r) => ({
+    remark: r.reply,
+    timestamp: r.timestamp,
+    staffName: r.staffName,
+  }))
+  const clientList = clientReplies.length > 0 ? clientReplies : (remarks?.clientRemark ?? [])
   const entries: { category: string; remark: CustomerRemark }[] = []
   const groups: [string, CustomerRemark[]][] = [
-    ['Department', remarks.departmentRemark ?? []],
-    ['Internal', remarks.internalRemark ?? []],
-    ['Client', remarks.clientRemark ?? []],
-    ['15-day meeting', remarks.fifteenDayMeetingRemark ?? []],
+    ['Department', remarks?.departmentRemark ?? []],
+    ['Internal', internalList.length > 0 ? internalList : (remarks?.internalRemark ?? [])],
+    ['Client', clientList],
+    ['15-day meeting', remarks?.fifteenDayMeetingRemark ?? []],
   ]
   for (const [category, groupRemarks] of groups) {
     for (const remark of groupRemarks) entries.push({ category, remark })

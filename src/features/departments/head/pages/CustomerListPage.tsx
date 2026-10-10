@@ -16,7 +16,6 @@ import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
-import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
@@ -29,6 +28,7 @@ import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDe
 import { getSession } from '../../../../app/auth/session'
 import { assignCustomerUser } from '../../../../api/department-users.api'
 import { TablePagination } from '../../../../components/ui/TablePagination'
+import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -65,7 +65,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
-  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
+  const [modalTab, setModalTab] = useState<any>(undefined)
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
@@ -268,7 +268,7 @@ export function CustomerListPage() {
           callStatus: 'connected',
           status,
           assigneeId: assigned,
-          remark: c.remark ?? '',
+          remark: getLatestInternalRemark(c, ['ONBOARDING_DEPARTMENT']) || c.remark || '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
@@ -321,7 +321,7 @@ export function CustomerListPage() {
                 ? 'in-progress'
                 : 'pending',
           assigneeId: assigned,
-          remark: c.remark ?? c.internalRemark ?? '',
+          remark: getLatestInternalRemark(c, ['ONBOARDING_DEPARTMENT']) || c.remark || c.internalRemark || '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
@@ -529,8 +529,14 @@ export function CustomerListPage() {
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        onOpenDetail={setSelectedCustomer}
-        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
+        onOpenDetail={(cust, tab) => {
+          setSelectedCustomer(cust)
+          setModalTab(tab)
+        }}
+        onOpenDuplicate={(cust) => {
+          setSelectedCustomer(cust)
+          setModalTab('duplicates')
+        }}
         onStatusChange={(id, status) =>
           patchCustomer(id, { onboardingStatus: status })
         }
@@ -557,11 +563,14 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
-        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         departmentType={currentDepartment}
-        onClose={() => setSelectedCustomer(null)}
+        initialTab={modalTab}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
       />
     </>
   )

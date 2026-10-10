@@ -60,7 +60,7 @@ export interface CustomersListProps {
   onStatusChange: (id: string, status: OnboardingStatus) => void
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
-  onOpenDetail: (customer: OnboardingCustomer) => void
+  onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
   canEdit?: boolean
   showStatus?: boolean
@@ -202,7 +202,7 @@ export function CustomersList({
               onRemarkChange={(remark) =>
                 onRemarkChange(customer.id, remark)
               }
-              onOpenDetail={() => onOpenDetail(customer)}
+              onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
               canEdit={canEdit}
               showBusiness={showBusiness}
@@ -230,7 +230,7 @@ interface CustomerRowProps {
   onStatusChange: (status: OnboardingStatus) => void
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
-  onOpenDetail: () => void
+  onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
   canEdit: boolean
   showBusiness?: boolean
@@ -330,7 +330,7 @@ function CustomerRow({
             <button
               type="button"
               className="cl-biz-name cl-biz-name--link"
-              onClick={onOpenDetail}
+              onClick={() => onOpenDetail()}
               title="View customer detail"
             >
               {customer.businessName}
@@ -341,7 +341,7 @@ function CustomerRow({
               className="cl-biz-eye"
               title="View customer detail"
               aria-label="View customer detail"
-              onClick={onOpenDetail}
+              onClick={() => onOpenDetail()}
             >
               <Icon name="eye" size={14} strokeWidth={1.8} />
             </button>
@@ -361,7 +361,7 @@ function CustomerRow({
               Form
             </button>
 
-            {(customer.hasDuplicateCustomer || (customer.duplicateCount && customer.duplicateCount > 0)) && (
+            {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
               <button
                 type="button"
                 className="cl-dup-pill-btn"
@@ -451,6 +451,7 @@ function CustomerRow({
             />
             {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
           </span>
+        </span>
         </td>
       )}
 
@@ -648,31 +649,91 @@ function CustomerRow({
                   className="cl-action"
                   title="View customer detail"
                   aria-label="View customer detail"
-                  onClick={onOpenDetail}
+                  onClick={() => onOpenDetail()}
                 >
                   <Icon name="eye" size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
           ) : (
-            <span
-              className={`cl-remark${
-                !customer.remark ? ' cl-remark--placeholder' : ''
-              }`}
-              role="button"
-              tabIndex={canEditRemark !== undefined ? (canEditRemark ? 0 : -1) : (canEdit ? 0 : -1)}
-              onClick={startEditing}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') startEditing()
-              }}
-              title={
-                (canEditRemark !== undefined ? canEditRemark : canEdit)
-                  ? 'Click to edit remark'
-                  : 'Read-only remark'
-              }
-            >
-              {customer.remark || 'Add remark...'}
-            </span>
+            <div className="cl-remark-display-container" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div
+                className={`cl-remark${
+                  !customer.remark ? ' cl-remark--placeholder' : ''
+                }`}
+                style={{
+                  position: 'relative',
+                  padding: '6px 8px',
+                  paddingRight: (canEditRemark !== undefined ? canEditRemark : canEdit) ? '28px' : '8px',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '6px',
+                  minHeight: '32px',
+                  cursor: (canEditRemark !== undefined ? canEditRemark : canEdit) ? 'pointer' : 'default',
+                }}
+                role="button"
+                tabIndex={(canEditRemark !== undefined ? canEditRemark : canEdit) ? 0 : -1}
+                onClick={(canEditRemark !== undefined ? canEditRemark : canEdit) ? startEditing : undefined}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && (canEditRemark !== undefined ? canEditRemark : canEdit)) {
+                    startEditing()
+                  }
+                }}
+                title={
+                  (canEditRemark !== undefined ? canEditRemark : canEdit)
+                    ? 'Click to edit remark'
+                    : 'Read-only remark'
+                }
+              >
+                {customer.remark || 'Add remark...'}
+                
+                {(canEditRemark !== undefined ? canEditRemark : canEdit) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      startEditing()
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      color: '#475569',
+                    }}
+                    title="Edit internal remark"
+                  >
+                    <Icon name="pencil" size={12} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenDetail('remarks')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  color: '#94a3b8',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  width: 'fit-content'
+                }}
+              >
+                <Icon name="messageSquare" size={10} strokeWidth={2} />
+                view remark history
+              </button>
+            </div>
           )}
         </td>
       )}

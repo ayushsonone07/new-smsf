@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getCustomerProfileDetails,
   getCustomerRemarks,
+  getCustomerInternalRemarks,
   getCustomerReviewReplies,
   getCustomerServiceRows,
 } from '../../../api/customer-drawer.api'
@@ -39,6 +40,13 @@ export function useCustomerDrawerDetails(
     staleTime: 0,
   })
 
+  const internalRemarksQuery = useQuery({
+    queryKey: ['customer-drawer-internal-remarks', customerId, CUSTOMER_DEPARTMENT],
+    queryFn: () => getCustomerInternalRemarks(customerId, CUSTOMER_DEPARTMENT),
+    enabled: isOpen && hasCustomerId,
+    staleTime: 0,
+  })
+
   const rowsQuery = useQuery({
     queryKey: ['customer-drawer-rows', contact],
     queryFn: () => getCustomerServiceRows(contact),
@@ -51,16 +59,19 @@ export function useCustomerDrawerDetails(
     serviceRows: rowsQuery.data ?? [],
     serviceRowsLoading: rowsQuery.isLoading,
     remarks: remarksQuery.data,
+    internalRemarks: internalRemarksQuery.data ?? [],
     reviewReplies: reviewRepliesQuery.data ?? [],
     isLoading:
       profileQuery.isLoading ||
       reviewRepliesQuery.isLoading ||
       remarksQuery.isLoading ||
+      internalRemarksQuery.isLoading ||
       rowsQuery.isLoading,
     errors: [
       profileQuery.error,
       reviewRepliesQuery.error,
       remarksQuery.error,
+      internalRemarksQuery.error,
       rowsQuery.error,
     ]
       .filter((error): error is Error => error instanceof Error)

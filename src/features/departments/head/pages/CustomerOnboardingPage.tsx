@@ -47,6 +47,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const [overrides, setOverrides] = useState<Record<string, OnboardingOverrides>>({})
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const [modalTab, setModalTab] = useState<any>(undefined)
 
   const screenPermission = getSession()?.user.role === 'USER'
     ? feature.roleBPermission
@@ -207,8 +208,14 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         onStatusChange={(id, status) => patchCustomer(id, { status })}
         onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
         onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
-        onOpenDetail={setSelectedCustomer}
-        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
+        onOpenDetail={(cust, tab) => {
+          setSelectedCustomer(cust)
+          setModalTab(tab)
+        }}
+        onOpenDuplicate={(cust) => {
+          setSelectedCustomer(cust)
+          setModalTab('duplicates')
+        }}
       />
       <CustomersListModal
         customer={selectedCustomer}
@@ -216,7 +223,11 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         departmentType="ONBOARDING_DEPARTMENT"
-        onClose={() => setSelectedCustomer(null)}
+        initialTab={modalTab}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
       />
     </>
   )

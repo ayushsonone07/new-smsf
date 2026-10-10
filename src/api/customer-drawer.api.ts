@@ -136,7 +136,9 @@ export interface CustomerRemarks {
 }
 
 export interface CustomerReviewReply {
-  data?: Record<string, unknown>
+  reply: string
+  timestamp: string
+  staffName: string
 }
 
 export interface CustomerDrawerApiDetails {
@@ -144,6 +146,7 @@ export interface CustomerDrawerApiDetails {
   serviceRows: CustomerServiceRow[]
   serviceRowsLoading: boolean
   remarks?: CustomerRemarks
+  internalRemarks: CustomerRemark[]
   reviewReplies: CustomerReviewReply[]
   isLoading: boolean
   errors: string[]
@@ -186,12 +189,15 @@ export async function getCustomerReviewReplies(
   customerId: number,
   departmentType: string,
 ): Promise<CustomerReviewReply[]> {
-  const response = await authedApiRequest<
-    ApiEnvelope<{ replies?: CustomerReviewReply[] }>
-  >(
+  const response = await authedApiRequest<any>(
     `/api/auth/customer-service/review-reply/${customerId}/${encodeURIComponent(departmentType)}`,
   )
-  return requireData(response, 'Review replies').replies ?? []
+  
+  const data = response?.data ?? response
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.data)) return data.data
+  if (Array.isArray(data?.replies)) return data.replies
+  return []
 }
 
 export async function getCustomerRemarks(
@@ -206,6 +212,21 @@ export async function getCustomerRemarks(
     `/api/auth/customer-service/remarks?${search.toString()}`,
   )
   return requireData(response, 'Customer remarks')
+}
+
+export async function getCustomerInternalRemarks(
+  customerId: number,
+  departmentType: string,
+): Promise<CustomerRemark[]> {
+  const search = new URLSearchParams({
+    customerId: String(customerId),
+    departmentType,
+  })
+  const response = await authedApiRequest<ApiEnvelope<CustomerRemark[]> | { data?: CustomerRemark[] }>(
+    `/api/auth/customer-service/internal-remarks?${search.toString()}`,
+  )
+  const data = (response as ApiEnvelope<CustomerRemark[]>).data ?? (response as any)
+  return Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])
 }
 
 export async function getCustomerServiceRows(

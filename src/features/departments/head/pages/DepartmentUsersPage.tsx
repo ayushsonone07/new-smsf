@@ -21,6 +21,8 @@ import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useInfiniteDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import {
   createDepartmentUser,
+  updateDepartmentUser,
+  deleteDepartmentUser,
   type DepartmentUserApiItem,
 } from '../../../../api/department-users.api'
 import { useMemberDetails } from '../../hooks/useMemberDetails'
@@ -280,8 +282,7 @@ export function DepartmentUsersPage() {
     })
   }, [departmentUsersQuery.data?.pages])
 
-  const [localUsers, setLocalUsers] = useState<DepartmentUser[] | null>(null)
-  const users = localUsers ?? apiUsersList
+  const users = apiUsersList
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -333,30 +334,50 @@ export function DepartmentUsersPage() {
     }
   }
 
-  function handleEdit(
+  async function handleEdit(
     user: DepartmentUser,
     values: DepartmentUserFormValues,
   ) {
-    setLocalUsers(
-      users.map((item) =>
-        item.id === user.id
-          ? {
-              ...item,
-              name: values.name,
-              phone: values.phone,
-              email: values.email,
-              role: values.role,
-              target: values.target,
-            }
-          : item,
-      ),
-    )
-    closeModal()
+    try {
+      const currentUser = session?.user
+      const deptType =
+        currentUser?.departmentType ||
+        (departmentId === 'google' ? 'GOOGLE_DEPARTMENT' : 'ONBOARDING_DEPARTMENT')
+
+      await updateDepartmentUser({
+        id: user.id,
+        username: (values.username || values.name || '').trim(),
+        email: (values.email || '').trim(),
+        password: values.password || undefined,
+        phoneNumber: values.phoneNumber || values.phone || undefined,
+        target: values.target || undefined,
+        role: values.role || 'DEPARTMENT_USER',
+        departmentType: deptType,
+        isHead: false,
+      })
+
+      // Refetch the infinite query so the updated user appears in the list
+      await departmentUsersQuery.refetch()
+      closeModal()
+    } catch (err: unknown) {
+      console.error('Failed to update department user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to update user'
+      alert(`Failed to update user: ${msg}`)
+    }
   }
 
-  function handleDelete(user: DepartmentUser) {
-    setLocalUsers(users.filter((item) => item.id !== user.id))
-    closeModal()
+  async function handleDelete(user: DepartmentUser) {
+    try {
+      await deleteDepartmentUser({
+        id: user.id,
+      })
+      await departmentUsersQuery.refetch()
+      closeModal()
+    } catch (err: unknown) {
+      console.error('Failed to delete department user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to delete user'
+      alert(`Failed to delete user: ${msg}`)
+    }
   }
 
   return (

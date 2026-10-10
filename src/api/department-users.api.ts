@@ -422,6 +422,96 @@ export async function createDepartmentUser(
   })
 }
 
+export interface UpdateDepartmentUserRequest {
+  id: string | number
+  username?: string
+  email?: string
+  password?: string
+  phoneNumber?: string
+  target?: number
+  departmentType?: string
+  role?: string
+  isHead?: boolean
+}
+
+export interface UpdateDepartmentUserResponse {
+  id: string
+  username: string
+  email: string
+  role: string
+  departmentType: string
+  createdAt: string
+  updatedAt: string
+  isHead: boolean
+  headUser: string
+}
+
+/**
+ * `PUT /api/auth/department/update?action=edit`
+ * Updates department user under a head.
+ */
+export async function updateDepartmentUser(
+  data: UpdateDepartmentUserRequest,
+): Promise<UpdateDepartmentUserResponse> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+  const rawDepartment = session?.user?.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google'))
+  const departmentType =
+    data.departmentType || (isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT'))
+
+  const body = {
+    ...data,
+    departmentType,
+    headUser: headEmail,
+  }
+
+  return authedApiRequest<any>('/api/auth/department/update?action=edit', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      username: headEmail,
+    },
+    body: JSON.stringify(body),
+  }).then((res) => {
+    if (res && res.success === false) {
+      throw new Error(res.message || 'Failed to update user')
+    }
+    return res.data || res
+  })
+}
+
+export interface DeleteDepartmentUserRequest {
+  id: string | number
+}
+
+/**
+ * `PUT /api/auth/department/update?action=delete`
+ * Deletes department user.
+ */
+export async function deleteDepartmentUser(
+  data: DeleteDepartmentUserRequest,
+): Promise<any> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+
+  return authedApiRequest<any>('/api/auth/department/update?action=delete', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      username: headEmail,
+    },
+    body: JSON.stringify(data),
+  }).then((res) => {
+    if (res && res.success === false) {
+      throw new Error(res.message || 'Failed to delete user')
+    }
+    return res.data || res
+  })
+}
+
 export interface AssignCustomerRequest {
   customerId: number | string
   assignedUserEmail: string

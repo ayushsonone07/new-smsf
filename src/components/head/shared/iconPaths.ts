@@ -54,6 +54,7 @@ export const ICON_PATHS = {
   link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
   copy: 'M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-4-4h-6zM14 4v4h4M10 12h4M10 16h4',
   shuffle: 'M2 18h1.4c1.3 0 2.5-.6 3.3-1.6l7.1-8.8c.8-1 2-1.6 3.3-1.6H22M18 2l4 4-4 4M18 22l4-4-4-4',
+  messageSquare: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
 } as const
 
 export type IconName = keyof typeof ICON_PATHS

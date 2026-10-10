@@ -293,29 +293,47 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>#</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Customer Name</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Phone</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Service</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Phase</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Assigned To</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Date</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Customer</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Assigned To</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Phase</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service Status</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Timeline</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Remarks</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Record</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historyItems.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
                           No task history records found
                         </td>
                       </tr>
                     ) : (
                       historyItems.map((item, index) => {
-                        const rowNum = page * pageSize + index + 1
-                        const status = (item.status || item.serviceStatus || 'ACTIVE').toUpperCase()
-                        const tone =
-                          status === 'COMPLETED' ? 'success' : status === 'ACTIVE' ? 'info' : 'warning'
+                        const serviceStatus = (item.serviceStatus || 'ACTIVE').toUpperCase()
+                        const status = (item.status || 'Pending')
+                        
+                        const assignedDateStr = (item.assignedAt || item.createdAt || item.startedAt)
+                          ? new Date(item.assignedAt || item.createdAt || item.startedAt || '').toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : null
+
+                        const endedDateStr = item.endedAt
+                          ? new Date(item.endedAt).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : null
+
+                        const isPendingStatus = status.toLowerCase() === 'pending'
+                        const isCompletedStatus = status.toLowerCase() === 'completed' || status.toLowerCase() === 'done'
 
                         return (
                           <tr
@@ -325,35 +343,79 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                               transition: 'background 0.15s',
                             }}
                           >
-                            <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{rowNum}</td>
                             <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
                               {item.customerName || '—'}
                             </td>
                             <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.customerPhone || item.contact || '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.departmentServiceName || item.serviceType || '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.phaseName || '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
                               {item.assignedTo || item.username || item.departmentUserFilter || '—'}
                             </td>
+                            <td style={{ padding: '10px 12px', color: '#475569' }}>
+                              {item.departmentServiceName || item.serviceType || 'ONBOARDING CUSTOMER'}
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#475569' }}>
+                              {item.phaseName || 'Default'}
+                            </td>
                             <td style={{ padding: '10px 12px' }}>
-                              <Pill tone={tone} size="sm">
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '4px 10px',
+                                borderRadius: '9999px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' ? '#3b82f6' : serviceStatus === 'COMPLETED' ? '#10b981' : '#e2e8f0',
+                                color: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' || serviceStatus === 'COMPLETED' ? '#ffffff' : '#475569',
+                                textTransform: 'uppercase'
+                              }}>
+                                {serviceStatus}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '9999px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                border: `1px solid ${isPendingStatus ? '#fde047' : isCompletedStatus ? '#86efac' : '#cbd5e1'}`,
+                                background: isPendingStatus ? '#fef9c3' : isCompletedStatus ? '#dcfce3' : '#f1f5f9',
+                                color: isPendingStatus ? '#ca8a04' : isCompletedStatus ? '#16a34a' : '#475569',
+                                textTransform: 'capitalize'
+                              }}>
+                                {isPendingStatus && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 22h14" />
+                                    <path d="M5 2h14" />
+                                    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+                                    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+                                  </svg>
+                                )}
+                                {!isPendingStatus && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
                                 {status}
-                              </Pill>
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '12px' }}>
+                              {assignedDateStr && <div>Assigned {assignedDateStr}</div>}
+                              {endedDateStr && <div style={{ color: '#16a34a', marginTop: 2 }}>Ended {endedDateStr}</div>}
+                              {!assignedDateStr && !endedDateStr && '—'}
                             </td>
                             <td style={{ padding: '10px 12px', color: '#64748b' }}>
-                              {(item.assignedAt || item.createdAt || item.startedAt)
-                                ? new Date(item.assignedAt || item.createdAt || item.startedAt || '').toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })
-                                : '—'}
+                              {item.remarks || 'Assigned manually'}
+                            </td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <a href="#" style={{ color: '#3b82f6', display: 'inline-flex', alignItems: 'center' }} onClick={(e) => e.preventDefault()}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                  <polyline points="15 3 21 3 21 9"></polyline>
+                                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                              </a>
                             </td>
                           </tr>
                         )
