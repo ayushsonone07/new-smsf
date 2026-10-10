@@ -265,20 +265,48 @@ export async function getDepartmentCustomerRows(params: {
   if (params.startDate) search.set('startDate', params.startDate)
   if (params.endDate) search.set('endDate', params.endDate)
 
-  const res = await authedApiRequest<
-    CustomPageResponseRaw<DepartmentCustomerRowItem> & CustomApiResponseRaw<DepartmentCustomerRowItem[]>
-  >(`/api/auth/department/customer/rows?${search.toString()}`)
+  const res = await authedApiRequest<any>(
+    `/api/auth/department/customer/rows?${search.toString()}`,
+  )
 
-  const items = Array.isArray(res?.data)
-    ? res.data
-    : Array.isArray(res?.customers)
-      ? res.customers
-      : []
+  const items: DepartmentCustomerRowItem[] = Array.isArray(res)
+    ? res
+    : Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+        ? res.data.data
+        : Array.isArray(res?.data?.content)
+          ? res.data.content
+          : Array.isArray(res?.content)
+            ? res.content
+            : Array.isArray(res?.customers)
+              ? res.customers
+              : Array.isArray(res?.data?.customers)
+                ? res.data.customers
+                : Array.isArray(res?.rows)
+                  ? res.rows
+                  : Array.isArray(res?.data?.rows)
+                    ? res.data.rows
+                    : []
+
+  const total =
+    res?.totalElements ??
+    res?.total ??
+    res?.data?.totalElements ??
+    res?.data?.total ??
+    items.length
+
+  const totalPage =
+    res?.totalPage ??
+    res?.totalPages ??
+    res?.data?.totalPage ??
+    res?.data?.totalPages ??
+    Math.max(1, Math.ceil(total / (params.size ?? 10)))
 
   return {
     customers: items,
-    totalElements: res?.totalElements ?? items.length,
-    totalPage: res?.totalPage ?? 1,
-    pageNumber: res?.pageNumber ?? (params.page ?? 0),
+    totalElements: total,
+    totalPage,
+    pageNumber: res?.pageNumber ?? res?.data?.pageNumber ?? (params.page ?? 0),
   }
 }

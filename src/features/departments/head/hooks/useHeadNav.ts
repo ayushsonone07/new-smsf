@@ -62,6 +62,30 @@ export function useHeadNav(departmentId: string) {
   const routePerms = useDepartmentRoutePermissions(session?.user.departmentType)
 
   const features = useMemo<FeaturePermission[]>(() => {
+    if (isGoogle) {
+      return GOOGLE_HEAD_SCREENS.map((item, index) => {
+        const existing = (query.data ?? []).find(
+          (f) => f.slug === item.slug || f.screen === item.screen,
+        )
+        return {
+          id: existing?.id ?? `google-feat-${item.slug}`,
+          departmentId,
+          name: item.label,
+          description: existing?.description ?? item.label,
+          enabled: true,
+          userVisible: true,
+          roleAPermission: existing?.roleAPermission ?? 'CAN_EDIT',
+          roleBPermission: existing?.roleBPermission ?? 'CAN_READ',
+          screen: item.screen,
+          slug: item.slug,
+          icon: item.icon,
+          order: index,
+          category: 'screens',
+          kind: 'screen',
+        }
+      })
+    }
+
     if (isUser) {
       return DEPARTMENT_USER_SCREENS
         .filter(
@@ -92,36 +116,6 @@ export function useHeadNav(departmentId: string) {
         })
     }
 
-    if (isGoogle) {
-      return GOOGLE_HEAD_SCREENS
-        .filter(
-          (item) =>
-            routePerms.isRouteEnabled(item.slug) &&
-            routePerms.isRouteEnabled(buildGoogleRoute(item.slug, role)),
-        )
-        .map((item, index) => {
-          const existing = (query.data ?? []).find(
-            (f) => f.slug === item.slug || f.screen === item.screen,
-          )
-          return {
-            id: existing?.id ?? `google-feat-${item.slug}`,
-            departmentId,
-            name: item.label,
-            description: existing?.description ?? item.label,
-            enabled: true,
-            userVisible: true,
-            roleAPermission: existing?.roleAPermission ?? 'CAN_EDIT',
-            roleBPermission: existing?.roleBPermission ?? 'CAN_READ',
-            screen: item.screen,
-            slug: item.slug,
-            icon: item.icon,
-            order: index,
-            category: 'screens',
-            kind: 'screen',
-          }
-        })
-    }
-
     return (query.data ?? [])
       .filter(
         (feature) =>
@@ -131,9 +125,18 @@ export function useHeadNav(departmentId: string) {
           routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
       )
       .sort((a, b) => a.order - b.order)
-  }, [isUser, isGoogle, query.data, departmentId, role, routePerms])
+  }, [isGoogle, isUser, query.data, departmentId, role, routePerms])
 
   const items = useMemo<HeadNavItem[]>(() => {
+    if (isGoogle) {
+      return GOOGLE_HEAD_SCREENS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        icon: item.icon,
+        to: buildGoogleRoute(item.slug, role),
+      }))
+    }
+
     if (isUser) {
       return DEPARTMENT_USER_SCREENS
         .filter(
@@ -151,21 +154,6 @@ export function useHeadNav(departmentId: string) {
         }))
     }
 
-    if (isGoogle) {
-      return GOOGLE_HEAD_SCREENS
-        .filter(
-          (item) =>
-            routePerms.isRouteEnabled(item.slug) &&
-            routePerms.isRouteEnabled(buildGoogleRoute(item.slug, role)),
-        )
-        .map((item) => ({
-          key: item.key,
-          label: item.label,
-          icon: item.icon,
-          to: buildGoogleRoute(item.slug, role),
-        }))
-    }
-
     return features.map((feature) => ({
       key: feature.slug,
       label: feature.name,
@@ -174,11 +162,11 @@ export function useHeadNav(departmentId: string) {
         ? buildOnboardingRoute(feature.slug, role)
         : `${basePath}/${feature.slug}`,
     }))
-  }, [isUser, isGoogle, features, basePath, isOnboarding, role, routePerms])
+  }, [isGoogle, isUser, features, basePath, isOnboarding, role, routePerms])
 
   const bySlug = (slug: string): FeaturePermission | undefined => {
     const s = slug === 'customer-list' ? 'customers' : slug
-    if (!routePerms.isRouteEnabled(s)) {
+    if (!isGoogle && !routePerms.isRouteEnabled(s)) {
       return undefined
     }
     const found = features.find(
@@ -232,12 +220,17 @@ export function useHeadNav(departmentId: string) {
     return undefined
   }
 
+  const isRouteEnabled = (slugOrPath: string): boolean => {
+    if (isGoogle) return true
+    return routePerms.isRouteEnabled(slugOrPath)
+  }
+
   return {
     ...query,
     features,
     items,
     bySlug,
-    isRouteEnabled: routePerms.isRouteEnabled,
+    isRouteEnabled,
     routesQuery: routePerms,
   }
 }

@@ -9,6 +9,7 @@ export interface DepartmentRoutePermissionsResult {
   isPending: boolean
   isError: boolean
   isRouteEnabled: (slugOrPathOrName: string) => boolean
+  isMasterDisabled: (slugOrPathOrName: string) => boolean
   refetch: () => unknown
 }
 
@@ -17,6 +18,7 @@ function normalizeRouteSegment(str: string): string {
   return str
     .toLowerCase()
     .trim()
+    .replace(/[\s_]+/g, '-')
     .replace(/^(\/|#)+/, '')
     .replace(/\/+$/, '')
 }
@@ -69,8 +71,10 @@ export function isRouteMatch(route: DynamicRouteResponse, target: string): boole
 
   // 2. Slug aliases
   if (
-    (tNorm === 'customer-list' && nameNorm === 'customers') ||
-    (tNorm === 'customers' && nameNorm === 'customer-list') ||
+    ((tNorm === 'customer-list' || tNorm === 'google-head/customer-list' || tNorm === 'google-head/customers') &&
+      (nameNorm === 'customers' || nameNorm === 'customer-list')) ||
+    ((tNorm === 'customers' || tNorm === 'customer-list') &&
+      (nameNorm === 'customers' || nameNorm === 'customer-list')) ||
     (tNorm === 'department-user' && (nameNorm === 'users' || nameNorm === 'department-users')) ||
     (tNorm === 'users' && (nameNorm === 'department-user' || nameNorm === 'department-users')) ||
     (tNorm === 'member-flow' && (nameNorm === 'member-performance' || nameNorm === 'members-performance')) ||
@@ -128,6 +132,20 @@ export function useDepartmentRoutePermissions(
   const query = useDynamicRoutes(dept)
   const routes = query.data ?? []
 
+  const isMasterDisabled = useCallback(
+    (slugOrPathOrName: string): boolean => {
+      if (!slugOrPathOrName || routes.length === 0) return false
+      const matching = routes.find((r) => isRouteMatch(r, slugOrPathOrName))
+      if (matching) {
+        if (matching.visibility === false || (matching.visibility as unknown) === 0) return true
+        if (isHead && (matching.enableHead === false || (matching.enableHead as unknown) === 0)) return true
+        if (!isHead && (matching.enableUser === false || (matching.enableUser as unknown) === 0)) return true
+      }
+      return false
+    },
+    [routes, isHead],
+  )
+
   const isRouteEnabled = useCallback(
     (slugOrPathOrName: string): boolean => {
       if (!slugOrPathOrName) return false
@@ -137,12 +155,12 @@ export function useDepartmentRoutePermissions(
       const matching = routes.find((r) => isRouteMatch(r, slugOrPathOrName))
       if (matching) {
         // If master visibility is false/0, route is completely disabled
-        if (matching.visibility === false) return false
+        if (matching.visibility === false || (matching.visibility as unknown) === 0) return false
 
-        // Check role-specific enable flag
+        // Check role-specific enable flag: allowed by default unless explicitly disabled with false/0
         return isHead
-          ? Boolean(matching.enableHead ?? matching.visibility ?? false)
-          : Boolean(matching.enableUser ?? matching.visibility ?? false)
+          ? matching.enableHead !== false && (matching.enableHead as unknown) !== 0
+          : matching.enableUser !== false && (matching.enableUser as unknown) !== 0
       }
 
       // If route not explicitly configured in DB, allow display
@@ -157,6 +175,7 @@ export function useDepartmentRoutePermissions(
     isPending: query.isPending,
     isError: query.isError,
     isRouteEnabled,
+    isMasterDisabled,
     refetch: query.refetch,
   }
 }

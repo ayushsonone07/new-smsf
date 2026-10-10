@@ -21,8 +21,17 @@ export function buildOnboardingRoute(slug: string, role?: string): string {
 }
 
 export function isUserGoogle(departmentType?: string | null): boolean {
-  if (!departmentType) return false
-  return departmentType.toUpperCase().includes('GOOGLE')
+  if (departmentType && departmentType.toUpperCase().includes('GOOGLE')) {
+    return true
+  }
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/google-head') ||
+     window.location.pathname.startsWith('/google'))
+  ) {
+    return true
+  }
+  return false
 }
 
 export function buildGoogleRoute(slug: string, _role?: string): string {

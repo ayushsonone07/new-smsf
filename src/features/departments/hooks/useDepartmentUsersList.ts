@@ -26,26 +26,34 @@ export function useDepartmentUsersList(params: {
   })
 }
 
-export function useOnboardingCustomersList(params: {
-  page?: number
-  size?: number
-  searchParam?: string
-  startDate?: string
-  endDate?: string
-  status?: string
-  filteredUser?: string
-} = {}) {
+export function useOnboardingCustomersList(
+  params: {
+    page?: number
+    size?: number
+    searchParam?: string
+    startDate?: string
+    endDate?: string
+    status?: string
+    filteredUser?: string
+  } = {},
+  options?: { enabled?: boolean },
+) {
   return useQuery<OnboardedCustomersPageResponse>({
     queryKey: ['onboarding-customers-list', params],
     queryFn: () => getOnboardingCustomers(params),
+    enabled: options?.enabled ?? true,
     staleTime: 30_000,
   })
 }
 
-export function useAuthOnboardingSummary(params: AuthOnboardingSummaryParams = {}) {
+export function useAuthOnboardingSummary(
+  params: AuthOnboardingSummaryParams = {},
+  options?: { enabled?: boolean },
+) {
   return useQuery<AuthOnboardingSummary>({
     queryKey: ['auth-onboarding-summary', params],
     queryFn: () => getAuthOnboardingSummary(params),
+    enabled: options?.enabled ?? true,
     staleTime: 30_000,
   })
 }

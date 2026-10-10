@@ -36,9 +36,12 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   }
 
   const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
+  const isGoogle =
+    location.pathname.startsWith('/google-head') ||
+    location.pathname.startsWith('/google')
 
   // Block display if route visibility is 0 or route is disabled
-  if (targetSlug && (!nav.isRouteEnabled(targetSlug) || !nav.isRouteEnabled(location.pathname))) {
+  if (!isGoogle && targetSlug && (!nav.isRouteEnabled(targetSlug) || !nav.isRouteEnabled(location.pathname))) {
     return (
       <ErrorState
         title="Page not available"

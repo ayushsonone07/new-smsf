@@ -43,7 +43,14 @@ const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
  */
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
-  const customersQuery = useDepartmentCustomers(departmentId)
+  const session = getSession()
+  const rawDepartment = session?.user.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google-head'))
+  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT')
+
+  const customersQuery = useDepartmentCustomers(departmentId, { enabled: !isGoogle })
   const updateMutation = useUpdateCustomer(departmentId)
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
@@ -61,7 +68,7 @@ export function CustomerListPage() {
   const canEdit = columnFeatures.canEdit('actions')
 
   const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+    useDepartmentColumnPermissions(currentDepartment)
   const isStatusVisible = isColumnEnabled('Status')
   const canEditStatus = canEditColumn('Status')
 
@@ -99,10 +106,6 @@ export function CustomerListPage() {
     }
   }, [isStatusVisible, activeTab])
 
-  const session = getSession()
-  const currentDepartment =
-    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
-  const isGoogle = currentDepartment.toUpperCase().includes('GOOGLE')
   const isUser = session?.user?.role === 'USER'
   const userEmail = session?.user?.email || session?.user?.username || ''
 
@@ -158,27 +161,33 @@ export function CustomerListPage() {
   }
 
   // 2. Summary counts: /api/auth/onboarding/summary (for onboarding)
-  const authSummaryQuery = useAuthOnboardingSummary({
-    department: currentDepartment,
-    startDate: dateFrom || undefined,
-    endDate: dateTo || undefined,
-    allTime: !dateFrom && !dateTo,
-  })
+  const authSummaryQuery = useAuthOnboardingSummary(
+    {
+      department: currentDepartment,
+      startDate: dateFrom || undefined,
+      endDate: dateTo || undefined,
+      allTime: !dateFrom && !dateTo,
+    },
+    { enabled: !isGoogle },
+  )
 
   // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
-  const onboardingApiQuery = useOnboardingCustomersList({
-    page,
-    size,
-    searchParam: search || undefined,
-    startDate: dateFrom || undefined,
-    endDate: dateTo || undefined,
-    status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
-    filteredUser: isUser
-      ? userEmail
-      : selectedAssigneeId !== 'all'
-        ? selectedAssigneeId ?? undefined
-        : undefined,
-  })
+  const onboardingApiQuery = useOnboardingCustomersList(
+    {
+      page,
+      size,
+      searchParam: search || undefined,
+      startDate: dateFrom || undefined,
+      endDate: dateTo || undefined,
+      status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+      filteredUser: isUser
+        ? userEmail
+        : selectedAssigneeId !== 'all'
+          ? selectedAssigneeId ?? undefined
+          : undefined,
+    },
+    { enabled: !isGoogle },
+  )
 
   // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
   const googleCustomerRowsQuery = useDepartmentCustomerRows(
@@ -203,51 +212,49 @@ export function CustomerListPage() {
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
     if (isGoogle) {
       const rows = googleCustomerRowsQuery.data?.customers ?? []
-      if (rows.length > 0) {
-        return rows.map((c, index) => {
-          const id = String(c.id ?? c.customerId ?? `c-${index}`)
-          const bName =
-            c.businessName ||
-            c.customerDetails?.businessName ||
-            c.customerDetails?.ownerName ||
-            c.ownerName ||
-            'Customer'
-          const cName =
-            c.ownerName ||
-            c.customerDetails?.ownerName ||
-            c.customerDetails?.businessName ||
-            'Customer'
-          const email = c.email || c.customerDetails?.email || ''
-          const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
-          const s = (c.status || c.onboardingStatus || 'pending').toLowerCase()
-          const status = s.includes('complete')
-            ? 'completed'
-            : s.includes('progress') || s === 'active'
-              ? 'in-progress'
-              : 'pending'
+      return rows.map((c, index) => {
+        const id = String(c.id ?? c.customerId ?? `c-${index}`)
+        const bName =
+          c.businessName ||
+          c.customerDetails?.businessName ||
+          c.customerDetails?.ownerName ||
+          c.ownerName ||
+          'Customer'
+        const cName =
+          c.ownerName ||
+          c.customerDetails?.ownerName ||
+          c.customerDetails?.businessName ||
+          'Customer'
+        const email = c.email || c.customerDetails?.email || ''
+        const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
+        const s = (c.status || c.onboardingStatus || 'pending').toLowerCase()
+        const status = s.includes('complete')
+          ? 'completed'
+          : s.includes('progress') || s === 'active'
+            ? 'in-progress'
+            : 'pending'
 
-          return {
-            id,
-            rowIndex: index + 1,
-            businessName: bName,
-            contactName: cName,
-            contactDate: c.createdAt
-              ? new Date(c.createdAt).toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })
-              : 'Recent',
-            email,
-            phone,
-            callStatus: 'connected',
-            status,
-            assigneeId: c.assignedUserEmail ?? null,
-            remark: c.remark ?? '',
-            updatedLabel: 'Just now',
-          }
-        })
-      }
+        return {
+          id,
+          rowIndex: index + 1,
+          businessName: bName,
+          contactName: cName,
+          contactDate: c.createdAt
+            ? new Date(c.createdAt).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })
+            : 'Recent',
+          email,
+          phone,
+          callStatus: 'connected',
+          status,
+          assigneeId: c.assignedUserEmail ?? null,
+          remark: c.remark ?? '',
+          updatedLabel: 'Just now',
+        }
+      })
     }
 
     const apiCustomers = onboardingApiQuery.data?.customers
@@ -383,22 +390,30 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
 
-  if (customersQuery.isPending && activeCustomerQuery.isPending) {
+  const isLoading = isGoogle
+    ? activeCustomerQuery.isPending
+    : customersQuery.isPending && activeCustomerQuery.isPending
+
+  if (isLoading) {
     return <LoadingState message="Loading customers..." />
   }
 
-  if (customersQuery.isError && activeCustomerQuery.isError) {
+  const isError = isGoogle
+    ? activeCustomerQuery.isError
+    : customersQuery.isError && activeCustomerQuery.isError
+
+  if (isError) {
     return (
       <ErrorState
         title="Unable to load customers"
         message={
-          customersQuery.error?.message ||
           activeCustomerQuery.error?.message ||
+          customersQuery.error?.message ||
           'Failed to load'
         }
         onRetry={() => {
-          customersQuery.refetch()
           activeCustomerQuery.refetch()
+          if (!isGoogle) customersQuery.refetch()
         }}
       />
     )
@@ -456,25 +471,25 @@ export function CustomerListPage() {
       />
 
       {/* Pagination */}
-      {onboardingApiQuery.data && onboardingApiQuery.data.totalPage > 1 && (
+      {activeCustomerQuery.data && activeCustomerQuery.data.totalPage > 1 && (
         <div className="clist-pagination">
           <button
             className="clist-page-btn"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0 || onboardingApiQuery.isFetching}
+            disabled={page === 0 || activeCustomerQuery.isFetching}
           >
             Previous
           </button>
           <span className="clist-page-info">
-            Page {page + 1} of {onboardingApiQuery.data.totalPage}
-            {onboardingApiQuery.data.totalElements !== undefined && (
-              <span> · {onboardingApiQuery.data.totalElements} total</span>
+            Page {page + 1} of {activeCustomerQuery.data.totalPage}
+            {activeCustomerQuery.data.totalElements !== undefined && (
+              <span> · {activeCustomerQuery.data.totalElements} total</span>
             )}
           </span>
           <button
             className="clist-page-btn"
-            onClick={() => setPage((p) => Math.min(onboardingApiQuery.data.totalPage - 1, p + 1))}
-            disabled={page >= onboardingApiQuery.data.totalPage - 1 || onboardingApiQuery.isFetching}
+            onClick={() => setPage((p) => Math.min(activeCustomerQuery.data.totalPage - 1, p + 1))}
+            disabled={page >= activeCustomerQuery.data.totalPage - 1 || activeCustomerQuery.isFetching}
           >
             Next
           </button>
