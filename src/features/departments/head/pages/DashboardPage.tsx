@@ -22,6 +22,9 @@ import {
 } from '../../../../components/head/dashboard/TopPerformers'
 import { MemberDetailsModal } from '../../../../components/head/dashboard/MemberDetailsModal'
 import '../../../../components/head/dashboard/Dashboard.css'
+import { LoadingState } from '../../../../components/ui/LoadingState'
+import { ErrorState } from '../../../../components/ui/ErrorState'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
@@ -203,7 +206,7 @@ function HeadDashboard() {
 
   const membersQuery = useOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
-  const { isColumnEnabled, refetch: refetchPermissions } =
+  const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
   function handleRefresh() {
@@ -212,6 +215,7 @@ function HeadDashboard() {
     membersQuery.refetch()
     assigningUsersQuery.refetch()
     authSummaryQuery.refetch()
+    refetchPermissions()
   }
 
   const authKpis = authSummaryQuery.data
@@ -302,7 +306,7 @@ function HeadDashboard() {
         }
       })
     }
-    return MOCK_TEAM_MEMBERS
+    return []
   }, [membersQuery.data?.teamMembers, authSummaryQuery.data?.teamMembers])
 
   const topPerformers = useMemo<TopPerformerItem[]>(() => {
@@ -316,14 +320,6 @@ function HeadDashboard() {
     }))
   }, [teamMembers])
 
-  function handleRefresh() {
-    setRefreshKey((k) => k + 1)
-    summaryQuery.refetch()
-    membersQuery.refetch()
-    assigningUsersQuery.refetch()
-    refetchPermissions()
-  }
-
   if (summaryQuery.isPending || membersQuery.isPending) {
     return <LoadingState message="Loading dashboard..." />
   }
@@ -336,47 +332,6 @@ function HeadDashboard() {
         onRetry={handleRefresh}
       />
     )
-  }
-
-  const kpis = summaryQuery.data?.kpis
-  const statsData: Partial<DashboardStatsData> = {
-    totalCustomers: {
-      value: num(kpis?.totalCustomers ?? 0),
-      growth: '',
-      sub: `${num(kpis?.totalCustomers ?? 0)} total customers`,
-    },
-    onboarded: {
-      value: num(kpis?.totalOnboarded ?? 0),
-      sub: `${Math.round(
-        ((kpis?.totalOnboarded ?? 0) / (kpis?.totalCustomers || 1)) * 100,
-      )}% of all customers`,
-    },
-    completed: {
-      value: num(kpis?.totalCompleted ?? 0),
-      growth: '',
-      sub: 'Completed customers',
-    },
-    inProgress: {
-      value: num(kpis?.totalInProgress ?? 0),
-      sub: 'Currently processing',
-    },
-    pending: {
-      value: num(kpis?.totalPending ?? 0),
-      sub: 'Awaiting processing',
-    },
-    delayed: {
-      value: num(kpis?.totalDelayed ?? 0),
-      growth: '',
-      sub: 'Needs follow-up',
-    },
-    presentUsers: {
-      value: num(kpis?.presentUsers ?? 0),
-      sub: 'Active today',
-    },
-    absentUsers: {
-      value: num(kpis?.absentUsers ?? 0),
-      sub: 'Not active today',
-    },
   }
 
   const activeDays = summaryQuery.data?.mostActiveDay?.map((d) => ({
