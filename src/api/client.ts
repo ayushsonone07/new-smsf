@@ -3,6 +3,9 @@ import { getSession } from '../app/auth/session'
 const API_BASE_URL = 
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002'
 
+/** Use relative URLs in development so Vite proxy handles CORS. */
+const USE_RELATIVE_API_URL = import.meta.env.DEV
+
 interface ApiErrorResponse {
   message?: string
   error?: string
@@ -42,7 +45,9 @@ export async function apiRequest<T>(
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const url = endpoint.startsWith('http')
     ? endpoint
-    : `${API_BASE_URL}${normalizedEndpoint}`
+    : USE_RELATIVE_API_URL
+      ? normalizedEndpoint
+      : `${API_BASE_URL}${normalizedEndpoint}`
   const response = await fetch(url, {
     ...options,
     headers: {

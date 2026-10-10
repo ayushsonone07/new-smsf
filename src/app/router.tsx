@@ -33,6 +33,9 @@ import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
 import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
 import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
+import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage'
+import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
+import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -173,6 +176,34 @@ const userScreenRoute = createRoute({
   getParentRoute: () => userLayoutRoute,
   path: '/users/$screen',
   component: HeadScreenPage,
+})
+
+const customerLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_customers',
+  component: () => (
+    <div className="cust-layout">
+      <Outlet />
+    </div>
+  ),
+})
+
+const customerLoginRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/login',
+  component: CustomerLoginPage,
+})
+
+const customerDashboardRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers',
+  component: CustomerDashboardPage,
+})
+
+const customerDetailsRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/details',
+  component: CustomerDetailsPage,
 })
 
 const forbiddenRoute = createRoute({
@@ -362,6 +393,11 @@ const routeTree = rootRoute.addChildren([
     accessTokensRoute,
     fetchRcRoute,
     forbiddenRoute,
+  ]),
+  customerLayoutRoute.addChildren([
+    customerLoginRoute,
+    customerDashboardRoute,
+    customerDetailsRoute,
   ]),
   departmentDashboardRoute,
   departmentCustomersRoute,

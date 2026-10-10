@@ -53,35 +53,35 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
   };
 
   return (
-    <div className={cn("w-full max-w-[600px] bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]", className)}>
+    <div className={cn("w-full max-w-[560px] bg-white rounded-2xl p-4 border border-gray-100 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)]", className)}>
       
       {/* --- Header --- */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 bg-[#eef2ff] rounded-xl">
-            <CalendarIcon className="w-5 h-5 text-[#4f46e5]" />
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-8 h-8 bg-[#eef2ff] rounded-lg">
+            <CalendarIcon className="w-4 h-4 text-[#4f46e5]" />
           </div>
-          <h2 className="text-[19px] font-bold text-gray-900">
+          <h2 className="text-[16px] font-bold text-gray-900">
             {monthName} {year}
           </h2>
         </div>
-        <span className="text-[14px] text-gray-400 font-medium">Sundays off</span>
+        <span className="text-[12px] text-gray-400 font-medium">Sundays off</span>
       </div>
 
       {/* --- Weekday Headers --- */}
-      <div className="grid grid-cols-7 gap-2 mb-3">
+      <div className="grid grid-cols-7 gap-1 mb-2">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-          <div key={day} className="text-center text-[13px] font-semibold text-gray-400">
+          <div key={day} className="text-center text-[11px] font-semibold text-gray-400">
             {day}
           </div>
         ))}
       </div>
 
       {/* --- Calendar Grid --- */}
-      <div className="grid grid-cols-7 gap-2 mb-8">
+      <div className="grid grid-cols-7 gap-1 mb-6">
         {/* Empty slots for days before the 1st */}
         {emptySlots.map((slot) => (
-          <div key={`empty-${slot}`} className="h-12 rounded-xl" />
+          <div key={`empty-${slot}`} className="h-9 rounded-lg" />
         ))}
 
         {/* Actual days */}
@@ -93,13 +93,13 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
             <div
               key={day}
               className={cn(
-                "h-12 flex items-center justify-center rounded-xl text-[15px] font-medium transition-all cursor-pointer",
+                "h-9 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all cursor-pointer",
                 // Status Styles
                 status === 'present' && "bg-[#e8f5e9] text-[#2e7d32]",
                 status === 'absent' && "bg-[#fde8e8] text-[#c62828]",
                 status === 'off' && "bg-[#f8f9fa] text-gray-400",
                 // Today Override
-                isToday && "border-[2.5px] border-[#2563eb] bg-transparent text-gray-900 font-bold"
+                isToday && "border-2 border-[#2563eb] bg-transparent text-gray-900 font-bold"
               )}
             >
               {day}
@@ -109,18 +109,18 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
       </div>
 
       {/* --- Legend --- */}
-      <div className="flex items-center gap-6 pt-2">
-        <div className="flex items-center gap-2">
-          <div className="w-[18px] h-[18px] rounded-[5px] border border-[#a5d6a7] bg-[#e8f5e9]" />
-          <span className="text-[13px] text-gray-500">Present</span>
+      <div className="flex items-center gap-4 pt-1">
+        <div className="flex items-center gap-1.5">
+          <div className="w-[14px] h-[14px] rounded-[4px] border border-[#a5d6a7] bg-[#e8f5e9]" />
+          <span className="text-[11px] text-gray-500">Present</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-[18px] h-[18px] rounded-[5px] border border-[#ef9a9a] bg-[#fde8e8]" />
-          <span className="text-[13px] text-gray-500">Absent</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-[14px] h-[14px] rounded-[4px] border border-[#ef9a9a] bg-[#fde8e8]" />
+          <span className="text-[11px] text-gray-500">Absent</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-[18px] h-[18px] rounded-[5px] border-[2px] border-[#2563eb] bg-transparent" />
-          <span className="text-[13px] text-gray-500">Today</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-[14px] h-[14px] rounded-[4px] border-2 border-[#2563eb] bg-transparent" />
+          <span className="text-[11px] text-gray-500">Today</span>
         </div>
       </div>
 

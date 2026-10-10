@@ -1,14 +1,14 @@
 .sop-modal__title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .sop-modal__icon-wrapper {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   background: var(--head-blue-soft);
   color: var(--head-blue);
   flex-shrink: 0;
@@ -18,49 +18,49 @@
 }
 .sop-modal__title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--head-text);
 }
 .sop-modal__subtitle {
   margin: 2px 0 0;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--head-muted);
 }
 .sop-modal__body {
-  padding: 8px 4px 16px;
+  padding: 6px 4px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .sop-modal__error {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #fecaca;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fef2f2;
   color: #b91c1c;
-  font-size: 13px;
+  font-size: 12px;
 }
 .sop-modal__steps {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 .sop-step-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 .sop-step-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   border: 1px solid var(--head-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--head-blue-soft);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -72,24 +72,24 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--head-blue);
   color: #fff;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
 .sop-step-row__input {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fff;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--head-text);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -104,16 +104,16 @@
 .sop-step-row__actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
 }
 .sop-step-row__action-btn {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--head-muted);
   cursor: pointer;
@@ -153,15 +153,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding: 10px 16px;
+  gap: 6px;
+  margin-top: 3px;
+  padding: 8px 12px;
   border: 1px dashed var(--head-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
   color: var(--head-blue);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -180,29 +180,29 @@
   cursor: not-allowed;
 }
 .sop-modal__max-steps {
-  margin-top: 4px;
-  padding-left: 40px;
-  font-size: 13px;
+  margin-top: 3px;
+  padding-left: 32px;
+  font-size: 12px;
   color: var(--head-muted);
 }
 .sop-modal__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 12px;
+  gap: 8px;
+  padding-top: 10px;
   border-top: 1px solid var(--head-border);
-  margin-top: 4px;
+  margin-top: 3px;
 }
 .sop-modal__cancel-btn {
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 15px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
 }
 .sop-modal__save-btn {
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 15px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
 }
 

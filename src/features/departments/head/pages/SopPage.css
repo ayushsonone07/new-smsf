@@ -5,13 +5,13 @@
 .sop-page__header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: 4px;
+  margin-bottom: 12px;
 }
 
 .sop-page__title {
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--head-text);
   letter-spacing: -0.02em;
@@ -19,44 +19,48 @@
 
 .sop-page__description {
   margin: 0;
-  font-size: 15px;
+  font-size: 12.5px;
   color: var(--head-muted);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .sop-page__search {
   width: 100%;
   max-width: 100%;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-/* Make the shared SearchBar more compact for SOP page */
-.sop-page__search .head-search {
-  padding: 0 14px;
-  height: 44px;
-  border-radius: 12px;
+/* Make the shared SearchBar more compact for SOP page.
+   The page class is applied to the SearchBar root itself,
+   so these must be compound selectors (.x.head-search),
+   not descendant selectors. */
+.sop-page__search.head-search {
+  flex: none;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: 9px;
   border-color: var(--head-border);
   background: #fff;
 }
 
 .sop-page__search .head-search__icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--head-muted);
 }
 
-.sop-page__search .head-search input {
-  padding: 10px 0;
-  font-size: 15px;
+.sop-page__search.head-search input {
+  padding: 8px 0;
+  font-size: 14px;
   font-weight: 400;
 }
 
-.sop-page__search .head-search input::placeholder {
+.sop-page__search.head-search input::placeholder {
   color: var(--head-muted);
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.sop-page__search .head-search:focus-within {
+.sop-page__search.head-search:focus-within {
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgb(29 78 216 / 10%);
 }
@@ -64,7 +68,7 @@
 .sop-page__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 @media (max-width: 900px) {
@@ -80,10 +84,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 60px 20px;
+  gap: 10px;
+  padding: 48px 16px;
   color: var(--head-muted);
-  font-size: 15px;
+  font-size: 13.5px;
   text-align: center;
 }
 
@@ -97,7 +101,7 @@
 
 .sop-card {
   border: 1px solid var(--head-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
   overflow: hidden;
@@ -118,17 +122,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px 10px;
+  gap: 10px;
+  padding: 12px 14px 8px;
 }
 
 .sop-card__icon-wrapper {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--head-blue-soft);
   color: var(--head-blue);
 }
@@ -147,7 +151,7 @@
 
 .sop-card__name {
   margin: 0;
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--head-text);
   white-space: nowrap;
@@ -157,7 +161,7 @@
 }
 
 .sop-card__step-count {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--head-muted);
   font-weight: 500;
 }
@@ -165,11 +169,11 @@
 .sop-card__edit-btn,
 .sop-card__save-btn {
   flex-shrink: 0;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 13.5px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
-  height: 34px;
+  height: 31px;
   white-space: nowrap;
 }
 
@@ -203,12 +207,12 @@
 .sop-step-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 5px 10px;
   border: 1px solid var(--head-border);
   border-radius: 999px;
   background: var(--head-blue-soft);
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--head-text);
   white-space: nowrap;
@@ -219,12 +223,12 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--head-blue);
   color: #fff;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
 }
