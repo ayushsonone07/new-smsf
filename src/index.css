@@ -538,6 +538,34 @@ a {
   color: #94a3b8;
 }
 
+.route-select-button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.route-select-button:hover,
+.route-select-button:focus-visible,
+.route-select-button[aria-pressed='true'] {
+  color: #4f46e5;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+tr.is-selected-row td {
+  background: #f5f7ff;
+}
+
+.route-selection-empty {
+  min-height: 170px;
+}
+
 .username {
   padding: 3px 8px;
   border-radius: 6px;

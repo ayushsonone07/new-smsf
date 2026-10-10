@@ -1,9 +1,4 @@
-import { useMemo } from 'react'
-import { useDepartmentFeatures } from '../../../permissions/hooks/useDepartmentFeatures'
-import { useDepartmentRoutePermissions } from '../../../permissions/hooks/useDepartmentRoutePermissions'
-import type { HeadNavItem } from '../types/head.types'
-import type { FeaturePermission, HeadScreenKey } from '../../../permissions/types/permission.types'
-import type { IconName } from '../../../../components/head/shared/iconPaths'
+import { useCallback, useMemo } from 'react'
 import { getSession } from '../../../../app/auth/session'
 import {
   buildGoogleRoute,
@@ -12,19 +7,22 @@ import {
   isUserOnboarding,
 } from '../utils/routeUtils'
 
-const DEPARTMENT_USER_SCREENS: Array<{
-  key: string
-  label: string
-  icon: IconName
-  slug: string
-  screen: HeadScreenKey
-}> = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
-  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
-  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customers', screen: 'customers' },
-  { key: 'meeting', label: '15 Days Meeting', icon: 'calendar', slug: 'meeting', screen: 'meeting' },
-  { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
-]
+const SCREEN_META: Record<
+  string,
+  { screen: HeadScreenKey; label: string; icon: IconName }
+> = {
+  dashboard: { screen: 'dashboard', label: 'Dashboard', icon: 'grid' },
+  users: { screen: 'users', label: 'Department Users', icon: 'users' },
+  customers: { screen: 'customers', label: 'Customer List', icon: 'users' },
+  attendance: { screen: 'attendance', label: 'Attendance', icon: 'clock' },
+  meeting: { screen: 'meeting', label: '15 Days Meeting', icon: 'calendar' },
+  sop: { screen: 'sop', label: 'SOP', icon: 'workflow' },
+  'help-center': { screen: 'help-center', label: 'Help Center', icon: 'help' },
+}
+
+function normalizeRoute(routeName: string): string {
+  return routeName.split('?')[0].replace(/^\/+|\/+$/g, '').toLowerCase()
+}
 
 const GOOGLE_HEAD_SCREENS: Array<{
   key: string
@@ -51,7 +49,6 @@ const GOOGLE_HEAD_SCREENS: Array<{
  * Filtered by live DB route visibility (if visibility is 0, item is not displayed).
  */
 export function useHeadNav(departmentId: string) {
-  const query = useDepartmentFeatures(departmentId)
   const session = getSession()
   const role = session?.user.role
   const isUser = role === 'USER'
@@ -59,38 +56,29 @@ export function useHeadNav(departmentId: string) {
   const isOnboarding = isUserOnboarding(session?.user.departmentType)
   const basePath = isUser ? '/users' : '/head'
 
-  const routePerms = useDepartmentRoutePermissions(session?.user.departmentType)
-
-  const features = useMemo<FeaturePermission[]>(() => {
-    if (isUser) {
-      return DEPARTMENT_USER_SCREENS
-        .filter(
-          (item) =>
-            routePerms.isRouteEnabled(item.slug) &&
-            routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)),
-        )
-        .map((item, index) => {
-          const existing = (query.data ?? []).find(
-            (f) => f.slug === item.slug || f.screen === item.screen,
-          )
-          return {
-            id: existing?.id ?? `user-feat-${item.slug}`,
-            departmentId,
-            name: item.label,
-            description: existing?.description ?? item.label,
-            enabled: true,
-            userVisible: true,
-            roleAPermission: existing?.roleAPermission ?? 'CAN_EDIT',
-            roleBPermission: existing?.roleBPermission ?? 'CAN_READ',
-            screen: item.screen,
-            slug: item.slug,
-            icon: item.icon,
-            order: index,
-            category: 'screens',
-            kind: 'screen',
-          }
+  const features = useMemo(
+    () =>
+      (query.data ?? [])
+        .filter((route) => {
+          if (route.visibility === false) return false
+          return role === 'USER'
+            ? route.enableUser === true
+            : route.enableHead === true
         })
-    }
+        .map((route, index) => routeToFeature(route, departmentId, index)),
+    [departmentId, query.data, role],
+  )
+
+  const items = useMemo<HeadNavItem[]>(
+    () =>
+      features.map((feature) => ({
+        key: feature.slug,
+        label: feature.name,
+        icon: feature.icon,
+        to: `${basePath}/${feature.slug}`,
+      })),
+    [basePath, features],
+  )
 
     if (isGoogle) {
       return GOOGLE_HEAD_SCREENS
@@ -125,10 +113,8 @@ export function useHeadNav(departmentId: string) {
     return (query.data ?? [])
       .filter(
         (feature) =>
-          feature.kind === 'screen' &&
-          feature.enabled &&
-          routePerms.isRouteEnabled(feature.slug) &&
-          routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
+          feature.slug === normalized ||
+          feature.screen === screenKeyForRoute(normalized),
       )
       .sort((a, b) => a.order - b.order)
   }, [isUser, isGoogle, query.data, departmentId, role, routePerms])

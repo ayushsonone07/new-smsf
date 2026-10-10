@@ -13,10 +13,11 @@ import { StaffReportModal } from '../../../../components/reports/StaffReportModa
 import { Icon } from '../../../../components/head/shared/Icon'
 import {
   sampleDailyTargetByUser,
-  sampleDepartmentUsers,
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
+import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
+import { getSession } from '../../../../app/auth/session'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import { generateDepartmentSession } from '../../../../api/auth.api'
@@ -31,6 +32,7 @@ import type {
   DepartmentUserFormValues,
   DepartmentUserRole,
 } from '../types/head.types'
+import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 type ModalState =
   | { kind: 'none' }
@@ -39,14 +41,67 @@ type ModalState =
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
 
+/** Whether a dynamic column is linked to the current feature/route. */
+function belongsToRoute(
+  column: DynamicColumnResponse,
+  feature: FeaturePermission,
+): boolean {
+  return (
+    column.routeId === feature.id ||
+    column.routesType === feature.id ||
+    column.routeName?.replace(/^\/+|\/+$/g, '').toLowerCase() ===
+      feature.description.replace(/^\/+|\/+$/g, '').toLowerCase()
+  )
+}
+
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
+ * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
 export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
+  const session = getSession()
+  const dynamicColumnsQuery = useDynamicColumns(session?.user.departmentType)
+  const isUser = session?.user.role === 'USER'
+
+  const routeColumns = useMemo(
+    () =>
+      (dynamicColumnsQuery.data ?? []).filter((column) => {
+        if (!belongsToRoute(column, feature) || column.visibility === false)
+          return false
+        return isUser ? column.enableUser === true : column.enableHead === true
+      }),
+    [dynamicColumnsQuery.data, feature, isUser],
+  )
+
+  // Columns configured for this route (ignoring the role enable flags) —
+  // tells us whether the API manages this table's columns at all.
+  const routeConfiguredColumns = useMemo(
+    () =>
+      (dynamicColumnsQuery.data ?? []).filter(
+        (column) =>
+          belongsToRoute(column, feature) && column.visibility !== false,
+      ),
+    [dynamicColumnsQuery.data, feature],
+  )
+
+  // Map the API columns onto the table's fixed columns: a fixed column
+  // shows only when the API exposes it for this route and role. Fails open
+  // (shows everything) when no columns are configured for the route yet.
+  const mappedHiddenColumns = useMemo<DepartmentUserColumnKey[]>(() => {
+    if (routeConfiguredColumns.length === 0) return []
+
+    const enabledKeys = new Set(
+      routeColumns
+        .map((column) => resolveUserColumnKey(column.columnName))
+        .filter((key): key is DepartmentUserColumnKey => key !== null),
+    )
+
+    return USER_TABLE_COLUMN_KEYS.filter((key) => !enabledKeys.has(key))
+  }, [routeColumns, routeConfiguredColumns.length])
 
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
@@ -95,18 +150,107 @@ export function DepartmentUsersPage() {
     search,
   })
 
+  // Get today's date range in ISO format for the member details API
+  const todayStart = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString().slice(0, 19)
+  }, [])
+  const todayEnd = useMemo(() => {
+    const d = new Date()
+    d.setHours(23, 59, 59, 0)
+    return d.toISOString().slice(0, 19)
+  }, [])
+
+  // Member details query - triggered when modal.kind === 'report'
+  const memberDetailsQuery = useMemberDetails({
+    userId: modal.kind === 'report' ? Number(modal.user.id) : 0,
+    department: 'ONBOARDING_DEPARTMENT',
+    startDate: todayStart,
+    endDate: todayEnd,
+    page: 0,
+    size: 50,
+  })
+
+  // Convert backend member details to frontend WorkReportItem format
+  const convertToWorkReportItems = (customers: OnboardingDashboardCustomerDTO[] = []): WorkReportItem[] => {
+    return customers.map((c) => {
+      const status = c.status === 'COMPLETED' ? 'COMPLETED' : c.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PENDING'
+      const delaySide = c.delaySide === 'CLIENT' ? 'CLIENT' : c.delaySide === 'OURS' ? 'OURS' : c.delaySide === 'TECH' ? 'TECH' : undefined
+      
+      return {
+        id: String(c.customerId ?? Math.random()),
+        customerName: c.customerName ?? c.ownerName ?? 'Customer',
+        contactName: c.ownerName,
+        city: c.city,
+        status: status as WorkItemStatus,
+        delayDays: c.delayDays ?? 0,
+        delaySide: delaySide as DelaySide | undefined,
+        reason: c.delayReason,
+        remark: c.remark,
+      }
+    })
+  }
+
+  // Build person info from member details or fallback to modal user
+  const person = useMemo(() => {
+    if (memberDetailsQuery.data?.member) {
+      return {
+        name: memberDetailsQuery.data.member.name,
+        email: memberDetailsQuery.data.member.email,
+        dateLabel: 'Today',
+        attendance: (memberDetailsQuery.data.statistics?.attendance === 'Present' ? 'PRESENT' : 'ABSENT') as Attendance,
+        avatarText: memberDetailsQuery.data.member.name?.charAt(0).toUpperCase(),
+        avatarSrc: memberDetailsQuery.data.member.avatar,
+      }
+    }
+    // Fallback to modal user data
+    if (modal.kind === 'report' && modal.user) {
+      return {
+        name: modal.user.name,
+        email: modal.user.email,
+        dateLabel: 'Today',
+        attendance: (modal.user.isPresentToday ? 'PRESENT' : 'ABSENT') as Attendance,
+        avatarText: modal.user.name?.charAt(0).toUpperCase(),
+      }
+    }
+    return null
+  }, [memberDetailsQuery.data, modal])
+
+  // Get items from member details or fallback to mock
+  const items = useMemo(() => {
+    if (memberDetailsQuery.data?.customers?.length) {
+      return convertToWorkReportItems(memberDetailsQuery.data.customers)
+    }
+    // Fallback to mock data
+    if (modal.kind === 'report' && modal.user) {
+      return sampleWorkItemsByUser[modal.user.id] ?? []
+    }
+    return []
+  }, [memberDetailsQuery.data, modal])
+
+  // Get target from member details or fallback
+  const target = useMemo(() => {
+    if (memberDetailsQuery.data?.statistics?.target) {
+      return memberDetailsQuery.data.statistics.target
+    }
+    if (modal.kind === 'report' && modal.user) {
+      return sampleDailyTargetByUser[modal.user.id] ?? 0
+    }
+    return 0
+  }, [memberDetailsQuery.data, modal])
+
   // Map API users to DepartmentUser table structure, with fallback to mock data
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
-    const list = departmentUsersQuery.data?.data
-    if (list && list.length > 0) {
-      return list.map((u, idx) => {
+    const list = departmentUsersQuery.data?.data ?? []
+    return list.map((u, idx) => {
         const isPresent =
           u.isPresentToday ??
-          (u.presentDays ? u.presentDays > 0 : true)
+          (u.absent !== undefined ? !u.absent : true)
         const role = (
           u.role === 'HEAD' || u.isHead
             ? 'TEAM_LEAD'
-            : u.role === 'SENIOR_EXECUTIVE'
+            : u.role === 'SENIOR_EXECUTIVE' || u.seniorUser
               ? 'SENIOR_EXECUTIVE'
               : 'ONBOARDING_EXECUTIVE'
         ) as DepartmentUserRole
@@ -114,7 +258,7 @@ export function DepartmentUsersPage() {
         return {
           id: String(u.id ?? u.username ?? `u-${idx}`),
           name: u.username || u.email,
-          phone: u.contact || '+91 98765 00000',
+          phone: u.contact || '—',
           email: u.email,
           role,
           joinedLabel: u.createdAt
@@ -122,20 +266,19 @@ export function DepartmentUsersPage() {
                 month: 'short',
                 year: 'numeric',
               })
-            : 'Jan 2024',
-          target: u.target ?? 6,
+            : '—',
+          target: u.target ?? 0,
           achievedPercent:
             u.achievedPercent ??
-            (u.completed && u.target
-              ? Math.round((u.completed / u.target) * 100)
-              : 100),
-          presentDays: u.presentDays ?? 1,
-          absentDays: u.absentDays ?? 0,
+            (u.totalCompletedCustomers && u.target
+              ? Math.round((u.totalCompletedCustomers / u.target) * 100)
+              : 0),
+          presentDays: u.presentDays ?? (isPresent ? 1 : 0),
+          absentDays: u.absentDays ?? (isPresent ? 0 : 1),
           isPresentToday: isPresent,
+          dynamicValues: { ...u } as Record<string, unknown>,
         }
       })
-    }
-    return sampleDepartmentUsers
   }, [departmentUsersQuery.data?.data])
 
   const [localUsers, setLocalUsers] = useState<DepartmentUser[] | null>(null)
@@ -258,7 +401,17 @@ export function DepartmentUsersPage() {
       >
         <DepartmentUsersTable
           users={filteredUsers}
-          hiddenColumns={columnFeatures.hiddenColumns}
+          emptyMessage={
+            departmentUsersQuery.isLoading
+              ? 'Loading users…'
+              : departmentUsersQuery.isError
+                ? 'Unable to load users. Please try again.'
+                : 'No users found.'
+          }
+          hiddenColumns={[
+            ...columnFeatures.hiddenColumns,
+            ...mappedHiddenColumns,
+          ]}
           canEditActions={canManageUsers}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}
@@ -333,20 +486,13 @@ export function DepartmentUsersPage() {
         />
       ) : null}
 
-      {modal.kind === 'report' ? (
+      {modal.kind === 'report' && person ? (
         <StaffReportModal
           open
           onClose={closeModal}
-          person={{
-            name: modal.user.name,
-            email: modal.user.email,
-            dateLabel: 'Today',
-            attendance: modal.user.isPresentToday
-              ? 'PRESENT'
-              : 'ABSENT',
-          }}
-          items={sampleWorkItemsByUser[modal.user.id] ?? []}
-          target={sampleDailyTargetByUser[modal.user.id] ?? 0}
+          person={person}
+          items={items}
+          target={target}
         />
       ) : null}
     </>

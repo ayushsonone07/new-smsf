@@ -55,6 +55,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
@@ -172,12 +173,12 @@ export function CustomerListPage() {
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
-    status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
-    filteredUser: isUser
-      ? userEmail
-      : selectedAssigneeId !== 'all'
-        ? selectedAssigneeId ?? undefined
-        : undefined,
+    status:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
   })
 
   // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
@@ -266,6 +267,7 @@ export function CustomerListPage() {
           : 'Recent',
         email: c.email || '',
         phone: c.phoneNumber || '',
+        formUrl: c.onboardingLink,
         callStatus: 'connected',
         status:
           c.onboardingStatus?.toLowerCase() === 'completed'
@@ -484,6 +486,7 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}

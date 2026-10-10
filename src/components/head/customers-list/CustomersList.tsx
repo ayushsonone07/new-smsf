@@ -522,6 +522,24 @@ function CustomerRow({
               <button
                 type="button"
                 className="cl-action"
+                title="Save remark"
+                aria-label="Save remark"
+                onClick={saveRemark}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="cl-action"
+                title="Cancel editing remark"
+                aria-label="Cancel editing remark"
+                onClick={cancelRemark}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="cl-action"
                 title="View schedule"
                 aria-label="View schedule"
               >
