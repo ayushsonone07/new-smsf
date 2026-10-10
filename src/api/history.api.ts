@@ -3,8 +3,10 @@ import { authedApiRequest } from './client'
 export interface TaskHistoryItem {
   id?: number | string
   customerName?: string
+  customerPhone?: string
   assignedTo?: string
   serviceType?: string
+  departmentServiceName?: string
   phaseName?: string
   status?: string
   serviceStatus?: string
@@ -14,6 +16,9 @@ export interface TaskHistoryItem {
   endedAt?: string | null
   remarks?: string
   contact?: string
+  username?: string
+  departmentUserFilter?: string
+  createdAt?: string
 }
 
 export interface TaskHistoryResponse {
@@ -42,16 +47,35 @@ export interface DepartmentUserAnalyticItem {
   userId?: string
   updatedBy?: string
   username?: string
+  name?: string
+  email?: string
+  role?: string
+  firstStatusUpdate?: string
+  lastStatusUpdate?: string
+  totalUpdates?: number
+  leadUpdates?: number
+  customerUpdates?: number
+  servicesDelivered?: number
   totalTasks?: number
   completedTasks?: number
   pendingTasks?: number
   activeTasks?: number
   averageCompletionTime?: string
   date?: string
+  allTimeCustomers?: number
+  assigned?: number
+  completed?: number
+  pendingCustomers?: number
+  delayed?: number
+  achievedPercentage?: number
+  presentDays?: number
+  absentDays?: number
 }
 
 export interface DepartmentUsersAnalyticResponse {
   data: DepartmentUserAnalyticItem[]
+  teamMembers?: DepartmentUserAnalyticItem[]
+  totalMembers?: number
   pageNumber: number
   elementSize: number
   totalElements: number
