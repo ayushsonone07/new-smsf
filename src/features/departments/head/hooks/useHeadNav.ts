@@ -17,7 +17,7 @@ const SCREEN_META: Record<
   customers: { screen: 'customers', label: 'Customer List', icon: 'users' },
   attendance: { screen: 'attendance', label: 'Attendance', icon: 'clock' },
   meeting: { screen: 'meeting', label: '15 Days Meeting', icon: 'calendar' },
-  sop: { screen: 'sop', label: 'SOP', icon: 'workflow' },
+  sop: { screen: 'sop', label: 'SOP', icon: 'flow' },
   'help-center': { screen: 'help-center', label: 'Help Center', icon: 'help' },
 }
 

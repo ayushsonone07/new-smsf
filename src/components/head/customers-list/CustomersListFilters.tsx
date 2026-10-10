@@ -45,7 +45,6 @@ export interface CustomersListFiltersProps {
   onReset?: () => void
   showStatusTabs?: boolean
   onRefresh?: () => void
-  showStatusTabs?: boolean
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [

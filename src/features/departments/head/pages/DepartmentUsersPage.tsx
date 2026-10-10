@@ -16,17 +16,30 @@ import {
   sampleDailyTargetByUser,
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
+import { generateDepartmentSession } from '../../../../api/auth.api'
+import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
+import {
+  saveAdminBackup,
+  setSession,
+} from '../../../../app/auth/session'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { getSession } from '../../../../app/auth/session'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useMemberDetails } from '../../hooks/useMemberDetails'
 import {
   resolveUserColumnKey,
   USER_TABLE_COLUMN_KEYS,
 } from '../utils/userColumnMatch'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
+import type {
+  Attendance,
+  DelaySide,
+  WorkItemStatus,
+  WorkReportItem,
+} from '../../../../features/reports/types/staff-report.types'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -60,6 +73,7 @@ function belongsToRoute(
  * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
 export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
+  const navigate = useNavigate()
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -242,12 +256,11 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
     const list = departmentUsersQuery.data?.data ?? []
     return list.map((u, idx) => {
         const isPresent =
-          u.isPresentToday ??
-          (u.absent !== undefined ? !u.absent : true)
+          u.isPresentToday ?? true
         const role = (
           u.role === 'HEAD' || u.isHead
             ? 'TEAM_LEAD'
-            : u.role === 'SENIOR_EXECUTIVE' || u.seniorUser
+            : u.role === 'SENIOR_EXECUTIVE' || u.isSeniorUser
               ? 'SENIOR_EXECUTIVE'
               : 'ONBOARDING_EXECUTIVE'
         ) as DepartmentUserRole
