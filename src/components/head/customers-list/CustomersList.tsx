@@ -507,6 +507,7 @@ function CustomerRow({
             )}
         </div>
       </td>
+      )}
 
       {/* Internal Remark */}
       <td className="cl-td" data-label="Internal Remark">

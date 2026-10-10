@@ -44,7 +44,6 @@ export interface CustomersListFiltersProps {
   selectedAssigneeId?: string | null | 'all'
   onAssigneeChange?: (id: string | null | 'all') => void
   onReset?: () => void
-  showStatusTabs?: boolean
   onRefresh?: () => void
 }
 
@@ -75,7 +74,6 @@ const panelVariants: Variants = {
  * screens and stack on narrow ones.
  */
 export function CustomersListFilters({
-  showStatusTabs,
   activeTab,
   onTabChange,
   tabCounts,
