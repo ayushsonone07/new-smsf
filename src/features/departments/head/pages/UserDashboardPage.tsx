@@ -3,7 +3,6 @@ import { motion, type Variants } from 'framer-motion'
 import { getSession } from '../../../../app/auth/session'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
-import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import { DashboardStatCards } from '../../../../components/head/dashboard/DashboardStatCards'
 import { OnboardingTrend } from '../../../../components/head/dashboard/OnboardingTrend'
@@ -40,8 +39,9 @@ const EMPTY_KPIS: OnboardingSummaryKpis = {
 }
 
 interface DateRange {
-  startDate: string
-  endDate: string
+  startDate?: string
+  endDate?: string
+  allTime?: boolean
 }
 
 /** Local-timezone `YYYY-MM-DD` (UTC slicing would shift the day). */
@@ -85,6 +85,8 @@ function rangeFor(period: string): DateRange {
         ),
         endDate: end,
       }
+    case 'All time':
+      return { allTime: true }
     default:
       return { startDate: end, endDate: end }
   }
@@ -133,6 +135,7 @@ export function UserDashboardPage() {
       department: 'ONBOARDING_DEPARTMENT',
       startDate: range.startDate,
       endDate: range.endDate,
+      allTime: range.allTime,
     }),
     [range],
   )
@@ -145,11 +148,11 @@ export function UserDashboardPage() {
       size: 10,
       startDate: range.startDate,
       endDate: range.endDate,
+      allTime: range.allTime,
     }),
     [range],
   )
   const membersQuery = useOnboardingDashboardMembers(membersParams)
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
   const { isColumnEnabled, refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
@@ -168,7 +171,6 @@ export function UserDashboardPage() {
         onRetry={() => {
           void query.refetch()
           void membersQuery.refetch()
-          void assigningUsersQuery.refetch()
           void refetchPermissions()
         }}
       />
@@ -199,7 +201,6 @@ export function UserDashboardPage() {
   function handleRefresh() {
     void query.refetch()
     void membersQuery.refetch()
-    void assigningUsersQuery.refetch()
     setRefreshKey((key) => key + 1)
   }
 

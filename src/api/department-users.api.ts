@@ -157,8 +157,14 @@ export async function getOnboardingCustomers(params: {
   if (params.page !== undefined) search.set('page', String(params.page))
   if (params.size !== undefined) search.set('size', String(params.size))
   if (params.searchParam) search.set('searchParam', params.searchParam)
-  if (params.startDate) search.set('startDate', params.startDate)
-  if (params.endDate) search.set('endDate', params.endDate)
+  if (params.startDate) {
+    const s = params.startDate.includes('T') ? params.startDate : `${params.startDate}T00:00:00`
+    search.set('startDate', s)
+  }
+  if (params.endDate) {
+    const e = params.endDate.includes('T') ? params.endDate : `${params.endDate}T23:59:59`
+    search.set('endDate', e)
+  }
   if (params.status) search.set('status', params.status)
   if (params.filteredUser) search.set('filteredUser', params.filteredUser)
 

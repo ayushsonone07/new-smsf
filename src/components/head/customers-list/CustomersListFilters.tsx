@@ -45,6 +45,7 @@ export interface CustomersListFiltersProps {
   onReset?: () => void
   showStatusTabs?: boolean
   onRefresh?: () => void
+  showStatusTabs?: boolean
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [
@@ -84,6 +85,7 @@ export function CustomersListFilters({
   completedFrom,
   completedTo,
   onCompletedChange,
+  showStatusTabs = true,
 }: CustomersListFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [localCompleted, setLocalCompleted] = useState({ from: '', to: '' })
@@ -115,22 +117,24 @@ export function CustomersListFilters({
     >
       {/* ── Header: tabs | search | Date filters ── */}
       <div className="cl-header-row">
-        <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
-          {TABS.map((tab) => (
-            <motion.button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
-              onClick={() => onTabChange(tab.key)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {tab.label}
-              <span className="cl-tab__count">{countFor(tab.key)}</span>
-            </motion.button>
-          ))}
-        </div>
+        {showStatusTabs !== false && (
+          <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+            {TABS.map((tab) => (
+              <motion.button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
+                onClick={() => onTabChange(tab.key)}
+                whileTap={{ scale: 0.95 }}
+              >
+                {tab.label}
+                <span className="cl-tab__count">{countFor(tab.key)}</span>
+              </motion.button>
+            ))}
+          </div>
+        )}
 
         {searchSlot}
 

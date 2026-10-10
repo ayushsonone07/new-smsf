@@ -506,6 +506,15 @@ function CustomerRow({
               className="cl-remark-textarea"
               value={remarkDraft}
               onChange={(e) => setRemarkDraft(e.target.value)}
+              onBlur={saveRemark}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  saveRemark()
+                } else if (e.key === 'Escape') {
+                  cancelRemark()
+                }
+              }}
               autoFocus
               aria-label="Edit internal remark"
             />

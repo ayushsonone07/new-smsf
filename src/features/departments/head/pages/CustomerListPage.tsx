@@ -22,6 +22,7 @@ import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useOnboardingCustomersList } from '../../hooks/useDepartmentUsersList'
 import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { getSession } from '../../../../app/auth/session'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -96,10 +97,24 @@ export function CustomerListPage() {
     }
   }, [isStatusVisible, activeTab])
 
-  // 1. Assigning users API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const session = getSession()
+  const isUser = session?.user?.role === 'USER'
+  const userEmail = session?.user?.email || session?.user?.username || ''
+
+  // 1. Assigning users API - disabled for department users
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT', {
+    enabled: !isUser,
+  })
 
   const assignees: OnboardingAssignee[] = useMemo(() => {
+    if (isUser) {
+      return [
+        {
+          id: userEmail,
+          name: session?.user?.name || userEmail,
+        },
+      ]
+    }
     const list = assigningUsersQuery.data
     if (list && list.length > 0) {
       return list.map((u) => ({
@@ -108,7 +123,7 @@ export function CustomerListPage() {
       }))
     }
     return FALLBACK_ASSIGNEES
-  }, [assigningUsersQuery.data])
+  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {

@@ -61,6 +61,25 @@ function mapBackendRole(
   return 'USER'
 }
 
+function decodeJwtClaims(
+  token: string,
+): Record<string, unknown> {
+  try {
+    const payload = token.split('.')[1]
+
+    if (!payload) return {}
+
+    const base64 = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+
+    return JSON.parse(atob(base64)) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
 function toSessionFromBackend(data: BackendLoginData): AuthSession {
   const token = data.accessToken
 
@@ -68,7 +87,13 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
     throw new Error('Invalid authentication token received from server')
   }
 
-  const email = (data.email || data.username || '').trim()
+  const claims = decodeJwtClaims(token)
+  const claimEmail = typeof claims.sub === 'string' ? claims.sub : undefined
+  const claimRole = typeof claims.role === 'string' ? claims.role : undefined
+  const claimIsHead = typeof claims.isHead === 'boolean' ? claims.isHead : undefined
+  const claimDept = typeof claims.departmentType === 'string' ? claims.departmentType : undefined
+
+  const email = (claimEmail || data.email || data.username || '').trim()
 
   if (!email) {
     throw new Error('Login response did not include an email/username')
@@ -78,8 +103,9 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
     id: String(data.id ?? email),
     name: data.username || email,
     email,
-    role: mapBackendRole(data.role, data.isHead),
-    departmentType: data.departmentType || undefined,
+    username: claimEmail || email,
+    role: mapBackendRole(data.role ?? claimRole, data.isHead ?? claimIsHead),
+    departmentType: data.departmentType || claimDept || undefined,
   }
 
   return {
@@ -174,25 +200,6 @@ interface BackendTokenEnvelope {
   token?: string
 }
 
-function decodeJwtClaims(
-  token: string,
-): Record<string, unknown> {
-  try {
-    const payload = token.split('.')[1]
-
-    if (!payload) return {}
-
-    const base64 = payload
-      .replace(/-/g, '+')
-      .replace(/_/g, '/')
-      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
-
-    return JSON.parse(atob(base64)) as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
 /**
  * Admin -> department login.
  *
@@ -276,7 +283,7 @@ export async function generateDepartmentSession(
       claimEmail ||
       username,
     // A department account opens the department console.
-    role: dataObject.role ?? claimRole ?? 'DEPARTMENT_HEAD',
+    role: dataObject.role ?? claimRole,
     isHead:
       dataObject.isHead ??
       (typeof claims.isHead === 'boolean'

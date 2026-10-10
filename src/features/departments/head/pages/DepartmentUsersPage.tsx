@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -19,7 +20,8 @@ import {
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
-import { useMemberDetails } from '../../hooks/useMemberDetails'
+import { generateDepartmentSession } from '../../../../api/auth.api'
+import { getSession, saveAdminBackup, setSession } from '../../../../app/auth/session'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -43,6 +45,7 @@ type ModalState =
  * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
 export function DepartmentUsersPage() {
+  const navigate = useNavigate()
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -53,6 +56,30 @@ export function DepartmentUsersPage() {
     useState<DepartmentUser | null>(null)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
+
+  async function handleLoginAs(targetUser: DepartmentUser) {
+    const email = targetUser.email?.trim()
+    if (!email) {
+      alert('This user does not have a valid email.')
+      return
+    }
+
+    try {
+      const currentSession = getSession()
+      if (currentSession) {
+        saveAdminBackup(currentSession)
+      }
+
+      const newSession = await generateDepartmentSession(email)
+      setSession(newSession)
+
+      navigate({ to: '/onboarding-user' as never })
+    } catch (err: unknown) {
+      console.error('Failed to log in as department user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to log in as user'
+      alert(`Login failed: ${msg}`)
+    }
+  }
 
   // Reset to page 0 when search changes
   const handleSearchChange = (value: string) => {
@@ -327,7 +354,7 @@ export function DepartmentUsersPage() {
           onDelete={(user) =>
             setModal({ kind: 'delete', user })
           }
-          onLoginAs={canManageUsers ? (user) => setViewingAs(user) : undefined}
+          onLoginAs={handleLoginAs}
           renderExpanded={(user) => (
             <UserDetails user={user} />
           )}

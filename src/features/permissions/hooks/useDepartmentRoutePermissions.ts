@@ -35,6 +35,34 @@ export function isRouteMatch(route: DynamicRouteResponse, target: string): boole
   // 1. Direct exact equality
   if (tNorm === nameNorm || tNorm === idNorm) return true
 
+  // 1b. Dashboard routes mapping: /onboarding-user is the user dashboard
+  if (
+    tNorm === 'onboarding-user' ||
+    tNorm === 'onboarding-dashboard-head-departmentuser' ||
+    tNorm === 'onboarding-dashboard-head' ||
+    tNorm === 'onboarding'
+  ) {
+    return nameNorm === 'dashboard' || idNorm === 'dashboard'
+  }
+
+  // 1c. History route mapping
+  if (
+    tNorm === 'history' ||
+    tNorm === 'task-history' ||
+    tNorm === 'onboarding-dashboard-head-departmentuser-history' ||
+    tNorm === 'onboarding-dashboard-head-history'
+  ) {
+    if (
+      nameNorm === 'history' ||
+      nameNorm === 'task-history' ||
+      nameNorm === 'my-analytics' ||
+      nameNorm === 'analytics' ||
+      idNorm === 'history'
+    ) {
+      return true
+    }
+  }
+
   // 2. Slug aliases (e.g. 'customer-list' <-> 'customers')
   const tAlias =
     tNorm === 'customer-list' ? 'customers' : tNorm === 'customers' ? 'customer-list' : tNorm
