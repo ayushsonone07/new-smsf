@@ -1,3 +1,5 @@
+import { authedApiRequest } from './client'
+import { getSession } from '../app/auth/session'
 import {
   delay,
   customers,
@@ -52,19 +54,67 @@ export async function createCustomer(
 export async function updateCustomer(
   id: string,
   data: UpdateCustomerRequest,
-): Promise<Customer> {
-  await delay()
-
-  const customer = customers.find(
-    (item) => item.id === id,
-  )
-
+): Promise<any> {
+  const session = getSession()
+  const customer = customers.find((c) => c.id === id)
+  
   if (!customer) {
     throw new Error('Customer not found')
   }
 
-  Object.assign(customer, data)
+  const departmentType = session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const username = session?.user?.email || session?.user?.username || ''
 
+  // Remark Update
+  if (data.remark !== undefined) {
+    const remarkPayload = {
+      customerId: id,
+      action: 'EDIT',
+      departmentType,
+      username,
+      remark: data.remark,
+    }
+    await authedApiRequest<any>('/api/auth/customers/manage', {
+      method: 'POST',
+      body: JSON.stringify(remarkPayload)
+    })
+  }
+
+  // Status Update
+  if (data.onboardingStatus !== undefined) {
+    const newStatusStr = data.onboardingStatus.toUpperCase().replace(/-/g, '_')
+    const oldStatusStr = (customer.onboardingStatus || customer.status || '').toUpperCase().replace(/-/g, '_')
+    
+    const statusPayload = {
+      customerId: id,
+      newStatus: newStatusStr,
+      username,
+      departmentType,
+      oldStatus: oldStatusStr
+    }
+    
+    await authedApiRequest<any>('/api/auth/update/service', {
+      method: 'POST',
+      body: JSON.stringify(statusPayload)
+    })
+  }
+
+  // Assignee Update
+  if (data.assigneeId !== undefined) {
+    const assignPayload = {
+      customerId: id,
+      departmentUserId: data.assigneeId,
+      departmentType
+    }
+    
+    await authedApiRequest<any>('/api/auth/customer-service/assign-user', {
+      method: 'POST',
+      body: JSON.stringify(assignPayload)
+    })
+  }
+
+  Object.assign(customer, data)
+  
   return structuredClone(customer)
 }
 

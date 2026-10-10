@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { getSession } from '../../../app/auth/session'
+import { useQueryClient } from '@tanstack/react-query'
+import { updateCustomer } from '../../../api/customers.api'
+import { Button } from '../../ui/Button'
 import { Icon } from '../shared/Icon'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
 import { useCustomerDrawerDetails } from '../../../features/departments/hooks/useCustomerDrawerDetails'
@@ -229,6 +233,8 @@ export function CustomersListModal({
   const [activeTab, setActiveTab] = useState<DrawerTab>(initialTab ?? 'overview')
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
+  const [isAddingRemark, setIsAddingRemark] = useState(false)
+  const queryClient = useQueryClient()
 
   const current = activeCustomer ?? customer
   const apiDetails = useCustomerDrawerDetails(current)
@@ -323,7 +329,10 @@ export function CustomersListModal({
   const profile = apiDetails.profile
   const services = getCustomerServices(apiDetails.serviceRows)
   const doneCount = services.filter((s) => s.status === 'completed').length
-  const remarkEntries = getRemarkEntries(apiDetails)
+  const remarkEntries = getRemarkEntries(apiDetails).sort(
+    (a, b) =>
+      (Date.parse(b.remark.timestamp || '') || 0) - (Date.parse(a.remark.timestamp || '') || 0)
+  )
   const customerRemarks = remarkEntries.filter(
     ({ category }) => category === 'Client',
   )
@@ -404,7 +413,7 @@ export function CustomersListModal({
       count: apiDetails.serviceRowsLoading ? undefined : services.length,
     },
     { id: 'business-form', label: 'Business form' },
-    { id: 'remarks', label: 'Remarks', count: remarkCount },
+    { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
     { id: 'activity', label: 'Updates', count: updates.length },
   ]
 
@@ -781,21 +790,52 @@ export function CustomersListModal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <RemarkGroup
-                title="Customer remark"
-                emptyMessage="No remark from customer yet."
-                entries={customerRemarks}
-              />
-              <RemarkGroup
-                title="Internal remark"
-                emptyMessage="No internal remarks yet."
-                entries={internalRemarks}
-                fallback={
-                  rowDetails?.remark ||
-                  serviceRow?.internalRemark
-                }
-                internal
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {getSession()?.user.role === 'USER' && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault()
+                      const form = e.target as HTMLFormElement
+                      const input = form.elements.namedItem('newRemark') as HTMLInputElement
+                      const value = input.value.trim()
+                      if (!value || isAddingRemark) return
+                      
+                      setIsAddingRemark(true)
+                      try {
+                        await updateCustomer(current.id, { remark: value })
+                        await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+                        input.value = ''
+                      } catch (err) {
+                        console.error('Failed to add remark', err)
+                      } finally {
+                        setIsAddingRemark(false)
+                      }
+                    }}
+                    style={{ display: 'flex', gap: '8px' }}
+                  >
+                    <input
+                      name="newRemark"
+                      type="text"
+                      placeholder="Add a new remark..."
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc' }}
+                      disabled={isAddingRemark}
+                    />
+                    <Button type="submit" disabled={isAddingRemark}>
+                      {isAddingRemark ? 'Adding...' : 'Add'}
+                    </Button>
+                  </form>
+                )}
+
+                <RemarkGroup
+                  title="Remarks History"
+                  emptyMessage="No remarks yet."
+                  entries={remarkEntries}
+                  fallback={
+                    rowDetails?.remark ||
+                    serviceRow?.internalRemark
+                  }
+                />
+              </div>
             </motion.div>
           )}
 
