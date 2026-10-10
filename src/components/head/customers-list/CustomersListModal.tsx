@@ -20,9 +20,6 @@ export interface CustomersListModalProps {
   showStatus?: boolean
   showAssignTo?: boolean
   onClose: () => void
-  /* Accepted so existing pages keep compiling */
-  showStatus?: boolean
-  showAssignTo?: boolean
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
 }

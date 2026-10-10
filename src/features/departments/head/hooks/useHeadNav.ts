@@ -137,14 +137,11 @@ export function useHeadNav(departmentId: string) {
     if (isUser) {
       return DEPARTMENT_USER_SCREENS
         .filter(
-          (feature) =>
-            feature.kind === 'screen' &&
-            feature.enabled &&
-            (role !== 'USER' || feature.userVisible !== false) &&
-            routePerms.isRouteEnabled(feature.slug) &&
-            routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)) &&
+          (item) =>
+            routePerms.isRouteEnabled(item.slug) &&
+            routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)) &&
             // Hide "Fetch R/C" from the sidebar for every role (ADMIN, HEAD, USER)
-            feature.slug !== 'fetch-rc',
+            item.slug !== 'fetch-rc',
         )
         .map((item) => ({
           key: item.key,
