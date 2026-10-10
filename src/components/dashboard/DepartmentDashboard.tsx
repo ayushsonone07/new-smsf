@@ -24,7 +24,7 @@ export function DepartmentDashboard({
 
             <p>
               Latest actions across this
-              department.
+               department.
             </p>
           </div>
 

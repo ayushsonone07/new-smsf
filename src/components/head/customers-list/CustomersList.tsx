@@ -39,6 +39,17 @@ export interface OnboardingCustomer {
   remark: string
   /** Updated column */
   updatedLabel: string
+  /** Client form link — the Form button opens it in a new tab */
+  formUrl?: string
+  /** Optional detail-drawer fields (shown as "—" when missing) */
+  address?: string
+  gstNumber?: string
+  packageName?: string
+  serviceMonths?: string
+  salesPerson?: string
+  services?: { name: string; status: OnboardingStatus }[]
+  activityCount?: number
+  remarkCount?: number
 }
 
 export interface CustomersListProps {
@@ -49,6 +60,8 @@ export interface CustomersListProps {
   onRemarkChange: (id: string, remark: string) => void
   onOpenDetail: (customer: OnboardingCustomer) => void
   canEdit?: boolean
+  showStatus?: boolean
+  canEditStatus?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -118,6 +131,8 @@ export function CustomersList({
   onRemarkChange,
   onOpenDetail,
   canEdit = true,
+  showStatus = true,
+  canEditStatus,
 }: CustomersListProps) {
 if (customers.length === 0) {
     return (
@@ -143,7 +158,7 @@ if (customers.length === 0) {
             <th className="cl-th cl-th--num">#</th>
             <th className="cl-th cl-th--biz">Business</th>
             <th className="cl-th cl-th--contact">Contact</th>
-            <th className="cl-th cl-th--status">Status</th>
+            {showStatus && <th className="cl-th cl-th--status">Status</th>}
             <th className="cl-th cl-th--assign">Assign To</th>
             <th className="cl-th cl-th--remark">Internal Remark</th>
             <th className="cl-th">Updated</th>
@@ -170,6 +185,8 @@ if (customers.length === 0) {
               }
               onOpenDetail={() => onOpenDetail(customer)}
               canEdit={canEdit}
+              showStatus={showStatus}
+              canEditStatus={canEditStatus}
             />
           ))}
         </motion.tbody>
@@ -188,6 +205,8 @@ interface CustomerRowProps {
   onRemarkChange: (remark: string) => void
   onOpenDetail: () => void
   canEdit: boolean
+  showStatus?: boolean
+  canEditStatus?: boolean
 }
 
 function CustomerRow({
@@ -198,6 +217,8 @@ function CustomerRow({
   onRemarkChange,
   onOpenDetail,
   canEdit,
+  showStatus = true,
+  canEditStatus,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -235,12 +256,6 @@ function CustomerRow({
 
   const statusMeta = STATUS_META[customer.status]
 
-  const hasBizPill = customer.businessRelationType !== undefined
-  const bizPillText =
-    customer.businessRelationType === 'main'
-      ? `Main · ${customer.businessCount} businesses`
-      : `Business ${customer.businessIndex} of ${customer.businessCount}`
-
   function startEditing() {
     if (!canEdit) return
     setRemarkDraft(customer.remark)
@@ -256,32 +271,55 @@ function CustomerRow({
     setRemarkEditing(false)
   }
 
+  /** Opens the client form in a new tab; falls back to the drawer until a link exists */
+  function openForm() {
+    if (!customer.formUrl) return
+    window.open(customer.formUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <motion.tr className="cl-row" variants={rowVariants}>
 
       {/* # */}
-      <td className="cl-td cl-td--num">{customer.rowIndex}</td>
+      <td className="cl-td cl-td--num" data-label="#">{customer.rowIndex}</td>
 
       {/* Business */}
-      <td className="cl-td">
-        <div className="cl-biz-name">{customer.businessName}</div>
+      <td className="cl-td" data-label="Business">
+        <div className="cl-biz-line">
+          <button
+            type="button"
+            className="cl-biz-name cl-biz-name--link"
+            onClick={onOpenDetail}
+            title="View customer detail"
+          >
+            {customer.businessName}
+          </button>
 
-        {hasBizPill && (
-          <div className="cl-biz-pills">
-            <span className="cl-biz-pill">
-              <Icon name="link" size={11} strokeWidth={2} />
-              {bizPillText}
-            </span>
+          <button
+            type="button"
+            className="cl-biz-eye"
+            title="View customer detail"
+            aria-label="View customer detail"
+            onClick={onOpenDetail}
+          >
+            <Icon name="eye" size={14} strokeWidth={1.8} />
+          </button>
 
-            {customer.duplicateCount ? (
-              <span className="cl-dup-pill">
-                <Icon name="copy" size={11} strokeWidth={2} />
-                {customer.duplicateCount}{' '}
-                {customer.duplicateCount === 1 ? 'duplicate' : 'duplicates'}
-              </span>
-            ) : null}
-          </div>
-        )}
+          <button
+            type="button"
+            className="cl-form-pill"
+            title="Open client form"
+            onClick={openForm}
+          >
+            <Icon
+              d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+              name="eye"
+              size={12}
+              strokeWidth={2}
+            />
+            Form
+          </button>
+        </div>
 
         <div className="cl-biz-meta">
           {customer.contactName} · {customer.contactDate}
@@ -289,7 +327,7 @@ function CustomerRow({
       </td>
 
       {/* Contact */}
-      <td className="cl-td">
+      <td className="cl-td" data-label="Contact">
         <div className="cl-email">{customer.email}</div>
 
         <div className="cl-phone-row">
@@ -330,56 +368,58 @@ function CustomerRow({
       </td>
 
       {/* Status */}
-      <td className="cl-td">
-        <div className="cl-status-wrap" ref={statusRef}>
-          <button
-            type="button"
-            className={`cl-status-btn ${statusMeta.btnClass}`}
-            onClick={() => setStatusOpen((o) => !o)}
-            disabled={!canEdit}
-            aria-expanded={statusOpen}
-            aria-haspopup="listbox"
-          >
-            <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
-            {statusMeta.label}
-            <Icon name="chevronDown" size={12} strokeWidth={2.5} />
-          </button>
-
-{canEdit && statusOpen && (
-            <motion.div
-              className="cl-status-menu"
-              role="listbox"
-              variants={menuVariants}
-              initial="hidden"
-              animate="visible"
+      {showStatus && (
+        <td className="cl-td" data-label="Status">
+          <div className="cl-status-wrap" ref={statusRef}>
+            <button
+              type="button"
+              className={`cl-status-btn ${statusMeta.btnClass}`}
+              onClick={() => setStatusOpen((o) => !o)}
+              disabled={canEditStatus !== undefined ? !canEditStatus : !canEdit}
+              aria-expanded={statusOpen}
+              aria-haspopup="listbox"
             >
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  role="option"
-                  aria-selected={customer.status === opt}
-                  className="cl-status-opt"
-                  onClick={() => {
-                    onStatusChange(opt)
-                    setStatusOpen(false)
-                  }}
-                >
-                  <Icon
-                    name={STATUS_META[opt].icon}
-                    size={13}
-                    strokeWidth={1.8}
-                  />
-                  {STATUS_META[opt].label}
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </div>
-      </td>
+              <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
+              {statusMeta.label}
+              <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+            </button>
+
+            {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && (
+              <motion.div
+                className="cl-status-menu"
+                role="listbox"
+                variants={menuVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    role="option"
+                    aria-selected={customer.status === opt}
+                    className="cl-status-opt"
+                    onClick={() => {
+                      onStatusChange(opt)
+                      setStatusOpen(false)
+                    }}
+                  >
+                    <Icon
+                      name={STATUS_META[opt].icon}
+                      size={13}
+                      strokeWidth={1.8}
+                    />
+                    {STATUS_META[opt].label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </div>
+        </td>
+      )}
 
       {/* Assign To */}
-      <td className="cl-td">
+      <td className="cl-td" data-label="Assign To">
         <div className="cl-assign-wrap" ref={assignRef}>
           <button
             type="button"
@@ -444,7 +484,7 @@ function CustomerRow({
       </td>
 
       {/* Internal Remark */}
-      <td className="cl-td">
+      <td className="cl-td" data-label="Internal Remark">
         {remarkEditing ? (
           <div className="cl-remark-editor">
             <textarea
@@ -490,28 +530,9 @@ function CustomerRow({
       </td>
 
       {/* Updated */}
-      <td className="cl-td cl-td--updated">
+      <td className="cl-td cl-td--updated" data-label="Updated">
         <div className="cl-updated-cell">
           <span className="cl-updated-text">{customer.updatedLabel}</span>
-          <div className="cl-row-actions">
-            <button
-              type="button"
-              className="cl-action"
-              title="View schedule"
-              aria-label="View schedule"
-            >
-              <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              className="cl-action"
-              title="View customer detail"
-              aria-label="View customer detail"
-              onClick={onOpenDetail}
-            >
-              <Icon name="eye" size={14} strokeWidth={1.8} />
-            </button>
-          </div>
         </div>
       </td>
     </motion.tr>

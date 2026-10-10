@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
-import { Avatar } from '../shared/Avatar'
 
 export type CustomerTab = 'all' | 'pending' | 'in-progress' | 'completed'
 
@@ -23,133 +22,88 @@ export interface CustomersListFiltersProps {
   onTabChange: (tab: CustomerTab) => void
   tabCounts: TabCounts
 
-  /** Search input injected between tabs and right controls */
+  /** Search input shown between the tabs and the Date filters button */
   searchSlot: ReactNode
 
-  /** Assignee filter */
-  assignees: AssigneeOption[]
-  /** 'all' = all assignees, null = unassigned, string = specific assignee id */
-  selectedAssigneeId: string | null | 'all'
-  onAssigneeChange: (id: string | null | 'all') => void
-
-  /** Date filter */
+  /** "Created between" range */
   dateFrom: string
   dateTo: string
   onDateChange: (from: string, to: string) => void
 
-  /** Green button: reset all filters */
-  onReset: () => void
+  /**
+   * "Completed between" range (optional).
+   * Pass these once the API supports it; until then the inputs keep their own value.
+   */
+  completedFrom?: string
+  completedTo?: string
+  onCompletedChange?: (from: string, to: string) => void
+
+  /* Accepted so existing pages keep compiling; this header doesn't show them. */
+  assignees?: AssigneeOption[]
+  selectedAssigneeId?: string | null | 'all'
+  onAssigneeChange?: (id: string | null | 'all') => void
+  onReset?: () => void
+  onRefresh?: () => void
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [
-  { key: 'all',        label: 'All' },
-  { key: 'pending',    label: 'Pending' },
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
   { key: 'in-progress', label: 'In progress' },
-  { key: 'completed',  label: 'Completed' },
+  { key: 'completed', label: 'Completed' },
 ]
+
+const FUNNEL_ICON = 'M22 3H2l8 9.46V19l4 2v-8.54L22 3Z'
 
 const controlsVariants: Variants = {
   hidden: { opacity: 0, y: -8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
 }
 
-const menuVariants: Variants = {
-  hidden: { opacity: 0, y: -5, scale: 0.97 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.14 },
-  },
+const panelVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.16 } },
 }
 
 /**
- * Customer Onboarding filter controls.
- * Renders the full single-row control bar:
- *   [status tabs] [search slot] [assignee ▾] [Date filters] [green reset btn]
- *
- * The search slot is passed in by the parent page so the search bar
- * component stays separate as required by the architecture.
- *
- * All dropdown open/close state is managed internally.
- * All data and callbacks come from props.
+ * Customer list header:
+ *   [ status tabs ]  [ search ........ ]  [ Date filters ]
+ * "Date filters" opens a panel with "Created between" and
+ * "Completed between". The two groups sit side by side on wide
+ * screens and stack on narrow ones.
  */
 export function CustomersListFilters({
   activeTab,
   onTabChange,
   tabCounts,
   searchSlot,
-  assignees,
-  selectedAssigneeId,
-  onAssigneeChange,
   dateFrom,
   dateTo,
   onDateChange,
-  onReset,
+  completedFrom,
+  completedTo,
+  onCompletedChange,
 }: CustomersListFiltersProps) {
-  const [assigneeOpen, setAssigneeOpen] = useState(false)
-  const [dateOpen, setDateOpen] = useState(false)
-  const [draftFrom, setDraftFrom] = useState(dateFrom)
-  const [draftTo, setDraftTo] = useState(dateTo)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [localCompleted, setLocalCompleted] = useState({ from: '', to: '' })
 
-  const assigneeRef = useRef<HTMLDivElement>(null)
-  const dateRef = useRef<HTMLDivElement>(null)
+  const doneFrom = completedFrom ?? localCompleted.from
+  const doneTo = completedTo ?? localCompleted.to
 
-  /* Close dropdowns on outside click */
-  useEffect(() => {
-    if (!assigneeOpen && !dateOpen) return
+  function changeCompleted(from: string, to: string) {
+    if (onCompletedChange) onCompletedChange(from, to)
+    else setLocalCompleted({ from, to })
+  }
 
-    function handler(e: MouseEvent) {
-      if (
-        assigneeRef.current &&
-        !assigneeRef.current.contains(e.target as Node)
-      ) {
-        setAssigneeOpen(false)
-      }
-      if (
-        dateRef.current &&
-        !dateRef.current.contains(e.target as Node)
-      ) {
-        setDateOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [assigneeOpen, dateOpen])
-
-  /* Count getter */
   function countFor(key: CustomerTab) {
-    if (key === 'all')         return tabCounts.all
-    if (key === 'pending')     return tabCounts.pending
+    if (key === 'all') return tabCounts.all
+    if (key === 'pending') return tabCounts.pending
     if (key === 'in-progress') return tabCounts.inProgress
     return tabCounts.completed
   }
 
-  /* Assignee label */
-  const selectedAssignee =
-    typeof selectedAssigneeId === 'string' && selectedAssigneeId !== 'all'
-      ? assignees.find((a) => a.id === selectedAssigneeId) ?? null
-      : null
-
-  const assigneeLabel =
-    selectedAssigneeId === 'all'   ? 'All assignees' :
-    selectedAssigneeId === null    ? 'Unassigned' :
-    selectedAssignee?.name         ?? 'All assignees'
-
-  const hasDateFilter = Boolean(dateFrom || dateTo)
-
-  function handleDateApply() {
-    onDateChange(draftFrom, draftTo)
-    setDateOpen(false)
-  }
-
-  function handleDateReset() {
-    setDraftFrom('')
-    setDraftTo('')
-    onDateChange('', '')
-    setDateOpen(false)
-  }
+  const activeFilterCount =
+    (dateFrom || dateTo ? 1 : 0) + (doneFrom || doneTo ? 1 : 0)
 
   return (
     <motion.div
@@ -158,159 +112,113 @@ export function CustomersListFilters({
       initial="hidden"
       animate="visible"
     >
+      {/* ── Header: tabs | search | Date filters ── */}
+      <div className="cl-header-row">
+        <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+          {TABS.map((tab) => (
+            <motion.button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
+              onClick={() => onTabChange(tab.key)}
+              whileTap={{ scale: 0.95 }}
+            >
+              {tab.label}
+              <span className="cl-tab__count">{countFor(tab.key)}</span>
+            </motion.button>
+          ))}
+        </div>
 
-      {/* ── Status tabs ── */}
-      <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
-        {TABS.map((tab) => (
-          <motion.button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
-            onClick={() => onTabChange(tab.key)}
-            whileTap={{ scale: 0.95 }}
-          >
-            {tab.label}
-            <span className="cl-tab__count">{countFor(tab.key)}</span>
-          </motion.button>
-        ))}
-      </div>
+        {searchSlot}
 
-      {/* ── Search (injected from parent) ── */}
-      {searchSlot}
-
-      {/* ── Assignee dropdown ── */}
-      <div className="cl-assignee-wrap" ref={assigneeRef}>
         <motion.button
           type="button"
-          className="cl-assignee-btn"
-          onClick={() => setAssigneeOpen((o) => !o)}
-          aria-expanded={assigneeOpen}
-          aria-haspopup="listbox"
+          className={`cl-filter-btn${filtersOpen ? ' is-open' : ''}`}
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          aria-controls="cl-filter-panel"
           whileTap={{ scale: 0.96 }}
         >
-          {assigneeLabel}
-          <Icon name="chevronDown" size={14} strokeWidth={2.5} />
-        </motion.button>
-
-        {assigneeOpen && (
-          <motion.div
-            className="cl-assignee-menu"
-            role="listbox"
-            aria-label="Filter by assignee"
-            variants={menuVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <button
-              type="button"
-              role="option"
-              aria-selected={selectedAssigneeId === 'all'}
-              className={`cl-assignee-opt${selectedAssigneeId === 'all' ? ' is-selected' : ''}`}
-              onClick={() => { onAssigneeChange('all'); setAssigneeOpen(false) }}
-            >
-              All assignees
-            </button>
-
-            {assignees.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                role="option"
-                aria-selected={selectedAssigneeId === a.id}
-                className={`cl-assignee-opt${selectedAssigneeId === a.id ? ' is-selected' : ''}`}
-                onClick={() => { onAssigneeChange(a.id); setAssigneeOpen(false) }}
-              >
-                <Avatar name={a.name} size={20} tone="brand" />
-                {a.name}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              role="option"
-              aria-selected={selectedAssigneeId === null}
-              className={`cl-assignee-opt${selectedAssigneeId === null ? ' is-selected' : ''}`}
-              onClick={() => { onAssigneeChange(null); setAssigneeOpen(false) }}
-            >
-              <Avatar name="?" size={20} tone="muted" />
-              Unassigned
-            </button>
-          </motion.div>
-        )}
-      </div>
-
-      {/* ── Date filter ── */}
-      <div className="cl-date-wrap" ref={dateRef}>
-        <motion.button
-          type="button"
-          className={`cl-date-btn${hasDateFilter ? ' is-active' : ''}`}
-          onClick={() => {
-            if (!dateOpen) {
-              setDraftFrom(dateFrom)
-              setDraftTo(dateTo)
-            }
-            setDateOpen((o) => !o)
-          }}
-          aria-expanded={dateOpen}
-          whileTap={{ scale: 0.96 }}
-        >
-          <Icon name="flow" size={14} strokeWidth={2} />
+          <Icon name="eye" d={FUNNEL_ICON} size={16} strokeWidth={2} />
           Date filters
+          {activeFilterCount > 0 && (
+            <span className="cl-filter-badge">{activeFilterCount}</span>
+          )}
         </motion.button>
+      </div>
 
-        {dateOpen && (
-          <motion.div
-            className="cl-date-panel"
-            role="dialog"
-            aria-label="Date filter"
-            variants={menuVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <div className="cl-date-field">
-              <label htmlFor="cl-date-from">From</label>
-              <input
-                id="cl-date-from"
-                type="date"
-                value={draftFrom}
-                onChange={(e) => setDraftFrom(e.target.value)}
-              />
-            </div>
-            <div className="cl-date-field">
-              <label htmlFor="cl-date-to">To</label>
-              <input
-                id="cl-date-to"
-                type="date"
-                value={draftTo}
-                onChange={(e) => setDraftTo(e.target.value)}
-              />
-            </div>
-            <div className="cl-date-footer">
-              <button type="button" className="cl-date-reset" onClick={handleDateReset}>
+      {/* ── Date filters panel ── */}
+      {filtersOpen && (
+        <motion.div
+          id="cl-filter-panel"
+          className="cl-filter-panel"
+          variants={panelVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <div className="cl-range">
+            <div className="cl-range__head">
+              <span className="cl-range__title">Created between</span>
+              <button
+                type="button"
+                className="cl-range__reset"
+                onClick={() => onDateChange('', '')}
+              >
                 Reset
               </button>
-              <button type="button" className="cl-date-apply" onClick={handleDateApply}>
-                Apply
+            </div>
+            <div className="cl-range__inputs">
+              <input
+                type="date"
+                aria-label="Created from"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => onDateChange(e.target.value, dateTo)}
+              />
+              <input
+                type="date"
+                aria-label="Created to"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => onDateChange(dateFrom, e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="cl-range">
+            <div className="cl-range__head">
+              <span className="cl-range__title cl-range__title--green">
+                Completed between
+              </span>
+              <button
+                type="button"
+                className="cl-range__reset"
+                onClick={() => changeCompleted('', '')}
+              >
+                Reset
               </button>
             </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* ── Green reset / shuffle button ── */}
-      <motion.button
-        type="button"
-        className="cl-green-btn"
-        title="Reset all filters"
-        aria-label="Reset all filters"
-        onClick={onReset}
-        whileTap={{ scale: 0.88, rotate: 15 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-      >
-        <Icon name="shuffle" size={16} strokeWidth={2} />
-      </motion.button>
+            <div className="cl-range__inputs">
+              <input
+                type="date"
+                aria-label="Completed from"
+                value={doneFrom}
+                max={doneTo || undefined}
+                onChange={(e) => changeCompleted(e.target.value, doneTo)}
+              />
+              <input
+                type="date"
+                aria-label="Completed to"
+                value={doneTo}
+                min={doneFrom || undefined}
+                onChange={(e) => changeCompleted(doneFrom, e.target.value)}
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

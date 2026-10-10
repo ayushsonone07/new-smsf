@@ -4,12 +4,15 @@ import { Icon } from '../shared/Icon'
 import type {
   OnboardingCustomer,
   OnboardingAssignee,
+  OnboardingStatus,
 } from './CustomersList'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
   assignees: OnboardingAssignee[]
   onClose: () => void
+  /** Optional: when passed, a "Full page" button appears in Personal information */
+  onOpenFullPage?: (customer: OnboardingCustomer) => void
 }
 
 type DrawerTab =
@@ -19,123 +22,26 @@ type DrawerTab =
   | 'remarks'
   | 'activity'
 
-interface BusinessItem {
-  id: string
-  name: string
-  location: string
-  status: 'Pending' | 'In progress' | 'Completed'
-  submittedBy: string
+const STATUS_LABEL: Record<OnboardingStatus, string> = {
+  pending: 'Pending',
+  'in-progress': 'In progress',
+  completed: 'Completed',
 }
 
-const SAMPLE_FOUNDER_BUSINESSES: Record<string, BusinessItem[]> = {
-  'cust-onb-1': [
-    {
-      id: 'b-1',
-      name: 'Main · Sector 21',
-      location: 'Sector 21',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-    {
-      id: 'b-2',
-      name: 'Sector 15',
-      location: 'Sector 15',
-      status: 'In progress',
-      submittedBy: 'Branch manager',
-    },
-    {
-      id: 'b-3',
-      name: 'NIT',
-      location: 'NIT',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-  ],
-  'cust-onb-2': [
-    {
-      id: 'b-1',
-      name: 'Main · Sector 21',
-      location: 'Sector 21',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-    {
-      id: 'b-2',
-      name: 'Sector 15',
-      location: 'Sector 15',
-      status: 'In progress',
-      submittedBy: 'Branch manager',
-    },
-    {
-      id: 'b-3',
-      name: 'NIT',
-      location: 'NIT',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-  ],
-  'cust-onb-3': [
-    {
-      id: 'b-4',
-      name: 'Main · Indiranagar',
-      location: 'Indiranagar',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-    {
-      id: 'b-5',
-      name: 'Koramangala',
-      location: 'Koramangala',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-  ],
-  'cust-1': [
-    {
-      id: 'b-1',
-      name: 'Main · Sector 21',
-      location: 'Sector 21',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-    {
-      id: 'b-2',
-      name: 'Sector 15',
-      location: 'Sector 15',
-      status: 'In progress',
-      submittedBy: 'Branch manager',
-    },
-    {
-      id: 'b-3',
-      name: 'NIT',
-      location: 'NIT',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-  ],
-  'cust-2': [
-    {
-      id: 'b-1',
-      name: 'Main · Sector 21',
-      location: 'Sector 21',
-      status: 'Pending',
-      submittedBy: 'Founder',
-    },
-    {
-      id: 'b-2',
-      name: 'Sector 15',
-      location: 'Sector 15',
-      status: 'In progress',
-      submittedBy: 'Branch manager',
-    },
-  ],
-}
+const SERVICE_DOT_COLORS = [
+  '#64748b',
+  '#2459e0',
+  '#16a34a',
+  '#e11d48',
+  '#f59e0b',
+  '#7c3aed',
+  '#0891b2',
+]
 
-/**
- * Customer Onboarding detail drawer / modal.
- * Matches the reference screenshot with founder businesses,
- * stats summary, meeting details, and package info.
- */
+const FORM_ICON =
+  'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6'
+const EXTERNAL_ICON =
+  'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'
 
 const overlayVariants: Variants = {
   hidden: { opacity: 0 },
@@ -155,40 +61,46 @@ const fadeUpVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.22 } },
 }
 
-const bizCardsVariants: Variants = {
-  hidden: {},
-  visible: { transition: { delayChildren: 0.15, staggerChildren: 0.05 } },
+/** Shows "—" for empty values */
+function show(value?: string) {
+  return value && value.trim() ? value : '—'
 }
 
-const bizCardVariants: Variants = {
-  hidden: { opacity: 0, y: 6 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+function Field({
+  label,
+  value,
+  full = false,
+}: {
+  label: string
+  value?: string
+  full?: boolean
+}) {
+  return (
+    <div className={`cl-drawer__field${full ? ' cl-drawer__field--full' : ''}`}>
+      <div className="cl-drawer__field-label">{label}</div>
+      <div className="cl-drawer__field-value">{show(value)}</div>
+    </div>
+  )
 }
 
-const statsRowVariants: Variants = {
-  hidden: {},
-  visible: { transition: { delayChildren: 0.2, staggerChildren: 0.06 } },
-}
-
-const statItemVariants: Variants = {
-  hidden: { opacity: 0, y: 6 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
-}
-
+/**
+ * Customer Onboarding detail drawer.
+ * Takes 40% of the screen width on desktop, 60% on tablet and the full
+ * width on phones. All data comes from the `customer` prop.
+ */
 export function CustomersListModal({
   customer,
   assignees,
   onClose,
+  onOpenFullPage,
 }: CustomersListModalProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview')
-  const [activeBizIndex, setActiveBizIndex] = useState(0)
   const [closing, setClosing] = useState(false)
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
     setPrevCustomerId(customer?.id)
     setActiveTab('overview')
-    setActiveBizIndex(0)
     setClosing(false)
   }
 
@@ -213,25 +125,10 @@ export function CustomersListModal({
   const assignee =
     assignees.find((a) => a.id === customer.assigneeId) ?? null
 
-  const founderBusinesses =
-    SAMPLE_FOUNDER_BUSINESSES[customer.id] || [
-      {
-        id: customer.id,
-        name: customer.businessName,
-        location: 'Main Branch',
-        status:
-          customer.status === 'completed'
-            ? 'Completed'
-            : customer.status === 'in-progress'
-              ? 'In progress'
-              : 'Pending',
-        submittedBy: 'Founder',
-      },
-    ]
-
-  const completedCount = founderBusinesses.filter(
-    (b) => b.status === 'Completed',
-  ).length
+  const services = customer.services ?? []
+  const doneCount = services.filter((s) => s.status === 'completed').length
+  const remarkCount = customer.remarkCount ?? (customer.remark ? 1 : 0)
+  const activityCount = customer.activityCount ?? 0
 
   const initialLetter = (
     customer.contactName || customer.businessName || 'C'
@@ -240,12 +137,13 @@ export function CustomersListModal({
     .charAt(0)
     .toUpperCase()
 
-  const statusLabel =
-    customer.status === 'completed'
-      ? 'Completed'
-      : customer.status === 'in-progress'
-        ? 'In progress'
-        : 'Pending'
+  const tabs: { id: DrawerTab; label: string; count?: number }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'deliverables', label: 'Deliverables', count: services.length },
+    { id: 'business-form', label: 'Business form' },
+    { id: 'remarks', label: 'Remarks', count: remarkCount },
+    { id: 'activity', label: 'Updates', count: activityCount },
+  ]
 
   return (
     <>
@@ -270,7 +168,7 @@ export function CustomersListModal({
           if (closing && definition === 'hidden') onClose()
         }}
       >
-        {/* Drawer Header */}
+        {/* Header */}
         <div className="cl-drawer__header">
           <button
             type="button"
@@ -303,220 +201,188 @@ export function CustomersListModal({
             transition={{ delay: 0.22 }}
           >
             <span className="cl-drawer__spill cl-drawer__spill--status">
-              <Icon name="hourglass" size={12} strokeWidth={2} />
-              {statusLabel}
+              {STATUS_LABEL[customer.status]}
             </span>
-
             <span className="cl-drawer__spill cl-drawer__spill--info">
               Dept: Onboarding
             </span>
-
             <span className="cl-drawer__spill cl-drawer__spill--info">
               Service user: {assignee?.name || 'Unassigned'}
             </span>
-
             <span className="cl-drawer__spill cl-drawer__spill--info">
-              Since {customer.contactDate || '18 Sep 2026'}
+              Since {customer.contactDate}
             </span>
           </motion.div>
         </div>
 
-        {/* Drawer Body */}
+        {/* Body */}
         <div className="cl-drawer__body">
-          {/* Same founder businesses section */}
-          {founderBusinesses.length > 1 && (
-            <div className="cl-drawer__biz-section">
-              <div className="cl-drawer__biz-head">
-                <strong>
-                  <Icon name="link" size={13} strokeWidth={2} />
-                  Same founder · {founderBusinesses.length} businesses
-                </strong>
-                <span>
-                  {completedCount} of {founderBusinesses.length} completed
-                </span>
+          {/* Stat cards */}
+          <div className="cl-drawer__stats">
+            <div className="cl-drawer__stat">
+              <div className="cl-drawer__stat-label">Services</div>
+              <div className="cl-drawer__stat-value">
+                {doneCount}/{services.length}
               </div>
-
-              <motion.div
-                className="cl-drawer__biz-cards"
-                variants={bizCardsVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {founderBusinesses.map((biz, idx) => (
-                  <motion.button
-                    key={biz.id}
-                    type="button"
-                    className={`cl-drawer__biz-card ${
-                      activeBizIndex === idx
-                        ? 'cl-drawer__biz-card--active'
-                        : ''
-                    }`}
-                    variants={bizCardVariants}
-                    onClick={() => setActiveBizIndex(idx)}
-                  >
-                    <div className="cl-drawer__biz-card-dot" />
-                    <div className="cl-drawer__biz-card-name">
-                      {biz.name}
-                    </div>
-                    <div className="cl-drawer__biz-card-sub">
-                      {biz.status} · form by {biz.submittedBy}
-                    </div>
-                  </motion.button>
-                ))}
-              </motion.div>
-
-              <div className="cl-drawer__founder-note">
-                Founder name, phone, email, GST and logo are pre-filled from the
-                main business. Each business has its own package and
-                onboarding. New businesses on {customer.phone} go straight to{' '}
-                {assignee?.name || 'assigned lead'} — round robin is skipped.
-              </div>
-            </div>
-          )}
-
-          {/* Stats summary row */}
-          <motion.div
-            className="cl-drawer__stats"
-            variants={statsRowVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
-              <div className="cl-drawer__stat-label">Service steps</div>
-              <div className="cl-drawer__stat-value">1/8</div>
               <div className="cl-drawer__stat-sub">completed</div>
-            </motion.div>
-
-            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
+            </div>
+            <div className="cl-drawer__stat">
               <div className="cl-drawer__stat-label">Activity</div>
-              <div className="cl-drawer__stat-value">5</div>
+              <div className="cl-drawer__stat-value">{activityCount}</div>
               <div className="cl-drawer__stat-sub">recorded updates</div>
-            </motion.div>
-
-            <motion.div className="cl-drawer__stat" variants={statItemVariants}>
+            </div>
+            <div className="cl-drawer__stat">
               <div className="cl-drawer__stat-label">Remarks</div>
-              <div className="cl-drawer__stat-value">3</div>
-              <div className="cl-drawer__stat-sub">2 customer · 1 internal</div>
-            </motion.div>
-          </motion.div>
-
-          {/* Drawer tab navigation */}
-          <div className="cl-drawer__tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'overview'}
-              className={`cl-drawer__tab-btn ${
-                activeTab === 'overview' ? 'is-active' : ''
-              }`}
-              onClick={() => setActiveTab('overview')}
-            >
-              Overview
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'deliverables'}
-              className={`cl-drawer__tab-btn ${
-                activeTab === 'deliverables' ? 'is-active' : ''
-              }`}
-              onClick={() => setActiveTab('deliverables')}
-            >
-              Deliverables 8
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'business-form'}
-              className={`cl-drawer__tab-btn ${
-                activeTab === 'business-form' ? 'is-active' : ''
-              }`}
-              onClick={() => setActiveTab('business-form')}
-            >
-              Business form
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'remarks'}
-              className={`cl-drawer__tab-btn ${
-                activeTab === 'remarks' ? 'is-active' : ''
-              }`}
-              onClick={() => setActiveTab('remarks')}
-            >
-              Remarks 3
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'activity'}
-              className={`cl-drawer__tab-btn ${
-                activeTab === 'activity' ? 'is-active' : ''
-              }`}
-              onClick={() => setActiveTab('activity')}
-            >
-              Activity 5
-            </button>
+              <div className="cl-drawer__stat-value">{remarkCount}</div>
+              <div className="cl-drawer__stat-sub">internal</div>
+            </div>
           </div>
 
-          {/* Tab Content */}
+          {/* Tabs */}
+          <div className="cl-drawer__tabs" role="tablist">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={`cl-drawer__tab-btn${
+                  activeTab === tab.id ? ' is-active' : ''
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+                {tab.count ? (
+                  <span className="cl-drawer__tab-count">{tab.count}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+
+          {/* Overview */}
           {activeTab === 'overview' && (
             <motion.div
+              className="cl-drawer__stack"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              {/* Meeting card */}
-              <div className="cl-drawer__meeting-card">
-                <div className="cl-drawer__meeting-icon">
-                  <Icon name="calendar" size={18} strokeWidth={2} />
+              <div className="cl-drawer__card">
+                <div className="cl-drawer__card-head">
+                  <h3>Personal information</h3>
+                  {onOpenFullPage && (
+                    <button
+                      type="button"
+                      className="cl-drawer__outline-btn"
+                      onClick={() => onOpenFullPage(customer)}
+                    >
+                      <Icon name="eye" d={EXTERNAL_ICON} size={13} strokeWidth={2} />
+                      Full page
+                    </button>
+                  )}
                 </div>
-                <div className="cl-drawer__meeting-text">
-                  <h4>Meeting on 1 Oct 2026, 11:00 am</h4>
-                  <p>
-                    Google Meet · Website theme demo · booked by{' '}
-                    {assignee?.name || 'lead'}
-                  </p>
+
+                <div className="cl-drawer__fields">
+                  <Field label="Full name" value={customer.contactName} />
+                  <Field label="Business name" value={customer.businessName} />
+                  <Field label="Phone" value={customer.phone} />
+                  <Field label="Email" value={customer.email} />
+                  <Field label="Address" value={customer.address} full />
+                  <Field label="Package" value={customer.packageName} full />
+                  <Field label="GST" value={customer.gstNumber} />
+                  <Field label="Service months" value={customer.serviceMonths} />
+                  <Field label="Sales person" value={customer.salesPerson} />
+                  <Field label="Assigned to" value={assignee?.name} />
                 </div>
               </div>
 
-              {/* Package card */}
-              <div className="cl-drawer__package">
-                <div className="cl-drawer__pkg-header">
-                  <strong>Package</strong>
-                  <span className="cl-drawer__pkg-badge">6 months</span>
+              <div className="cl-drawer__card">
+                <div className="cl-drawer__card-head">
+                  <h3>Included services</h3>
+                  <span className="cl-drawer__card-meta">
+                    {doneCount}/{services.length} completed
+                  </span>
                 </div>
-                <div className="cl-drawer__pkg-label">Package Name</div>
-                <div className="cl-drawer__pkg-name">Digital Card + Website</div>
-                <div className="cl-drawer__pkg-sub">
-                  ₹18,500 · 6 month package · renews Mar 2027
-                </div>
+
+                {services.length === 0 ? (
+                  <div className="cl-drawer__card-meta">
+                    No services added yet.
+                  </div>
+                ) : (
+                  <ul className="cl-drawer__services">
+                    {services.map((service, idx) => (
+                      <li key={`${service.name}-${idx}`} className="cl-drawer__service">
+                        <span
+                          className="cl-drawer__service-dot"
+                          style={{
+                            background:
+                              SERVICE_DOT_COLORS[idx % SERVICE_DOT_COLORS.length],
+                          }}
+                        />
+                        <span className="cl-drawer__service-name">
+                          {service.name}
+                        </span>
+                        <span
+                          className={`cl-drawer__service-pill cl-drawer__service-pill--${service.status}`}
+                        >
+                          {STATUS_LABEL[service.status]}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </motion.div>
           )}
 
+          {/* Remarks */}
           {activeTab === 'remarks' && (
             <motion.div
+              className="cl-drawer__card"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="cl-drawer__package">
-                <div className="cl-drawer__pkg-header">
-                  <strong>Internal Remark</strong>
-                </div>
-                <p style={{ margin: 0, fontSize: 13, color: '#334155' }}>
-                  {customer.remark || 'No internal remarks added yet.'}
-                </p>
+              <div className="cl-drawer__card-head">
+                <h3>Internal Remark</h3>
               </div>
+              <p className="cl-drawer__field-value">
+                {customer.remark || 'No internal remarks added yet.'}
+              </p>
             </motion.div>
           )}
 
-          {activeTab !== 'overview' && activeTab !== 'remarks' && (
+          {/* Business form */}
+          {activeTab === 'business-form' && (
+            <motion.div
+              className="cl-drawer__card"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__card-head">
+                <h3>Business form</h3>
+                {customer.formUrl && (
+                  <button
+                    type="button"
+                    className="cl-drawer__outline-btn"
+                    onClick={() =>
+                      window.open(customer.formUrl, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    <Icon name="eye" d={FORM_ICON} size={13} strokeWidth={2} />
+                    Open client form
+                  </button>
+                )}
+              </div>
+              <p className="cl-drawer__card-meta">
+                Customer submitted onboarding form responses.
+              </p>
+            </motion.div>
+          )}
+
+          {/* Deliverables / Updates placeholders */}
+          {(activeTab === 'deliverables' || activeTab === 'activity') && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -527,9 +393,7 @@ export function CustomersListModal({
                 <p>
                   {activeTab === 'deliverables'
                     ? 'Deliverables checklist and files will appear here.'
-                    : activeTab === 'business-form'
-                      ? 'Customer submitted onboarding form responses.'
-                      : 'Activity logs and status change timeline.'}
+                    : 'Activity logs and status change timeline.'}
                 </p>
               </div>
             </motion.div>
