@@ -6,10 +6,10 @@ import { Avatar } from '../shared/Avatar'
 export type CustomerTab = 'all' | 'pending' | 'in-progress' | 'completed'
 
 export interface TabCounts {
-  all: number
-  pending: number
-  inProgress: number
-  completed: number
+  all?: number
+  pending?: number
+  inProgress?: number
+  completed?: number
 }
 
 export interface AssigneeOption {
@@ -172,7 +172,7 @@ export function CustomersListFilters({
             whileTap={{ scale: 0.95 }}
           >
             {tab.label}
-            <span className="cl-tab__count">{countFor(tab.key)}</span>
+            <span className="cl-tab__count">{countFor(tab.key) ?? '—'}</span>
           </motion.button>
         ))}
       </div>
