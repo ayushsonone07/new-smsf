@@ -35,7 +35,51 @@ export function isRouteMatch(route: DynamicRouteResponse, target: string): boole
   // 1. Direct exact equality
   if (tNorm === nameNorm || tNorm === idNorm) return true
 
-  // 2. Slug aliases (e.g. 'customer-list' <-> 'customers')
+  // 1b. Dashboard routes mapping: /onboarding-user is the user dashboard, /google-head is Google dashboard
+  if (
+    tNorm === 'onboarding-user' ||
+    tNorm === 'onboarding-dashboard-head-departmentuser' ||
+    tNorm === 'onboarding-dashboard-head' ||
+    tNorm === 'onboarding' ||
+    tNorm === 'google-head' ||
+    tNorm === 'google-head/dashboard' ||
+    tNorm === 'google-head-dashboard'
+  ) {
+    return nameNorm === 'dashboard' || idNorm === 'dashboard'
+  }
+
+  // 1c. History route mapping
+  if (
+    tNorm === 'history' ||
+    tNorm === 'task-history' ||
+    tNorm === 'onboarding-dashboard-head-departmentuser-history' ||
+    tNorm === 'onboarding-dashboard-head-history' ||
+    tNorm === 'google-head/history'
+  ) {
+    if (
+      nameNorm === 'history' ||
+      nameNorm === 'task-history' ||
+      nameNorm === 'my-analytics' ||
+      nameNorm === 'analytics' ||
+      idNorm === 'history'
+    ) {
+      return true
+    }
+  }
+
+  // 2. Slug aliases
+  if (
+    (tNorm === 'customer-list' && nameNorm === 'customers') ||
+    (tNorm === 'customers' && nameNorm === 'customer-list') ||
+    (tNorm === 'department-user' && (nameNorm === 'users' || nameNorm === 'department-users')) ||
+    (tNorm === 'users' && (nameNorm === 'department-user' || nameNorm === 'department-users')) ||
+    (tNorm === 'member-flow' && (nameNorm === 'member-performance' || nameNorm === 'members-performance')) ||
+    (tNorm === 'help-support' && (nameNorm === 'help-center' || nameNorm === 'help')) ||
+    (tNorm === 'help-center' && (nameNorm === 'help-support' || nameNorm === 'help'))
+  ) {
+    return true
+  }
+
   const tAlias =
     tNorm === 'customer-list' ? 'customers' : tNorm === 'customers' ? 'customer-list' : tNorm
   if (tAlias === nameNorm) return true

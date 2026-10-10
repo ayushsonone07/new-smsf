@@ -163,6 +163,10 @@ export function DashboardPage() {
 }
 
 function HeadDashboard() {
+  const session = getSession()
+  const currentDepartment =
+    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')

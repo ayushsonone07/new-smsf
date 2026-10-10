@@ -53,6 +53,7 @@ interface DepartmentUsersTableProps {
    * edit/delete disappear (Role B with CAN_READ).
    */
   canEditActions?: boolean
+  dynamicColumns?: Array<{ key: string; label: string }>
 }
 
 /**
@@ -71,6 +72,7 @@ export function DepartmentUsersTable({
   emptyMessage = 'No users found.',
   hiddenColumns,
   canEditActions = true,
+  dynamicColumns = [],
 }: DepartmentUsersTableProps) {
   const [expandedId, setExpandedId] = useState<
     string | null
@@ -100,6 +102,7 @@ export function DepartmentUsersTable({
 
   const columnCount =
     visibleColumnCount +
+    dynamicColumns.length +
     (renderExpanded ? 1 : 0) +
     (showActions ? 1 : 0)
 
@@ -122,6 +125,9 @@ export function DepartmentUsersTable({
             {visible('attendance') ? (
               <th className="is-center">P / A days</th>
             ) : null}
+            {dynamicColumns.map((column) => (
+              <th key={column.key}>{column.label}</th>
+            ))}
             {showActions ? (
               <th className="is-right users-table__actions-head">
                 Actions
@@ -171,6 +177,7 @@ export function DepartmentUsersTable({
                 columnCount={columnCount}
                 showActions={showActions}
                 canEditActions={canEditActions}
+                dynamicColumns={dynamicColumns}
                 onView={onView}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -193,6 +200,7 @@ interface UserRowProps {
   columnCount: number
   showActions: boolean
   canEditActions: boolean
+  dynamicColumns: Array<{ key: string; label: string }>
   onView?: (user: DepartmentUser) => void
   onEdit?: (user: DepartmentUser) => void
   onDelete?: (user: DepartmentUser) => void
@@ -208,6 +216,7 @@ function UserRow({
   columnCount,
   showActions,
   canEditActions,
+  dynamicColumns,
   onView,
   onEdit,
   onDelete,
@@ -300,6 +309,18 @@ function UserRow({
             />
           </td>
         ) : null}
+
+        {dynamicColumns.map((column) => {
+          const value = user.dynamicValues?.[column.key]
+          const displayValue =
+            value === null || value === undefined
+              ? ''
+              : typeof value === 'object'
+                ? JSON.stringify(value)
+                : String(value)
+
+          return <td key={column.key}>{displayValue}</td>
+        })}
 
         {showActions ? (
           <td className="is-right">

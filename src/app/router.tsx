@@ -250,12 +250,22 @@ const onboardingLayoutRoute = createRoute({
 const onboardingIndexRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
+  component: () => {
+    const session = getSession()
+    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    return <HeadIndexPage portalRole={portalRole} />
+  },
 })
 
 const onboardingHeadDashboardRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding-dashboard-head',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const onboardingUserRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-user',
   component: () => <HeadScreenPage screenOverride="dashboard" />,
 })
 
@@ -349,17 +359,123 @@ const onboardingUserHelpCenterRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="help-center" />,
 })
 
+const onboardingHeadHistoryRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
+const onboardingUserHistoryRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
 const onboardingDynamicScreenRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding/$screen',
   component: HeadScreenPage,
 })
 
+const googleLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_google',
+  component: () => <HeadConsoleLayout portalRole="HEAD" />,
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+})
+
+const googleHeadIndexRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const googleHeadDashboardRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/dashboard',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const googleHeadUsersRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/users',
+  component: () => <HeadScreenPage screenOverride="users" />,
+})
+
+const googleHeadCustomersRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/customers',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const googleHeadCustomerListRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/customer-list',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const googleHeadHistoryRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
+const googleHeadAnalyticsRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/analytics',
+  component: () => <HeadScreenPage screenOverride="analytics" />,
+})
+
+const googleHeadServiceFlowRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/service-flow',
+  component: () => <HeadScreenPage screenOverride="service-flow" />,
+})
+
+const googleHeadMemberFlowRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/member-flow',
+  component: () => <HeadScreenPage screenOverride="member-flow" />,
+})
+
+const googleHeadHelpSupportRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/help-support',
+  component: () => <HeadScreenPage screenOverride="help-support" />,
+})
+
+const googleHeadHelpCenterRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/help-center',
+  component: () => <HeadScreenPage screenOverride="help-support" />,
+})
+
+const googleHeadDynamicScreenRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/$screen',
+  component: HeadScreenPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  googleLayoutRoute.addChildren([
+    googleHeadIndexRoute,
+    googleHeadDashboardRoute,
+    googleHeadUsersRoute,
+    googleHeadCustomersRoute,
+    googleHeadCustomerListRoute,
+    googleHeadHistoryRoute,
+    googleHeadAnalyticsRoute,
+    googleHeadServiceFlowRoute,
+    googleHeadMemberFlowRoute,
+    googleHeadHelpSupportRoute,
+    googleHeadHelpCenterRoute,
+    googleHeadDynamicScreenRoute,
+  ]),
   onboardingLayoutRoute.addChildren([
     onboardingIndexRoute,
+    onboardingUserRoute,
     onboardingHeadDashboardRoute,
     onboardingUserDashboardRoute,
     onboardingHeadCustomersRoute,
@@ -376,6 +492,8 @@ const routeTree = rootRoute.addChildren([
     onboardingUserAttendanceRoute,
     onboardingHeadHelpCenterRoute,
     onboardingUserHelpCenterRoute,
+    onboardingHeadHistoryRoute,
+    onboardingUserHistoryRoute,
     onboardingDynamicScreenRoute,
   ]),
   headLayoutRoute.addChildren([

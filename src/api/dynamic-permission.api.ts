@@ -54,6 +54,7 @@ export interface DynamicColumnResponse {
   columnName: string
   departmentType?: string
   departmentId?: number
+  routeId?: string
   routesType?: string
   routeName?: string
   readWriteAccess?: string

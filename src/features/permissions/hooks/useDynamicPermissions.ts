@@ -29,6 +29,7 @@ export function useDynamicRoutes(departmentType?: string) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
+    enabled: Boolean(departmentType),
     staleTime: 0,
     refetchOnMount: 'always',
   })

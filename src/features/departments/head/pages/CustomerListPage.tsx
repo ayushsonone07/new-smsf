@@ -16,11 +16,17 @@ import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
+import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
-import { useOnboardingCustomersList } from '../../hooks/useDepartmentUsersList'
+import {
+  useOnboardingCustomersList,
+  useAuthOnboardingSummary,
+  useDepartmentCustomerRows,
+} from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { getSession } from '../../../../app/auth/session'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -50,6 +56,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
@@ -94,10 +101,27 @@ export function CustomerListPage() {
     }
   }, [isStatusVisible, activeTab])
 
-  // 1. Assigning users API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const session = getSession()
+  const currentDepartment =
+    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const isGoogle = currentDepartment.toUpperCase().includes('GOOGLE')
+  const isUser = session?.user?.role === 'USER'
+  const userEmail = session?.user?.email || session?.user?.username || ''
+
+  // 1. Assigning users API - for Onboarding: ONBOARDING_DEPARTMENT, for Google: GOOGLE_DEPARTMENT
+  const assigningUsersQuery = useAssigningUsers(currentDepartment, {
+    enabled: !isUser,
+  })
 
   const assignees: OnboardingAssignee[] = useMemo(() => {
+    if (isUser) {
+      return [
+        {
+          id: userEmail,
+          name: session?.user?.name || userEmail,
+        },
+      ]
+    }
     const list = assigningUsersQuery.data
     if (list && list.length > 0) {
       return list.map((u) => ({
@@ -106,7 +130,7 @@ export function CustomerListPage() {
       }))
     }
     return FALLBACK_ASSIGNEES
-  }, [assigningUsersQuery.data])
+  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {
@@ -135,17 +159,99 @@ export function CustomerListPage() {
     setPage(0)
   }
 
-  // 3. Onboarding customers live API
+  // 2. Summary counts: /api/auth/onboarding/summary (for onboarding)
+  const authSummaryQuery = useAuthOnboardingSummary({
+    department: currentDepartment,
+    startDate: dateFrom || undefined,
+    endDate: dateTo || undefined,
+    allTime: !dateFrom && !dateTo,
+  })
+
+  // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
   const onboardingApiQuery = useOnboardingCustomersList({
     page,
     size,
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
-    status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+    status:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
   })
 
+  // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
+  const googleCustomerRowsQuery = useDepartmentCustomerRows(
+    {
+      page,
+      size,
+      searchParam: search || undefined,
+      statusFilter: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+      userFilter:
+        selectedAssigneeId !== 'all'
+          ? selectedAssigneeId ?? undefined
+          : undefined,
+      startDate: dateFrom || undefined,
+      endDate: dateTo || undefined,
+      compatible: true,
+    },
+    { enabled: isGoogle },
+  )
+
+  const activeCustomerQuery = isGoogle ? googleCustomerRowsQuery : onboardingApiQuery
+
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
+    if (isGoogle) {
+      const rows = googleCustomerRowsQuery.data?.customers ?? []
+      if (rows.length > 0) {
+        return rows.map((c, index) => {
+          const id = String(c.id ?? c.customerId ?? `c-${index}`)
+          const bName =
+            c.businessName ||
+            c.customerDetails?.businessName ||
+            c.customerDetails?.ownerName ||
+            c.ownerName ||
+            'Customer'
+          const cName =
+            c.ownerName ||
+            c.customerDetails?.ownerName ||
+            c.customerDetails?.businessName ||
+            'Customer'
+          const email = c.email || c.customerDetails?.email || ''
+          const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
+          const s = (c.status || c.onboardingStatus || 'pending').toLowerCase()
+          const status = s.includes('complete')
+            ? 'completed'
+            : s.includes('progress') || s === 'active'
+              ? 'in-progress'
+              : 'pending'
+
+          return {
+            id,
+            rowIndex: index + 1,
+            businessName: bName,
+            contactName: cName,
+            contactDate: c.createdAt
+              ? new Date(c.createdAt).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : 'Recent',
+            email,
+            phone,
+            callStatus: 'connected',
+            status,
+            assigneeId: c.assignedUserEmail ?? null,
+            remark: c.remark ?? '',
+            updatedLabel: 'Just now',
+          }
+        })
+      }
+    }
+
     const apiCustomers = onboardingApiQuery.data?.customers
     if (apiCustomers && apiCustomers.length > 0) {
       return apiCustomers.map((c, index) => ({
@@ -162,6 +268,7 @@ export function CustomerListPage() {
           : 'Recent',
         email: c.email || '',
         phone: c.phoneNumber || '',
+        formUrl: c.onboardingLink,
         callStatus: 'connected',
         status:
           c.onboardingStatus?.toLowerCase() === 'completed'
@@ -205,17 +312,55 @@ export function CustomerListPage() {
       businessIndex: customer.businessIndex,
       duplicateCount: customer.duplicateCount,
     }))
-  }, [onboardingApiQuery.data?.customers, customersQuery.data])
+  }, [isGoogle, googleCustomerRowsQuery.data?.customers, onboardingApiQuery.data?.customers, customersQuery.data])
 
-  const tabCounts = useMemo(
-    () => ({
-      all: onboardingApiQuery.data?.summary?.total,
-      pending: onboardingApiQuery.data?.summary?.pending,
-      inProgress: onboardingApiQuery.data?.summary?.inProgress,
-      completed: onboardingApiQuery.data?.summary?.completed,
-    }),
-    [onboardingApiQuery.data?.summary],
-  )
+  const tabCounts = useMemo(() => {
+    if (isGoogle) {
+      const rows = googleCustomerRowsQuery.data?.customers ?? []
+      const total = googleCustomerRowsQuery.data?.totalElements ?? rows.length
+      return {
+        all: total,
+        pending: rows.filter((r) => (r.status || '').toLowerCase().includes('pending')).length,
+        inProgress: rows.filter((r) => (r.status || '').toLowerCase().includes('progress') || (r.status || '').toUpperCase() === 'ACTIVE').length,
+        completed: rows.filter((r) => (r.status || '').toLowerCase().includes('complete')).length,
+      }
+    }
+
+    const authData = authSummaryQuery.data
+    const apiSummary = onboardingApiQuery.data?.summary
+
+    const all =
+      authData?.totalCustomers ??
+      authData?.total ??
+      authData?.summary?.total ??
+      apiSummary?.total
+
+    const pending =
+      authData?.totalPendingOnboarding ??
+      authData?.pending ??
+      authData?.summary?.pending ??
+      apiSummary?.pending
+
+    const inProgress =
+      authData?.totalInProgressOnboarding ??
+      authData?.inProgress ??
+      authData?.summary?.inProgress ??
+      apiSummary?.inProgress
+
+    const completed =
+      authData?.totalCompletedOnboarding ??
+      authData?.totalOnboardedCustomers ??
+      authData?.completed ??
+      authData?.summary?.completed ??
+      apiSummary?.completed
+
+    return {
+      all,
+      pending,
+      inProgress,
+      completed,
+    }
+  }, [isGoogle, googleCustomerRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -241,22 +386,22 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
 
-  if (customersQuery.isPending && onboardingApiQuery.isPending) {
+  if (customersQuery.isPending && activeCustomerQuery.isPending) {
     return <LoadingState message="Loading customers..." />
   }
 
-  if (customersQuery.isError && onboardingApiQuery.isError) {
+  if (customersQuery.isError && activeCustomerQuery.isError) {
     return (
       <ErrorState
         title="Unable to load customers"
         message={
           customersQuery.error?.message ||
-          onboardingApiQuery.error?.message ||
+          activeCustomerQuery.error?.message ||
           'Failed to load'
         }
         onRetry={() => {
           customersQuery.refetch()
-          onboardingApiQuery.refetch()
+          activeCustomerQuery.refetch()
         }}
       />
     )
@@ -342,6 +487,7 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}

@@ -1568,6 +1568,35 @@
   color: #334155;
 }
 
+.hpage-coming-soon {
+  display: flex;
+  min-height: min(620px, calc(100vh - 190px));
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 32px 20px;
+  color: #64748b;
+  text-align: center;
+}
+
+.hpage-coming-soon__illustration {
+  width: min(240px, 70vw);
+  height: auto;
+  margin-bottom: 20px;
+}
+
+.hpage-coming-soon h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 650;
+}
+
+.hpage-coming-soon p {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
 /* =============================================================
    RESPONSIVE — Additional head.css rules
    Breakpoints: 768 / 480

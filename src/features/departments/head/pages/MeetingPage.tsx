@@ -13,6 +13,7 @@ import {
   useFollowUpMeetingCounts,
 } from '../../hooks/useFollowUpMeetings'
 import { markMeetingDone, type CustomerFollowUpItem } from '../../../../api/meetings.api'
+import { getSession } from '../../../../app/auth/session'
 import './MeetingPage.css'
 
 const controlsVariants: Variants = {
@@ -154,19 +155,25 @@ export function MeetingPage() {
   const [dateTo, setDateTo] = useState('')
   const filterDropdownRef = useRef<HTMLDivElement>(null)
 
-  // 1. Assigning users list API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const session = getSession()
+  const isUser = session?.user?.role === 'USER'
+  const userEmail = session?.user?.email || session?.user?.username || ''
+
+  // 1. Assigning users list API (only for head/admin, disabled for department user)
+  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT', {
+    enabled: !isUser,
+  })
 
   // Common query params
   const baseParams = useMemo(
     () => ({
       departmentType: 'ONBOARDING_DEPARTMENT',
       searchParam: search || undefined,
-      filteredUser: selectedUser || undefined,
+      filteredUser: isUser ? userEmail : (selectedUser || undefined),
       createdAtFrom: dateFrom || undefined,
       createdAtTo: dateTo || undefined,
     }),
-    [search, selectedUser, dateFrom, dateTo],
+    [isUser, userEmail, search, selectedUser, dateFrom, dateTo],
   )
 
   // 2. Counts API (/recent?size=1&days=15 and /due?size=1)
@@ -363,28 +370,30 @@ export function MeetingPage() {
                     </select>
                   </div>
 
-                  <div className="filter-dropdown__field">
-                    <label>Assigned User</label>
-                    <select
-                      className="filter-dropdown__select"
-                      value={selectedUser}
-                      onChange={(e) =>
-                        setSelectedUser(e.target.value)
-                      }
-                    >
-                      <option value="">All Users</option>
-                      {(assigningUsersQuery.data ?? []).map(
-                        (user) => (
-                          <option
-                            key={user.email}
-                            value={user.email}
-                          >
-                            {user.username} ({user.email})
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </div>
+                  {!isUser && (
+                    <div className="filter-dropdown__field">
+                      <label>Assigned User</label>
+                      <select
+                        className="filter-dropdown__select"
+                        value={selectedUser}
+                        onChange={(e) =>
+                          setSelectedUser(e.target.value)
+                        }
+                      >
+                        <option value="">All Users</option>
+                        {(assigningUsersQuery.data ?? []).map(
+                          (user) => (
+                            <option
+                              key={user.email}
+                              value={user.email}
+                            >
+                              {user.username} ({user.email})
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="filter-dropdown__field">
                     <label>Date Range</label>

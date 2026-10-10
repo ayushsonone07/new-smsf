@@ -56,6 +56,7 @@ export interface OnboardedCustomerItem {
   phoneNumber?: string
   email?: string
   onboardingStatus?: string
+  onboardingLink?: string
   createdAt?: string
   assignedUser?: string
   status?: string
@@ -156,8 +157,14 @@ export async function getOnboardingCustomers(params: {
   if (params.page !== undefined) search.set('page', String(params.page))
   if (params.size !== undefined) search.set('size', String(params.size))
   if (params.searchParam) search.set('searchParam', params.searchParam)
-  if (params.startDate) search.set('startDate', params.startDate)
-  if (params.endDate) search.set('endDate', params.endDate)
+  if (params.startDate) {
+    const s = params.startDate.includes('T') ? params.startDate : `${params.startDate}T00:00:00`
+    search.set('startDate', s)
+  }
+  if (params.endDate) {
+    const e = params.endDate.includes('T') ? params.endDate : `${params.endDate}T23:59:59`
+    search.set('endDate', e)
+  }
   if (params.status) search.set('status', params.status)
   if (params.filteredUser) search.set('filteredUser', params.filteredUser)
 
@@ -200,4 +207,79 @@ export async function getAuthOnboardingSummary(params: {
   >(`/api/auth/onboarding/summary?${search.toString()}`)
 
   return (res?.data ?? res) as AuthOnboardingSummary
+}
+
+export interface DepartmentCustomerRowItem {
+  customerId?: number
+  id?: number | string
+  serviceType?: string
+  status?: string
+  createdAt?: string
+  updatedAt?: string
+  customerDetails?: {
+    email?: string
+    ownerName?: string
+    businessName?: string
+    phoneNumber?: string
+    gstNumber?: string
+    address?: string
+    zipCode?: string
+  }
+  assignedUserEmail?: string
+  assignedUserName?: string
+  remark?: string
+  onboardingStatus?: string
+  businessName?: string
+  ownerName?: string
+  email?: string
+  phoneNumber?: string
+  [key: string]: unknown
+}
+
+export interface DepartmentCustomerRowsPageResponse {
+  customers: DepartmentCustomerRowItem[]
+  totalElements: number
+  totalPage: number
+  pageNumber: number
+}
+
+/**
+ * `GET /api/auth/department/customer/rows?page=0&size=10&compatible=true`
+ */
+export async function getDepartmentCustomerRows(params: {
+  page?: number
+  size?: number
+  searchParam?: string
+  statusFilter?: string
+  userFilter?: string
+  startDate?: string
+  endDate?: string
+  compatible?: boolean
+} = {}): Promise<DepartmentCustomerRowsPageResponse> {
+  const search = new URLSearchParams()
+  search.set('page', String(params.page ?? 0))
+  search.set('size', String(params.size ?? 10))
+  search.set('compatible', 'true')
+  if (params.searchParam) search.set('searchParam', params.searchParam)
+  if (params.statusFilter && params.statusFilter !== 'all') search.set('statusFilter', params.statusFilter)
+  if (params.userFilter && params.userFilter !== 'all') search.set('userFilter', params.userFilter)
+  if (params.startDate) search.set('startDate', params.startDate)
+  if (params.endDate) search.set('endDate', params.endDate)
+
+  const res = await authedApiRequest<
+    CustomPageResponseRaw<DepartmentCustomerRowItem> & CustomApiResponseRaw<DepartmentCustomerRowItem[]>
+  >(`/api/auth/department/customer/rows?${search.toString()}`)
+
+  const items = Array.isArray(res?.data)
+    ? res.data
+    : Array.isArray(res?.customers)
+      ? res.customers
+      : []
+
+  return {
+    customers: items,
+    totalElements: res?.totalElements ?? items.length,
+    totalPage: res?.totalPage ?? 1,
+    pageNumber: res?.pageNumber ?? (params.page ?? 0),
+  }
 }

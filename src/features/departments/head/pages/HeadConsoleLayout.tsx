@@ -45,7 +45,13 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
 
   function handleExitImpersonation() {
     if (restoreAdminSession()) {
-      navigate({ to: homeForRole('ADMIN') as never })
+      const restored = getSession()
+      navigate({
+        to: homeForRole(
+          restored?.user.role ?? 'ADMIN',
+          restored?.user.departmentType,
+        ) as never,
+      })
     } else {
       handleLogout()
     }
