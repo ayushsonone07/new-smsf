@@ -100,7 +100,7 @@ export async function authedApiRequest<T>(
     ...options,
     headers: {
       Authorization: `Bearer ${session.token}`,
-      username: session.user.username || session.user.email,
+      username: session.user.email || session.user.username || '',
       ...options.headers,
     },
   })

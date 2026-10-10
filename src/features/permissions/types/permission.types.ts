@@ -34,6 +34,7 @@ export type HeadScreenKey =
   | 'meeting'
   | 'sop'
   | 'help-center'
+  | 'history'
   | 'custom'
 
 /**

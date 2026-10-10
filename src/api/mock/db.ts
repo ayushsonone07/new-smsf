@@ -87,6 +87,14 @@ export const FEATURE_TEMPLATE: Array<{
     defaultEnabled: true,
   },
   {
+    name: 'History',
+    description: 'Task history and performance analytics',
+    screen: 'history',
+    slug: 'history',
+    icon: 'history',
+    defaultEnabled: true,
+  },
+  {
     name: 'Reports',
     description: 'Generate and export reports',
     screen: 'custom',
