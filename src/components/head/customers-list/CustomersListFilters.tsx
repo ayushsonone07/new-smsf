@@ -43,6 +43,7 @@ export interface CustomersListFiltersProps {
   selectedAssigneeId?: string | null | 'all'
   onAssigneeChange?: (id: string | null | 'all') => void
   onReset?: () => void
+  showStatusTabs?: boolean
   onRefresh?: () => void
 }
 

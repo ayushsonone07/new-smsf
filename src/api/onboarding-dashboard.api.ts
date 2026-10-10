@@ -222,3 +222,101 @@ export async function getAuthOnboardingSummary(
 
   return (res?.data ?? res) as AuthOnboardingSummary
 }
+
+/**
+ * `GET /api/onboarding/dashboard/member/{userId}`
+ * Get detailed member report with customers list and statistics.
+ */
+export interface MemberDetailsParams {
+  userId: number | string
+  department?: string
+  startDate?: string
+  endDate?: string
+  page?: number
+  size?: number
+}
+
+export interface OnboardingMemberInfoDTO {
+  userId: number | string
+  name: string
+  email: string
+  avatar?: string
+}
+
+export interface OnboardingDelaySideCountsDTO {
+  clientSide?: number
+  ourSide?: number
+  techSide?: number
+}
+
+export interface OnboardingMemberPerformanceDTO {
+  userId: number | string
+  name: string
+  email: string
+  avatar?: string
+  phone?: string
+  role?: string
+  department?: string
+  active?: boolean
+  allTimeCustomers?: number
+  attendance?: string
+  presentDays?: number
+  absentDays?: number
+  assigned?: number
+  completed?: number
+  delayed?: number
+  target?: number
+  achievedPercentage?: number
+  delaySideCounts?: OnboardingDelaySideCountsDTO
+}
+
+export interface OnboardingDashboardCustomerDTO {
+  customerId?: number | string
+  customerName?: string
+  ownerName?: string
+  email?: string
+  phone?: string
+  city?: string
+  status?: string
+  isDelayed?: boolean
+  delayDays?: number
+  delaySide?: string
+  delayReason?: string
+  remark?: string
+  assignedMemberId?: number | string
+  assignedMember?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface OnboardingMemberDetailsDTO {
+  member?: OnboardingMemberInfoDTO
+  statistics?: OnboardingMemberPerformanceDTO
+  customers?: OnboardingDashboardCustomerDTO[]
+  totalCustomers?: number
+  page?: number
+  size?: number
+  totalPages?: number
+  first?: boolean
+  last?: boolean
+}
+
+export async function getMemberDetails(
+  params: MemberDetailsParams,
+): Promise<OnboardingMemberDetailsDTO> {
+  const { userId, ...queryParams } = params
+  const search = new URLSearchParams()
+
+  search.set('department', queryParams.department ?? summaryDepartment())
+
+  if (queryParams.startDate) search.set('startDate', queryParams.startDate)
+  if (queryParams.endDate) search.set('endDate', queryParams.endDate)
+  if (queryParams.page !== undefined) search.set('page', String(queryParams.page))
+  if (queryParams.size !== undefined) search.set('size', String(queryParams.size))
+
+  const res = await authedApiRequest<
+    { data?: OnboardingMemberDetailsDTO } & OnboardingMemberDetailsDTO
+  >(`/api/onboarding/dashboard/member/${userId}?${search.toString()}`)
+
+  return (res?.data ?? res) as OnboardingMemberDetailsDTO
+}

@@ -56,6 +56,7 @@ export interface OnboardedCustomerItem {
   phoneNumber?: string
   email?: string
   onboardingStatus?: string
+  onboardingLink?: string
   createdAt?: string
   assignedUser?: string
   status?: string
