@@ -19,6 +19,7 @@ import { getSession } from '../../../../app/auth/session'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
@@ -52,6 +53,39 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
     : feature.roleAPermission
   const canEdit =
     screenPermission === 'CAN_EDIT' && columnFeatures.canEdit('actions')
+
+  const { isColumnEnabled, canEditColumn } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+  const isStatusVisible = isColumnEnabled('Status')
+  const canEditStatus = canEditColumn('Status')
+
+  const isAssignToVisible =
+    isColumnEnabled('Assign To') ||
+    isColumnEnabled('Assign') ||
+    isColumnEnabled('Assignee')
+  const canEditAssignTo =
+    canEditColumn('Assign To') ||
+    canEditColumn('Assign') ||
+    canEditColumn('Assignee')
+
+  const isRemarkVisible =
+    isColumnEnabled('Internal Remark') ||
+    isColumnEnabled('Remark')
+  const canEditRemark =
+    canEditColumn('Internal Remark') ||
+    canEditColumn('Remark')
+
+  const isContactVisible =
+    isColumnEnabled('Contact') ||
+    isColumnEnabled('Phone') ||
+    isColumnEnabled('Email')
+
+  const isBusinessVisible =
+    isColumnEnabled('Business') ||
+    isColumnEnabled('Company')
+
+  const isUpdatedVisible =
+    isColumnEnabled('Updated')
 
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(
     () =>
@@ -158,11 +192,21 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
           setDateTo(to)
         }}
         onReset={resetFilters}
+        showStatusTabs={isStatusVisible}
       />
       <CustomersList
         customers={filteredCustomers}
         assignees={ASSIGNEES}
         canEdit={canEdit}
+        showStatus={isStatusVisible}
+        canEditStatus={canEditStatus}
+        showAssignTo={isAssignToVisible}
+        canEditAssignTo={canEditAssignTo}
+        showRemark={isRemarkVisible}
+        canEditRemark={canEditRemark}
+        showContact={isContactVisible}
+        showBusiness={isBusinessVisible}
+        showUpdated={isUpdatedVisible}
         onStatusChange={(id, status) => patchCustomer(id, { status })}
         onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
         onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
@@ -171,6 +215,8 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
       <CustomersListModal
         customer={selectedCustomer}
         assignees={ASSIGNEES}
+        showStatus={isStatusVisible}
+        showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
       />
     </>

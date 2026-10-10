@@ -10,6 +10,8 @@ export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
   assignees: OnboardingAssignee[]
   onClose: () => void
+  showStatus?: boolean
+  showAssignTo?: boolean
 }
 
 type DrawerTab =
@@ -179,6 +181,8 @@ export function CustomersListModal({
   customer,
   assignees,
   onClose,
+  showStatus = true,
+  showAssignTo = true,
 }: CustomersListModalProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>('overview')
   const [activeBizIndex, setActiveBizIndex] = useState(0)
@@ -302,18 +306,22 @@ export function CustomersListModal({
             animate="visible"
             transition={{ delay: 0.22 }}
           >
-            <span className="cl-drawer__spill cl-drawer__spill--status">
-              <Icon name="hourglass" size={12} strokeWidth={2} />
-              {statusLabel}
-            </span>
+            {showStatus && (
+              <span className="cl-drawer__spill cl-drawer__spill--status">
+                <Icon name="hourglass" size={12} strokeWidth={2} />
+                {statusLabel}
+              </span>
+            )}
 
             <span className="cl-drawer__spill cl-drawer__spill--info">
               Dept: Onboarding
             </span>
 
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Service user: {assignee?.name || 'Unassigned'}
-            </span>
+            {showAssignTo && (
+              <span className="cl-drawer__spill cl-drawer__spill--info">
+                Service user: {assignee?.name || 'Unassigned'}
+              </span>
+            )}
 
             <span className="cl-drawer__spill cl-drawer__spill--info">
               Since {customer.contactDate || '18 Sep 2026'}

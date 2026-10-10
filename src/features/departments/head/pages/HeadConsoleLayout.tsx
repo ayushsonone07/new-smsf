@@ -63,10 +63,10 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
         {
           key: 'fetch-rc',
           label: 'Fetch R/C',
-          icon: 'link',
+          icon: 'link' as const,
           to: '/admin/fetch-rc',
         },
-      ]}
+      ].filter((item) => nav.isRouteEnabled(item.key) && nav.isRouteEnabled(item.to))}
       activeKey={slug}
       onNavigate={(item) => {
         if (item.to) navigate({ to: item.to })

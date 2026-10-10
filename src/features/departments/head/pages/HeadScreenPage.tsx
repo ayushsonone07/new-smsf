@@ -36,6 +36,17 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   }
 
   const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
+
+  // Block display if route visibility is 0 or route is disabled
+  if (targetSlug && (!nav.isRouteEnabled(targetSlug) || !nav.isRouteEnabled(location.pathname))) {
+    return (
+      <ErrorState
+        title="Page not available"
+        message="This page is disabled because route visibility is set to 0. Ask the admin to enable it in dynamic permissions."
+      />
+    )
+  }
+
   const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
 
   const Screen = (

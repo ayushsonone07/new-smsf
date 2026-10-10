@@ -39,6 +39,9 @@ export interface CustomersListFiltersProps {
 
   /** Green button: reset all filters */
   onReset: () => void
+
+  /** Whether to show the status filter tabs (hidden if Status column disabled) */
+  showStatusTabs?: boolean
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [
@@ -86,6 +89,7 @@ export function CustomersListFilters({
   dateTo,
   onDateChange,
   onReset,
+  showStatusTabs = true,
 }: CustomersListFiltersProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
@@ -160,22 +164,24 @@ export function CustomersListFilters({
     >
 
       {/* ── Status tabs ── */}
-      <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
-        {TABS.map((tab) => (
-          <motion.button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
-            onClick={() => onTabChange(tab.key)}
-            whileTap={{ scale: 0.95 }}
-          >
-            {tab.label}
-            <span className="cl-tab__count">{countFor(tab.key)}</span>
-          </motion.button>
-        ))}
-      </div>
+      {showStatusTabs && (
+        <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+          {TABS.map((tab) => (
+            <motion.button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
+              onClick={() => onTabChange(tab.key)}
+              whileTap={{ scale: 0.95 }}
+            >
+              {tab.label}
+              <span className="cl-tab__count">{countFor(tab.key)}</span>
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       {/* ── Search (injected from parent) ── */}
       {searchSlot}
