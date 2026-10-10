@@ -1,16 +1,23 @@
-import { useParams } from '@tanstack/react-router'
+import { useLocation, useParams } from '@tanstack/react-router'
 import { useHeadNav } from '../hooks/useHeadNav'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
+import { resolveSlugFromPath } from '../utils/routeUtils'
+import type { FeaturePermission } from '../../../permissions/types/permission.types'
+
+interface HeadScreenPageProps {
+  screenOverride?: string
+}
 
 /**
- * /head/$screen — resolves the slug to an enabled
- * feature and renders that screen's component.
+ * Resolves the slug from route params, screenOverride, or pathname,
+ * and renders that screen's component.
  */
-export function HeadScreenPage() {
+export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   const { screen } = useParams({ strict: false }) as { screen?: string }
+  const location = useLocation()
   const departmentId = useHeadDepartmentId()
   const nav = useHeadNav(departmentId)
 
@@ -28,9 +35,16 @@ export function HeadScreenPage() {
     )
   }
 
-  const feature = screen ? nav.bySlug(screen) : undefined
+  const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
+  const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
 
-  if (!feature) {
+  const Screen = (
+    feature
+      ? SCREEN_REGISTRY[feature.screen]?.component
+      : SCREEN_REGISTRY[targetSlug as keyof typeof SCREEN_REGISTRY]?.component
+  )
+
+  if (!Screen) {
     return (
       <ErrorState
         title="Page not available"
@@ -39,6 +53,22 @@ export function HeadScreenPage() {
     )
   }
 
-  const Screen = SCREEN_REGISTRY[feature.screen].component
-  return <Screen feature={feature} />
+  const effectiveFeature: FeaturePermission = feature ?? {
+    id: targetSlug,
+    departmentId,
+    name: targetSlug.toUpperCase(),
+    description: targetSlug,
+    screen: (targetSlug === 'customer-list' ? 'customers' : targetSlug) as never,
+    slug: targetSlug,
+    icon: 'grid',
+    enabled: true,
+    kind: 'screen',
+    order: 0,
+    userVisible: true,
+    roleAPermission: 'CAN_EDIT',
+    roleBPermission: 'CAN_READ',
+    category: 'screens',
+  }
+
+  return <Screen feature={effectiveFeature} />
 }

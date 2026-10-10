@@ -98,7 +98,22 @@ export function TeamTargetPerformance({
             </tr>
           </thead>
           <tbody>
-            {filteredMembers.map((member) => (
+            {filteredMembers.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={9}
+                  style={{
+                    textAlign: 'center',
+                    padding: '36px 16px',
+                    color: '#64748b',
+                    fontSize: 14,
+                  }}
+                >
+                  No team members found for this period
+                </td>
+              </tr>
+            ) : (
+              filteredMembers.map((member) => (
               <tr
                 key={member.id}
                 onClick={() => onSelectMember(member)}
@@ -198,7 +213,7 @@ export function TeamTargetPerformance({
                   <span className="hdb-row-arrow">›</span>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>

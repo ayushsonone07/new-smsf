@@ -78,12 +78,19 @@ export type HomeRoute =
   | '/users'
   | '/customers'
   | '/forbidden'
+  | '/onboarding'
 
 export function homeForRole(
   role: UserRole,
+  departmentType?: string | null,
 ): HomeRoute {
   if (role === 'ADMIN') {
     return '/admin'
+  }
+
+  const dept = (departmentType ?? getSession()?.user.departmentType ?? '').toUpperCase()
+  if (dept.includes('ONBOARDING')) {
+    return '/onboarding'
   }
 
   if (role === 'HEAD') {

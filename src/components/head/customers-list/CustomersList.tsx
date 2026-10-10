@@ -49,6 +49,8 @@ export interface CustomersListProps {
   onRemarkChange: (id: string, remark: string) => void
   onOpenDetail: (customer: OnboardingCustomer) => void
   canEdit?: boolean
+  showStatus?: boolean
+  canEditStatus?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -118,6 +120,8 @@ export function CustomersList({
   onRemarkChange,
   onOpenDetail,
   canEdit = true,
+  showStatus = true,
+  canEditStatus,
 }: CustomersListProps) {
 if (customers.length === 0) {
     return (
@@ -143,7 +147,7 @@ if (customers.length === 0) {
             <th className="cl-th cl-th--num">#</th>
             <th className="cl-th cl-th--biz">Business</th>
             <th className="cl-th cl-th--contact">Contact</th>
-            <th className="cl-th cl-th--status">Status</th>
+            {showStatus && <th className="cl-th cl-th--status">Status</th>}
             <th className="cl-th cl-th--assign">Assign To</th>
             <th className="cl-th cl-th--remark">Internal Remark</th>
             <th className="cl-th">Updated</th>
@@ -170,6 +174,8 @@ if (customers.length === 0) {
               }
               onOpenDetail={() => onOpenDetail(customer)}
               canEdit={canEdit}
+              showStatus={showStatus}
+              canEditStatus={canEditStatus}
             />
           ))}
         </motion.tbody>
@@ -188,6 +194,8 @@ interface CustomerRowProps {
   onRemarkChange: (remark: string) => void
   onOpenDetail: () => void
   canEdit: boolean
+  showStatus?: boolean
+  canEditStatus?: boolean
 }
 
 function CustomerRow({
@@ -198,6 +206,8 @@ function CustomerRow({
   onRemarkChange,
   onOpenDetail,
   canEdit,
+  showStatus = true,
+  canEditStatus,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -330,53 +340,55 @@ function CustomerRow({
       </td>
 
       {/* Status */}
-      <td className="cl-td">
-        <div className="cl-status-wrap" ref={statusRef}>
-          <button
-            type="button"
-            className={`cl-status-btn ${statusMeta.btnClass}`}
-            onClick={() => setStatusOpen((o) => !o)}
-            disabled={!canEdit}
-            aria-expanded={statusOpen}
-            aria-haspopup="listbox"
-          >
-            <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
-            {statusMeta.label}
-            <Icon name="chevronDown" size={12} strokeWidth={2.5} />
-          </button>
-
-{canEdit && statusOpen && (
-            <motion.div
-              className="cl-status-menu"
-              role="listbox"
-              variants={menuVariants}
-              initial="hidden"
-              animate="visible"
+      {showStatus && (
+        <td className="cl-td">
+          <div className="cl-status-wrap" ref={statusRef}>
+            <button
+              type="button"
+              className={`cl-status-btn ${statusMeta.btnClass}`}
+              onClick={() => setStatusOpen((o) => !o)}
+              disabled={canEditStatus !== undefined ? !canEditStatus : !canEdit}
+              aria-expanded={statusOpen}
+              aria-haspopup="listbox"
             >
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  role="option"
-                  aria-selected={customer.status === opt}
-                  className="cl-status-opt"
-                  onClick={() => {
-                    onStatusChange(opt)
-                    setStatusOpen(false)
-                  }}
-                >
-                  <Icon
-                    name={STATUS_META[opt].icon}
-                    size={13}
-                    strokeWidth={1.8}
-                  />
-                  {STATUS_META[opt].label}
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </div>
-      </td>
+              <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
+              {statusMeta.label}
+              <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+            </button>
+
+            {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && (
+              <motion.div
+                className="cl-status-menu"
+                role="listbox"
+                variants={menuVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    role="option"
+                    aria-selected={customer.status === opt}
+                    className="cl-status-opt"
+                    onClick={() => {
+                      onStatusChange(opt)
+                      setStatusOpen(false)
+                    }}
+                  >
+                    <Icon
+                      name={STATUS_META[opt].icon}
+                      size={13}
+                      strokeWidth={1.8}
+                    />
+                    {STATUS_META[opt].label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </div>
+        </td>
+      )}
 
       {/* Assign To */}
       <td className="cl-td">

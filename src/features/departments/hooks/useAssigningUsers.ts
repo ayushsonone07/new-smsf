@@ -10,7 +10,8 @@ export function useAssigningUsers(
   return useQuery<AssigningUser[]>({
     queryKey: ['assigning-users', departmentType],
     queryFn: () => getAssigningUsers(departmentType),
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

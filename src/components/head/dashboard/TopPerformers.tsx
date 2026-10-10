@@ -32,7 +32,19 @@ export function TopPerformers({
       </div>
 
       <div className="hdb-top-performers-list">
-        {performers.map((item) => (
+        {performers.length === 0 ? (
+          <div
+            style={{
+              padding: '24px 16px',
+              textAlign: 'center',
+              color: '#64748b',
+              fontSize: 13,
+            }}
+          >
+            No performers recorded for this period
+          </div>
+        ) : (
+          performers.map((item) => (
           <div key={item.rank} className="hdb-top-performer-item">
             <div className="hdb-top-performer-left">
               <span className={`hdb-rank-badge hdb-rank-badge--${item.rank}`}>
@@ -48,7 +60,7 @@ export function TopPerformers({
 
             <span className="hdb-top-performer-score">{item.score}</span>
           </div>
-        ))}
+        )))}
       </div>
     </div>
   )
