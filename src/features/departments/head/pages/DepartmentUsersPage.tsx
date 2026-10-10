@@ -36,7 +36,6 @@ import {
   USER_TABLE_COLUMN_KEYS,
 } from '../utils/userColumnMatch'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
-import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
 import type {
   Attendance,
@@ -49,7 +48,6 @@ import type {
   DepartmentUserFormValues,
   DepartmentUserRole,
 } from '../types/head.types'
-import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 type ModalState =
   | { kind: 'none' }
@@ -58,25 +56,12 @@ type ModalState =
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
 
-/** Whether a dynamic column is linked to the current feature/route. */
-function belongsToRoute(
-  column: DynamicColumnResponse,
-  feature: FeaturePermission,
-): boolean {
-  return (
-    column.routeId === feature.id ||
-    column.routesType === feature.id ||
-    column.routeName?.replace(/^\/+|\/+$/g, '').toLowerCase() ===
-      feature.description.replace(/^\/+|\/+$/g, '').toLowerCase()
-  )
-}
-
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
  * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
-export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
+export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -84,41 +69,29 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
   const dynamicColumnsQuery = useDynamicColumns(session?.user.departmentType)
   const isUser = session?.user.role === 'USER'
 
-  const routeColumns = useMemo(
-    () =>
-      (dynamicColumnsQuery.data ?? []).filter((column) => {
-        if (!belongsToRoute(column, feature) || column.visibility === false)
-          return false
-        return isUser ? column.enableUser === true : column.enableHead === true
-      }),
-    [dynamicColumnsQuery.data, feature, isUser],
-  )
-
-  // Columns configured for this route (ignoring the role enable flags) —
-  // tells us whether the API manages this table's columns at all.
-  const routeConfiguredColumns = useMemo(
-    () =>
-      (dynamicColumnsQuery.data ?? []).filter(
-        (column) =>
-          belongsToRoute(column, feature) && column.visibility !== false,
-      ),
-    [dynamicColumnsQuery.data, feature],
-  )
-
-  // Map the API columns onto the table's fixed columns: a fixed column
-  // shows only when the API exposes it for this route and role. Fails open
-  // (shows everything) when no columns are configured for the route yet.
+  // Map the API columns onto the table's fixed columns: a fixed column is
+  // hidden only when the API explicitly disables it for this department and
+  // role. Columns not configured in the DB stay visible (fails open).
   const mappedHiddenColumns = useMemo<DepartmentUserColumnKey[]>(() => {
-    if (routeConfiguredColumns.length === 0) return []
+    const dynamic = dynamicColumnsQuery.data ?? []
 
-    const enabledKeys = new Set(
-      routeColumns
-        .map((column) => resolveUserColumnKey(column.columnName))
-        .filter((key): key is DepartmentUserColumnKey => key !== null),
-    )
+    return USER_TABLE_COLUMN_KEYS.filter((key) => {
+      const matches = dynamic.filter(
+        (column) => resolveUserColumnKey(column.columnName) === key,
+      )
+      // Not configured for this department yet → keep the column visible.
+      if (matches.length === 0) return false
 
-    return USER_TABLE_COLUMN_KEYS.filter((key) => !enabledKeys.has(key))
-  }, [routeColumns, routeConfiguredColumns.length])
+      const anyEnabled = matches.some((column) => {
+        if (column.visibility === false) return false
+        return isUser
+          ? column.enableUser === true && column.roleBPermission !== '0'
+          : column.enableHead === true && column.roleAPermission !== '0'
+      })
+
+      return !anyEnabled
+    })
+  }, [dynamicColumnsQuery.data, isUser])
 
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })

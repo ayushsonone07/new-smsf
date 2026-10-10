@@ -17,6 +17,7 @@ export interface AssigneeOption {
 }
 
 export interface CustomersListFiltersProps {
+  showStatusTabs?: boolean
   /** Active status tab */
   activeTab: CustomerTab
   onTabChange: (tab: CustomerTab) => void
@@ -43,7 +44,6 @@ export interface CustomersListFiltersProps {
   selectedAssigneeId?: string | null | 'all'
   onAssigneeChange?: (id: string | null | 'all') => void
   onReset?: () => void
-  showStatusTabs?: boolean
   onRefresh?: () => void
 }
 
@@ -117,7 +117,11 @@ export function CustomersListFilters({
       {/* ── Header: tabs | search | Date filters ── */}
       <div className="cl-header-row">
         {showStatusTabs !== false && (
-          <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+          <div
+            className="cl-tabs"
+            role="tablist"
+            aria-label="Filter by onboarding status"
+          >
             {TABS.map((tab) => (
               <motion.button
                 key={tab.key}

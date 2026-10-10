@@ -65,6 +65,7 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
   return (
     <HeadShell
       navItems={nav.items}
+      secondaryNavItems={[]}
       activeKey={slug}
       onNavigate={(item) => {
         if (item.to) navigate({ to: item.to })

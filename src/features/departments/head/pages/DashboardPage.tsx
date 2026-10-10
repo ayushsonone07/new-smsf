@@ -31,7 +31,11 @@ import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboar
 import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useAuthOnboardingSummary } from '../../hooks/useAuthOnboardingSummary'
-import type { OnboardingSummaryParams, AuthOnboardingSummaryParams } from '../../../../api/onboarding-dashboard.api'
+import {
+  summaryDepartment,
+  type OnboardingSummaryParams,
+  type AuthOnboardingSummaryParams,
+} from '../../../../api/onboarding-dashboard.api'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -173,18 +177,19 @@ function HeadDashboard() {
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')
   const [refreshKey, setRefreshKey] = useState(0)
+  const department = summaryDepartment()
 
   const range = useMemo(() => rangeFor(datePeriod), [datePeriod])
   const authRange = useMemo(() => rangeForAuth(datePeriod), [datePeriod])
 
   const summaryParams: OnboardingSummaryParams = useMemo(
     () => ({
-      department: currentDepartment,
+      department,
       startDate: range.startDate,
       endDate: range.endDate,
       allTime: range.allTime,
     }),
-    [currentDepartment, range],
+    [range, department],
   )
 
   const summaryQuery = useOnboardingDashboardSummary(summaryParams)
@@ -192,12 +197,12 @@ function HeadDashboard() {
   // Additional call to /api/auth/onboarding/summary with ISO datetime
   const authSummaryParams: AuthOnboardingSummaryParams = useMemo(
     () => ({
-      department: currentDepartment,
+      department,
       startDate: authRange.startDate,
       endDate: authRange.endDate,
       allTime: authRange.allTime,
     }),
-    [currentDepartment, authRange],
+    [authRange, department],
   )
 
   const authSummaryQuery = useAuthOnboardingSummary(authSummaryParams)
@@ -210,13 +215,13 @@ function HeadDashboard() {
       endDate: range.endDate,
       allTime: range.allTime,
     }),
-    [currentDepartment, range],
+    [range, department],
   )
 
   const infiniteMembersQuery = useInfiniteOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers(currentDepartment)
   const { refetch: refetchPermissions } =
-    useDepartmentColumnPermissions(currentDepartment)
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1)
@@ -362,6 +367,8 @@ function HeadDashboard() {
       />
     )
   }
+
+
 
   const activeDays = summaryQuery.data?.mostActiveDay?.map((d) => ({
     day: d.day,

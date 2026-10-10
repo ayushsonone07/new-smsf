@@ -67,6 +67,7 @@ export interface CustomersListProps {
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
+  /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
   showContact?: boolean
@@ -152,7 +153,7 @@ export function CustomersList({
   showBusiness = true,
   showUpdated = false,
 }: CustomersListProps) {
-if (customers.length === 0) {
+  if (customers.length === 0) {
     return (
       <motion.div
         className="cl-table-wrapper"
@@ -429,9 +430,16 @@ function CustomerRow({
             </button>
           </div>
 
+        <span
+          className={`cl-contact-pill cl-contact-pill--${
+            customer.callStatus === 'connected' ? 'connected' : 'not-answered'
+          }`}
+        >
           <span
-            className={`cl-contact-pill cl-contact-pill--${
-              customer.callStatus === 'connected' ? 'connected' : 'not-answered'
+            className={`cl-contact-dot cl-contact-dot--${
+              customer.callStatus === 'connected'
+                ? 'connected'
+                : 'not-answered'
             }`}
           >
             <span
