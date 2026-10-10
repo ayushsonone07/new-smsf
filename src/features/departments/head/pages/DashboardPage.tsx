@@ -159,6 +159,10 @@ export function DashboardPage() {
 }
 
 function HeadDashboard() {
+  const session = getSession()
+  const currentDepartment =
+    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')
@@ -169,12 +173,12 @@ function HeadDashboard() {
 
   const summaryParams: OnboardingSummaryParams = useMemo(
     () => ({
-      department: 'ONBOARDING_DEPARTMENT',
+      department: currentDepartment,
       startDate: range.startDate,
       endDate: range.endDate,
       allTime: range.allTime,
     }),
-    [range],
+    [currentDepartment, range],
   )
 
   const summaryQuery = useOnboardingDashboardSummary(summaryParams)
@@ -182,32 +186,32 @@ function HeadDashboard() {
   // Additional call to /api/auth/onboarding/summary with ISO datetime
   const authSummaryParams: AuthOnboardingSummaryParams = useMemo(
     () => ({
-      department: 'ONBOARDING_DEPARTMENT',
+      department: currentDepartment,
       startDate: authRange.startDate,
       endDate: authRange.endDate,
       allTime: authRange.allTime,
     }),
-    [authRange],
+    [currentDepartment, authRange],
   )
 
   const authSummaryQuery = useAuthOnboardingSummary(authSummaryParams)
 
   const membersParams = useMemo(
     () => ({
-      department: 'ONBOARDING_DEPARTMENT',
+      department: currentDepartment,
       page: 0,
       size: 10,
       startDate: range.startDate,
       endDate: range.endDate,
       allTime: range.allTime,
     }),
-    [range],
+    [currentDepartment, range],
   )
 
   const membersQuery = useOnboardingDashboardMembers(membersParams)
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
+  const assigningUsersQuery = useAssigningUsers(currentDepartment)
   const { refetch: refetchPermissions } =
-    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+    useDepartmentColumnPermissions(currentDepartment)
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1)

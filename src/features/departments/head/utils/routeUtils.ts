@@ -20,11 +20,54 @@ export function buildOnboardingRoute(slug: string, role?: string): string {
     : `/onboarding-dashboard-head-${normalizedSlug}`
 }
 
+export function isUserGoogle(departmentType?: string | null): boolean {
+  if (!departmentType) return false
+  return departmentType.toUpperCase().includes('GOOGLE')
+}
+
+export function buildGoogleRoute(slug: string, _role?: string): string {
+  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
+  if (normalizedSlug === 'dashboard') {
+    return '/google-head'
+  }
+  return `/google-head/${normalizedSlug}`
+}
+
+export function buildDepartmentRoute(
+  slug: string,
+  departmentType?: string | null,
+  role?: string,
+): string {
+  if (isUserGoogle(departmentType)) {
+    return buildGoogleRoute(slug, role)
+  }
+  if (isUserOnboarding(departmentType)) {
+    return buildOnboardingRoute(slug, role)
+  }
+  const basePath = role === 'USER' ? '/users' : '/head'
+  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
+  return `${basePath}/${normalizedSlug}`
+}
+
 export function resolveSlugFromPath(
   pathname: string,
   portalRole?: HeadRole | string,
 ): string {
   const p = pathname.replace(/\/+$/, '')
+
+  if (p === '/google-head' || p === '/google-head/dashboard') {
+    return 'dashboard'
+  }
+
+  if (p.startsWith('/google-head/')) {
+    const s = p.replace('/google-head/', '')
+    return s === 'customer-list' ? 'customers' : s
+  }
+
+  if (p.startsWith('/google-head-')) {
+    const s = p.replace('/google-head-', '')
+    return s === 'customer-list' ? 'customers' : s
+  }
 
   if (
     p === '/onboarding' ||

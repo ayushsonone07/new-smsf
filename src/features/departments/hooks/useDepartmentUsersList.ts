@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getDepartmentUsers,
   getOnboardingCustomers,
+  getDepartmentCustomerRows,
   type DepartmentUsersPageResponse,
   type OnboardedCustomersPageResponse,
+  type DepartmentCustomerRowsPageResponse,
 } from '../../../api/department-users.api'
 import {
   getAuthOnboardingSummary,
@@ -44,6 +46,27 @@ export function useAuthOnboardingSummary(params: AuthOnboardingSummaryParams = {
   return useQuery<AuthOnboardingSummary>({
     queryKey: ['auth-onboarding-summary', params],
     queryFn: () => getAuthOnboardingSummary(params),
+    staleTime: 30_000,
+  })
+}
+
+export function useDepartmentCustomerRows(
+  params: {
+    page?: number
+    size?: number
+    searchParam?: string
+    statusFilter?: string
+    userFilter?: string
+    startDate?: string
+    endDate?: string
+    compatible?: boolean
+  } = {},
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepartmentCustomerRowsPageResponse>({
+    queryKey: ['department-customer-rows', params],
+    queryFn: () => getDepartmentCustomerRows(params),
+    enabled: options?.enabled ?? true,
     staleTime: 30_000,
   })
 }

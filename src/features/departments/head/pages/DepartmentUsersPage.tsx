@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -21,7 +20,12 @@ import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import { generateDepartmentSession } from '../../../../api/auth.api'
-import { getSession, saveAdminBackup, setSession } from '../../../../app/auth/session'
+import {
+  getSession,
+  saveAdminBackup,
+  homeForRole,
+  openSessionInNewTab,
+} from '../../../../app/auth/session'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -40,7 +44,6 @@ type ModalState =
  * - GET /api/auth/department/users?page=0&size=10
  */
 export function DepartmentUsersPage() {
-  const navigate = useNavigate()
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -66,9 +69,12 @@ export function DepartmentUsersPage() {
       }
 
       const newSession = await generateDepartmentSession(email)
-      setSession(newSession)
+      const targetRoute = homeForRole(
+        newSession.user.role as never,
+        newSession.user.departmentType,
+      )
 
-      navigate({ to: '/onboarding-user' as never })
+      openSessionInNewTab(newSession, targetRoute)
     } catch (err: unknown) {
       console.error('Failed to log in as department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to log in as user'

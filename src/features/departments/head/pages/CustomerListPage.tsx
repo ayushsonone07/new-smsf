@@ -22,6 +22,7 @@ import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
+  useDepartmentCustomerRows,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
@@ -99,11 +100,14 @@ export function CustomerListPage() {
   }, [isStatusVisible, activeTab])
 
   const session = getSession()
+  const currentDepartment =
+    session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const isGoogle = currentDepartment.toUpperCase().includes('GOOGLE')
   const isUser = session?.user?.role === 'USER'
   const userEmail = session?.user?.email || session?.user?.username || ''
 
-  // 1. Assigning users API - disabled for department users
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT', {
+  // 1. Assigning users API - for Onboarding: ONBOARDING_DEPARTMENT, for Google: GOOGLE_DEPARTMENT
+  const assigningUsersQuery = useAssigningUsers(currentDepartment, {
     enabled: !isUser,
   })
 
@@ -153,15 +157,15 @@ export function CustomerListPage() {
     setPage(0)
   }
 
-  // 2. Summary counts: /api/auth/onboarding/summary
+  // 2. Summary counts: /api/auth/onboarding/summary (for onboarding)
   const authSummaryQuery = useAuthOnboardingSummary({
-    department: 'ONBOARDING_DEPARTMENT',
+    department: currentDepartment,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
     allTime: !dateFrom && !dateTo,
   })
 
-  // 3. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
+  // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
   const onboardingApiQuery = useOnboardingCustomersList({
     page,
     size,
@@ -176,7 +180,76 @@ export function CustomerListPage() {
         : undefined,
   })
 
+  // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
+  const googleCustomerRowsQuery = useDepartmentCustomerRows(
+    {
+      page,
+      size,
+      searchParam: search || undefined,
+      statusFilter: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+      userFilter:
+        selectedAssigneeId !== 'all'
+          ? selectedAssigneeId ?? undefined
+          : undefined,
+      startDate: dateFrom || undefined,
+      endDate: dateTo || undefined,
+      compatible: true,
+    },
+    { enabled: isGoogle },
+  )
+
+  const activeCustomerQuery = isGoogle ? googleCustomerRowsQuery : onboardingApiQuery
+
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
+    if (isGoogle) {
+      const rows = googleCustomerRowsQuery.data?.customers ?? []
+      if (rows.length > 0) {
+        return rows.map((c, index) => {
+          const id = String(c.id ?? c.customerId ?? `c-${index}`)
+          const bName =
+            c.businessName ||
+            c.customerDetails?.businessName ||
+            c.customerDetails?.ownerName ||
+            c.ownerName ||
+            'Customer'
+          const cName =
+            c.ownerName ||
+            c.customerDetails?.ownerName ||
+            c.customerDetails?.businessName ||
+            'Customer'
+          const email = c.email || c.customerDetails?.email || ''
+          const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
+          const s = (c.status || c.onboardingStatus || 'pending').toLowerCase()
+          const status = s.includes('complete')
+            ? 'completed'
+            : s.includes('progress') || s === 'active'
+              ? 'in-progress'
+              : 'pending'
+
+          return {
+            id,
+            rowIndex: index + 1,
+            businessName: bName,
+            contactName: cName,
+            contactDate: c.createdAt
+              ? new Date(c.createdAt).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : 'Recent',
+            email,
+            phone,
+            callStatus: 'connected',
+            status,
+            assigneeId: c.assignedUserEmail ?? null,
+            remark: c.remark ?? '',
+            updatedLabel: 'Just now',
+          }
+        })
+      }
+    }
+
     const apiCustomers = onboardingApiQuery.data?.customers
     if (apiCustomers && apiCustomers.length > 0) {
       return apiCustomers.map((c, index) => ({
@@ -236,9 +309,20 @@ export function CustomerListPage() {
       businessIndex: customer.businessIndex,
       duplicateCount: customer.duplicateCount,
     }))
-  }, [onboardingApiQuery.data?.customers, customersQuery.data])
+  }, [isGoogle, googleCustomerRowsQuery.data?.customers, onboardingApiQuery.data?.customers, customersQuery.data])
 
   const tabCounts = useMemo(() => {
+    if (isGoogle) {
+      const rows = googleCustomerRowsQuery.data?.customers ?? []
+      const total = googleCustomerRowsQuery.data?.totalElements ?? rows.length
+      return {
+        all: total,
+        pending: rows.filter((r) => (r.status || '').toLowerCase().includes('pending')).length,
+        inProgress: rows.filter((r) => (r.status || '').toLowerCase().includes('progress') || (r.status || '').toUpperCase() === 'ACTIVE').length,
+        completed: rows.filter((r) => (r.status || '').toLowerCase().includes('complete')).length,
+      }
+    }
+
     const authData = authSummaryQuery.data
     const apiSummary = onboardingApiQuery.data?.summary
 
@@ -273,7 +357,7 @@ export function CustomerListPage() {
       inProgress,
       completed,
     }
-  }, [authSummaryQuery.data, onboardingApiQuery.data?.summary])
+  }, [isGoogle, googleCustomerRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -299,22 +383,22 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
 
-  if (customersQuery.isPending && onboardingApiQuery.isPending) {
+  if (customersQuery.isPending && activeCustomerQuery.isPending) {
     return <LoadingState message="Loading customers..." />
   }
 
-  if (customersQuery.isError && onboardingApiQuery.isError) {
+  if (customersQuery.isError && activeCustomerQuery.isError) {
     return (
       <ErrorState
         title="Unable to load customers"
         message={
           customersQuery.error?.message ||
-          onboardingApiQuery.error?.message ||
+          activeCustomerQuery.error?.message ||
           'Failed to load'
         }
         onRetry={() => {
           customersQuery.refetch()
-          onboardingApiQuery.refetch()
+          activeCustomerQuery.refetch()
         }}
       />
     )
