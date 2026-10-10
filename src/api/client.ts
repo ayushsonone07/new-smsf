@@ -53,6 +53,7 @@ export async function apiRequest<T>(
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'ngrok-skip-browser-warning': 'true',
       ...options.headers,
     },
   })
@@ -75,7 +76,16 @@ export async function apiRequest<T>(
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  const contentType = response.headers.get('content-type')
+  if (contentType && !contentType.includes('application/json')) {
+    throw new ApiError(`Expected JSON response but received ${contentType}`, response.status)
+  }
+
+  try {
+    return (await response.json()) as T
+  } catch {
+    throw new ApiError('Failed to parse API response as JSON', response.status)
+  }
 }
 
 /**

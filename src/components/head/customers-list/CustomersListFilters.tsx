@@ -17,6 +17,7 @@ export interface AssigneeOption {
 }
 
 export interface CustomersListFiltersProps {
+  showStatusTabs?: boolean
   /** Active status tab */
   activeTab: CustomerTab
   onTabChange: (tab: CustomerTab) => void
@@ -73,6 +74,7 @@ const panelVariants: Variants = {
  * screens and stack on narrow ones.
  */
 export function CustomersListFilters({
+  showStatusTabs,
   activeTab,
   onTabChange,
   tabCounts,
@@ -114,22 +116,28 @@ export function CustomersListFilters({
     >
       {/* ── Header: tabs | search | Date filters ── */}
       <div className="cl-header-row">
-        <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
-          {TABS.map((tab) => (
-            <motion.button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
-              onClick={() => onTabChange(tab.key)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {tab.label}
-              <span className="cl-tab__count">{countFor(tab.key)}</span>
-            </motion.button>
-          ))}
-        </div>
+        {showStatusTabs !== false && (
+          <div
+            className="cl-tabs"
+            role="tablist"
+            aria-label="Filter by onboarding status"
+          >
+            {TABS.map((tab) => (
+              <motion.button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                className={`cl-tab${activeTab === tab.key ? ' is-active' : ''}`}
+                onClick={() => onTabChange(tab.key)}
+                whileTap={{ scale: 0.95 }}
+              >
+                {tab.label}
+                <span className="cl-tab__count">{countFor(tab.key)}</span>
+              </motion.button>
+            ))}
+          </div>
+        )}
 
         {searchSlot}
 

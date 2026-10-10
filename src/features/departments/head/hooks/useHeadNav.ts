@@ -34,7 +34,9 @@ export function useHeadNav(departmentId: string) {
             feature.enabled &&
             (role !== 'USER' || feature.userVisible !== false) &&
             routePerms.isRouteEnabled(feature.slug) &&
-            routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
+            routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)) &&
+            // Hide "Fetch R/C" from the sidebar for every role (ADMIN, HEAD, USER)
+            feature.slug !== 'fetch-rc',
         )
         .sort((a, b) => a.order - b.order),
     [query.data, role, routePerms],

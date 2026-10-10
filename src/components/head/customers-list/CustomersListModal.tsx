@@ -11,6 +11,9 @@ export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
   assignees: OnboardingAssignee[]
   onClose: () => void
+  /* Accepted so existing pages keep compiling */
+  showStatus?: boolean
+  showAssignTo?: boolean
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
 }

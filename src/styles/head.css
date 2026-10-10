@@ -67,7 +67,7 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  width: 200px;
+  width: clamp(200px, 20vw, 320px);
   height: 100vh;
   background: #fff;
   border-right: 1px solid var(--c-border);
@@ -131,7 +131,9 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--c-blue);
-  white-space: nowrap;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hbrand__toggle {
@@ -618,7 +620,7 @@
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1024px) {
   .htop__menu-btn {
     display: grid;
   }
@@ -636,6 +638,11 @@
     width: 0;
     overflow: hidden;
     border: 0;
+  }
+
+  /* Main content offset for fixed sidebar */
+  .hside:not(.is-collapsed) ~ .hmain {
+    margin-left: clamp(200px, 20vw, 320px);
   }
 
   .hside-backdrop.is-visible {
@@ -691,7 +698,7 @@
 /* --- Sidebar (overrides for wider head panel) ---------------- */
 
 .hside {
-  width: 360px;
+  width: clamp(200px, 20vw, 320px);
   border-right: 1px solid var(--head-border);
 }
 
@@ -717,6 +724,9 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--head-blue);
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hnav__item {
@@ -802,6 +812,9 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--head-blue);
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .head-brand__toggle {

@@ -27,8 +27,7 @@
 }
 
 .cdb-sidebar {
-  width: 236px;
-  flex: flex-shrink-0;
+  width: clamp(200px, 20vw, 320px);
   flex-shrink: 0;
   height: 100vh;
   position: sticky;
@@ -1145,6 +1144,11 @@
 
   .cdb-sidebar.is-collapsed {
     transform: translateX(-100%);
+  }
+
+  /* Main content offset for fixed sidebar */
+  .cdb-sidebar:not(.is-collapsed) ~ .cdb-main {
+    margin-left: clamp(200px, 20vw, 320px);
   }
 
   .cdb-services-grid {
