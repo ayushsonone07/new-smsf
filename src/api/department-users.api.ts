@@ -16,7 +16,13 @@ export interface DepartmentUserApiItem {
   presentDays?: number
   absentDays?: number
   isPresentToday?: boolean
-  users?: DepartmentUserApiItem[]
+  totalCustomers?: number
+  totalCompletedCustomers?: number
+  totalPendingCustomers?: number
+  isSeniorUser?: boolean
+  isAddUserDb?: boolean
+  departmentType?: string
+  updatedAt?: string
 }
 
 export interface DepartmentUsersPageResponse {
@@ -25,6 +31,21 @@ export interface DepartmentUsersPageResponse {
   totalPage: number
   pageNumber: number
   elementSize: number
+}
+
+interface DepartmentUsersResponse {
+  departmentId?: number | string
+  username?: string
+  email?: string
+  contact?: string
+  departmentType?: string
+  role?: string
+  createdAt?: string
+  isHead?: boolean
+  headUser?: string
+  users?: DepartmentUserApiItem[]
+  departmentSubUsers?: DepartmentUserApiItem[]
+  sfpUsers?: DepartmentUserApiItem[]
 }
 
 export interface OnboardedCustomerItem {
@@ -45,6 +66,14 @@ export interface OnboardedCustomersPageResponse {
   totalElements: number
   totalPage: number
   pageNumber: number
+  summary?: OnboardedCustomersSummary
+}
+
+export interface OnboardedCustomersSummary {
+  total?: number
+  pending?: number
+  inProgress?: number
+  completed?: number
 }
 
 export interface AuthOnboardingSummary {
@@ -63,6 +92,7 @@ interface CustomPageResponseRaw<T> {
   totalPage?: number
   pageNumber?: number
   elementSize?: number
+  summary?: OnboardedCustomersSummary
   success?: boolean
   message?: string
 }
@@ -76,6 +106,10 @@ interface CustomApiResponseRaw<T> {
 
 /**
  * `GET /api/auth/department/users`
+ * 
+ * Backend returns: CustomPageResponse<DepartmentUsersResponse>
+ * where data is List<DepartmentUsersResponse> with ONE element (the head user's response)
+ * and the actual users are in data[0].users (List<DepartmentUsersDetail>)
  */
 export async function getDepartmentUsers(params: {
   page?: number
@@ -87,11 +121,16 @@ export async function getDepartmentUsers(params: {
   if (params.size !== undefined) search.set('size', String(params.size))
   if (params.search) search.set('search', params.search)
 
-  const res = await authedApiRequest<CustomPageResponseRaw<DepartmentUserApiItem>>(
+  const res = await authedApiRequest<CustomPageResponseRaw<DepartmentUsersResponse>>(
     `/api/auth/department/users?${search.toString()}`,
   )
 
-  const items = Array.isArray(res?.data) ? res.data : []
+  // Backend returns data as List<DepartmentUsersResponse> with one element
+  // The actual users are in data[0].users
+  const responseData = Array.isArray(res?.data) ? res.data : []
+  const headUserResponse = responseData[0]
+  const items = headUserResponse?.users ?? []
+
   return {
     data: items,
     totalElements: res?.totalElements ?? items.length,
@@ -137,6 +176,7 @@ export async function getOnboardingCustomers(params: {
     totalElements: res?.totalElements ?? items.length,
     totalPage: res?.totalPage ?? 1,
     pageNumber: res?.pageNumber ?? 0,
+    summary: res?.summary,
   }
 }
 
@@ -161,4 +201,3 @@ export async function getAuthOnboardingSummary(params: {
 
   return (res?.data ?? res) as AuthOnboardingSummary
 }
-

@@ -5,10 +5,10 @@ import { Icon } from '../shared/Icon'
 export type CustomerTab = 'all' | 'pending' | 'in-progress' | 'completed'
 
 export interface TabCounts {
-  all: number
-  pending: number
-  inProgress: number
-  completed: number
+  all?: number
+  pending?: number
+  inProgress?: number
+  completed?: number
 }
 
 export interface AssigneeOption {

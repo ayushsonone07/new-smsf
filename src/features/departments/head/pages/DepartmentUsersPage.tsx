@@ -18,12 +18,7 @@ import {
 } from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import {
-  useDepartmentUsersList,
-  useOnboardingCustomersList,
-  useAuthOnboardingSummary,
-} from '../../hooks/useDepartmentUsersList'
-import { useAssigningUsers } from '../../hooks/useAssigningUsers'
+import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -40,9 +35,6 @@ type ModalState =
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
- * - GET /api/meetings/users/assigning-list?departmentType=ONBOARDING_DEPARTMENT
- * - GET /api/auth/onboarding/customers?page=0&size=10
- * - GET /api/auth/onboarding/summary
  */
 export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
@@ -53,26 +45,20 @@ export function DepartmentUsersPage() {
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+  const [page, setPage] = useState(0)
+  const [size] = useState(10)
 
-  // 1. Department Users API
+  // Reset to page 0 when search changes
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(0)
+  }
+
+  // Only Department Users API
   const departmentUsersQuery = useDepartmentUsersList({
-    page: 0,
-    size: 10,
+    page,
+    size,
     search,
-  })
-
-  // 2. Assigning List API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
-
-  // 3. Onboarding Customers API
-  const onboardingCustomersQuery = useOnboardingCustomersList({
-    page: 0,
-    size: 10,
-  })
-
-  // 4. Onboarding Summary API
-  const authSummaryQuery = useAuthOnboardingSummary({
-    department: 'ONBOARDING_DEPARTMENT',
   })
 
   // Map API users to DepartmentUser table structure, with fallback to mock data
@@ -204,7 +190,7 @@ export function DepartmentUsersPage() {
       <div className="head-toolbar">
         <SearchBar
           value={search}
-          onChange={setSearch}
+          onChange={handleSearchChange}
           placeholder="Search by name, number or email"
         />
 
@@ -226,31 +212,12 @@ export function DepartmentUsersPage() {
         meta={
           <>
             <Pill tone="info" size="sm">
-              {users.length} users
+              {departmentUsersQuery.data?.totalElements ?? users.length} users
             </Pill>
 
             <Pill tone="success" size="sm">
               {presentToday} present today
             </Pill>
-
-            {assigningUsersQuery.data &&
-            assigningUsersQuery.data.length > 0 ? (
-              <Pill tone="neutral" size="sm">
-                {assigningUsersQuery.data.length} assignable
-              </Pill>
-            ) : null}
-
-            {authSummaryQuery.data?.totalCustomers !== undefined ? (
-              <Pill tone="neutral" size="sm">
-                {authSummaryQuery.data.totalCustomers} total customers
-              </Pill>
-            ) : null}
-
-            {onboardingCustomersQuery.data?.totalElements !== undefined ? (
-              <Pill tone="warning" size="sm">
-                {onboardingCustomersQuery.data.totalElements} onboarding queue
-              </Pill>
-            ) : null}
           </>
         }
         hint="Attendance & achievement · this month"
@@ -270,6 +237,29 @@ export function DepartmentUsersPage() {
           )}
         />
       </SectionCard>
+
+      {/* Pagination */}
+      {departmentUsersQuery.data && departmentUsersQuery.data.totalPage > 1 && (
+        <div className="pagination">
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || departmentUsersQuery.isFetching}
+          >
+            Previous
+          </button>
+          <span className="pagination-info">
+            Page {page + 1} of {departmentUsersQuery.data.totalPage}
+          </span>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.min(departmentUsersQuery.data.totalPage - 1, p + 1))}
+            disabled={page >= departmentUsersQuery.data.totalPage - 1 || departmentUsersQuery.isFetching}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {canManageUsers ? (
         <UserFormModal
