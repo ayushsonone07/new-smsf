@@ -250,7 +250,11 @@ const onboardingLayoutRoute = createRoute({
 const onboardingIndexRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
+  component: () => {
+    const session = getSession()
+    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    return <HeadIndexPage portalRole={portalRole} />
+  },
 })
 
 const onboardingHeadDashboardRoute = createRoute({

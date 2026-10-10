@@ -47,6 +47,8 @@ export interface DepartmentUser {
   absentDays: number
   isPresentToday: boolean
   avatarSrc?: string
+  /** Unmodified backend row used by admin-created dynamic columns. */
+  dynamicValues?: Record<string, unknown>
 }
 
 export interface DepartmentUserFormValues {
