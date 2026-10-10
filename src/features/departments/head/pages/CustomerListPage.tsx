@@ -16,6 +16,7 @@ import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
+import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
@@ -62,6 +63,7 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
   const [page, setPage] = useState(0)
   const [size] = useState(10)
 
@@ -172,22 +174,19 @@ export function CustomerListPage() {
   )
 
   // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
-  const onboardingApiQuery = useOnboardingCustomersList(
-    {
-      page,
-      size,
-      searchParam: search || undefined,
-      startDate: dateFrom || undefined,
-      endDate: dateTo || undefined,
-      status: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
-      filteredUser: isUser
-        ? userEmail
-        : selectedAssigneeId !== 'all'
-          ? selectedAssigneeId ?? undefined
-          : undefined,
-    },
-    { enabled: !isGoogle },
-  )
+  const onboardingApiQuery = useOnboardingCustomersList({
+    page,
+    size,
+    searchParam: search || undefined,
+    startDate: dateFrom || undefined,
+    endDate: dateTo || undefined,
+    status:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
+  })
 
   // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
   const googleCustomerRowsQuery = useDepartmentCustomerRows(
@@ -273,6 +272,7 @@ export function CustomerListPage() {
           : 'Recent',
         email: c.email || '',
         phone: c.phoneNumber || '',
+        formUrl: c.onboardingLink,
         callStatus: 'connected',
         status:
           c.onboardingStatus?.toLowerCase() === 'completed'
@@ -499,6 +499,7 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
