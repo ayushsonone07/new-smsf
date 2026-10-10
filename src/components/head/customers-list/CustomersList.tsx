@@ -140,6 +140,7 @@ export function CustomersList({
   onOpenDetail,
   canEdit = true,
   showStatus = true,
+  showAssignTo = true,
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
@@ -196,6 +197,7 @@ export function CustomersList({
               onOpenDetail={() => onOpenDetail(customer)}
               canEdit={canEdit}
               showStatus={showStatus}
+              showAssignTo={showAssignTo}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
               canEditAssignTo={canEditAssignTo}
@@ -218,6 +220,7 @@ interface CustomerRowProps {
   onOpenDetail: () => void
   canEdit: boolean
   showStatus?: boolean
+  showAssignTo?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
@@ -232,6 +235,7 @@ function CustomerRow({
   onOpenDetail,
   canEdit,
   showStatus = true,
+  showAssignTo = true,
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
@@ -446,14 +450,14 @@ function CustomerRow({
       {showAssignTo && (
         <td className="cl-td" data-label="Assign To">
           <div className="cl-assign-wrap" ref={assignRef}>
-            <button
-              type="button"
-              className="cl-assign-btn"
-              onClick={() => setAssignOpen((o) => !o)}
-              disabled={canEditAssignTo !== undefined ? !canEditAssignTo : !canEdit}
-              aria-expanded={assignOpen}
-              aria-haspopup="listbox"
-            >
+          <button
+            type="button"
+            className="cl-assign-btn"
+            onClick={() => setAssignOpen((o) => !o)}
+            disabled={!canEdit}
+            aria-expanded={assignOpen}
+            aria-haspopup="listbox"
+          >
               {assignee ? (
                 <Avatar name={assignee.name} size={20} tone="brand" />
               ) : (
@@ -505,8 +509,8 @@ function CustomerRow({
                 ))}
             </motion.div>
             )}
-        </div>
-      </td>
+          </div>
+        </td>
       )}
 
       {/* Internal Remark */}

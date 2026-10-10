@@ -58,6 +58,7 @@ export interface OnboardedCustomerItem {
   onboardingStatus?: string
   onboardingLink?: string
   createdAt?: string
+  onboardingCompletedAt?: string
   assignedUser?: string
   status?: string
 }
@@ -75,6 +76,39 @@ export interface OnboardedCustomersSummary {
   pending?: number
   inProgress?: number
   completed?: number
+}
+
+export type OnboardingStatusUpdate = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
+
+interface OnboardingStatusUpdateResponse {
+  success?: boolean
+  message?: string
+  data?: unknown
+}
+
+/**
+ * `PUT /api/auth/onboarding/update/{customerId}`
+ */
+export async function updateOnboardingCustomerStatus(params: {
+  customerId: string
+  status: OnboardingStatusUpdate
+  onboardingLink?: string
+}): Promise<void> {
+  const search = new URLSearchParams({
+    updatedStatus: params.status,
+  })
+  if (params.onboardingLink) {
+    search.set('onboardingLink', params.onboardingLink)
+  }
+
+  const response = await authedApiRequest<OnboardingStatusUpdateResponse>(
+    `/api/auth/onboarding/update/${encodeURIComponent(params.customerId)}?${search.toString()}`,
+    { method: 'PUT' },
+  )
+
+  if (response.success === false) {
+    throw new Error(response.message || 'Failed to update customer onboarding status')
+  }
 }
 
 export interface AuthOnboardingSummary {
@@ -150,6 +184,8 @@ export async function getOnboardingCustomers(params: {
   searchParam?: string
   startDate?: string
   endDate?: string
+  completionStartDate?: string
+  completionEndDate?: string
   status?: string
   filteredUser?: string
 } = {}): Promise<OnboardedCustomersPageResponse> {
@@ -164,6 +200,18 @@ export async function getOnboardingCustomers(params: {
   if (params.endDate) {
     const e = params.endDate.includes('T') ? params.endDate : `${params.endDate}T23:59:59`
     search.set('endDate', e)
+  }
+  if (params.completionStartDate) {
+    const start = params.completionStartDate.includes('T')
+      ? params.completionStartDate
+      : `${params.completionStartDate}T00:00:00`
+    search.set('completionStartDate', start)
+  }
+  if (params.completionEndDate) {
+    const end = params.completionEndDate.includes('T')
+      ? params.completionEndDate
+      : `${params.completionEndDate}T23:59:59`
+    search.set('completionEndDate', end)
   }
   if (params.status) search.set('status', params.status)
   if (params.filteredUser) search.set('filteredUser', params.filteredUser)

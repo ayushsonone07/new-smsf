@@ -38,6 +38,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const departmentId = useHeadDepartmentId()
   const customersQuery = useDepartmentCustomers(departmentId)
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
+  const isUser = getSession()?.user.role === 'USER'
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<CustomerTab>('all')
   const [selectedAssigneeId, setSelectedAssigneeId] =
@@ -60,13 +61,15 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const canEditStatus = canEditColumn('Status')
 
   const isAssignToVisible =
-    isColumnEnabled('Assign To') ||
-    isColumnEnabled('Assign') ||
-    isColumnEnabled('Assignee')
+    !isUser &&
+    (isColumnEnabled('Assign To') ||
+      isColumnEnabled('Assign') ||
+      isColumnEnabled('Assignee'))
   const canEditAssignTo =
-    canEditColumn('Assign To') ||
-    canEditColumn('Assign') ||
-    canEditColumn('Assignee')
+    !isUser &&
+    (canEditColumn('Assign To') ||
+      canEditColumn('Assign') ||
+      canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
