@@ -328,14 +328,11 @@ function CustomerRow({
                   {customer.duplicateCount === 1 ? 'duplicate' : 'duplicates'}
                 </span>
               ) : null}
-            </div>
-          )}
 
           <div className="cl-biz-meta">
             {customer.contactName} · {customer.contactDate}
           </div>
         </td>
-      )}
 
       {/* Contact */}
       <td className="cl-td" data-label="Contact">
@@ -377,7 +374,6 @@ function CustomerRow({
             {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
           </span>
         </td>
-      )}
 
       {/* Status */}
       {showStatus && (
@@ -441,27 +437,6 @@ function CustomerRow({
             aria-expanded={assignOpen}
             aria-haspopup="listbox"
           >
-            {assignee ? (
-              <Avatar name={assignee.name} size={20} tone="brand" />
-            ) : (
-              <Avatar name="?" size={20} tone="muted" />
-            )}
-          </div>
-        </td>
-      )}
-
-      {/* Assign To */}
-      {showAssignTo && (
-        <td className="cl-td">
-          <div className="cl-assign-wrap" ref={assignRef}>
-            <button
-              type="button"
-              className="cl-assign-btn"
-              onClick={() => setAssignOpen((o) => !o)}
-              disabled={canEditAssignTo !== undefined ? !canEditAssignTo : !canEdit}
-              aria-expanded={assignOpen}
-              aria-haspopup="listbox"
-            >
               {assignee ? (
                 <Avatar name={assignee.name} size={20} tone="brand" />
               ) : (
@@ -473,7 +448,7 @@ function CustomerRow({
               <Icon name="chevronDown" size={12} strokeWidth={2.5} />
             </button>
 
-            {(canEditAssignTo !== undefined ? canEditAssignTo : canEdit) && assignOpen && (
+            {canEdit && assignOpen && (
               <motion.div
                 className="cl-assign-menu"
                 role="listbox"
@@ -511,11 +486,10 @@ function CustomerRow({
                     {a.name}
                   </button>
                 ))}
-              </motion.div>
+            </motion.div>
             )}
-          </div>
-        </td>
-      )}
+        </div>
+      </td>
 
       {/* Internal Remark */}
       <td className="cl-td" data-label="Internal Remark">
