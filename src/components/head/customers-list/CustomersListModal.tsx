@@ -22,8 +22,6 @@ export interface CustomersListModalProps {
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
-  showStatus?: boolean
-  showAssignTo?: boolean
 }
 
 const EMPTY_API_DETAILS: CustomerDrawerApiDetails = {
