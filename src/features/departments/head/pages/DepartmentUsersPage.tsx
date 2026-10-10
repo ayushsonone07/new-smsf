@@ -18,7 +18,11 @@ import {
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useInfiniteDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import {
+  createDepartmentUser,
+  type DepartmentUserApiItem,
+} from '../../../../api/department-users.api'
 import { useMemberDetails } from '../../hooks/useMemberDetails'
 import { generateDepartmentSession } from '../../../../api/auth.api'
 import {
@@ -93,8 +97,6 @@ export function DepartmentUsersPage() {
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
-  const [page, setPage] = useState(0)
-  const [size] = useState(10)
 
   async function handleLoginAs(targetUser: DepartmentUser) {
     const email = targetUser.email?.trim()
@@ -123,17 +125,15 @@ export function DepartmentUsersPage() {
     }
   }
 
-  // Reset to page 0 when search changes
+  // Update search state
   const handleSearchChange = (value: string) => {
     setSearch(value)
-    setPage(0)
   }
 
-  // Only Department Users API
-  const departmentUsersQuery = useDepartmentUsersList({
-    page,
-    size,
-    search,
+  // Infinite query for Department Users: page 0, size 10 initial, next 10 on scroll
+  const departmentUsersQuery = useInfiniteDepartmentUsersList({
+    size: 10,
+    search: search.trim() || undefined,
   })
 
   // Get today's date range in ISO format for the member details API
@@ -226,46 +226,59 @@ export function DepartmentUsersPage() {
     return 0
   }, [memberDetailsQuery.data, modal])
 
-  // Map API users to DepartmentUser table structure, with fallback to mock data
+  // Map API users to DepartmentUser table structure across all infinite pages
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
-    const list = departmentUsersQuery.data?.data ?? []
-    return list.map((u, idx) => {
-        const isPresent =
-          u.isPresentToday ??
-          (u.absentDays === undefined ? true : u.absentDays === 0)
-        const role = (
-          u.role === 'HEAD' || u.isHead
-            ? 'TEAM_LEAD'
-            : u.role === 'SENIOR_EXECUTIVE' || u.isSeniorUser
-              ? 'SENIOR_EXECUTIVE'
-              : 'ONBOARDING_EXECUTIVE'
-        ) as DepartmentUserRole
+    const pages = departmentUsersQuery.data?.pages ?? []
+    const allUsers: DepartmentUserApiItem[] = []
+    const seenIds = new Set<string>()
 
-        return {
-          id: String(u.id ?? u.username ?? `u-${idx}`),
-          name: u.username || u.email,
-          phone: u.contact || '—',
-          email: u.email,
-          role,
-          joinedLabel: u.createdAt
-            ? new Date(u.createdAt).toLocaleDateString('en-IN', {
-                month: 'short',
-                year: 'numeric',
-              })
-            : '—',
-          target: u.target ?? 0,
-          achievedPercent:
-            u.achievedPercent ??
-            (u.totalCompletedCustomers && u.target
-              ? Math.round((u.totalCompletedCustomers / u.target) * 100)
-              : 0),
-          presentDays: u.presentDays ?? (isPresent ? 1 : 0),
-          absentDays: u.absentDays ?? (isPresent ? 0 : 1),
-          isPresentToday: isPresent,
-          dynamicValues: { ...u } as Record<string, unknown>,
+    for (const p of pages) {
+      for (const u of p.data ?? []) {
+        const idKey = String(u.id ?? u.username ?? u.email ?? Math.random())
+        if (!seenIds.has(idKey)) {
+          seenIds.add(idKey)
+          allUsers.push(u)
         }
-      })
-  }, [departmentUsersQuery.data?.data])
+      }
+    }
+
+    return allUsers.map((u, idx) => {
+      const isPresent =
+        u.isPresentToday ??
+        (u.absentDays === undefined ? true : u.absentDays === 0)
+      const role = (
+        u.role === 'HEAD' || u.isHead
+          ? 'TEAM_LEAD'
+          : u.role === 'SENIOR_EXECUTIVE' || u.isSeniorUser
+            ? 'SENIOR_EXECUTIVE'
+            : 'ONBOARDING_EXECUTIVE'
+      ) as DepartmentUserRole
+
+      return {
+        id: String(u.id ?? u.username ?? `u-${idx}`),
+        name: u.username || u.email,
+        phone: u.contact || '—',
+        email: u.email,
+        role,
+        joinedLabel: u.createdAt
+          ? new Date(u.createdAt).toLocaleDateString('en-IN', {
+              month: 'short',
+              year: 'numeric',
+            })
+          : '—',
+        target: u.target ?? 0,
+        achievedPercent:
+          u.achievedPercent ??
+          (u.totalCompletedCustomers && u.target
+            ? Math.round((u.totalCompletedCustomers / u.target) * 100)
+            : 0),
+        presentDays: u.presentDays ?? (isPresent ? 1 : 0),
+        absentDays: u.absentDays ?? (isPresent ? 0 : 1),
+        isPresentToday: isPresent,
+        dynamicValues: { ...u } as Record<string, unknown>,
+      }
+    })
+  }, [departmentUsersQuery.data?.pages])
 
   const [localUsers, setLocalUsers] = useState<DepartmentUser[] | null>(null)
   const users = localUsers ?? apiUsersList
@@ -292,27 +305,32 @@ export function DepartmentUsersPage() {
     setModal({ kind: 'none' })
   }
 
-  function handleCreate(values: DepartmentUserFormValues) {
-    setLocalUsers([
-      ...users,
-      {
-        id: `u-${Date.now()}`,
-        name: values.name,
-        phone: values.phone,
-        email: values.email,
-        role: values.role,
-        target: values.target,
-        joinedLabel: new Date().toLocaleDateString('en-IN', {
-          month: 'short',
-          year: 'numeric',
-        }),
-        achievedPercent: 0,
-        presentDays: 0,
-        absentDays: 0,
-        isPresentToday: false,
-      },
-    ])
-    closeModal()
+  async function handleCreate(values: DepartmentUserFormValues) {
+    try {
+      const currentUser = session?.user
+      const deptType =
+        currentUser?.departmentType ||
+        (departmentId === 'google' ? 'GOOGLE_DEPARTMENT' : 'ONBOARDING_DEPARTMENT')
+
+      await createDepartmentUser({
+        username: (values.username || values.name || '').trim(),
+        email: (values.email || '').trim(),
+        password: values.password || '',
+        phoneNumber: values.phoneNumber || values.phone || '',
+        departmentType: deptType,
+        role: 'DEPARTMENT_USER',
+        isHead: false,
+        headUser: currentUser?.email || '',
+      })
+
+      // Refetch the infinite query so the newly created user appears in the list
+      await departmentUsersQuery.refetch()
+      closeModal()
+    } catch (err: unknown) {
+      console.error('Failed to create department user:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to create user'
+      alert(`Failed to add user: ${msg}`)
+    }
   }
 
   function handleEdit(
@@ -375,7 +393,7 @@ export function DepartmentUsersPage() {
         meta={
           <>
             <Pill tone="info" size="sm">
-              {departmentUsersQuery.data?.totalElements ?? users.length} users
+              {departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length} users
             </Pill>
 
             <Pill tone="success" size="sm">
@@ -399,6 +417,14 @@ export function DepartmentUsersPage() {
             ...mappedHiddenColumns,
           ]}
           canEditActions={canManageUsers}
+          hasNextPage={departmentUsersQuery.hasNextPage}
+          isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
+          onLoadMore={() => {
+            if (departmentUsersQuery.hasNextPage && !departmentUsersQuery.isFetchingNextPage) {
+              departmentUsersQuery.fetchNextPage()
+            }
+          }}
+          totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}
           onDelete={(user) =>
@@ -410,29 +436,6 @@ export function DepartmentUsersPage() {
           )}
         />
       </SectionCard>
-
-      {/* Pagination */}
-      {departmentUsersQuery.data && departmentUsersQuery.data.totalPage > 1 && (
-        <div className="pagination">
-          <button
-            className="pagination-btn"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0 || departmentUsersQuery.isFetching}
-          >
-            Previous
-          </button>
-          <span className="pagination-info">
-            Page {page + 1} of {departmentUsersQuery.data.totalPage}
-          </span>
-          <button
-            className="pagination-btn"
-            onClick={() => setPage((p) => Math.min(departmentUsersQuery.data.totalPage - 1, p + 1))}
-            disabled={page >= departmentUsersQuery.data.totalPage - 1 || departmentUsersQuery.isFetching}
-          >
-            Next
-          </button>
-        </div>
-      )}
 
       {canManageUsers ? (
         <UserFormModal

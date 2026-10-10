@@ -8,12 +8,13 @@ export const departmentCustomersQueryKey = (
 
 export function useDepartmentCustomers(
   departmentId: string,
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey:
       departmentCustomersQueryKey(departmentId),
     queryFn: () =>
       getCustomers(departmentId),
-    enabled: Boolean(departmentId),
+    enabled: (options?.enabled ?? true) && Boolean(departmentId),
   })
 }

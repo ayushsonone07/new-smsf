@@ -25,6 +25,8 @@ export interface OnboardingCustomer {
   businessCount?: number
   businessIndex?: number
   duplicateCount?: number
+  hasDuplicateCustomer?: boolean
+  duplicateCustomers?: any[]
   contactName: string
   contactDate: string
   /** Contact column */
@@ -37,8 +39,8 @@ export interface OnboardingCustomer {
   assigneeId: string | null
   /** Internal Remark column */
   remark: string
-  /** Updated column */
-  updatedLabel: string
+  /** Updated column (legacy/optional) */
+  updatedLabel?: string
   /** Client form link — the Form button opens it in a new tab */
   formUrl?: string
   /** Optional detail-drawer fields (shown as "—" when missing) */
@@ -59,6 +61,7 @@ export interface CustomersListProps {
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
   onOpenDetail: (customer: OnboardingCustomer) => void
+  onOpenDuplicate?: (customer: OnboardingCustomer) => void
   canEdit?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
@@ -138,11 +141,17 @@ export function CustomersList({
   onAssigneeChange,
   onRemarkChange,
   onOpenDetail,
+  onOpenDuplicate,
   canEdit = true,
   showStatus = true,
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
+  showRemark = true,
+  canEditRemark,
+  showContact = true,
+  showBusiness = true,
+  showUpdated = false,
 }: CustomersListProps) {
   if (customers.length === 0) {
     return (
@@ -166,12 +175,12 @@ export function CustomersList({
         <thead>
           <tr>
             <th className="cl-th cl-th--num">#</th>
-            <th className="cl-th cl-th--biz">Business</th>
-            <th className="cl-th cl-th--contact">Contact</th>
+            {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
+            {showContact && <th className="cl-th cl-th--contact">Contact</th>}
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
-            <th className="cl-th cl-th--remark">Internal Remark</th>
-            <th className="cl-th">Updated</th>
+            {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
+            {showUpdated && <th className="cl-th">Updated</th>}
           </tr>
         </thead>
         <motion.tbody
@@ -194,11 +203,17 @@ export function CustomersList({
                 onRemarkChange(customer.id, remark)
               }
               onOpenDetail={() => onOpenDetail(customer)}
+              onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
               canEdit={canEdit}
+              showBusiness={showBusiness}
+              showContact={showContact}
               showStatus={showStatus}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
               canEditAssignTo={canEditAssignTo}
+              showRemark={showRemark}
+              canEditRemark={canEditRemark}
+              showUpdated={showUpdated}
             />
           ))}
         </motion.tbody>
@@ -216,11 +231,17 @@ interface CustomerRowProps {
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
   onOpenDetail: () => void
+  onOpenDuplicate?: () => void
   canEdit: boolean
+  showBusiness?: boolean
+  showContact?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
+  showRemark?: boolean
+  canEditRemark?: boolean
+  showUpdated?: boolean
 }
 
 function CustomerRow({
@@ -230,11 +251,17 @@ function CustomerRow({
   onAssigneeChange,
   onRemarkChange,
   onOpenDetail,
+  onOpenDuplicate,
   canEdit,
+  showBusiness = true,
+  showContact = true,
   showStatus = true,
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
+  showRemark = true,
+  canEditRemark,
+  showUpdated = false,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
@@ -267,9 +294,6 @@ function CustomerRow({
     return () => document.removeEventListener('mousedown', handler)
   }, [statusOpen, assignOpen])
 
-  const assignee =
-    assignees.find((a) => a.id === customer.assigneeId) ?? null
-
   const statusMeta = STATUS_META[customer.status]
 
   function startEditing() {
@@ -300,80 +324,111 @@ function CustomerRow({
       <td className="cl-td cl-td--num" data-label="#">{customer.rowIndex}</td>
 
       {/* Business */}
-      <td className="cl-td" data-label="Business">
-        <div className="cl-biz-line">
-          <button
-            type="button"
-            className="cl-biz-name cl-biz-name--link"
-            onClick={onOpenDetail}
-            title="View customer detail"
-          >
-            {customer.businessName}
-          </button>
+      {showBusiness && (
+        <td className="cl-td" data-label="Business">
+          <div className="cl-biz-line">
+            <button
+              type="button"
+              className="cl-biz-name cl-biz-name--link"
+              onClick={onOpenDetail}
+              title="View customer detail"
+            >
+              {customer.businessName}
+            </button>
 
-          <button
-            type="button"
-            className="cl-biz-eye"
-            title="View customer detail"
-            aria-label="View customer detail"
-            onClick={onOpenDetail}
-          >
-            <Icon name="eye" size={14} strokeWidth={1.8} />
-          </button>
+            <button
+              type="button"
+              className="cl-biz-eye"
+              title="View customer detail"
+              aria-label="View customer detail"
+              onClick={onOpenDetail}
+            >
+              <Icon name="eye" size={14} strokeWidth={1.8} />
+            </button>
 
-          <button
-            type="button"
-            className="cl-form-pill"
-            title="Open client form"
-            onClick={openForm}
-          >
-            <Icon
-              d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
-              name="eye"
-              size={12}
-              strokeWidth={2}
-            />
-            Form
-          </button>
-        </div>
+            <button
+              type="button"
+              className="cl-form-pill"
+              title="Open client form"
+              onClick={openForm}
+            >
+              <Icon
+                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                name="eye"
+                size={12}
+                strokeWidth={2}
+              />
+              Form
+            </button>
 
-        {customer.duplicateCount ? (
-          <span className="cl-dup-pill">
-            <Icon name="copy" size={11} strokeWidth={2} />
-            {customer.duplicateCount}{' '}
-            {customer.duplicateCount === 1 ? 'duplicate' : 'duplicates'}
-          </span>
-        ) : null}
+            {(customer.hasDuplicateCustomer || (customer.duplicateCount && customer.duplicateCount > 0)) && (
+              <button
+                type="button"
+                className="cl-dup-pill-btn"
+                title="View duplicate businesses"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onOpenDuplicate) {
+                    onOpenDuplicate()
+                  } else {
+                    onOpenDetail()
+                  }
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '9999px',
+                  border: '1px solid #ffe19a',
+                  backgroundColor: '#fff5d6',
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#8a5a00',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon name="copy" size={11} strokeWidth={2} />
+                <span>
+                  {customer.duplicateCount && customer.duplicateCount > 0
+                    ? `${customer.duplicateCount} duplicate${customer.duplicateCount === 1 ? '' : 's'}`
+                    : 'Duplicate'}
+                </span>
+              </button>
+            )}
+          </div>
 
-        <div className="cl-biz-meta">
-          {customer.contactName} · {customer.contactDate}
-        </div>
-      </td>
+          <div className="cl-biz-meta">
+            {customer.contactName} · {customer.contactDate}
+          </div>
+        </td>
+      )}
 
       {/* Contact */}
-      <td className="cl-td" data-label="Contact">
-        <div className="cl-email">{customer.email}</div>
+      {showContact && (
+        <td className="cl-td" data-label="Contact">
+          <div className="cl-email">{customer.email}</div>
 
-        <div className="cl-phone-row">
-          <span className="cl-phone-text">{customer.phone}</span>
-          <button
-            type="button"
-            className="cl-icon-micro"
-            title="Edit phone"
-            aria-label="Edit phone number"
-            disabled={!canEdit}
-          >
-            <Icon name="pencil" size={12} strokeWidth={2} />
-          </button>
-          <button
-            type="button"
-            className="cl-call-icon"
-            title="Call customer"
-            aria-label="Call customer"
-          >
-            <Icon name="phone" size={13} strokeWidth={2} />
-          </button>
-        </div>
+          <div className="cl-phone-row">
+            <span className="cl-phone-text">{customer.phone}</span>
+            <button
+              type="button"
+              className="cl-icon-micro"
+              title="Edit phone"
+              aria-label="Edit phone number"
+              disabled={!canEdit}
+            >
+              <Icon name="pencil" size={12} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="cl-call-icon"
+              title="Call customer"
+              aria-label="Call customer"
+            >
+              <Icon name="phone" size={13} strokeWidth={2} />
+            </button>
+          </div>
 
         <span
           className={`cl-contact-pill cl-contact-pill--${
@@ -386,10 +441,18 @@ function CustomerRow({
                 ? 'connected'
                 : 'not-answered'
             }`}
-          />
-          {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
-        </span>
-      </td>
+          >
+            <span
+              className={`cl-contact-dot cl-contact-dot--${
+                customer.callStatus === 'connected'
+                  ? 'connected'
+                  : 'not-answered'
+              }`}
+            />
+            {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
+          </span>
+        </td>
+      )}
 
       {/* Status */}
       {showStatus && (
@@ -445,174 +508,183 @@ function CustomerRow({
       {/* Assign To */}
       {showAssignTo && (
         <td className="cl-td" data-label="Assign To">
-          <div className="cl-assign-wrap" ref={assignRef}>
-            <button
-              type="button"
-              className="cl-assign-btn"
-              onClick={() => setAssignOpen((o) => !o)}
-              disabled={canEditAssignTo !== undefined ? !canEditAssignTo : !canEdit}
-              aria-expanded={assignOpen}
-              aria-haspopup="listbox"
-            >
-              {assignee ? (
-                <Avatar name={assignee.name} size={20} tone="brand" />
-              ) : (
-                <Avatar name="?" size={20} tone="muted" />
-              )}
-              <span className="cl-assign-name">
-                {assignee ? assignee.name : 'Unassigned'}
-              </span>
-              <Icon name="chevronDown" size={12} strokeWidth={2.5} />
-            </button>
+          {(() => {
+            const isAssignEditable = canEditAssignTo !== undefined ? canEditAssignTo : canEdit
+            const matchedAssignee = assignees.find(
+              (a) =>
+                a.id === customer.assigneeId ||
+                a.id.toLowerCase() === (customer.assigneeId || '').toLowerCase() ||
+                a.name.toLowerCase().includes((customer.assigneeId || '').toLowerCase())
+            )
 
-            {canEdit && assignOpen && (
-              <motion.div
-                className="cl-assign-menu"
-                role="listbox"
-                variants={menuVariants}
-                initial="hidden"
-                animate="visible"
-              >
+            return (
+              <div className="cl-assign-wrap" ref={assignRef}>
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={customer.assigneeId === null}
-                  className="cl-assign-opt"
-                  onClick={() => {
-                    onAssigneeChange(null)
-                    setAssignOpen(false)
-                  }}
+                  className="cl-assign-btn"
+                  onClick={() => setAssignOpen((o) => !o)}
+                  disabled={!isAssignEditable}
+                  aria-expanded={assignOpen}
+                  aria-haspopup="listbox"
                 >
-                  <Avatar name="?" size={20} tone="muted" />
-                  Unassigned
+                  {matchedAssignee ? (
+                    <Avatar name={matchedAssignee.name} size={20} tone="brand" />
+                  ) : (
+                    <Avatar
+                      name={customer.assigneeId ? customer.assigneeId.charAt(0).toUpperCase() : '?'}
+                      size={20}
+                      tone={customer.assigneeId ? 'brand' : 'muted'}
+                    />
+                  )}
+                  <span className="cl-assign-name">
+                    {matchedAssignee
+                      ? matchedAssignee.name
+                      : customer.assigneeId || 'Unassigned'}
+                  </span>
+                  {isAssignEditable && (
+                    <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+                  )}
                 </button>
 
-                {assignees.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    role="option"
-                    aria-selected={customer.assigneeId === a.id}
-                    className="cl-assign-opt"
-                    onClick={() => {
-                      onAssigneeChange(a.id)
-                      setAssignOpen(false)
-                    }}
+                {isAssignEditable && assignOpen && (
+                  <motion.div
+                    className="cl-assign-menu"
+                    role="listbox"
+                    variants={menuVariants}
+                    initial="hidden"
+                    animate="visible"
                   >
-                    <Avatar name={a.name} size={20} tone="brand" />
-                    {a.name}
-                  </button>
-                ))}
-            </motion.div>
-            )}
-        </div>
-      </td>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={!customer.assigneeId}
+                      className="cl-assign-opt"
+                      onClick={() => {
+                        onAssigneeChange(null)
+                        setAssignOpen(false)
+                      }}
+                    >
+                      <Avatar name="?" size={20} tone="muted" />
+                      Unassigned
+                    </button>
+
+                    {assignees.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        role="option"
+                        aria-selected={
+                          customer.assigneeId === a.id ||
+                          customer.assigneeId?.toLowerCase() === a.id.toLowerCase()
+                        }
+                        className="cl-assign-opt"
+                        onClick={() => {
+                          onAssigneeChange(a.id)
+                          setAssignOpen(false)
+                        }}
+                      >
+                        <Avatar name={a.name} size={20} tone="brand" />
+                        {a.name}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </div>
+            )
+          })()}
+        </td>
       )}
 
       {/* Internal Remark */}
-      <td className="cl-td" data-label="Internal Remark">
-        {remarkEditing ? (
-          <div className="cl-remark-editor">
-            <textarea
-              className="cl-remark-textarea"
-              value={remarkDraft}
-              onChange={(e) => setRemarkDraft(e.target.value)}
-              onBlur={saveRemark}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  saveRemark()
-                } else if (e.key === 'Escape') {
-                  cancelRemark()
-                }
-              }}
-              autoFocus
-              aria-label="Edit internal remark"
-            />
-
-            <div className="cl-remark-actions">
-              <button
-                type="button"
-                className="cl-action"
-                title="Save remark"
-                aria-label="Save remark"
-                onClick={saveRemark}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                className="cl-action"
-                title="Cancel editing remark"
-                aria-label="Cancel editing remark"
-                onClick={cancelRemark}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="cl-action"
-                title="View schedule"
-                aria-label="View schedule"
-              >
-                <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
-              </button>
-
-              <button
-                type="button"
-                className="cl-action"
-                title="View customer detail"
-                aria-label="View customer detail"
-                onClick={onOpenDetail}
-              >
-                <Icon name="eye" size={14} strokeWidth={1.8} />
-              </button>
-
-              <button
-                type="button"
-                className="cl-action"
-                title="Save remark"
-                aria-label="Save remark"
-                onClick={saveRemark}
-              >
-                <Icon name="check" size={14} strokeWidth={1.8} />
-              </button>
-
-              <button
-                type="button"
-                className="cl-action"
-                title="Cancel editing"
-                aria-label="Cancel editing"
-                onClick={cancelRemark}
-              >
-                <Icon name="x" size={14} strokeWidth={1.8} />
-              </button>
+      {showRemark && (
+        <td className="cl-td" data-label="Internal Remark">
+          {remarkEditing ? (
+            <div className="cl-remark-editor">
+              <textarea
+                className="cl-remark-textarea"
+                value={remarkDraft}
+                onChange={(e) => setRemarkDraft(e.target.value)}
+                onBlur={saveRemark}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    saveRemark()
+                  } else if (e.key === 'Escape') {
+                    cancelRemark()
+                  }
+                }}
+                autoFocus
+                aria-label="Edit internal remark"
+              />
+              <div className="cl-remark-actions">
+                <button
+                  type="button"
+                  className="cl-action"
+                  title="Save remark"
+                  aria-label="Save remark"
+                  onClick={saveRemark}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="cl-action"
+                  title="Cancel editing remark"
+                  aria-label="Cancel editing remark"
+                  onClick={cancelRemark}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cl-action"
+                  title="View schedule"
+                  aria-label="View schedule"
+                >
+                  <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  className="cl-action"
+                  title="View customer detail"
+                  aria-label="View customer detail"
+                  onClick={onOpenDetail}
+                >
+                  <Icon name="eye" size={14} strokeWidth={1.8} />
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <span
-            className={`cl-remark${
-              !customer.remark ? ' cl-remark--placeholder' : ''
-            }`}
-            role="button"
-            tabIndex={canEdit ? 0 : -1}
-            onClick={startEditing}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') startEditing()
-            }}
-            title={canEdit ? 'Click to edit remark' : 'Read-only remark'}
-          >
-            {customer.remark || 'Add remark...'}
-          </span>
-        )}
-      </td>
+          ) : (
+            <span
+              className={`cl-remark${
+                !customer.remark ? ' cl-remark--placeholder' : ''
+              }`}
+              role="button"
+              tabIndex={canEditRemark !== undefined ? (canEditRemark ? 0 : -1) : (canEdit ? 0 : -1)}
+              onClick={startEditing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') startEditing()
+              }}
+              title={
+                (canEditRemark !== undefined ? canEditRemark : canEdit)
+                  ? 'Click to edit remark'
+                  : 'Read-only remark'
+              }
+            >
+              {customer.remark || 'Add remark...'}
+            </span>
+          )}
+        </td>
+      )}
 
-      {/* Updated */}
-      <td className="cl-td cl-td--updated" data-label="Updated">
-        <div className="cl-updated-cell">
-          <span className="cl-updated-text">{customer.updatedLabel}</span>
-        </div>
-      </td>
+      {/* Optional Updated */}
+      {showUpdated && (
+        <td className="cl-td cl-td--updated" data-label="Updated">
+          <div className="cl-updated-cell">
+            <span className="cl-updated-text">{customer.updatedLabel}</span>
+          </div>
+        </td>
+      )}
     </motion.tr>
   )
 }

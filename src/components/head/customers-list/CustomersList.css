@@ -1250,6 +1250,227 @@
   color: #fff;
 }
 
+/* duplicate businesses banner */
+.cl-drawer__dup-banner {
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid #f6d899;
+  background: #fffdf5;
+  padding: 12px;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.cl-drawer__dup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cl-drawer__dup-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #92400e;
+}
+
+.cl-drawer__dup-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.cl-drawer__dup-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: #b45309;
+}
+
+.cl-drawer__dup-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.cl-drawer__dup-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+.cl-drawer__dup-scroll::-webkit-scrollbar-thumb {
+  background: #fed7aa;
+  border-radius: 999px;
+}
+
+.cl-drawer__dup-btn {
+  flex: 1;
+  min-width: 140px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.cl-drawer__dup-btn:hover {
+  border-color: #2459e0;
+  background: #f8fafc;
+}
+
+.cl-drawer__dup-btn.is-selected {
+  background: #2459e0;
+  color: #fff;
+  border-color: #2459e0;
+  box-shadow: 0 2px 4px rgba(36, 89, 224, 0.25);
+}
+
+.cl-drawer__dup-btn-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cl-drawer__dup-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cl-drawer__dup-btn-title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-drawer__dup-btn-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
+.cl-drawer__dup-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(246, 216, 153, 0.5);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(146, 64, 14, 0.85);
+}
+
+/* duplicate cards list inside duplicates tab */
+.cl-drawer__dup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cl-drawer__dup-card {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.cl-drawer__dup-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cl-drawer__dup-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cl-drawer__dup-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cl-drawer__dup-card-name {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cl-drawer__dup-card-rows {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.cl-drawer__dup-card-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.cl-drawer__dup-card-label {
+  min-width: 60px;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.cl-drawer__dup-card-value {
+  color: #1e293b;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.cl-drawer__dup-services {
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.cl-drawer__dup-services-title {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cl-drawer__dup-services-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 /* cards */
 .cl-drawer__card {
   padding: 14px 16px;

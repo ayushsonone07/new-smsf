@@ -84,9 +84,6 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
     isColumnEnabled('Business') ||
     isColumnEnabled('Company')
 
-  const isUpdatedVisible =
-    isColumnEnabled('Updated')
-
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(
     () =>
       (customersQuery.data ?? []).map((customer, index) => {
@@ -206,17 +203,19 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         canEditRemark={canEditRemark}
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
-        showUpdated={isUpdatedVisible}
+        showUpdated={false}
         onStatusChange={(id, status) => patchCustomer(id, { status })}
         onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
         onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
         onOpenDetail={setSelectedCustomer}
+        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
       />
       <CustomersListModal
         customer={selectedCustomer}
         assignees={ASSIGNEES}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
+        departmentType="ONBOARDING_DEPARTMENT"
         onClose={() => setSelectedCustomer(null)}
       />
     </>
