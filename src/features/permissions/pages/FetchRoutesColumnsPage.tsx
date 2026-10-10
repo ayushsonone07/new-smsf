@@ -107,8 +107,8 @@ export function FetchRoutesColumnsPage() {
         const next = { ...prev }
         routesQuery.data.forEach((r) => {
           next[r.routeId] = {
-            enableHead: r.enableHead ?? true,
-            enableUser: r.enableUser ?? true,
+            enableHead: r.enableHead ?? r.visibility ?? false,
+            enableUser: r.enableUser ?? r.visibility ?? false,
             readWriteHead: prev[r.routeId]?.readWriteHead ?? '1',
             readWriteUser: prev[r.routeId]?.readWriteUser ?? '1',
           }
@@ -124,8 +124,8 @@ export function FetchRoutesColumnsPage() {
         const next = { ...prev }
         columnsQuery.data.forEach((c) => {
           next[c.columnId] = {
-            enableHead: c.enableHead ?? true,
-            enableUser: c.enableUser ?? true,
+            enableHead: c.enableHead === true,
+            enableUser: c.enableUser === true,
             readWriteHead:
               prev[c.columnId]?.readWriteHead ?? (c.roleAPermission === '1' ? '1' : '12'),
             readWriteUser:
@@ -208,8 +208,8 @@ export function FetchRoutesColumnsPage() {
     setRoutesUiState((prev) => ({
       ...prev,
       [route.routeId]: {
-        enableHead: key === 'enableHead' ? val : prev[route.routeId]?.enableHead ?? (route.enableHead ?? true),
-        enableUser: key === 'enableUser' ? val : prev[route.routeId]?.enableUser ?? (route.enableUser ?? true),
+        enableHead: key === 'enableHead' ? val : prev[route.routeId]?.enableHead ?? (route.enableHead ?? route.visibility ?? false),
+        enableUser: key === 'enableUser' ? val : prev[route.routeId]?.enableUser ?? (route.enableUser ?? route.visibility ?? false),
         readWriteHead: prev[route.routeId]?.readWriteHead ?? '1',
         readWriteUser: prev[route.routeId]?.readWriteUser ?? '1',
       },
@@ -223,6 +223,7 @@ export function FetchRoutesColumnsPage() {
         roleName,
         departmentType: dept,
         enable: val,
+        visibility: val,
       },
       {
         onSuccess: () => {
@@ -265,8 +266,8 @@ export function FetchRoutesColumnsPage() {
     setColumnsUiState((prev) => ({
       ...prev,
       [col.columnId]: {
-        enableHead: key === 'enableHead' ? val : prev[col.columnId]?.enableHead ?? (col.enableHead ?? true),
-        enableUser: key === 'enableUser' ? val : prev[col.columnId]?.enableUser ?? (col.enableUser ?? true),
+        enableHead: key === 'enableHead' ? val : prev[col.columnId]?.enableHead ?? (col.enableHead === true),
+        enableUser: key === 'enableUser' ? val : prev[col.columnId]?.enableUser ?? (col.enableUser === true),
         readWriteHead: prev[col.columnId]?.readWriteHead ?? (col.roleAPermission === '1' ? '1' : '12'),
         readWriteUser: prev[col.columnId]?.readWriteUser ?? (col.roleBPermission === '12' ? '12' : '1'),
       },
@@ -280,6 +281,7 @@ export function FetchRoutesColumnsPage() {
         roleName,
         departmentType: dept,
         enable: val,
+        visibility: val,
       },
       {
         onSuccess: () => {
@@ -318,8 +320,8 @@ export function FetchRoutesColumnsPage() {
     setColumnsUiState((prev) => ({
       ...prev,
       [column.columnId]: {
-        enableHead: prev[column.columnId]?.enableHead ?? true,
-        enableUser: prev[column.columnId]?.enableUser ?? true,
+        enableHead: prev[column.columnId]?.enableHead ?? (column.enableHead === true),
+        enableUser: prev[column.columnId]?.enableUser ?? (column.enableUser === true),
         readWriteHead:
           roleName === 'DEPARTMENT_HEAD'
             ? accessCode
@@ -337,7 +339,7 @@ export function FetchRoutesColumnsPage() {
         columnId: column.columnId,
         columnName: column.columnName,
         roleName,
-        departmentType: selectedDept === 'ALL' ? 'ONBOARDING_DEPARTMENT' : selectedDept,
+        departmentType: selectedDept === 'ALL' ? (column.departmentType || 'ONBOARDING_DEPARTMENT') : selectedDept,
         readWriteAccess: accessCode,
       },
       {
@@ -368,8 +370,8 @@ export function FetchRoutesColumnsPage() {
     setRoutesUiState((prev) => ({
       ...prev,
       [routeId]: {
-        enableHead: prev[routeId]?.enableHead ?? true,
-        enableUser: prev[routeId]?.enableUser ?? true,
+        enableHead: prev[routeId]?.enableHead ?? false,
+        enableUser: prev[routeId]?.enableUser ?? false,
         readWriteHead: key === 'readWriteHead' ? val : prev[routeId]?.readWriteHead ?? '1',
         readWriteUser: key === 'readWriteUser' ? val : prev[routeId]?.readWriteUser ?? '1',
       },
@@ -754,8 +756,8 @@ export function FetchRoutesColumnsPage() {
             ) : (
               filteredRoutes.map((route, index) => {
                 const ui = routesUiState[route.routeId] || {
-                  enableHead: route.enableHead ?? true,
-                  enableUser: route.enableUser ?? true,
+                  enableHead: route.enableHead ?? route.visibility ?? false,
+                  enableUser: route.enableUser ?? route.visibility ?? false,
                   readWriteHead: '1',
                   readWriteUser: '1',
                 }
@@ -954,8 +956,8 @@ export function FetchRoutesColumnsPage() {
             ) : (
               filteredColumns.map((col, index) => {
                 const ui = columnsUiState[col.columnId] || {
-                  enableHead: col.enableHead ?? true,
-                  enableUser: col.enableUser ?? true,
+                  enableHead: col.enableHead === true,
+                  enableUser: col.enableUser === true,
                   readWriteHead: col.roleAPermission === '1' ? '1' : '12',
                   readWriteUser: col.roleBPermission === '12' ? '12' : '1',
                 }
@@ -985,6 +987,23 @@ export function FetchRoutesColumnsPage() {
                         <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                           Store ID: {storeSnippet}
                         </div>
+                        {col.routesType && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: '#f5f3ff',
+                                color: '#7c3aed',
+                                border: '1px solid #ddd6fe',
+                              }}
+                            >
+                              Route: {col.routeName || `${col.routesType.slice(0, 8)}...`}
+                            </span>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: '4px', margin: '2px 0' }}>
                           <span
                             style={{
