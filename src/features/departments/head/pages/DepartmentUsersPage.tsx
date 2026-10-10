@@ -13,7 +13,6 @@ import { StaffReportModal } from '../../../../components/reports/StaffReportModa
 import { Icon } from '../../../../components/head/shared/Icon'
 import {
   sampleDailyTargetByUser,
-  sampleDepartmentUsers,
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
@@ -75,18 +74,17 @@ export function DepartmentUsersPage() {
     department: 'ONBOARDING_DEPARTMENT',
   })
 
-  // Map API users to DepartmentUser table structure, with fallback to mock data
+  // Map the real API users to the table's view model.
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
-    const list = departmentUsersQuery.data?.data
-    if (list && list.length > 0) {
-      return list.map((u, idx) => {
+    const list = departmentUsersQuery.data?.data ?? []
+    return list.map((u, idx) => {
         const isPresent =
           u.isPresentToday ??
-          (u.presentDays ? u.presentDays > 0 : true)
+          (u.absent !== undefined ? !u.absent : true)
         const role = (
           u.role === 'HEAD' || u.isHead
             ? 'TEAM_LEAD'
-            : u.role === 'SENIOR_EXECUTIVE'
+            : u.role === 'SENIOR_EXECUTIVE' || u.seniorUser
               ? 'SENIOR_EXECUTIVE'
               : 'ONBOARDING_EXECUTIVE'
         ) as DepartmentUserRole
@@ -94,7 +92,7 @@ export function DepartmentUsersPage() {
         return {
           id: String(u.id ?? u.username ?? `u-${idx}`),
           name: u.username || u.email,
-          phone: u.contact || '+91 98765 00000',
+          phone: u.contact || '—',
           email: u.email,
           role,
           joinedLabel: u.createdAt
@@ -102,20 +100,18 @@ export function DepartmentUsersPage() {
                 month: 'short',
                 year: 'numeric',
               })
-            : 'Jan 2024',
-          target: u.target ?? 6,
+            : '—',
+          target: u.target ?? 0,
           achievedPercent:
             u.achievedPercent ??
-            (u.completed && u.target
-              ? Math.round((u.completed / u.target) * 100)
-              : 100),
-          presentDays: u.presentDays ?? 1,
-          absentDays: u.absentDays ?? 0,
+            (u.totalCompletedCustomers && u.target
+              ? Math.round((u.totalCompletedCustomers / u.target) * 100)
+              : 0),
+          presentDays: u.presentDays ?? (isPresent ? 1 : 0),
+          absentDays: u.absentDays ?? (isPresent ? 0 : 1),
           isPresentToday: isPresent,
         }
       })
-    }
-    return sampleDepartmentUsers
   }, [departmentUsersQuery.data?.data])
 
   const [localUsers, setLocalUsers] = useState<DepartmentUser[] | null>(null)
@@ -257,6 +253,13 @@ export function DepartmentUsersPage() {
       >
         <DepartmentUsersTable
           users={filteredUsers}
+          emptyMessage={
+            departmentUsersQuery.isLoading
+              ? 'Loading users…'
+              : departmentUsersQuery.isError
+                ? 'Unable to load users. Please try again.'
+                : 'No users found.'
+          }
           hiddenColumns={columnFeatures.hiddenColumns}
           canEditActions={canManageUsers}
           onView={(user) => setModal({ kind: 'report', user })}

@@ -5,7 +5,6 @@ import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { resolveSlugFromPath } from '../utils/routeUtils'
-import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -38,13 +37,11 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
   const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
 
-  const Screen = (
-    feature
-      ? SCREEN_REGISTRY[feature.screen]?.component
-      : SCREEN_REGISTRY[targetSlug as keyof typeof SCREEN_REGISTRY]?.component
-  )
+  const Screen = feature
+    ? SCREEN_REGISTRY[feature.screen]?.component
+    : undefined
 
-  if (!Screen) {
+  if (!feature || !Screen) {
     return (
       <ErrorState
         title="Page not available"
@@ -53,22 +50,5 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
     )
   }
 
-  const effectiveFeature: FeaturePermission = feature ?? {
-    id: targetSlug,
-    departmentId,
-    name: targetSlug.toUpperCase(),
-    description: targetSlug,
-    screen: (targetSlug === 'customer-list' ? 'customers' : targetSlug) as never,
-    slug: targetSlug,
-    icon: 'grid',
-    enabled: true,
-    kind: 'screen',
-    order: 0,
-    userVisible: true,
-    roleAPermission: 'CAN_EDIT',
-    roleBPermission: 'CAN_READ',
-    category: 'screens',
-  }
-
-  return <Screen feature={effectiveFeature} />
+  return <Screen feature={feature} />
 }

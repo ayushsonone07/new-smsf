@@ -16,6 +16,11 @@ export interface DepartmentUserApiItem {
   presentDays?: number
   absentDays?: number
   isPresentToday?: boolean
+  seniorUser?: boolean
+  absent?: boolean
+  totalCustomers?: number
+  totalCompletedCustomers?: number
+  totalPendingCustomers?: number
   users?: DepartmentUserApiItem[]
 }
 
@@ -91,7 +96,14 @@ export async function getDepartmentUsers(params: {
     `/api/auth/department/users?${search.toString()}`,
   )
 
-  const items = Array.isArray(res?.data) ? res.data : []
+  const responseItems = Array.isArray(res?.data) ? res.data : []
+  // This endpoint returns one department/head object in `data`, while the
+  // paginated users themselves are nested under that object's `users` field.
+  // Keep direct-list support as well so the client remains compatible if the
+  // backend response is simplified later.
+  const items = responseItems.flatMap((item) =>
+    Array.isArray(item.users) ? item.users : [item],
+  )
   return {
     data: items,
     totalElements: res?.totalElements ?? items.length,

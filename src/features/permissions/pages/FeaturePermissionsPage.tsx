@@ -12,7 +12,7 @@ import type {
   FeaturePermission,
   UpdateFeaturePermissionRequest,
 } from '../types/permission.types'
-import { FeaturePermissionsTable } from '../../../components/permissions/FeaturePermissionsTable'
+import { DynamicRoutesTable } from '../components/DynamicRoutesTable'
 import { ColumnFeaturesTable } from '../../../components/permissions/ColumnFeaturesTable'
 import { FeatureFormModal } from '../../../components/permissions/FeatureFormModal'
 import { FEATURE_CATEGORIES } from '../config/featureCategories'
@@ -28,6 +28,11 @@ import { CreateRouteModal } from '../../../components/permissions/CreateRouteMod
 import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 import { MyAccessPanel } from '../../../components/permissions/MyAccessPanel'
 import { AllDepartmentsPanel } from '../../../components/permissions/AllDepartmentsPanel'
+import {
+  useDynamicRoutes,
+  useUpdateRouteStatus,
+} from '../hooks/useDynamicPermissions'
+import type { DynamicRouteResponse } from '../../../api/dynamic-permission.api'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
@@ -39,7 +44,7 @@ export function FeaturePermissionsPage() {
     useDepartmentFeatures(departmentId)
   const updateMutation =
     useUpdateFeaturePermission(departmentId)
-  const { create, remove, move } =
+  const { create, remove } =
     useFeatureMutations(departmentId)
 
   const [modal, setModal] = useState<
@@ -56,6 +61,25 @@ export function FeaturePermissionsPage() {
   const department = departmentsQuery.data?.find(
     (item) => item.id === departmentId,
   )
+  const departmentType = department?.type
+  const routesQuery = useDynamicRoutes(departmentType)
+  const updateRouteStatusMutation = useUpdateRouteStatus()
+
+  function handleRouteToggle(
+    route: DynamicRouteResponse,
+    roleName: 'DEPARTMENT_HEAD' | 'DEPARTMENT_USER',
+    enable: boolean,
+  ) {
+    if (!departmentType) return
+
+    updateRouteStatusMutation.mutate({
+      routeId: route.routeId,
+      routeName: route.routeName,
+      roleName,
+      departmentType,
+      enable,
+    })
+  }
 
   function handleUpdate(
     id: string,
@@ -178,24 +202,25 @@ export function FeaturePermissionsPage() {
           </div>
 
           {meta.key === 'screens' ? (
-            <FeaturePermissionsTable
-              features={items}
-              updatingFeatureId={
-                updateMutation.isPending
-                  ? updateMutation.variables?.id
-                  : undefined
-              }
-              onUpdate={handleUpdate}
-              onEdit={(feature) =>
-                setModal({ kind: 'edit', feature })
-              }
-              onDelete={(feature) =>
-                setModal({ kind: 'delete', feature })
-              }
-              onMove={(feature, direction) =>
-                move.mutate({ id: feature.id, direction })
-              }
-            />
+            routesQuery.isPending || !departmentType ? (
+              <LoadingState message="Loading department routes..." />
+            ) : routesQuery.isError ? (
+              <ErrorState
+                title="Unable to load routes"
+                message={routesQuery.error.message}
+                onRetry={() => routesQuery.refetch()}
+              />
+            ) : (
+              <DynamicRoutesTable
+                routes={routesQuery.data ?? []}
+                updatingRouteId={
+                  updateRouteStatusMutation.isPending
+                    ? updateRouteStatusMutation.variables?.routeId
+                    : undefined
+                }
+                onToggle={handleRouteToggle}
+              />
+            )
           ) : (
             <ColumnFeaturesTable
               features={items}
@@ -286,9 +311,10 @@ export function FeaturePermissionsPage() {
       ) : null}
 
       <CreateRouteModal
+        key={department?.id}
         open={showRouteModal}
         onClose={() => setShowRouteModal(false)}
-        initialDepartmentType={department?.username || department?.name}
+        initialDepartmentType={department?.type}
       />
 
       <CreateColumnModal
