@@ -17,6 +17,7 @@ export interface AssigneeOption {
 }
 
 export interface CustomersListFiltersProps {
+  showStatusTabs?: boolean
   /** Active status tab */
   activeTab: CustomerTab
   onTabChange: (tab: CustomerTab) => void
@@ -74,6 +75,7 @@ const panelVariants: Variants = {
  * screens and stack on narrow ones.
  */
 export function CustomersListFilters({
+  showStatusTabs,
   activeTab,
   onTabChange,
   tabCounts,
@@ -117,7 +119,11 @@ export function CustomersListFilters({
       {/* ── Header: tabs | search | Date filters ── */}
       <div className="cl-header-row">
         {showStatusTabs !== false && (
-          <div className="cl-tabs" role="tablist" aria-label="Filter by onboarding status">
+          <div
+            className="cl-tabs"
+            role="tablist"
+            aria-label="Filter by onboarding status"
+          >
             {TABS.map((tab) => (
               <motion.button
                 key={tab.key}
