@@ -35,6 +35,10 @@ export type HeadScreenKey =
   | 'sop'
   | 'help-center'
   | 'history'
+  | 'analytics'
+  | 'service-flow'
+  | 'member-flow'
+  | 'help-support'
   | 'custom'
 
 /**

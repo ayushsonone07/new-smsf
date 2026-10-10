@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -21,12 +20,13 @@ import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissi
 import { getSession } from '../../../../app/auth/session'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { generateDepartmentSession } from '../../../../api/auth.api'
 import {
-  resolveUserColumnKey,
-  USER_TABLE_COLUMN_KEYS,
-} from '../utils/userColumnMatch'
-import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
-import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
+  getSession,
+  saveAdminBackup,
+  homeForRole,
+  openSessionInNewTab,
+} from '../../../../app/auth/session'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
@@ -59,7 +59,7 @@ function belongsToRoute(
  * - GET /api/auth/department/users?page=0&size=10
  * - GET /api/onboarding/dashboard/member/{userId} (on view click)
  */
-export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
+export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
@@ -124,9 +124,12 @@ export function DepartmentUsersPage({ feature }: { feature: FeaturePermission })
       }
 
       const newSession = await generateDepartmentSession(email)
-      setSession(newSession)
+      const targetRoute = homeForRole(
+        newSession.user.role as never,
+        newSession.user.departmentType,
+      )
 
-      navigate({ to: '/onboarding-user' as never })
+      openSessionInNewTab(newSession, targetRoute)
     } catch (err: unknown) {
       console.error('Failed to log in as department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to log in as user'
