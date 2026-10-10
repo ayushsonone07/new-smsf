@@ -236,9 +236,148 @@ const departmentServicesRoute = createRoute({
   component: DepartmentServicesPage,
 })
 
+const onboardingLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_onboarding',
+  component: () => {
+    const session = getSession()
+    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    return <HeadConsoleLayout portalRole={portalRole} />
+  },
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+})
+
+const onboardingIndexRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const onboardingHeadDashboardRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const onboardingUserDashboardRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const onboardingHeadCustomersRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-customers',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const onboardingUserCustomersRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-customers',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const onboardingHeadCustomerListRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-customer-list',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const onboardingUserCustomerListRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-customer-list',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const onboardingHeadUsersRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-users',
+  component: () => <HeadScreenPage screenOverride="users" />,
+})
+
+const onboardingUserUsersRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-users',
+  component: () => <HeadScreenPage screenOverride="users" />,
+})
+
+const onboardingHeadMeetingRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-meeting',
+  component: () => <HeadScreenPage screenOverride="meeting" />,
+})
+
+const onboardingUserMeetingRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-meeting',
+  component: () => <HeadScreenPage screenOverride="meeting" />,
+})
+
+const onboardingHeadSopRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-sop',
+  component: () => <HeadScreenPage screenOverride="sop" />,
+})
+
+const onboardingUserSopRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-sop',
+  component: () => <HeadScreenPage screenOverride="sop" />,
+})
+
+const onboardingHeadAttendanceRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-attendance',
+  component: () => <HeadScreenPage screenOverride="attendance" />,
+})
+
+const onboardingUserAttendanceRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-attendance',
+  component: () => <HeadScreenPage screenOverride="attendance" />,
+})
+
+const onboardingHeadHelpCenterRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-help-center',
+  component: () => <HeadScreenPage screenOverride="help-center" />,
+})
+
+const onboardingUserHelpCenterRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-help-center',
+  component: () => <HeadScreenPage screenOverride="help-center" />,
+})
+
+const onboardingDynamicScreenRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding/$screen',
+  component: HeadScreenPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  onboardingLayoutRoute.addChildren([
+    onboardingIndexRoute,
+    onboardingHeadDashboardRoute,
+    onboardingUserDashboardRoute,
+    onboardingHeadCustomersRoute,
+    onboardingUserCustomersRoute,
+    onboardingHeadCustomerListRoute,
+    onboardingUserCustomerListRoute,
+    onboardingHeadUsersRoute,
+    onboardingUserUsersRoute,
+    onboardingHeadMeetingRoute,
+    onboardingUserMeetingRoute,
+    onboardingHeadSopRoute,
+    onboardingUserSopRoute,
+    onboardingHeadAttendanceRoute,
+    onboardingUserAttendanceRoute,
+    onboardingHeadHelpCenterRoute,
+    onboardingUserHelpCenterRoute,
+    onboardingDynamicScreenRoute,
+  ]),
   headLayoutRoute.addChildren([
     headIndexRoute,
     headScreenRoute,

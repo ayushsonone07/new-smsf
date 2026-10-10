@@ -33,7 +33,10 @@ export function LoginPage() {
     (session: AuthSession) => {
       setSession(session)
       navigate({
-        to: homeForRole(session.user.role as never) as never,
+        to: homeForRole(
+          session.user.role as never,
+          session.user.departmentType,
+        ) as never,
       })
     },
     [navigate],
