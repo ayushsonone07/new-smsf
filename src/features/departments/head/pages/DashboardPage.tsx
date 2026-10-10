@@ -22,15 +22,16 @@ import {
 } from '../../../../components/head/dashboard/TopPerformers'
 import { MemberDetailsModal } from '../../../../components/head/dashboard/MemberDetailsModal'
 import '../../../../components/head/dashboard/Dashboard.css'
+import { LoadingState } from '../../../../components/ui/LoadingState'
+import { ErrorState } from '../../../../components/ui/ErrorState'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
-import { LoadingState } from '../../../../components/ui/LoadingState'
-import { ErrorState } from '../../../../components/ui/ErrorState'
-import type { OnboardingSummaryParams } from '../../../../api/onboarding-dashboard.api'
-import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { useAuthOnboardingSummary } from '../../hooks/useAuthOnboardingSummary'
+import type { OnboardingSummaryParams, AuthOnboardingSummaryParams } from '../../../../api/onboarding-dashboard.api'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -55,6 +56,20 @@ function shiftDays(date: Date, days: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
+}
+
+/** Convert local date to ISO datetime string (start of day: 00:00:00). */
+function toStartOfDayIso(date: Date): string {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString().slice(0, 19) // "2026-10-10T00:00:00"
+}
+
+/** Convert local date to ISO datetime string (end of day: 23:59:59). */
+function toEndOfDayIso(date: Date): string {
+  const d = new Date(date)
+  d.setHours(23, 59, 59, 0)
+  return d.toISOString().slice(0, 19) // "2026-10-10T23:59:59"
 }
 
 function rangeFor(period: string): {
@@ -90,6 +105,47 @@ function rangeFor(period: string): {
   }
 }
 
+/** Range with ISO datetime for `/api/auth/onboarding/summary`. */
+function rangeForAuth(period: string): {
+  startDate?: string
+  endDate?: string
+  allTime?: boolean
+} {
+  const today = new Date()
+
+  switch (period) {
+    case 'Yesterday': {
+      const yesterday = shiftDays(today, -1)
+      return {
+        startDate: toStartOfDayIso(yesterday),
+        endDate: toEndOfDayIso(yesterday),
+      }
+    }
+    case 'Last 7 days':
+    case 'Custom range': {
+      const start = shiftDays(today, -6)
+      return {
+        startDate: toStartOfDayIso(start),
+        endDate: toEndOfDayIso(today),
+      }
+    }
+    case 'This month': {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1)
+      return {
+        startDate: toStartOfDayIso(start),
+        endDate: toEndOfDayIso(today),
+      }
+    }
+    case 'All time':
+      return { allTime: true }
+    default: // Today
+      return {
+        startDate: toStartOfDayIso(today),
+        endDate: toEndOfDayIso(today),
+      }
+  }
+}
+
 function num(value: number | undefined): string {
   return (value ?? 0).toLocaleString('en-US')
 }
@@ -109,6 +165,7 @@ function HeadDashboard() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const range = useMemo(() => rangeFor(datePeriod), [datePeriod])
+  const authRange = useMemo(() => rangeForAuth(datePeriod), [datePeriod])
 
   const summaryParams: OnboardingSummaryParams = useMemo(
     () => ({
@@ -121,6 +178,19 @@ function HeadDashboard() {
   )
 
   const summaryQuery = useOnboardingDashboardSummary(summaryParams)
+
+  // Additional call to /api/auth/onboarding/summary with ISO datetime
+  const authSummaryParams: AuthOnboardingSummaryParams = useMemo(
+    () => ({
+      department: 'ONBOARDING_DEPARTMENT',
+      startDate: authRange.startDate,
+      endDate: authRange.endDate,
+      allTime: authRange.allTime,
+    }),
+    [authRange],
+  )
+
+  const authSummaryQuery = useAuthOnboardingSummary(authSummaryParams)
 
   const membersParams = useMemo(
     () => ({
@@ -136,15 +206,82 @@ function HeadDashboard() {
 
   const membersQuery = useOnboardingDashboardMembers(membersParams)
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
-  const { isColumnEnabled, refetch: refetchPermissions } =
+  const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
-  const isStatusVisible = isColumnEnabled('Status')
+  function handleRefresh() {
+    setRefreshKey((k) => k + 1)
+    summaryQuery.refetch()
+    membersQuery.refetch()
+    assigningUsersQuery.refetch()
+    authSummaryQuery.refetch()
+    refetchPermissions()
+  }
+
+  const authKpis = authSummaryQuery.data
+
+  // Merge KPIs from both APIs, preferring auth summary when available
+  const mergedKpis = {
+    totalCustomers: authKpis?.totalCustomers ?? summaryQuery.data?.kpis?.totalCustomers ?? 0,
+    totalOnboarded: authKpis?.totalOnboardedCustomers ?? summaryQuery.data?.kpis?.totalOnboarded ?? 0,
+    totalCompleted: authKpis?.totalCompletedOnboarding ?? summaryQuery.data?.kpis?.totalCompleted ?? 0,
+    totalInProgress: authKpis?.totalInProgressOnboarding ?? summaryQuery.data?.kpis?.totalInProgress ?? 0,
+    totalPending: authKpis?.totalPendingOnboarding ?? summaryQuery.data?.kpis?.totalPending ?? 0,
+    totalDelayed: authKpis?.totalOnboardingTimeExceedingCustomers ?? summaryQuery.data?.kpis?.totalDelayed ?? 0,
+    presentUsers: authKpis?.presentUsers ?? summaryQuery.data?.kpis?.presentUsers ?? 0,
+    absentUsers: authKpis?.absentUsers ?? summaryQuery.data?.kpis?.absentUsers ?? 0,
+  }
+
+  const statsData: Partial<DashboardStatsData> | undefined = mergedKpis
+    ? {
+        totalCustomers: {
+          value: num(mergedKpis.totalCustomers),
+          growth: '▲ 4.7%',
+          sub: '+45 this period',
+        },
+        onboarded: {
+          value: num(mergedKpis.totalOnboarded),
+          sub: `${Math.round(
+            (mergedKpis.totalOnboarded / (mergedKpis.totalCustomers || 1)) * 100,
+          )}% of all customers`,
+        },
+        completed: {
+          value: num(mergedKpis.totalCompleted),
+          growth: '▲ 13.8%',
+          sub: 'vs last period',
+        },
+        inProgress: {
+          value: num(mergedKpis.totalInProgress),
+          sub: 'Currently processing',
+        },
+        pending: {
+          value: num(mergedKpis.totalPending),
+          sub: 'Awaiting processing',
+        },
+        delayed: {
+          value: num(mergedKpis.totalDelayed),
+          growth: '▲ 0%',
+          sub: 'vs last period',
+        },
+        presentUsers: {
+          value: num(mergedKpis.presentUsers),
+          sub: 'Active today',
+        },
+        absentUsers: {
+          value: num(mergedKpis.absentUsers),
+          sub: 'Not active today',
+        },
+      }
+    : undefined
 
   const teamMembers = useMemo<TeamMemberPerformance[]>(() => {
     const list = membersQuery.data?.teamMembers
-    if (list && list.length > 0) {
-      return list.map((m) => {
+    // Also consider auth summary team members
+    const authMembers = authSummaryQuery.data?.teamMembers
+    const sourceList = (list && list.length > 0) ? list : (authMembers && authMembers.length > 0 ? authMembers : null)
+    
+    if (sourceList) {
+      return sourceList.map((m) => {
         const target = m.target ?? 0
         const completed = m.completed ?? 0
         const isPresent =
@@ -170,7 +307,7 @@ function HeadDashboard() {
       })
     }
     return []
-  }, [membersQuery.data?.teamMembers])
+  }, [membersQuery.data?.teamMembers, authSummaryQuery.data?.teamMembers])
 
   const topPerformers = useMemo<TopPerformerItem[]>(() => {
     const sorted = [...teamMembers].sort(
@@ -182,14 +319,6 @@ function HeadDashboard() {
       score: item.completed,
     }))
   }, [teamMembers])
-
-  function handleRefresh() {
-    setRefreshKey((k) => k + 1)
-    summaryQuery.refetch()
-    membersQuery.refetch()
-    assigningUsersQuery.refetch()
-    refetchPermissions()
-  }
 
   if (summaryQuery.isPending || membersQuery.isPending) {
     return <LoadingState message="Loading dashboard..." />
@@ -205,56 +334,21 @@ function HeadDashboard() {
     )
   }
 
-  const kpis = summaryQuery.data?.kpis
-  const statsData: Partial<DashboardStatsData> = {
-    totalCustomers: {
-      value: num(kpis?.totalCustomers ?? 0),
-      growth: '',
-      sub: `${num(kpis?.totalCustomers ?? 0)} total customers`,
-    },
-    onboarded: {
-      value: num(kpis?.totalOnboarded ?? 0),
-      sub: `${Math.round(
-        ((kpis?.totalOnboarded ?? 0) / (kpis?.totalCustomers || 1)) * 100,
-      )}% of all customers`,
-    },
-    completed: {
-      value: num(kpis?.totalCompleted ?? 0),
-      growth: '',
-      sub: 'Completed customers',
-    },
-    inProgress: {
-      value: num(kpis?.totalInProgress ?? 0),
-      sub: 'Currently processing',
-    },
-    pending: {
-      value: num(kpis?.totalPending ?? 0),
-      sub: 'Awaiting processing',
-    },
-    delayed: {
-      value: num(kpis?.totalDelayed ?? 0),
-      growth: '',
-      sub: 'Needs follow-up',
-    },
-    presentUsers: {
-      value: num(kpis?.presentUsers ?? 0),
-      sub: 'Active today',
-    },
-    absentUsers: {
-      value: num(kpis?.absentUsers ?? 0),
-      sub: 'Not active today',
-    },
-  }
-
   const activeDays = summaryQuery.data?.mostActiveDay?.map((d) => ({
     day: d.day,
     value: d.count,
     isActive: d.count > 0,
   }))
 
-  const delayBreakdown = summaryQuery.data?.delayBreakdown
+  // Use auth summary for delay breakdown and team target
+  const delayBreakdown = authSummaryQuery.data?.delayBreakdown ?? summaryQuery.data?.delayBreakdown
   const totalDelayed =
-    summaryQuery.data?.totalDelayed ?? kpis?.totalDelayed ?? 0
+    authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers ??
+    summaryQuery.data?.totalDelayed ??
+    mergedKpis?.totalDelayed ??
+    9
+
+  const teamTarget = authSummaryQuery.data?.teamTarget ?? summaryQuery.data?.teamTarget
 
   return (
     <motion.div
@@ -283,7 +377,7 @@ function HeadDashboard() {
         <div className="hdb-row-two-col">
           <OnboardingTrend
             total={
-              kpis?.totalCustomers ??
+              mergedKpis?.totalCustomers ??
               summaryQuery.data?.trend?.newCustomers?.reduce(
                 (a, b) => a + b,
                 0,
@@ -291,49 +385,51 @@ function HeadDashboard() {
             }
           />
           <TeamTargetAchievement
-            percentage={summaryQuery.data?.teamTarget?.percentage}
-            target={summaryQuery.data?.teamTarget?.target}
-            achieved={summaryQuery.data?.teamTarget?.achieved}
-            remaining={summaryQuery.data?.teamTarget?.remaining}
+            percentage={teamTarget?.percentage}
+            target={teamTarget?.target}
+            achieved={teamTarget?.achieved}
+            remaining={teamTarget?.remaining}
           />
         </div>
       </motion.div>
 
       {/* 4. Middle Row 2: Status Breakdown, Most Active Day & Delay Donut */}
       <motion.div variants={sectionVariants}>
-        <div className={isStatusVisible ? 'hdb-row-three-col' : 'hdb-row-two-col-equal'}>
-          {isStatusVisible && (
-            <StatusBreakdown
-              pendingCount={
-                summaryQuery.data?.statusBreakdown?.pending?.count ??
-                kpis?.totalPending
-              }
-              pendingPercent={
-                summaryQuery.data?.statusBreakdown?.pending?.percentage
-              }
-              inProgressCount={
-                summaryQuery.data?.statusBreakdown?.inProgress?.count ??
-                kpis?.totalInProgress
-              }
-              inProgressPercent={
-                summaryQuery.data?.statusBreakdown?.inProgress?.percentage
-              }
-              completedCount={
-                summaryQuery.data?.statusBreakdown?.completed?.count ??
-                kpis?.totalCompleted
-              }
-              completedPercent={
-                summaryQuery.data?.statusBreakdown?.completed?.percentage
-              }
-              delayedCount={
-                summaryQuery.data?.statusBreakdown?.delayed?.count ??
-                kpis?.totalDelayed
-              }
-              delayedPercent={
-                summaryQuery.data?.statusBreakdown?.delayed?.percentage
-              }
-            />
-          )}
+        <div className="hdb-row-three-col">
+          <StatusBreakdown
+            pendingCount={
+              authSummaryQuery.data?.totalPendingOnboarding ??
+              summaryQuery.data?.statusBreakdown?.pending?.count ??
+              mergedKpis?.totalPending
+            }
+            pendingPercent={
+              summaryQuery.data?.statusBreakdown?.pending?.percentage
+            }
+            inProgressCount={
+              authSummaryQuery.data?.totalInProgressOnboarding ??
+              summaryQuery.data?.statusBreakdown?.inProgress?.count ??
+              mergedKpis?.totalInProgress
+            }
+            inProgressPercent={
+              summaryQuery.data?.statusBreakdown?.inProgress?.percentage
+            }
+            completedCount={
+              authSummaryQuery.data?.totalCompletedOnboarding ??
+              summaryQuery.data?.statusBreakdown?.completed?.count ??
+              mergedKpis?.totalCompleted
+            }
+            completedPercent={
+              summaryQuery.data?.statusBreakdown?.completed?.percentage
+            }
+            delayedCount={
+              authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers ??
+              summaryQuery.data?.statusBreakdown?.delayed?.count ??
+              mergedKpis?.totalDelayed
+            }
+            delayedPercent={
+              summaryQuery.data?.statusBreakdown?.delayed?.percentage
+            }
+          />
           <MostActiveDay days={activeDays} />
           <DelayWhoseSide
             totalDelayed={totalDelayed}

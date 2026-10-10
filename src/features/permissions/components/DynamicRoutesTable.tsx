@@ -4,6 +4,8 @@ import { PermissionToggle } from '../../../components/permissions/PermissionTogg
 interface DynamicRoutesTableProps {
   routes: DynamicRouteResponse[]
   updatingRouteId?: string
+  selectedRouteId?: string
+  onSelectRoute?: (route: DynamicRouteResponse) => void
   onToggle: (
     route: DynamicRouteResponse,
     role: 'DEPARTMENT_HEAD' | 'DEPARTMENT_USER',
@@ -14,6 +16,8 @@ interface DynamicRoutesTableProps {
 export function DynamicRoutesTable({
   routes,
   updatingRouteId,
+  selectedRouteId,
+  onSelectRoute,
   onToggle,
 }: DynamicRoutesTableProps) {
   if (routes.length === 0) {
@@ -42,10 +46,24 @@ export function DynamicRoutesTable({
             const isUpdating = updatingRouteId === route.routeId
 
             return (
-              <tr key={route.routeId}>
+              <tr
+                key={route.routeId}
+                className={selectedRouteId === route.routeId ? 'is-selected-row' : ''}
+              >
                 <td>
                   <div className="feature-cell">
-                    <strong>{route.routeName}</strong>
+                    {onSelectRoute ? (
+                      <button
+                        type="button"
+                        className="route-select-button"
+                        aria-pressed={selectedRouteId === route.routeId}
+                        onClick={() => onSelectRoute(route)}
+                      >
+                        {route.routeName}
+                      </button>
+                    ) : (
+                      <strong>{route.routeName}</strong>
+                    )}
                     <span>{route.routeId}</span>
                   </div>
                 </td>

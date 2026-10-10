@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -50,6 +50,8 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const [page, setPage] = useState(0)
+  const [size] = useState(10)
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -57,6 +59,40 @@ export function CustomerListPage() {
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
   const canEditStatus = canEditColumn('Status')
+
+  const isAssignToVisible =
+    isColumnEnabled('Assign To') ||
+    isColumnEnabled('Assign') ||
+    isColumnEnabled('Assignee')
+  const canEditAssignTo =
+    canEditColumn('Assign To') ||
+    canEditColumn('Assign') ||
+    canEditColumn('Assignee')
+
+  const isRemarkVisible =
+    isColumnEnabled('Internal Remark') ||
+    isColumnEnabled('Remark')
+  const canEditRemark =
+    canEditColumn('Internal Remark') ||
+    canEditColumn('Remark')
+
+  const isContactVisible =
+    isColumnEnabled('Contact') ||
+    isColumnEnabled('Phone') ||
+    isColumnEnabled('Email')
+
+  const isBusinessVisible =
+    isColumnEnabled('Business') ||
+    isColumnEnabled('Company')
+
+  const isUpdatedVisible =
+    isColumnEnabled('Updated')
+
+  useEffect(() => {
+    if (!isStatusVisible && activeTab !== 'all') {
+      setActiveTab('all')
+    }
+  }, [isStatusVisible, activeTab])
 
   // 1. Assigning users API
   const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
@@ -72,10 +108,37 @@ export function CustomerListPage() {
     return FALLBACK_ASSIGNEES
   }, [assigningUsersQuery.data])
 
-  // 2. Onboarding customers live API
+  // Reset page when filters/search change
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(0)
+  }
+  const handleTabChange = (tab: CustomerTab) => {
+    setActiveTab(tab)
+    setPage(0)
+  }
+  const handleAssigneeChange = (id: string | null | 'all') => {
+    setSelectedAssigneeId(id)
+    setPage(0)
+  }
+  const handleDateChange = (from: string, to: string) => {
+    setDateFrom(from)
+    setDateTo(to)
+    setPage(0)
+  }
+  const handleResetFilters = () => {
+    setSearch('')
+    setActiveTab('all')
+    setSelectedAssigneeId('all')
+    setDateFrom('')
+    setDateTo('')
+    setPage(0)
+  }
+
+  // 3. Onboarding customers live API
   const onboardingApiQuery = useOnboardingCustomersList({
-    page: 0,
-    size: 50,
+    page,
+    size,
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
@@ -146,18 +209,12 @@ export function CustomerListPage() {
 
   const tabCounts = useMemo(
     () => ({
-      all: onboardingCustomers.length,
-      pending: onboardingCustomers.filter(
-        (item) => item.status === 'pending',
-      ).length,
-      inProgress: onboardingCustomers.filter(
-        (item) => item.status === 'in-progress',
-      ).length,
-      completed: onboardingCustomers.filter(
-        (item) => item.status === 'completed',
-      ).length,
+      all: onboardingApiQuery.data?.summary?.total,
+      pending: onboardingApiQuery.data?.summary?.pending,
+      inProgress: onboardingApiQuery.data?.summary?.inProgress,
+      completed: onboardingApiQuery.data?.summary?.completed,
     }),
-    [onboardingCustomers],
+    [onboardingApiQuery.data?.summary],
   )
 
   const filteredCustomers = useMemo(() => {
@@ -210,36 +267,25 @@ export function CustomerListPage() {
     updateMutation.mutate({ id, data: patch })
   }
 
-  function resetFilters() {
-    setSearch('')
-    setActiveTab('all')
-    setSelectedAssigneeId('all')
-    setDateFrom('')
-    setDateTo('')
-  }
-
   return (
     <>
       <CustomersListFilters
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         tabCounts={tabCounts}
         searchSlot={
           <CustomersListSearchBar
             value={search}
-            onChange={setSearch}
+            onChange={handleSearchChange}
           />
         }
         assignees={assignees}
         selectedAssigneeId={selectedAssigneeId}
-        onAssigneeChange={setSelectedAssigneeId}
+        onAssigneeChange={handleAssigneeChange}
         dateFrom={dateFrom}
         dateTo={dateTo}
-        onDateChange={(from, to) => {
-          setDateFrom(from)
-          setDateTo(to)
-        }}
-        onReset={resetFilters}
+        onDateChange={handleDateChange}
+        onReset={handleResetFilters}
       />
 
       <CustomersList
@@ -248,6 +294,13 @@ export function CustomerListPage() {
         canEdit={canEdit}
         showStatus={isStatusVisible}
         canEditStatus={canEditStatus}
+        showAssignTo={isAssignToVisible}
+        canEditAssignTo={canEditAssignTo}
+        showRemark={isRemarkVisible}
+        canEditRemark={canEditRemark}
+        showContact={isContactVisible}
+        showBusiness={isBusinessVisible}
+        showUpdated={isUpdatedVisible}
         onOpenDetail={setSelectedCustomer}
         onStatusChange={(id, status) =>
           patchCustomer(id, { onboardingStatus: status })
@@ -260,9 +313,37 @@ export function CustomerListPage() {
         }
       />
 
+      {/* Pagination */}
+      {onboardingApiQuery.data && onboardingApiQuery.data.totalPage > 1 && (
+        <div className="clist-pagination">
+          <button
+            className="clist-page-btn"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || onboardingApiQuery.isFetching}
+          >
+            Previous
+          </button>
+          <span className="clist-page-info">
+            Page {page + 1} of {onboardingApiQuery.data.totalPage}
+            {onboardingApiQuery.data.totalElements !== undefined && (
+              <span> · {onboardingApiQuery.data.totalElements} total</span>
+            )}
+          </span>
+          <button
+            className="clist-page-btn"
+            onClick={() => setPage((p) => Math.min(onboardingApiQuery.data.totalPage - 1, p + 1))}
+            disabled={page >= onboardingApiQuery.data.totalPage - 1 || onboardingApiQuery.isFetching}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
+        showStatus={isStatusVisible}
+        showAssignTo={isAssignToVisible}
         onClose={() => setSelectedCustomer(null)}
       />
     </>

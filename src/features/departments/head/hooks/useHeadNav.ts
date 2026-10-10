@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { getSession } from '../../../../app/auth/session'
 import type { IconName } from '../../../../components/head/shared/iconPaths'
 import { useDynamicRoutes } from '../../../permissions/hooks/useDynamicPermissions'
@@ -14,18 +14,26 @@ const SCREEN_META: Record<
 > = {
   dashboard: { screen: 'dashboard', label: 'Dashboard', icon: 'grid' },
   users: { screen: 'users', label: 'Department Users', icon: 'users' },
-  'department-users': { screen: 'users', label: 'Department Users', icon: 'users' },
   customers: { screen: 'customers', label: 'Customer List', icon: 'users' },
-  'customer-list': { screen: 'customers', label: 'Customer List', icon: 'users' },
   attendance: { screen: 'attendance', label: 'Attendance', icon: 'clock' },
-  '15-days-meeting': { screen: 'meeting', label: '15 Days Meeting', icon: 'calendar' },
   meeting: { screen: 'meeting', label: '15 Days Meeting', icon: 'calendar' },
   sop: { screen: 'sop', label: 'SOP', icon: 'workflow' },
   'help-center': { screen: 'help-center', label: 'Help Center', icon: 'help' },
 }
 
-function routeSlug(routeName: string): string {
-  return routeName.split('?')[0].replace(/^\/+|\/+$/g, '')
+function normalizeRoute(routeName: string): string {
+  return routeName.split('?')[0].replace(/^\/+|\/+$/g, '').toLowerCase()
+}
+
+function screenKeyForRoute(slug: string): string {
+  if (slug === 'customer-list' || slug.endsWith('-customers')) return 'customers'
+  if (slug === 'department-users' || slug.endsWith('-users')) return 'users'
+  if (slug === '15-days-meeting' || slug.endsWith('-meeting')) return 'meeting'
+  if (slug.endsWith('-attendance')) return 'attendance'
+  if (slug.endsWith('-help-center')) return 'help-center'
+  if (slug.endsWith('-sop')) return 'sop'
+  if (slug === 'dashboard') return 'dashboard'
+  return slug
 }
 
 function humanizeRoute(slug: string): string {
@@ -41,8 +49,8 @@ function routeToFeature(
   departmentId: string,
   order: number,
 ): FeaturePermission {
-  const slug = routeSlug(route.routeName)
-  const meta = SCREEN_META[slug]
+  const slug = normalizeRoute(route.routeName)
+  const meta = SCREEN_META[screenKeyForRoute(slug)]
 
   return {
     id: route.routeId,
@@ -62,7 +70,7 @@ function routeToFeature(
   }
 }
 
-/** Sidebar routes are read live for the signed-in user's department and role. */
+/** The sidebar is the enabled route list returned by the backend for this department. */
 export function useHeadNav(departmentId: string) {
   const session = getSession()
   const role = session?.user.role
@@ -73,11 +81,12 @@ export function useHeadNav(departmentId: string) {
   const features = useMemo(
     () =>
       (query.data ?? [])
-        .filter((route) =>
-          role === 'USER'
+        .filter((route) => {
+          if (route.visibility === false) return false
+          return role === 'USER'
             ? route.enableUser === true
-            : route.enableHead === true,
-        )
+            : route.enableHead === true
+        })
         .map((route, index) => routeToFeature(route, departmentId, index)),
     [departmentId, query.data, role],
   )
@@ -90,18 +99,25 @@ export function useHeadNav(departmentId: string) {
         icon: feature.icon,
         to: `${basePath}/${feature.slug}`,
       })),
-    [features, basePath],
+    [basePath, features],
   )
 
-  const bySlug = (slug: string): FeaturePermission | undefined => {
-    const normalized = routeSlug(slug)
-    return features.find(
-      (feature) =>
-        feature.slug === normalized ||
-        feature.screen === normalized ||
-        (normalized === 'customer-list' && feature.screen === 'customers'),
-    )
-  }
+  const bySlug = useCallback(
+    (slug: string): FeaturePermission | undefined => {
+      const normalized = normalizeRoute(slug)
+      return features.find(
+        (feature) =>
+          feature.slug === normalized ||
+          feature.screen === screenKeyForRoute(normalized),
+      )
+    },
+    [features],
+  )
 
-  return { ...query, features, items, bySlug }
+  const isRouteEnabled = useCallback(
+    (slugOrPath: string): boolean => bySlug(slugOrPath) !== undefined,
+    [bySlug],
+  )
+
+  return { ...query, features, items, bySlug, isRouteEnabled }
 }

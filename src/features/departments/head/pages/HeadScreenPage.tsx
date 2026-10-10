@@ -1,4 +1,5 @@
-import { useLocation, useParams } from '@tanstack/react-router'
+import { Navigate, useLocation, useParams } from '@tanstack/react-router'
+import { getSession } from '../../../../app/auth/session'
 import { useHeadNav } from '../hooks/useHeadNav'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
@@ -35,17 +36,47 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   }
 
   const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
+
   const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
 
   const Screen = feature
     ? SCREEN_REGISTRY[feature.screen]?.component
     : undefined
 
-  if (!feature || !Screen) {
+  if (!feature) {
+    const firstEnabledFeature = nav.features[0]
+
+    if (firstEnabledFeature) {
+      const isUser = getSession()?.user.role === 'USER'
+
+      return isUser ? (
+        <Navigate
+          to="/users/$screen"
+          params={{ screen: firstEnabledFeature.slug }}
+          replace
+        />
+      ) : (
+        <Navigate
+          to="/head/$screen"
+          params={{ screen: firstEnabledFeature.slug }}
+          replace
+        />
+      )
+    }
+
+    return (
+      <ErrorState
+        title="No pages enabled"
+        message="The admin has not enabled any route for your department yet."
+      />
+    )
+  }
+
+  if (!Screen) {
     return (
       <ErrorState
         title="Page not available"
-        message="This page is not enabled for your department. Ask the admin to enable it."
+        message="This page is not available yet."
       />
     )
   }

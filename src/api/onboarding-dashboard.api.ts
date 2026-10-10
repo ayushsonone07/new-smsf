@@ -18,7 +18,70 @@ export interface OnboardingSummaryParams {
   department?: string
 }
 
-export interface OnboardingMemberPerformance {
+/**
+ * `GET /api/auth/onboarding/summary` — onboarding summary from auth service
+ * with date-time support (e.g., 2026-10-10T00:00:00, 2026-10-10T23:59:59)
+ */
+export interface AuthOnboardingSummaryParams {
+  startDate?: string
+  endDate?: string
+  selectedUserIds?: number[]
+  department?: string
+  allTime?: boolean
+}
+
+export interface AuthOnboardingSummary {
+  summary?: {
+    total?: number
+    pending?: number
+    inProgress?: number
+    completed?: number
+  }
+
+  // Backend field names (from OnboardingSummaryDTO)
+  totalCustomers?: number
+  totalOnboardedCustomers?: number
+  totalPendingOnboarding?: number
+  totalInProgressOnboarding?: number
+  totalCompletedOnboarding?: number
+  totalOnboardingTimeExceedingCustomers?: number
+  presentUsers?: number
+  absentUsers?: number
+  trend?: OnboardingTrendDTO
+  teamTarget?: OnboardingTargetAchievementDTO
+  teamMembers?: OnboardingMemberPerformanceDTO[]
+  delayBreakdown?: OnboardingDelayBreakdownDTO
+  
+  // Alternative field names (in case backend uses different JSON property names)
+  total?: number
+  pending?: number
+  inProgress?: number
+  completed?: number
+  onboarded?: number
+}
+
+export interface OnboardingDelayBreakdownDTO {
+  clientSide?: { count: number; percentage: number }
+  ourSide?: { count: number; percentage: number }
+  techOtherDepartment?: { count: number; percentage: number }
+  available?: boolean
+}
+
+export interface OnboardingTrendDTO {
+  interval?: string
+  labels: string[]
+  newCustomers: number[]
+  previousPeriod: number[]
+}
+
+export interface OnboardingTargetAchievementDTO {
+  target: number
+  achieved: number
+  remaining: number
+  percentage: number
+}
+
+export interface OnboardingMemberPerformanceDTO {
   userId: number | string
   name: string
   email: string
@@ -40,7 +103,7 @@ export interface OnboardingMemberPerformance {
 
 export interface OnboardingMembersResponse {
   totalMembers?: number
-  teamMembers: OnboardingMemberPerformance[]
+  teamMembers: OnboardingMemberPerformanceDTO[]
   page?: number
   size?: number
   totalPages?: number
@@ -132,4 +195,30 @@ export async function getOnboardingDashboardMembers(
     size: payload?.size ?? 10,
     totalPages: payload?.totalPages ?? 1,
   }
+}
+
+/**
+ * `GET /api/auth/onboarding/summary`
+ * Onboarding summary from auth service with date-time support.
+ * Uses ISO datetime format: 2026-10-10T00:00:00, 2026-10-10T23:59:59
+ */
+export async function getAuthOnboardingSummary(
+  params: AuthOnboardingSummaryParams = {},
+): Promise<AuthOnboardingSummary> {
+  const search = new URLSearchParams()
+
+  search.set('department', params.department ?? summaryDepartment())
+
+  if (params.startDate) search.set('startDate', params.startDate)
+  if (params.endDate) search.set('endDate', params.endDate)
+  if (params.allTime) search.set('allTime', 'true')
+  if (params.selectedUserIds?.length) {
+    params.selectedUserIds.forEach(id => search.append('selectedUserIds', String(id)))
+  }
+
+  const res = await authedApiRequest<
+    { data?: AuthOnboardingSummary } & AuthOnboardingSummary
+  >(`/api/auth/onboarding/summary?${search.toString()}`)
+
+  return (res?.data ?? res) as AuthOnboardingSummary
 }

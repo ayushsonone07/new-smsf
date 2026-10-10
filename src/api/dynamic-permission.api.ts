@@ -35,6 +35,7 @@ export interface DynamicRouteResponse {
   departmentId?: number
   enableHead?: boolean
   enableUser?: boolean
+  visibility?: boolean
   assignedRoles?: string[]
   createdAt?: string
   updatedAt?: string
@@ -43,6 +44,8 @@ export interface DynamicRouteResponse {
 export interface CreateDynamicColumnPayload {
   departmentType: string
   columnName: string
+  routesType?: string
+  routeId?: string
   readWriteAccess?: '1' | '2' | '12'
 }
 
@@ -51,11 +54,15 @@ export interface DynamicColumnResponse {
   columnName: string
   departmentType?: string
   departmentId?: number
+  routeId?: string
+  routesType?: string
+  routeName?: string
   readWriteAccess?: string
   roleAPermission?: string
   roleBPermission?: string
   enableHead?: boolean
   enableUser?: boolean
+  visibility?: boolean
   isConfigured?: boolean
   createdAt?: string
   updatedAt?: string
@@ -226,7 +233,8 @@ export interface UpdateColumnStatusPayload {
   columnName?: string
   roleName: string
   departmentType: string
-  enable: boolean
+  enable?: boolean
+  visibility?: boolean
 }
 
 export interface ColumnStatusUpdateResponse {
@@ -235,8 +243,9 @@ export interface ColumnStatusUpdateResponse {
   roleName: string
   departmentId: number | string
   departmentType: string
-  enable: boolean
-  disable: boolean
+  enable?: boolean
+  disable?: boolean
+  visibility?: boolean
   assignedRoles?: string[]
 }
 
@@ -263,7 +272,8 @@ export interface UpdateRouteStatusPayload {
   routeName?: string
   roleName: string
   departmentType: string
-  enable: boolean
+  enable?: boolean
+  visibility?: boolean
 }
 
 export interface RouteStatusUpdateResponse {
@@ -272,8 +282,9 @@ export interface RouteStatusUpdateResponse {
   roleName: string
   departmentId: number | string
   departmentType: string
-  enable: boolean
-  disable: boolean
+  enable?: boolean
+  disable?: boolean
+  visibility?: boolean
   assignedRoles?: string[]
 }
 
@@ -313,6 +324,7 @@ export interface UserDynamicPermissionsResponse {
     canRead: boolean
     canEdit: boolean
     enabled?: boolean
+    visibility?: boolean
   }>
 }
 

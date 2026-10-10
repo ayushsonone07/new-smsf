@@ -16,18 +16,22 @@ import {
   sampleWorkItemsByUser,
 } from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
+import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
+import { getSession } from '../../../../app/auth/session'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
+import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import {
-  useDepartmentUsersList,
-  useOnboardingCustomersList,
-  useAuthOnboardingSummary,
-} from '../../hooks/useDepartmentUsersList'
-import { useAssigningUsers } from '../../hooks/useAssigningUsers'
+  resolveUserColumnKey,
+  USER_TABLE_COLUMN_KEYS,
+} from '../utils/userColumnMatch'
+import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
+import type { DynamicColumnResponse } from '../../../../api/dynamic-permission.api'
 import type {
   DepartmentUser,
   DepartmentUserFormValues,
   DepartmentUserRole,
 } from '../types/head.types'
+import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 type ModalState =
   | { kind: 'none' }
@@ -36,45 +40,88 @@ type ModalState =
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
 
+/** Whether a dynamic column is linked to the current feature/route. */
+function belongsToRoute(
+  column: DynamicColumnResponse,
+  feature: FeaturePermission,
+): boolean {
+  return (
+    column.routeId === feature.id ||
+    column.routesType === feature.id ||
+    column.routeName?.replace(/^\/+|\/+$/g, '').toLowerCase() ===
+      feature.description.replace(/^\/+|\/+$/g, '').toLowerCase()
+  )
+}
+
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
- * - GET /api/meetings/users/assigning-list?departmentType=ONBOARDING_DEPARTMENT
- * - GET /api/auth/onboarding/customers?page=0&size=10
- * - GET /api/auth/onboarding/summary
  */
-export function DepartmentUsersPage() {
+export function DepartmentUsersPage({ feature }: { feature: FeaturePermission }) {
   const departmentId = useHeadDepartmentId()
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
+  const session = getSession()
+  const dynamicColumnsQuery = useDynamicColumns(session?.user.departmentType)
+  const isUser = session?.user.role === 'USER'
+
+  const routeColumns = useMemo(
+    () =>
+      (dynamicColumnsQuery.data ?? []).filter((column) => {
+        if (!belongsToRoute(column, feature) || column.visibility === false)
+          return false
+        return isUser ? column.enableUser === true : column.enableHead === true
+      }),
+    [dynamicColumnsQuery.data, feature, isUser],
+  )
+
+  // Columns configured for this route (ignoring the role enable flags) —
+  // tells us whether the API manages this table's columns at all.
+  const routeConfiguredColumns = useMemo(
+    () =>
+      (dynamicColumnsQuery.data ?? []).filter(
+        (column) =>
+          belongsToRoute(column, feature) && column.visibility !== false,
+      ),
+    [dynamicColumnsQuery.data, feature],
+  )
+
+  // Map the API columns onto the table's fixed columns: a fixed column
+  // shows only when the API exposes it for this route and role. Fails open
+  // (shows everything) when no columns are configured for the route yet.
+  const mappedHiddenColumns = useMemo<DepartmentUserColumnKey[]>(() => {
+    if (routeConfiguredColumns.length === 0) return []
+
+    const enabledKeys = new Set(
+      routeColumns
+        .map((column) => resolveUserColumnKey(column.columnName))
+        .filter((key): key is DepartmentUserColumnKey => key !== null),
+    )
+
+    return USER_TABLE_COLUMN_KEYS.filter((key) => !enabledKeys.has(key))
+  }, [routeColumns, routeConfiguredColumns.length])
 
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+  const [page, setPage] = useState(0)
+  const [size] = useState(10)
 
-  // 1. Department Users API
+  // Reset to page 0 when search changes
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(0)
+  }
+
+  // Only Department Users API
   const departmentUsersQuery = useDepartmentUsersList({
-    page: 0,
-    size: 10,
+    page,
+    size,
     search,
   })
 
-  // 2. Assigning List API
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT')
-
-  // 3. Onboarding Customers API
-  const onboardingCustomersQuery = useOnboardingCustomersList({
-    page: 0,
-    size: 10,
-  })
-
-  // 4. Onboarding Summary API
-  const authSummaryQuery = useAuthOnboardingSummary({
-    department: 'ONBOARDING_DEPARTMENT',
-  })
-
-  // Map the real API users to the table's view model.
+  // Map API users to DepartmentUser table structure, with fallback to mock data
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
     const list = departmentUsersQuery.data?.data ?? []
     return list.map((u, idx) => {
@@ -110,6 +157,7 @@ export function DepartmentUsersPage() {
           presentDays: u.presentDays ?? (isPresent ? 1 : 0),
           absentDays: u.absentDays ?? (isPresent ? 0 : 1),
           isPresentToday: isPresent,
+          dynamicValues: { ...u } as Record<string, unknown>,
         }
       })
   }, [departmentUsersQuery.data?.data])
@@ -200,7 +248,7 @@ export function DepartmentUsersPage() {
       <div className="head-toolbar">
         <SearchBar
           value={search}
-          onChange={setSearch}
+          onChange={handleSearchChange}
           placeholder="Search by name, number or email"
         />
 
@@ -222,31 +270,12 @@ export function DepartmentUsersPage() {
         meta={
           <>
             <Pill tone="info" size="sm">
-              {users.length} users
+              {departmentUsersQuery.data?.totalElements ?? users.length} users
             </Pill>
 
             <Pill tone="success" size="sm">
               {presentToday} present today
             </Pill>
-
-            {assigningUsersQuery.data &&
-            assigningUsersQuery.data.length > 0 ? (
-              <Pill tone="neutral" size="sm">
-                {assigningUsersQuery.data.length} assignable
-              </Pill>
-            ) : null}
-
-            {authSummaryQuery.data?.totalCustomers !== undefined ? (
-              <Pill tone="neutral" size="sm">
-                {authSummaryQuery.data.totalCustomers} total customers
-              </Pill>
-            ) : null}
-
-            {onboardingCustomersQuery.data?.totalElements !== undefined ? (
-              <Pill tone="warning" size="sm">
-                {onboardingCustomersQuery.data.totalElements} onboarding queue
-              </Pill>
-            ) : null}
           </>
         }
         hint="Attendance & achievement · this month"
@@ -260,7 +289,10 @@ export function DepartmentUsersPage() {
                 ? 'Unable to load users. Please try again.'
                 : 'No users found.'
           }
-          hiddenColumns={columnFeatures.hiddenColumns}
+          hiddenColumns={[
+            ...columnFeatures.hiddenColumns,
+            ...mappedHiddenColumns,
+          ]}
           canEditActions={canManageUsers}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}
@@ -273,6 +305,29 @@ export function DepartmentUsersPage() {
           )}
         />
       </SectionCard>
+
+      {/* Pagination */}
+      {departmentUsersQuery.data && departmentUsersQuery.data.totalPage > 1 && (
+        <div className="pagination">
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || departmentUsersQuery.isFetching}
+          >
+            Previous
+          </button>
+          <span className="pagination-info">
+            Page {page + 1} of {departmentUsersQuery.data.totalPage}
+          </span>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.min(departmentUsersQuery.data.totalPage - 1, p + 1))}
+            disabled={page >= departmentUsersQuery.data.totalPage - 1 || departmentUsersQuery.isFetching}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {canManageUsers ? (
         <UserFormModal
