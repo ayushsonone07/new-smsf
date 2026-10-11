@@ -13,6 +13,7 @@ import {
 } from '../../../../components/head/customers-list/CustomersListFilters'
 import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import { OnboardingConfirmationModal } from '../../../../components/head/customers-list/OnboardingConfirmationModal'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
@@ -71,6 +72,7 @@ export function CustomerListPage() {
   const [size, setSize] = useState(10)
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
   const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
+  const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -498,6 +500,17 @@ export function CustomerListPage() {
   async function handleStatusChange(customerId: string, status: OnboardingStatus) {
     if (session?.user?.role !== 'USER') return
 
+    // Customer acknowledgement is strictly required before marking Completed
+    if (status === 'completed') {
+      const target =
+        filteredCustomers.find((c) => c.id === customerId) ||
+        onboardingCustomers.find((c) => c.id === customerId)
+      if (target) {
+        setConfirmingCustomer(target)
+        return
+      }
+    }
+
     const prevStatus = localStatusMap[customerId]
     setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
 
@@ -598,6 +611,17 @@ export function CustomerListPage() {
         onClose={() => {
           setSelectedCustomer(null)
           setModalTab(undefined)
+        }}
+      />
+
+      <OnboardingConfirmationModal
+        open={Boolean(confirmingCustomer)}
+        customer={confirmingCustomer}
+        onClose={() => setConfirmingCustomer(null)}
+        onSuccess={() => {
+          setConfirmingCustomer(null)
+          activeCustomerQuery.refetch()
+          authSummaryQuery.refetch()
         }}
       />
     </>

@@ -573,6 +573,39 @@ export async function updateOnboardingStatus(
   }
 }
 
+export interface SendOnboardingConfirmationParams {
+  recipientUsername: string
+  contact: string
+  isDuplicate?: boolean
+  domainConnect?: boolean
+  themeSelection?: boolean
+}
+
+/**
+ * `POST /api/smtp/onboarding/confirmation`
+ * Sends an onboarding acknowledgement email to the customer with confirmation link.
+ */
+export async function sendOnboardingConfirmationMail(
+  params: SendOnboardingConfirmationParams,
+): Promise<any> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const search = new URLSearchParams({
+    recipientUsername: params.recipientUsername,
+    contact: params.contact,
+    isDuplicate: String(Boolean(params.isDuplicate)),
+    domainConnect: String(Boolean(params.domainConnect)),
+    themeSelection: String(Boolean(params.themeSelection)),
+  })
+
+  return authedApiRequest<any>(`/api/smtp/onboarding/confirmation?${search.toString()}`, {
+    method: 'POST',
+    headers: {
+      username,
+    },
+  })
+}
+
 export interface DuplicateCustomerSummaryItem {
   customerId?: number | string
   id?: number | string

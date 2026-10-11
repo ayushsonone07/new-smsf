@@ -13,6 +13,7 @@ import {
 } from '../../../../components/head/customers-list/CustomersListFilters'
 import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import { OnboardingConfirmationModal } from '../../../../components/head/customers-list/OnboardingConfirmationModal'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { getSession } from '../../../../app/auth/session'
@@ -49,6 +50,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
   const [modalTab, setModalTab] = useState<any>(undefined)
+  const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
 
   const screenPermission = getSession()?.user.role === 'USER'
     ? feature.roleBPermission
@@ -204,6 +206,15 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showBusiness={isBusinessVisible}
         showUpdated={false}
         onStatusChange={(id, status) => {
+          if (status === 'completed') {
+            const target =
+              filteredCustomers.find((c) => c.id === id) ||
+              onboardingCustomers.find((c) => c.id === id)
+            if (target) {
+              setConfirmingCustomer(target)
+              return
+            }
+          }
           patchCustomer(id, { status })
           updateOnboardingStatus(id, status).catch(console.error)
         }}
@@ -228,6 +239,15 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         onClose={() => {
           setSelectedCustomer(null)
           setModalTab(undefined)
+        }}
+      />
+      <OnboardingConfirmationModal
+        open={Boolean(confirmingCustomer)}
+        customer={confirmingCustomer}
+        onClose={() => setConfirmingCustomer(null)}
+        onSuccess={() => {
+          setConfirmingCustomer(null)
+          customersQuery.refetch()
         }}
       />
     </>
