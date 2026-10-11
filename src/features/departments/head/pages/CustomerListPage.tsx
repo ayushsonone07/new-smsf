@@ -5,6 +5,7 @@ import {
   CustomersList,
   type OnboardingAssignee,
   type OnboardingCustomer,
+  type OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
 import {
   CustomersListFilters,
@@ -26,7 +27,7 @@ import {
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
-import { assignCustomerUser } from '../../../../api/department-users.api'
+import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
@@ -69,13 +70,14 @@ export function CustomerListPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
+  const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
 
   const canEdit = columnFeatures.canEdit('actions')
 
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment)
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = session?.user?.role === 'USER'
 
   const isAssignToVisible =
     isColumnEnabled('Assign To') ||
@@ -89,9 +91,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark =
-    canEditColumn('Internal Remark') ||
-    canEditColumn('Remark')
+  const canEditRemark = session?.user.role === 'USER'
 
   const isContactVisible =
     isColumnEnabled('Contact') ||
@@ -266,7 +266,7 @@ export function CustomerListPage() {
           email,
           phone,
           callStatus: 'connected',
-          status,
+          status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
           remark: getLatestInternalRemark(c, ['ONBOARDING_DEPARTMENT']) || c.remark || '',
           hasDuplicateCustomer: hasDuplicates,
@@ -315,11 +315,13 @@ export function CustomerListPage() {
           formUrl: c.onboardingLink,
           callStatus: 'connected',
           status:
-            c.onboardingStatus?.toLowerCase() === 'completed'
-              ? 'completed'
-              : c.onboardingStatus?.toLowerCase() === 'in_progress'
-                ? 'in-progress'
-                : 'pending',
+            localStatusMap[id] !== undefined
+              ? localStatusMap[id]
+              : c.onboardingStatus?.toLowerCase() === 'completed'
+                ? 'completed'
+                : c.onboardingStatus?.toLowerCase() === 'in_progress'
+                  ? 'in-progress'
+                  : 'pending',
           assigneeId: assigned,
           remark: getLatestInternalRemark(c, ['ONBOARDING_DEPARTMENT']) || c.remark || c.internalRemark || '',
           hasDuplicateCustomer: hasDuplicates,
@@ -347,8 +349,10 @@ export function CustomerListPage() {
         customer.callStatus ??
         (index % 3 === 1 ? 'not-answered' : 'connected'),
       status:
-        customer.onboardingStatus ??
-        (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
+        localStatusMap[customer.id] !== undefined
+          ? localStatusMap[customer.id]
+          : customer.onboardingStatus ??
+            (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
       assigneeId: localAssigneeMap[customer.id] ?? customer.assigneeId ?? null,
       remark: customer.remark ?? '',
       businessRelationType: customer.businessRelationType,
@@ -363,6 +367,7 @@ export function CustomerListPage() {
     onboardingApiQuery.data?.customers,
     customersQuery.data,
     localAssigneeMap,
+    localStatusMap,
     page,
     size,
   ])
@@ -490,8 +495,33 @@ export function CustomerListPage() {
     }
   }
 
+  async function handleStatusChange(customerId: string, status: OnboardingStatus) {
+    if (session?.user?.role !== 'USER') return
+
+    const prevStatus = localStatusMap[customerId]
+    setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
+
+    try {
+      await updateOnboardingStatus(customerId, status)
+      await activeCustomerQuery.refetch()
+      await authSummaryQuery.refetch()
+    } catch (err: unknown) {
+      console.error('Failed to update status:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to update status'
+      alert(`Status update failed: ${msg}`)
+      setLocalStatusMap((prev) => {
+        const next = { ...prev }
+        if (prevStatus !== undefined) {
+          next[customerId] = prevStatus
+        } else {
+          delete next[customerId]
+        }
+        return next
+      })
+    }
+  }
+
   function patchCustomer(id: string, patch: UpdateCustomerRequest) {
-    if (!canEdit) return
     updateMutation.mutate({ id, data: patch })
   }
 
@@ -537,9 +567,7 @@ export function CustomerListPage() {
           setSelectedCustomer(cust)
           setModalTab('duplicates')
         }}
-        onStatusChange={(id, status) =>
-          patchCustomer(id, { onboardingStatus: status })
-        }
+        onStatusChange={(id, status) => handleStatusChange(id, status)}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) =>
           patchCustomer(id, { remark })

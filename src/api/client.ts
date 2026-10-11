@@ -74,13 +74,18 @@ export async function apiRequest<T>(
 
   const contentType = response.headers.get('content-type')
   if (contentType && !contentType.includes('application/json')) {
-    throw new ApiError(`Expected JSON response but received ${contentType}`, response.status)
+    const text = await response.text()
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return text as unknown as T
+    }
   }
 
   try {
     return (await response.json()) as T
   } catch {
-    throw new ApiError('Failed to parse API response as JSON', response.status)
+    return undefined as unknown as T
   }
 }
 

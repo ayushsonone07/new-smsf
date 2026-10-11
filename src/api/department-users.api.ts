@@ -549,6 +549,30 @@ export async function assignCustomerUser(params: AssignCustomerRequest): Promise
   })
 }
 
+/**
+ * `PUT /api/auth/onboarding/update/{customerId}?updatedStatus={updatedStatus}`
+ * Updates customer onboarding status in backend DB.
+ */
+export async function updateOnboardingStatus(
+  customerId: string | number,
+  updatedStatus: string,
+): Promise<any> {
+  const newStatusStr = updatedStatus.toUpperCase().replace(/-/g, '_')
+  const endpoint = `/api/auth/onboarding/update/${customerId}?updatedStatus=${encodeURIComponent(newStatusStr)}`
+  try {
+    return await authedApiRequest<any>(endpoint, {
+      method: 'PUT',
+    })
+  } catch (err: any) {
+    if (err?.status === 405) {
+      return await authedApiRequest<any>(endpoint, {
+        method: 'POST',
+      })
+    }
+    throw err
+  }
+}
+
 export interface DuplicateCustomerSummaryItem {
   customerId?: number | string
   id?: number | string

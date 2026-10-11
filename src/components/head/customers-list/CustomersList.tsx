@@ -297,7 +297,7 @@ function CustomerRow({
   const statusMeta = STATUS_META[customer.status]
 
   function startEditing() {
-    if (!canEdit) return
+    if (!(canEditRemark !== undefined ? canEditRemark : canEdit)) return
     setRemarkDraft(customer.remark)
     setRemarkEditing(true)
   }
@@ -469,7 +469,9 @@ function CustomerRow({
             >
               <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
               {statusMeta.label}
-              <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+              {(canEditStatus !== undefined ? canEditStatus : canEdit) && (
+                <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+              )}
             </button>
 
             {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && (
@@ -716,7 +718,7 @@ function CustomerRow({
               </div>
               <button
                 type="button"
-                onClick={() => onOpenDetail('remarks')}
+                onClick={() => onOpenDetail('internal-remarks')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

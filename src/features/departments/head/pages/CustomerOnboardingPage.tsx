@@ -21,6 +21,7 @@ import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
+import { updateOnboardingStatus } from '../../../../api/department-users.api'
 
 const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
   id: user.id,
@@ -58,7 +59,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = getSession()?.user.role === 'USER'
 
   const isAssignToVisible =
     isColumnEnabled('Assign To') ||
@@ -72,9 +73,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark =
-    canEditColumn('Internal Remark') ||
-    canEditColumn('Remark')
+  const canEditRemark = getSession()?.user.role === 'USER'
 
   const isContactVisible =
     isColumnEnabled('Contact') ||
@@ -158,7 +157,6 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   }
 
   function patchCustomer(id: string, patch: OnboardingOverrides) {
-    if (!canEdit) return
     setOverrides((current) => ({
       ...current,
       [id]: { ...current[id], ...patch },
@@ -205,7 +203,10 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        onStatusChange={(id, status) => patchCustomer(id, { status })}
+        onStatusChange={(id, status) => {
+          patchCustomer(id, { status })
+          updateOnboardingStatus(id, status).catch(console.error)
+        }}
         onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
         onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
         onOpenDetail={(cust, tab) => {

@@ -42,6 +42,7 @@ export interface UpdateCustomerRequest {
   email?: string
   phone?: string
   company?: string
+  status?: CustomerStatus
   onboardingStatus?: CustomerOnboardingStatus
   callStatus?: CustomerCallStatus
   assigneeId?: string | null
