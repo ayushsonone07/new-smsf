@@ -64,14 +64,25 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const isStatusVisible = isColumnEnabled('Status')
   const canEditStatus = getSession()?.user.role === 'USER'
 
+  const role = (getSession()?.user.role || '').toUpperCase()
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.includes('/google-user') ||
+        window.location.pathname.includes('/onboarding-user') ||
+        window.location.pathname.includes('/users')))
+
   const isAssignToVisible =
-    isColumnEnabled('Assign To') ||
-    isColumnEnabled('Assign') ||
-    isColumnEnabled('Assignee')
+    !isDeptUser &&
+    (isColumnEnabled('Assign To') ||
+      isColumnEnabled('Assign') ||
+      isColumnEnabled('Assignee'))
   const canEditAssignTo =
-    canEditColumn('Assign To') ||
-    canEditColumn('Assign') ||
-    canEditColumn('Assignee')
+    !isDeptUser &&
+    (canEditColumn('Assign To') ||
+      canEditColumn('Assign') ||
+      canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||

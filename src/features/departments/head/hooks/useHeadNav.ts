@@ -43,10 +43,25 @@ const GOOGLE_HEAD_SCREENS: Array<{
   { key: 'help-support', label: 'Help & Support', icon: 'help', slug: 'help-support', screen: 'help-support' },
 ]
 
+const GOOGLE_USER_SCREENS: Array<{
+  key: string
+  label: string
+  icon: IconName
+  slug: string
+  screen: HeadScreenKey
+}> = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
+  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customers', screen: 'customers' },
+  { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
+  { key: 'help-support', label: 'Help & Support', icon: 'help', slug: 'help-support', screen: 'help-support' },
+]
+
 /**
  * Sidebar items for a department:
  * - For Department User: strictly [Dashboard, Attendance, Customer List, 15 Days Meeting, History]
  * - For Google Department Head: strictly [Dashboard, Department User, Customer List, History, Analytics, Service Flow, Member Flow, Help & Support]
+ * - For Google Department User: strictly [Dashboard, Attendance, Customer List, History, Help & Support]
  * - For Onboarding Head: enabled feature permissions in admin-defined order
  * Filtered by live DB route visibility (if visibility is 0, item is not displayed).
  */
@@ -63,7 +78,8 @@ export function useHeadNav(departmentId: string) {
 
   const features = useMemo<FeaturePermission[]>(() => {
     if (isGoogle) {
-      return GOOGLE_HEAD_SCREENS.map((item, index) => {
+      const screensList = isUser ? GOOGLE_USER_SCREENS : GOOGLE_HEAD_SCREENS
+      return screensList.map((item, index) => {
         const existing = (query.data ?? []).find(
           (f) => f.slug === item.slug || f.screen === item.screen,
         )
@@ -129,7 +145,8 @@ export function useHeadNav(departmentId: string) {
 
   const items = useMemo<HeadNavItem[]>(() => {
     if (isGoogle) {
-      return GOOGLE_HEAD_SCREENS.map((item) => ({
+      const screensList = isUser ? GOOGLE_USER_SCREENS : GOOGLE_HEAD_SCREENS
+      return screensList.map((item) => ({
         key: item.key,
         label: item.label,
         icon: item.icon,

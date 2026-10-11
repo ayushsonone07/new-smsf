@@ -50,9 +50,14 @@ export interface OnboardingCustomer {
   packageName?: string
   serviceMonths?: string
   salesPerson?: string
+  serviceType?: string
   services?: { name: string; status: OnboardingStatus }[]
   activityCount?: number
   remarkCount?: number
+  serviceTags?: Record<string, string> | any
+  subServiceInfo?: any[]
+  flowSteps?: any[]
+  rawCustomer?: any
 }
 
 export interface CustomersListProps {
@@ -63,11 +68,16 @@ export interface CustomersListProps {
   onRemarkChange: (id: string, remark: string) => void
   onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
+  onOpenServiceFlow?: (customer: OnboardingCustomer) => void
+  onOpenServiceTags?: (customer: OnboardingCustomer) => void
+  onOpenGoogleInfo?: (customer: OnboardingCustomer) => void
   canEdit?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
+  showServiceType?: boolean
+  isGoogle?: boolean
   /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
@@ -148,6 +158,11 @@ export function CustomersList({
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
+  showServiceType = false,
+  onOpenServiceFlow,
+  onOpenServiceTags,
+  isGoogle = false,
+  onOpenGoogleInfo,
   showRemark = true,
   canEditRemark,
   showContact = true,
@@ -178,6 +193,7 @@ export function CustomersList({
             <th className="cl-th cl-th--num">#</th>
             {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
             {showContact && <th className="cl-th cl-th--contact">Contact</th>}
+            {showServiceType && <th className="cl-th cl-th--service">Service Type</th>}
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
@@ -205,9 +221,14 @@ export function CustomersList({
               }
               onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
+              onOpenServiceFlow={onOpenServiceFlow ? () => onOpenServiceFlow(customer) : undefined}
+              onOpenServiceTags={onOpenServiceTags ? () => onOpenServiceTags(customer) : undefined}
+              onOpenGoogleInfo={onOpenGoogleInfo ? () => onOpenGoogleInfo(customer) : undefined}
               canEdit={canEdit}
               showBusiness={showBusiness}
               showContact={showContact}
+              showServiceType={showServiceType}
+              isGoogle={isGoogle}
               showStatus={showStatus}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
@@ -503,9 +524,14 @@ interface CustomerRowProps {
   onRemarkChange: (remark: string) => void
   onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
+  onOpenServiceFlow?: () => void
+  onOpenServiceTags?: () => void
+  isGoogle?: boolean
+  onOpenGoogleInfo?: () => void
   canEdit: boolean
   showBusiness?: boolean
   showContact?: boolean
+  showServiceType?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
@@ -523,9 +549,14 @@ function CustomerRow({
   onRemarkChange,
   onOpenDetail,
   onOpenDuplicate,
+  onOpenServiceFlow,
+  onOpenServiceTags,
+  isGoogle = false,
+  onOpenGoogleInfo,
   canEdit,
   showBusiness = true,
   showContact = true,
+  showServiceType = false,
   showStatus = true,
   canEditStatus,
   showAssignTo = true,
@@ -595,6 +626,39 @@ function CustomerRow({
     window.open(fullUrl, '_blank')
   }
 
+  const renderedTags = useMemo(() => {
+    if (!customer.serviceTags) return []
+    if (typeof customer.serviceTags === 'string') {
+      try {
+        const parsed = JSON.parse(customer.serviceTags)
+        if (typeof parsed === 'object' && parsed !== null) {
+          return Object.entries(parsed).map(([k, v]) => ({
+            key: k,
+            label: String(v || k),
+          }))
+        }
+      } catch {
+        return [{ key: customer.serviceTags, label: customer.serviceTags }]
+      }
+    }
+    if (Array.isArray(customer.serviceTags)) {
+      return (customer.serviceTags as any[]).map((t, idx) => {
+        const label = typeof t === 'object' && t ? (t.tagName || t.name || Object.values(t)[0]) : t
+        return {
+          key: `tag_${idx}`,
+          label: String(label || `tag_${idx}`),
+        }
+      })
+    }
+    if (typeof customer.serviceTags === 'object') {
+      return Object.entries(customer.serviceTags).map(([k, v]) => ({
+        key: k,
+        label: String(v || k),
+      }))
+    }
+    return []
+  }, [customer.serviceTags])
+
   return (
     <motion.tr className="cl-row" variants={rowVariants}>
 
@@ -624,20 +688,48 @@ function CustomerRow({
               <Icon name="eye" size={14} strokeWidth={1.8} />
             </button>
 
-            <button
-              type="button"
-              className="cl-form-pill"
-              title="Open client form"
-              onClick={openForm}
-            >
-              <Icon
-                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
-                name="eye"
-                size={12}
-                strokeWidth={2}
-              />
-              Form
-            </button>
+            {isGoogle ? (
+              <>
+                <button
+                  type="button"
+                  className="cl-form-pill"
+                  title="Open requirement form"
+                  onClick={openForm}
+                >
+                  <Icon
+                    d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                    name="eye"
+                    size={12}
+                    strokeWidth={2}
+                  />
+                  Requirement
+                </button>
+                <button
+                  type="button"
+                  className="cl-form-pill cl-form-pill--google"
+                  title="Open Google Info"
+                  onClick={() => onOpenGoogleInfo?.()}
+                >
+                  <Icon name="eye" size={12} strokeWidth={2} />
+                  Google Info
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="cl-form-pill"
+                title="Open client form"
+                onClick={openForm}
+              >
+                <Icon
+                  d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                  name="eye"
+                  size={12}
+                  strokeWidth={2}
+                />
+                Form
+              </button>
+            )}
 
             {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
               <button
@@ -733,6 +825,107 @@ function CustomerRow({
         </td>
       )}
 
+      {/* Service Type */}
+      {showServiceType && (
+        <td className="cl-td" data-label="Service Type">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="cl-service-type-badge"
+              onClick={() => onOpenServiceFlow?.()}
+              title="Manage sub-service details"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 8px',
+                borderRadius: '8px',
+                border: '1px solid #fed7aa',
+                backgroundColor: '#fff7ed',
+                color: '#c2410c',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="alert" size={11} strokeWidth={2.4} />
+              <span>Phase 1</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenServiceTags?.()
+              }}
+              title="Manage service tags"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                padding: '2px 7px',
+                borderRadius: '9999px',
+                fontSize: '11px',
+                fontWeight: 600,
+                backgroundColor: '#faf5ff',
+                color: '#7e22ce',
+                border: '1px solid #d8b4fe',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="plus" size={10} strokeWidth={2.5} />
+              <span>Tag</span>
+            </button>
+          </div>
+          {renderedTags.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {renderedTags.slice(0, 2).map(({ key, label }) => (
+                <span
+                  key={key}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenServiceTags?.()
+                  }}
+                  title="Click to manage service tags"
+                  style={{
+                    display: 'inline-block',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '9999px',
+                    backgroundColor: '#fff7ed',
+                    color: '#c2410c',
+                    border: '1px solid #fed7aa',
+                    cursor: 'pointer',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label.replace(/_/g, ' ')}
+                </span>
+              ))}
+              {renderedTags.length > 2 && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenServiceTags?.()
+                  }}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#6366f1',
+                    cursor: 'pointer',
+                  }}
+                >
+                  +{renderedTags.length - 2}
+                </span>
+              )}
+            </div>
+          )}
+        </td>
+      )}
+
       {/* Status */}
       {showStatus && (
         <td className="cl-td" data-label="Status">
@@ -760,26 +953,55 @@ function CustomerRow({
                 initial="hidden"
                 animate="visible"
               >
-                {STATUS_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    role="option"
-                    aria-selected={customer.status === opt}
-                    className="cl-status-opt"
-                    onClick={() => {
-                      onStatusChange(opt)
-                      setStatusOpen(false)
-                    }}
-                  >
-                    <Icon
-                      name={STATUS_META[opt].icon}
-                      size={13}
-                      strokeWidth={1.8}
-                    />
-                    {STATUS_META[opt].label}
-                  </button>
-                ))}
+                {STATUS_OPTIONS.map((opt) => {
+                  let isOptDisabled = false
+                  if (opt === 'completed') {
+                    let allDone = false
+                    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+                      allDone = customer.subServiceInfo.every((sub: any) => {
+                        const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
+                        return String(st).toUpperCase() === 'COMPLETED'
+                      })
+                    } else if (Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0) {
+                      allDone = customer.flowSteps.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                    } else if (Array.isArray(customer.services) && customer.services.length > 0) {
+                      allDone = customer.services.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                    }
+
+                    if (!allDone && customer.status !== 'completed') {
+                      isOptDisabled = true
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      role="option"
+                      aria-selected={customer.status === opt}
+                      className="cl-status-opt"
+                      style={isOptDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      onClick={() => {
+                        if (isOptDisabled) {
+                          alert(
+                            'All sub-services must be completed and acknowledgement sent before marking the main service as completed.',
+                          )
+                          setStatusOpen(false)
+                          return
+                        }
+                        onStatusChange(opt)
+                        setStatusOpen(false)
+                      }}
+                    >
+                      <Icon
+                        name={STATUS_META[opt].icon}
+                        size={13}
+                        strokeWidth={1.8}
+                      />
+                      {STATUS_META[opt].label}
+                    </button>
+                  )
+                })}
               </motion.div>
             )}
           </div>

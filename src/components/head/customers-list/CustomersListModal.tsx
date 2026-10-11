@@ -14,7 +14,6 @@ import type {
   OnboardingStatus,
 } from './CustomersList'
 import type {
-  CustomerDrawerApiDetails,
   CustomerProfileDetails,
   CustomerRemark,
   CustomerServiceRow,
@@ -316,40 +315,84 @@ export function CustomersListModal({
     }).length
   }, [allBusinesses])
 
-  if (!customer || !current) return null
-
   const assignee =
-    assignees.find((a) => a.id === current.assigneeId) ?? null
+    assignees.find((a) => a.id === current?.assigneeId) ?? null
 
   const serviceRow =
     apiDetails.serviceRows.find(
-      (row) => String(row.customerId) === String(current.id),
+      (row) => String(row.customerId) === String(current?.id),
     ) ?? apiDetails.serviceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
   const services = getCustomerServices(apiDetails.serviceRows)
   const doneCount = services.filter((s) => s.status === 'completed').length
-  const remarkEntries = getRemarkEntries(apiDetails).sort(
-    (a, b) =>
-      (Date.parse(b.remark.timestamp || '') || 0) - (Date.parse(a.remark.timestamp || '') || 0)
-  )
-  const customerRemarks = remarkEntries.filter(
-    ({ category }) => category === 'Client',
-  )
-  const internalRemarks = remarkEntries.filter(
-    ({ category }) => category !== 'Client',
-  )
+  const internalRemarkEntries = useMemo(() => {
+    const list =
+      apiDetails.internalRemarks && apiDetails.internalRemarks.length > 0
+        ? apiDetails.internalRemarks
+        : (apiDetails.remarks?.internalRemark ?? [])
+    return list.map((remark) => ({ category: 'Internal', remark }))
+  }, [apiDetails.internalRemarks, apiDetails.remarks?.internalRemark])
+
+  const clientRemarkEntries = useMemo(() => {
+    const clientReplies = (apiDetails.reviewReplies ?? []).map((r) => ({
+      remark: r.reply,
+      timestamp: r.timestamp,
+      staffName: r.staffName,
+    }))
+    const list =
+      clientReplies.length > 0
+        ? clientReplies
+        : (apiDetails.remarks?.clientRemark ?? [])
+    return list.map((remark) => ({ category: 'Client', remark }))
+  }, [apiDetails.reviewReplies, apiDetails.remarks?.clientRemark])
+
+  const onboardingRemarkEntries = useMemo(() => {
+    const list: CustomerRemark[] = [
+      ...(apiDetails.remarks?.departmentRemark ?? []),
+      ...(apiDetails.remarks?.fifteenDayMeetingRemark ?? []),
+    ]
+    if (apiDetails.profile?.remarks && typeof apiDetails.profile.remarks === 'string') {
+      list.push({
+        remark: apiDetails.profile.remarks,
+        staffName: 'Form Submission',
+        timestamp: apiDetails.profile.lastUpdatedAt || '',
+      })
+    }
+    return list.map((remark) => ({ category: 'Onboarding', remark }))
+  }, [
+    apiDetails.remarks?.departmentRemark,
+    apiDetails.remarks?.fifteenDayMeetingRemark,
+    apiDetails.profile?.remarks,
+    apiDetails.profile?.lastUpdatedAt,
+  ])
+
+  const remarkEntries = useMemo(() => {
+    return [
+      ...internalRemarkEntries,
+      ...clientRemarkEntries,
+      ...onboardingRemarkEntries,
+    ].sort(
+      (a, b) =>
+        (Date.parse(b.remark.timestamp || '') || 0) -
+        (Date.parse(a.remark.timestamp || '') || 0),
+    )
+  }, [internalRemarkEntries, clientRemarkEntries, onboardingRemarkEntries])
+
+  const customerRemarks = clientRemarkEntries
+  const internalRemarks = internalRemarkEntries
   const remarkCount =
     remarkEntries.length ||
     Number(
-      Boolean(rowDetails?.remark || serviceRow?.internalRemark),
+      Boolean(rowDetails?.remark || serviceRow?.internalRemark || current?.remark),
     )
   const contactName =
-    apiDetails.profile?.ownerName || rowDetails?.ownerName || current.contactName
+    apiDetails.profile?.ownerName || rowDetails?.ownerName || current?.contactName || ''
   const businessName =
     apiDetails.profile?.businessName ||
     rowDetails?.businessName ||
-    current.businessName
+    current?.businessName ||
+    ''
   const fullAddress =
     apiDetails.profile?.address ||
     apiDetails.profile?.billingAddress ||
@@ -367,7 +410,7 @@ export function CustomersListModal({
     {
       title: 'Customer registered',
       detail: businessName,
-      timestamp: current.contactDate,
+      timestamp: current?.contactDate || '',
     },
     ...apiDetails.reviewReplies.map((reply) => ({
       title: 'Review reply added',
@@ -416,6 +459,8 @@ export function CustomersListModal({
     { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
     { id: 'activity', label: 'Updates', count: updates.length },
   ]
+
+  if (!customer || !current) return null
 
   return (
     <>
@@ -790,51 +835,98 @@ export function CustomersListModal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {getSession()?.user.role === 'USER' && (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault()
-                      const form = e.target as HTMLFormElement
-                      const input = form.elements.namedItem('newRemark') as HTMLInputElement
-                      const value = input.value.trim()
-                      if (!value || isAddingRemark) return
-                      
-                      setIsAddingRemark(true)
-                      try {
-                        await updateCustomer(current.id, { remark: value })
-                        await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
-                        input.value = ''
-                      } catch (err) {
-                        console.error('Failed to add remark', err)
-                      } finally {
-                        setIsAddingRemark(false)
-                      }
-                    }}
-                    style={{ display: 'flex', gap: '8px' }}
-                  >
-                    <input
-                      name="newRemark"
-                      type="text"
-                      placeholder="Add a new remark..."
-                      style={{ flex: 1, padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc' }}
-                      disabled={isAddingRemark}
-                    />
-                    <Button type="submit" disabled={isAddingRemark}>
-                      {isAddingRemark ? 'Adding...' : 'Add'}
-                    </Button>
-                  </form>
-                )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Status summary pill header */}
+                <div className="cl-drawer__remarks-summary">
+                  <div className="cl-drawer__remarks-pills">
+                    <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--internal">
+                      Internal ({internalRemarkEntries.length})
+                    </span>
+                    <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--client">
+                      Client ({clientRemarkEntries.length})
+                    </span>
+                    <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--onboarding">
+                      Onboarding ({onboardingRemarkEntries.length})
+                    </span>
+                  </div>
+                </div>
 
-                <RemarkGroup
-                  title="Remarks History"
-                  emptyMessage="No remarks yet."
-                  entries={remarkEntries}
-                  fallback={
-                    rowDetails?.remark ||
-                    serviceRow?.internalRemark
-                  }
-                />
+                {/* Section 1: Internal Remarks */}
+                <div className="cl-drawer__remark-section">
+                  {getSession()?.user.role === 'USER' && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        const form = e.target as HTMLFormElement
+                        const input = form.elements.namedItem('newRemark') as HTMLInputElement
+                        const value = input.value.trim()
+                        if (!value || isAddingRemark) return
+                        
+                        setIsAddingRemark(true)
+                        try {
+                          await updateCustomer(current.id, { remark: value })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+                          input.value = ''
+                        } catch (err) {
+                          console.error('Failed to add remark', err)
+                        } finally {
+                          setIsAddingRemark(false)
+                        }
+                      }}
+                      style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
+                    >
+                      <input
+                        name="newRemark"
+                        type="text"
+                        placeholder="Add internal remark..."
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                        }}
+                        disabled={isAddingRemark}
+                      />
+                      <Button type="submit" disabled={isAddingRemark}>
+                        {isAddingRemark ? 'Adding...' : 'Add'}
+                      </Button>
+                    </form>
+                  )}
+
+                  <RemarkGroup
+                    title="Internal Remarks"
+                    badge="Team only"
+                    emptyMessage="No internal remarks recorded."
+                    entries={internalRemarkEntries}
+                    fallback={
+                      current.remark ||
+                      rowDetails?.remark ||
+                      serviceRow?.internalRemark
+                    }
+                    internal
+                  />
+                </div>
+
+                {/* Section 2: Client Remarks */}
+                <div className="cl-drawer__remark-section">
+                  <RemarkGroup
+                    title="Client Remarks"
+                    badge="Customer replies"
+                    emptyMessage="No client remarks recorded."
+                    entries={clientRemarkEntries}
+                  />
+                </div>
+
+                {/* Section 3: Onboarding Remarks */}
+                <div className="cl-drawer__remark-section">
+                  <RemarkGroup
+                    title="Onboarding Remarks"
+                    badge="Department & meetings"
+                    emptyMessage="No onboarding remarks recorded."
+                    entries={onboardingRemarkEntries}
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -1465,23 +1557,32 @@ function RemarkGroup({
   entries,
   fallback,
   internal = false,
+  badge,
 }: {
   title: string
   emptyMessage: string
   entries: { category: string; remark: CustomerRemark }[]
   fallback?: string
   internal?: boolean
+  badge?: string
 }) {
   return (
     <section className="cl-drawer__remark-group">
       <div className="cl-drawer__card-head">
-        <h3>{title}</h3>
-        {internal && <span className="cl-drawer__card-meta">Team only</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3>{title}</h3>
+          <span className="cl-drawer__remark-count-badge">({entries.length})</span>
+        </div>
+        {badge ? (
+          <span className="cl-drawer__card-meta">{badge}</span>
+        ) : internal ? (
+          <span className="cl-drawer__card-meta">Team only</span>
+        ) : null}
       </div>
       {entries.length > 0 ? (
         <ul className="cl-drawer__remark-list">
           {entries.map(({ remark }, index) => (
-            <li key={`${remark.timestamp || index}-${remark.staffName || ''}`}>
+            <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
               <p>{remark.remark || '—'}</p>
               <span>
                 {[remark.staffName, remark.type, remark.timestamp]
@@ -1492,34 +1593,13 @@ function RemarkGroup({
           ))}
         </ul>
       ) : fallback ? (
-        <p className="cl-drawer__remark-empty">{fallback}</p>
+        <div className="cl-drawer__remark-fallback">
+          <p>{fallback}</p>
+          <span>Latest noted remark</span>
+        </div>
       ) : (
         <p className="cl-drawer__remark-empty">{emptyMessage}</p>
       )}
     </section>
   )
-}
-
-function getRemarkEntries(
-  apiDetails: CustomerDrawerApiDetails,
-): { category: string; remark: CustomerRemark }[] {
-  const remarks = apiDetails.remarks
-  const internalList = apiDetails.internalRemarks ?? []
-  const clientReplies = (apiDetails.reviewReplies ?? []).map((r) => ({
-    remark: r.reply,
-    timestamp: r.timestamp,
-    staffName: r.staffName,
-  }))
-  const clientList = clientReplies.length > 0 ? clientReplies : (remarks?.clientRemark ?? [])
-  const entries: { category: string; remark: CustomerRemark }[] = []
-  const groups: [string, CustomerRemark[]][] = [
-    ['Department', remarks?.departmentRemark ?? []],
-    ['Internal', internalList.length > 0 ? internalList : (remarks?.internalRemark ?? [])],
-    ['Client', clientList],
-    ['15-day meeting', remarks?.fifteenDayMeetingRemark ?? []],
-  ]
-  for (const [category, groupRemarks] of groups) {
-    for (const remark of groupRemarks) entries.push({ category, remark })
-  }
-  return entries
 }

@@ -60,6 +60,7 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
     role === 'DEPARTMENT_USER' ||
     (typeof window !== 'undefined' &&
       (window.location.pathname.includes('/onboarding-user') ||
+        window.location.pathname.includes('/google-user') ||
         window.location.pathname.includes('/users')))
   const isHead = !isDepartmentUser
 

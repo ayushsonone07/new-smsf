@@ -153,7 +153,7 @@ export function DepartmentUsersPage() {
   // Member details query - triggered when modal.kind === 'report'
   const memberDetailsQuery = useMemberDetails({
     userId: modal.kind === 'report' ? Number(modal.user.id) : 0,
-    department: 'ONBOARDING_DEPARTMENT',
+    department: session?.user?.departmentType || 'GOOGLE_DEPARTMENT',
     startDate: todayStart,
     endDate: todayEnd,
     page: 0,

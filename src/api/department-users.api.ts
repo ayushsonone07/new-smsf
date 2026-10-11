@@ -144,10 +144,25 @@ export async function getDepartmentUsers(params: {
   )
 
   // Backend returns data as List<DepartmentUsersResponse> with one element
-  // The actual users are in data[0].users
-  const responseData = Array.isArray(res?.data) ? res.data : []
-  const headUserResponse = responseData[0]
-  const items = headUserResponse?.users ?? []
+  // The actual users are in data[0].users or directly in data
+  let rawUsers: DepartmentUserApiItem[] = []
+  if (Array.isArray(res?.data) && res.data.length > 0) {
+    const first: any = res.data[0]
+    if (Array.isArray(first?.users)) {
+      rawUsers = first.users
+    } else if (Array.isArray(first?.departmentSubUsers)) {
+      rawUsers = first.departmentSubUsers
+    } else if (first?.email || first?.username) {
+      rawUsers = res.data as any
+    }
+  } else if (Array.isArray((res as any)?.users)) {
+    rawUsers = (res as any).users
+  }
+
+  const items = rawUsers.map((u: any) => ({
+    ...u,
+    isSeniorUser: u.seniorUser !== undefined ? u.seniorUser : u.isSeniorUser,
+  }))
 
   return {
     data: items,
