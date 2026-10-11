@@ -206,6 +206,12 @@ const customerDetailsRoute = createRoute({
   component: CustomerDetailsPage,
 })
 
+const directCustomerDetailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/customer-details',
+  component: CustomerDetailsPage,
+})
+
 const forbiddenRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/forbidden',
@@ -517,6 +523,7 @@ const routeTree = rootRoute.addChildren([
     customerDashboardRoute,
     customerDetailsRoute,
   ]),
+  directCustomerDetailsRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,
   departmentHelpCenterRoute,

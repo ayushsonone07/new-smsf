@@ -3,6 +3,7 @@ import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import type { IconName } from '../shared/iconPaths'
+import { getCustomerFormUrl } from '../../../utils/urlEncryption'
 
 /* ── Public types ─────────────────────────────────────────── */
 
@@ -311,10 +312,25 @@ function CustomerRow({
     setRemarkEditing(false)
   }
 
-  /** Opens the client form in a new tab; falls back to the drawer until a link exists */
+  /** Opens the client form in a new tab matching SMSF /customer-details parity */
   function openForm() {
-    if (!customer.formUrl) return
-    window.open(customer.formUrl, '_blank', 'noopener,noreferrer')
+    const isDuplicate = Boolean(
+      customer.hasDuplicateCustomer || (customer.duplicateCount ?? 0) > 0,
+    )
+    const url =
+      getCustomerFormUrl(customer.phone, isDuplicate) ||
+      customer.formUrl
+
+    if (!url) {
+      alert('Phone number missing: Unable to open details without a contact number.')
+      return
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
+
+    window.open(fullUrl, '_blank')
   }
 
   return (

@@ -23,6 +23,7 @@ import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import { updateOnboardingStatus } from '../../../../api/department-users.api'
+import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 
 const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
   id: user.id,
@@ -102,6 +103,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
           }),
           email: customer.email,
           phone: customer.phone,
+          formUrl: getCustomerFormUrl(customer.phone, (customer.duplicateCount ?? 0) > 0),
           callStatus: index % 3 === 1 ? 'not-answered' : 'connected',
           status: override?.status ?? (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
           assigneeId:

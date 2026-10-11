@@ -1,8 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { CustomerDashboardLayout } from './CustomerDashboardLayout'
 import { Icon } from '../head/shared/Icon'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
+import { decryptUrlParams } from '../../utils/urlEncryption'
+import { getCustomerProfileDetails } from '../../api/customer-drawer.api'
 
 export interface OfferItem {
   id: string
@@ -16,7 +18,7 @@ export function CustomerDetailsPage() {
   const { session } = useCustomerSession()
 
   // Active step state: 1: Basic Info, 2: Billing, 3: Website, 4: Google, 5: Automation, 6: Done
-  const [activeStep, setActiveStep] = useState<number>(4) // Default to Google step for previewing
+  const [activeStep, setActiveStep] = useState<number>(1) // Default to step 1 for onboarding
 
   // Step 2: Billing Form State
   const [billingAddress, setBillingAddress] = useState(
@@ -66,6 +68,50 @@ export function CustomerDetailsPage() {
   const [autoServices, setAutoServices] = useState<string[]>([])
   const [aiChatbotEmail, setAiChatbotEmail] = useState('')
   const [aiChatbotLink, setAiChatbotLink] = useState('')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const search = new URLSearchParams(window.location.search)
+    const decrypted = decryptUrlParams(search)
+
+    if (
+      decrypted.validation &&
+      decrypted.validation !== 'customer' &&
+      decrypted.validation.toLowerCase() !== 'billing'
+    ) {
+      sessionStorage.setItem('token', decrypted.validation)
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('smsf.auth.session') || '{}')
+        stored.token = decrypted.validation
+        sessionStorage.setItem('smsf.auth.session', JSON.stringify(stored))
+      } catch {
+        // ignore
+      }
+    }
+
+    const contact = (decrypted.contact || search.get('contact') || '').trim()
+    if (contact) {
+      getCustomerProfileDetails(contact)
+        .then((profile) => {
+          if (profile.businessName) setBusinessName(profile.businessName)
+          if (profile.email) setEmail(profile.email)
+          if (profile.billingAddress) setBillingAddress(profile.billingAddress)
+          if (profile.gstNumber) setGstNumber(profile.gstNumber)
+          if (profile.domain) setDomainName(profile.domain)
+          if (profile.domainStatus) setDomainStatus(profile.domainStatus)
+          if (profile.tagline) setBusinessTagline(profile.tagline)
+          if (profile.businessCategory) setBusinessCategory(profile.businessCategory)
+          if (profile.gmbProfileLink) setGmbProfileLink(profile.gmbProfileLink)
+          if (profile.brandName) setBrandName(profile.brandName)
+          if (profile.websiteLink) setWebsiteLink(profile.websiteLink)
+          if (profile.area) setArea(profile.area)
+          if (profile.city) setCityName(profile.city)
+          if (profile.state) setStateName(profile.state)
+          if (profile.address) setFullAddress(profile.address)
+        })
+        .catch(console.error)
+    }
+  }, [])
 
   // Compute profile progress % strictly by active step
   const progressPercent =

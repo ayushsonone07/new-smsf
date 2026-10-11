@@ -31,6 +31,7 @@ import { getSession } from '../../../../app/auth/session'
 import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
+import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -314,7 +315,10 @@ export function CustomerListPage() {
             : 'Recent',
           email: c.email || '',
           phone: c.phoneNumber || c.contact || '',
-          formUrl: c.onboardingLink,
+          formUrl:
+            getCustomerFormUrl(c.phoneNumber || c.contact, hasDuplicates) ||
+            c.onboardingLink ||
+            '',
           callStatus: 'connected',
           status:
             localStatusMap[id] !== undefined
@@ -347,6 +351,7 @@ export function CustomerListPage() {
         }),
       email: customer.email,
       phone: customer.phone,
+      formUrl: getCustomerFormUrl(customer.phone, (customer.duplicateCount ?? 0) > 0),
       callStatus:
         customer.callStatus ??
         (index % 3 === 1 ? 'not-answered' : 'connected'),
