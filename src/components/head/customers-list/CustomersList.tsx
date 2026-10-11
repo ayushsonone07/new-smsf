@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
@@ -223,6 +223,276 @@ export function CustomersList({
   )
 }
 
+/* ── AssigneeDropdown (with Search & Pagination) ────────── */
+
+interface AssigneeDropdownProps {
+  assigneeId: string | null
+  assignees: OnboardingAssignee[]
+  isEditable: boolean
+  onAssigneeChange: (assigneeId: string | null) => void
+}
+
+function AssigneeDropdown({
+  assigneeId,
+  assignees,
+  isEditable,
+  onAssigneeChange,
+}: AssigneeDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(0)
+
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const PAGE_SIZE = 5
+
+  const matchedAssignee = useMemo(() => {
+    if (!assigneeId) return null
+    const target = assigneeId.toLowerCase()
+    return (
+      assignees.find(
+        (a) =>
+          a.id === assigneeId ||
+          a.id.toLowerCase() === target ||
+          a.name.toLowerCase().includes(target)
+      ) || null
+    )
+  }, [assignees, assigneeId])
+
+  const filteredAssignees = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return assignees
+    return assignees.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.id.toLowerCase().includes(q)
+    )
+  }, [assignees, searchQuery])
+
+  const showUnassigned = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return 'unassigned'.includes(q)
+  }, [searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const paginatedAssignees = useMemo(() => {
+    const start = safePage * PAGE_SIZE
+    return filteredAssignees.slice(start, start + PAGE_SIZE)
+  }, [filteredAssignees, safePage])
+
+  // Close menus on outside click or escape
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handleOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  // Focus search input when menu opens, reset on close
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
+    } else {
+      setSearchQuery('')
+      setPage(0)
+    }
+  }, [isOpen])
+
+  const isUnassignedSelected = !assigneeId
+
+  return (
+    <div className="cl-assign-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="cl-assign-btn"
+        onClick={() => setIsOpen((o) => !o)}
+        disabled={!isEditable}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+      >
+        {matchedAssignee ? (
+          <Avatar name={matchedAssignee.name} size={20} tone="brand" />
+        ) : (
+          <Avatar
+            name={assigneeId ? assigneeId.charAt(0).toUpperCase() : '?'}
+            size={20}
+            tone={assigneeId ? 'brand' : 'muted'}
+          />
+        )}
+        <span className="cl-assign-name">
+          {matchedAssignee
+            ? matchedAssignee.name
+            : assigneeId || 'Unassigned'}
+        </span>
+        {isEditable && (
+          <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+        )}
+      </button>
+
+      {isEditable && isOpen && (
+        <motion.div
+          className="cl-assign-menu"
+          role="listbox"
+          variants={menuVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Search Box */}
+          <div className="cl-assign-search-wrap">
+            <Icon name="search" size={13} strokeWidth={2} className="cl-assign-search-icon" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="cl-assign-search-input"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setPage(0)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search assignee..."
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="cl-assign-search-clear"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSearchQuery('')
+                  setPage(0)
+                  searchInputRef.current?.focus()
+                }}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <Icon name="x" size={11} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+
+          {/* Unassigned Option */}
+          {showUnassigned && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={isUnassignedSelected}
+              className={`cl-assign-opt ${isUnassignedSelected ? 'cl-assign-opt--active' : ''}`}
+              onClick={() => {
+                onAssigneeChange(null)
+                setIsOpen(false)
+              }}
+            >
+              <Avatar name="?" size={20} tone="muted" />
+              <span className="cl-assign-opt-name">Unassigned</span>
+              {isUnassignedSelected && (
+                <Icon name="check" size={13} strokeWidth={2.5} className="cl-assign-check" />
+              )}
+            </button>
+          )}
+
+          {showUnassigned && paginatedAssignees.length > 0 && (
+            <div className="cl-assign-divider" />
+          )}
+
+          {/* Paginated Assignees List */}
+          <div className="cl-assign-list">
+            {paginatedAssignees.map((a) => {
+              const isSelected =
+                assigneeId === a.id ||
+                assigneeId?.toLowerCase() === a.id.toLowerCase()
+
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={`cl-assign-opt ${isSelected ? 'cl-assign-opt--active' : ''}`}
+                  onClick={() => {
+                    onAssigneeChange(a.id)
+                    setIsOpen(false)
+                  }}
+                >
+                  <Avatar name={a.name} size={20} tone="brand" />
+                  <span className="cl-assign-opt-name" title={a.name}>
+                    {a.name}
+                  </span>
+                  {isSelected && (
+                    <Icon name="check" size={13} strokeWidth={2.5} className="cl-assign-check" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Empty state */}
+          {!showUnassigned && filteredAssignees.length === 0 && (
+            <div className="cl-assign-empty">No assignees found</div>
+          )}
+
+          {/* Pagination Controls */}
+          {filteredAssignees.length > 0 && (
+            <div className="cl-assign-pagination">
+              <button
+                type="button"
+                className="cl-assign-page-btn"
+                disabled={safePage === 0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPage((p) => Math.max(0, p - 1))
+                }}
+                title="Previous page"
+              >
+                <Icon name="chevronLeft" size={13} strokeWidth={2.5} />
+                <span>Prev</span>
+              </button>
+              <span className="cl-assign-page-info">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="cl-assign-page-btn"
+                disabled={safePage >= totalPages - 1}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPage((p) => Math.min(totalPages - 1, p + 1))
+                }}
+                title="Next page"
+              >
+                <span>Next</span>
+                <Icon name="chevronRight" size={13} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
 /* ── CustomerRow (private, same file) ────────────────────── */
 
 interface CustomerRowProps {
@@ -265,16 +535,14 @@ function CustomerRow({
   showUpdated = false,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
 
   const statusRef = useRef<HTMLDivElement>(null)
-  const assignRef = useRef<HTMLDivElement>(null)
 
   /* Close menus on outside click */
   useEffect(() => {
-    if (!statusOpen && !assignOpen) return
+    if (!statusOpen) return
 
     function handler(e: MouseEvent) {
       if (
@@ -283,17 +551,11 @@ function CustomerRow({
       ) {
         setStatusOpen(false)
       }
-      if (
-        assignRef.current &&
-        !assignRef.current.contains(e.target as Node)
-      ) {
-        setAssignOpen(false)
-      }
     }
 
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [statusOpen, assignOpen])
+  }, [statusOpen])
 
   const statusMeta = STATUS_META[customer.status]
 
@@ -527,90 +789,12 @@ function CustomerRow({
       {/* Assign To */}
       {showAssignTo && (
         <td className="cl-td" data-label="Assign To">
-          {(() => {
-            const isAssignEditable = canEditAssignTo !== undefined ? canEditAssignTo : canEdit
-            const matchedAssignee = assignees.find(
-              (a) =>
-                a.id === customer.assigneeId ||
-                a.id.toLowerCase() === (customer.assigneeId || '').toLowerCase() ||
-                a.name.toLowerCase().includes((customer.assigneeId || '').toLowerCase())
-            )
-
-            return (
-              <div className="cl-assign-wrap" ref={assignRef}>
-                <button
-                  type="button"
-                  className="cl-assign-btn"
-                  onClick={() => setAssignOpen((o) => !o)}
-                  disabled={!isAssignEditable}
-                  aria-expanded={assignOpen}
-                  aria-haspopup="listbox"
-                >
-                  {matchedAssignee ? (
-                    <Avatar name={matchedAssignee.name} size={20} tone="brand" />
-                  ) : (
-                    <Avatar
-                      name={customer.assigneeId ? customer.assigneeId.charAt(0).toUpperCase() : '?'}
-                      size={20}
-                      tone={customer.assigneeId ? 'brand' : 'muted'}
-                    />
-                  )}
-                  <span className="cl-assign-name">
-                    {matchedAssignee
-                      ? matchedAssignee.name
-                      : customer.assigneeId || 'Unassigned'}
-                  </span>
-                  {isAssignEditable && (
-                    <Icon name="chevronDown" size={12} strokeWidth={2.5} />
-                  )}
-                </button>
-
-                {isAssignEditable && assignOpen && (
-                  <motion.div
-                    className="cl-assign-menu"
-                    role="listbox"
-                    variants={menuVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={!customer.assigneeId}
-                      className="cl-assign-opt"
-                      onClick={() => {
-                        onAssigneeChange(null)
-                        setAssignOpen(false)
-                      }}
-                    >
-                      <Avatar name="?" size={20} tone="muted" />
-                      Unassigned
-                    </button>
-
-                    {assignees.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        role="option"
-                        aria-selected={
-                          customer.assigneeId === a.id ||
-                          customer.assigneeId?.toLowerCase() === a.id.toLowerCase()
-                        }
-                        className="cl-assign-opt"
-                        onClick={() => {
-                          onAssigneeChange(a.id)
-                          setAssignOpen(false)
-                        }}
-                      >
-                        <Avatar name={a.name} size={20} tone="brand" />
-                        {a.name}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </div>
-            )
-          })()}
+          <AssigneeDropdown
+            assigneeId={customer.assigneeId}
+            assignees={assignees}
+            isEditable={canEditAssignTo !== undefined ? canEditAssignTo : canEdit}
+            onAssigneeChange={onAssigneeChange}
+          />
         </td>
       )}
 
