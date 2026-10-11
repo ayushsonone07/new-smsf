@@ -750,7 +750,7 @@ tr.is-selected-row td {
   color: #0f172a;
 }
 
-.modal label {
+.modal label:not(.checkbox-field):not(.inline-label) {
   display: block;
   margin-bottom: 10px;
   font-size: 11.5px;
@@ -758,7 +758,7 @@ tr.is-selected-row td {
   color: #334155;
 }
 
-.modal input {
+.modal input:not([type="checkbox"]):not([type="radio"]) {
   display: block;
   width: 100%;
   margin-top: 4px;
@@ -769,9 +769,22 @@ tr.is-selected-row td {
   font-size: 12.5px;
 }
 
-.modal input:focus {
+.modal input:not([type="checkbox"]):not([type="radio"]):focus {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 3px rgb(79 70 229 / 12%);
+}
+
+.modal input[type="checkbox"],
+.modal input[type="radio"] {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
+  border: initial;
+  cursor: pointer;
+  accent-color: #2563eb;
 }
 
 .modal-actions {
