@@ -103,3 +103,4 @@ export function getCustomerFormUrl(phone?: string | null, isDuplicate = false): 
 
   return `/customer-details?${encryptedParams}`
 }
+

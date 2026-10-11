@@ -26,10 +26,44 @@ const sectionVariants: Variants = {
 type StatusTab = 'all' | 'ACTIVE' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
 type HistoryView = 'task-history' | 'status-history'
 
+function getEffectiveUserEmail(session: ReturnType<typeof getSession>): string {
+  if (session?.user?.email && session.user.email.includes('@')) {
+    return session.user.email.trim()
+  }
+  if (session?.user?.username && session.user.username.includes('@')) {
+    return session.user.username.trim()
+  }
+  if (session?.token) {
+    try {
+      const parts = session.token.split('.')
+      if (parts.length === 3) {
+        const payload = JSON.parse(
+          atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')),
+        )
+        const found = payload.sub || payload.username || payload.email
+        if (found && String(found).includes('@')) {
+          return String(found).trim()
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return (session?.user?.email || session?.user?.username || '').trim()
+}
+
 export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const session = getSession()
-  const isHead = session?.user.role !== 'USER'
-  const userEmail = session?.user.email || ''
+  const role = (session?.user?.role || '').toUpperCase()
+  const isDepartmentUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.includes('/onboarding-user') ||
+        window.location.pathname.includes('/users')))
+  const isHead = !isDepartmentUser
+
+  const userEmail = useMemo(() => getEffectiveUserEmail(session), [session])
 
   const [activeView, setActiveView] = useState<HistoryView>('task-history')
   const [selectedUser, setSelectedUser] = useState<string>('')
@@ -53,9 +87,13 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const startDate = `${todayIso}T00:00:00`
   const endDate = `${todayIso}T23:59:59`
 
+  const departmentUserFilter = isHead
+    ? (selectedUser || undefined)
+    : (userEmail || undefined)
+
   // 2. Task History Query: /api/task-history/department?pageNumber=0&pageSize=10
   const historyQuery = useTaskHistory({
-    departmentUserFilter: isHead ? (selectedUser || undefined) : userEmail,
+    departmentUserFilter,
     taskState: statusFilter === 'all' ? undefined : statusFilter,
     customerName: search || undefined,
     pageNumber: page,
@@ -78,7 +116,7 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
 
   // 4. Analytics Query
   const analyticsQuery = useDepartmentUsersAnalytics({
-    userId: isHead ? (selectedUser || undefined) : userEmail,
+    userId: departmentUserFilter,
     startDate,
     endDate,
     page: 0,
