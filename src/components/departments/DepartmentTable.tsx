@@ -18,8 +18,6 @@ const columns = [
   { key: 'username', title: 'LOGIN USERNAME' },
   { key: 'email', title: 'EMAIL' },
   { key: 'role', title: 'ROLE' },
-  { key: 'status', title: 'STATUS' },
-  { key: 'created', title: 'CREATED' },
   {
     key: 'actions',
     title: 'ACTIONS',
@@ -85,12 +83,6 @@ export function DepartmentTable({
             ) : (
               <span className="text-muted">—</span>
             )}
-          </td>
-
-          <td>
-            {new Date(
-              department.createdAt,
-            ).toLocaleDateString()}
           </td>
 
           <td>

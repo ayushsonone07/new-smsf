@@ -70,8 +70,12 @@ export function AdminSidebar({
   const session = getSession()
   const role = session?.user.role
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    role ? item.roles.includes(role) : false,
+  const visibleItems = NAV_ITEMS.filter(
+    (item) =>
+      (role ? item.roles.includes(role) : false) &&
+      // Head Panel and Users are hidden from the sidebar (UI only)
+      item.to !== '/head' &&
+      item.to !== '/users',
   )
 
   function handleLogout() {
