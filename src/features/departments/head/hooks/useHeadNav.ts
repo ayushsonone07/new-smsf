@@ -203,7 +203,7 @@ export function useHeadNav(departmentId: string) {
       name: 'Salary Management',
       description: 'Manage employee salaries, targets, and incentives',
       screen: 'salary-management',
-      icon: 'dollar',
+      icon: 'trend',
     },
   }
 

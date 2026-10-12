@@ -161,7 +161,7 @@ export async function getDepartmentAirtelAnalytics(
   query: AirtelCallsQuery,
   departmentType: string,
 ): Promise<AirtelAnalytics | null> {
-  const qs = toQueryString(cleanParams({ departmentType }))
+  const qs = toQueryString(cleanParams({ ...query, departmentType }))
   const res = await authedApiRequest<AirtelAnalyticsResponse>(`/api/v1/airtel/department/calls/analytics${qs}`)
   return res?.data ?? null
 }
