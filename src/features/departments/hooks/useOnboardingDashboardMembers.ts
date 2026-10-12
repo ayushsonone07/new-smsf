@@ -7,12 +7,14 @@ import {
 
 export function useOnboardingDashboardMembers(
   params: OnboardingMembersParams = {},
+  options?: { enabled?: boolean },
 ) {
   return useQuery<OnboardingMembersResponse>({
     queryKey: ['onboarding-dashboard-members', params],
     queryFn: () => getOnboardingDashboardMembers(params),
     staleTime: 30_000,
     refetchOnMount: 'always',
+    enabled: options?.enabled,
   })
 }
 

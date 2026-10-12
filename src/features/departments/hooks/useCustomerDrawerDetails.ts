@@ -2,17 +2,24 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getCustomerProfileDetails,
   getCustomerRemarks,
+  getCustomerInternalRemarks,
   getCustomerReviewReplies,
   getCustomerServiceRows,
 } from '../../../api/customer-drawer.api'
 import type { CustomerDrawerApiDetails } from '../../../api/customer-drawer.api'
 import type { OnboardingCustomer } from '../../../components/head/customers-list/CustomersList'
-
-const CUSTOMER_DEPARTMENT = 'ONBOARDING_DEPARTMENT'
+import { getSession } from '../../../app/auth/session'
 
 export function useCustomerDrawerDetails(
   customer: OnboardingCustomer | null,
 ): CustomerDrawerApiDetails {
+  const session = getSession()
+  const rawDept = session?.user.departmentType || ''
+  const isGoogle =
+    rawDept.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google-head'))
+  const customerDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDept || 'ONBOARDING_DEPARTMENT')
+
   const customerId = Number(customer?.id)
   const hasCustomerId = Number.isInteger(customerId) && customerId > 0
   const contact = customer?.phone.trim() ?? ''
@@ -26,15 +33,22 @@ export function useCustomerDrawerDetails(
   })
 
   const reviewRepliesQuery = useQuery({
-    queryKey: ['customer-drawer-review-replies', customerId, CUSTOMER_DEPARTMENT],
-    queryFn: () => getCustomerReviewReplies(customerId, CUSTOMER_DEPARTMENT),
+    queryKey: ['customer-drawer-review-replies', customerId, customerDepartment],
+    queryFn: () => getCustomerReviewReplies(customerId, customerDepartment),
     enabled: isOpen && hasCustomerId,
     staleTime: 0,
   })
 
   const remarksQuery = useQuery({
-    queryKey: ['customer-drawer-remarks', customerId, CUSTOMER_DEPARTMENT],
-    queryFn: () => getCustomerRemarks(customerId, CUSTOMER_DEPARTMENT),
+    queryKey: ['customer-drawer-remarks', customerId, customerDepartment],
+    queryFn: () => getCustomerRemarks(customerId, customerDepartment),
+    enabled: isOpen && hasCustomerId,
+    staleTime: 0,
+  })
+
+  const internalRemarksQuery = useQuery({
+    queryKey: ['customer-drawer-internal-remarks', customerId, customerDepartment],
+    queryFn: () => getCustomerInternalRemarks(customerId, customerDepartment),
     enabled: isOpen && hasCustomerId,
     staleTime: 0,
   })
@@ -51,16 +65,19 @@ export function useCustomerDrawerDetails(
     serviceRows: rowsQuery.data ?? [],
     serviceRowsLoading: rowsQuery.isLoading,
     remarks: remarksQuery.data,
+    internalRemarks: internalRemarksQuery.data ?? [],
     reviewReplies: reviewRepliesQuery.data ?? [],
     isLoading:
       profileQuery.isLoading ||
       reviewRepliesQuery.isLoading ||
       remarksQuery.isLoading ||
+      internalRemarksQuery.isLoading ||
       rowsQuery.isLoading,
     errors: [
       profileQuery.error,
       reviewRepliesQuery.error,
       remarksQuery.error,
+      internalRemarksQuery.error,
       rowsQuery.error,
     ]
       .filter((error): error is Error => error instanceof Error)

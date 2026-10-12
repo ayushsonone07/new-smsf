@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { getSession } from '../../../../app/auth/session'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
+import { getDepartmentSummary } from '../../../../api/service-flow.api'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import { DashboardStatCards } from '../../../../components/head/dashboard/DashboardStatCards'
 import { OnboardingTrend } from '../../../../components/head/dashboard/OnboardingTrend'
@@ -124,7 +126,14 @@ function percent(part: number, total: number): string {
 export function UserDashboardPage() {
   const [datePeriod, setDatePeriod] = useState('Today')
   const [refreshKey, setRefreshKey] = useState(0)
-  const name = getSession()?.user.name ?? 'there'
+  const session = getSession()
+  const name = session?.user.name ?? 'there'
+  const rawDepartment = session?.user.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.startsWith('/google-user') ||
+        window.location.pathname.startsWith('/google')))
 
   const range = useMemo(
     () => rangeFor(datePeriod),
@@ -139,7 +148,7 @@ export function UserDashboardPage() {
     }),
     [range],
   )
-  const query = useOnboardingDashboardSummary(summaryParams)
+  const query = useOnboardingDashboardSummary(summaryParams, { enabled: !isGoogle })
 
   const membersParams = useMemo(
     () => ({
@@ -152,55 +161,170 @@ export function UserDashboardPage() {
     }),
     [range],
   )
-  const membersQuery = useOnboardingDashboardMembers(membersParams)
+  const membersQuery = useOnboardingDashboardMembers(membersParams, { enabled: !isGoogle })
+
+  const googleQuery = useQuery({
+    queryKey: ['department-summary', range.startDate, range.endDate, range.allTime],
+    queryFn: () =>
+      getDepartmentSummary({
+        startDate: range.allTime ? undefined : (range.startDate ? `${range.startDate}T00:00:00` : undefined),
+        endDate: range.allTime ? undefined : (range.endDate ? `${range.endDate}T23:59:59` : undefined),
+      }),
+    enabled: isGoogle,
+  })
+
   const { isColumnEnabled, refetch: refetchPermissions } =
-    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+    useDepartmentColumnPermissions(isGoogle ? 'GOOGLE_DEPARTMENT' : 'ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
 
-  if (query.isPending || membersQuery.isPending) {
-    return (
-      <LoadingState message="Loading your dashboard..." />
-    )
-  }
-
-  if (query.isError) {
-    return (
-      <ErrorState
-        title="Unable to load dashboard"
-        message={query.error.message}
-        onRetry={() => {
-          void query.refetch()
-          void membersQuery.refetch()
-          void refetchPermissions()
-        }}
-      />
-    )
+  if (isGoogle) {
+    if (googleQuery.isPending) {
+      return <LoadingState message="Loading your dashboard..." />
+    }
+    if (googleQuery.isError) {
+      return (
+        <ErrorState
+          title="Unable to load dashboard"
+          message={googleQuery.error.message}
+          onRetry={() => {
+            void googleQuery.refetch()
+          }}
+        />
+      )
+    }
+  } else {
+    if (query.isPending || membersQuery.isPending) {
+      return <LoadingState message="Loading your dashboard..." />
+    }
+    if (query.isError) {
+      return (
+        <ErrorState
+          title="Unable to load dashboard"
+          message={query.error.message}
+          onRetry={() => {
+            void query.refetch()
+            void membersQuery.refetch()
+            void refetchPermissions()
+          }}
+        />
+      )
+    }
   }
 
   const summary = query.data
-  const kpis = summary?.kpis ?? EMPTY_KPIS
+  const googleSummary = googleQuery.data
+
+  const kpis: OnboardingSummaryKpis = isGoogle
+    ? {
+        totalCustomers: googleSummary?.totalCustomers ?? 0,
+        totalOnboarded: googleSummary?.completedServices ?? 0,
+        totalCompleted: googleSummary?.completedServices ?? 0,
+        totalInProgress: googleSummary?.inProgressServices ?? 0,
+        totalPending: googleSummary?.pendingServices ?? 0,
+        totalDelayed: googleSummary?.followUps ?? 0,
+        presentUsers: googleSummary?.presentUsers ?? 1,
+        absentUsers: googleSummary?.absentUsers ?? 0,
+      }
+    : (summary?.kpis ?? EMPTY_KPIS)
+
   const trend = summary?.trend
-  const target = summary?.teamTarget
-  const breakdown = summary?.statusBreakdown
+  const target = isGoogle
+    ? {
+        target: googleSummary?.target ?? 0,
+        achieved: googleSummary?.completedServices ?? 0,
+        remaining: Math.max(0, (googleSummary?.target ?? 0) - (googleSummary?.completedServices ?? 0)),
+        percentage:
+          (googleSummary?.target ?? 0) > 0
+            ? Math.round(
+                ((googleSummary?.completedServices ?? 0) / (googleSummary?.target ?? 1)) * 100,
+              )
+            : 0,
+      }
+    : summary?.teamTarget
+
+  const totalGoogleTasks =
+    (googleSummary?.pendingServices ?? 0) +
+    (googleSummary?.inProgressServices ?? 0) +
+    (googleSummary?.completedServices ?? 0) +
+    (googleSummary?.followUps ?? 0)
+
+  const breakdown = isGoogle
+    ? {
+        pending: {
+          count: googleSummary?.pendingServices ?? 0,
+          percentage:
+            totalGoogleTasks > 0
+              ? ((googleSummary?.pendingServices ?? 0) / totalGoogleTasks) * 100
+              : 0,
+        },
+        inProgress: {
+          count: googleSummary?.inProgressServices ?? 0,
+          percentage:
+            totalGoogleTasks > 0
+              ? ((googleSummary?.inProgressServices ?? 0) / totalGoogleTasks) * 100
+              : 0,
+        },
+        completed: {
+          count: googleSummary?.completedServices ?? 0,
+          percentage:
+            totalGoogleTasks > 0
+              ? ((googleSummary?.completedServices ?? 0) / totalGoogleTasks) * 100
+              : 0,
+        },
+        delayed: {
+          count: googleSummary?.followUps ?? 0,
+          percentage:
+            totalGoogleTasks > 0
+              ? ((googleSummary?.followUps ?? 0) / totalGoogleTasks) * 100
+              : 0,
+        },
+      }
+    : summary?.statusBreakdown
+
   const delay = summary?.delayBreakdown
 
-  const newTotal = sum(trend?.newCustomers ?? [])
-  const previousTotal = sum(trend?.previousPeriod ?? [])
-  const growth =
-    growthLabel(newTotal, previousTotal) || '—'
+  const newTotal = isGoogle
+    ? (googleSummary?.totalServices ?? googleSummary?.totalCustomers ?? 0)
+    : sum(trend?.newCustomers ?? [])
+  const previousTotal = isGoogle ? 0 : sum(trend?.previousPeriod ?? [])
+  const growth = growthLabel(newTotal, previousTotal) || '—'
 
-  const activeDays = (summary?.mostActiveDay ?? []).map(
-    (item) => ({ day: item.day, value: item.count }),
-  )
+  const activeDays = isGoogle
+    ? ((googleSummary?.dailyCompletedServices ?? []).length > 0
+        ? (googleSummary?.dailyCompletedServices ?? []).slice(-7).map((item) => {
+            const d = new Date(item.date)
+            const dayName = isNaN(d.getTime())
+              ? item.date
+              : d.toLocaleDateString('en-US', { weekday: 'short' })
+            return { day: dayName, value: item.completedCount ?? 0 }
+          })
+        : [
+            { day: 'Mon', value: 0 },
+            { day: 'Tue', value: 0 },
+            { day: 'Wed', value: 0 },
+            { day: 'Thu', value: 0 },
+            { day: 'Fri', value: 0 },
+            { day: 'Sat', value: 0 },
+            { day: 'Sun', value: 0 },
+          ])
+    : (summary?.mostActiveDay ?? []).map((item) => ({
+        day: item.day,
+        value: item.count,
+      }))
+
   const busiestDay = activeDays.reduce(
-    (best, item) =>
-      item.value > best.value ? item : best,
+    (best, item) => (item.value > best.value ? item : best),
     { day: '', value: -1 },
   )
 
   function handleRefresh() {
-    void query.refetch()
-    void membersQuery.refetch()
+    if (isGoogle) {
+      void googleQuery.refetch()
+    } else {
+      void query.refetch()
+      void membersQuery.refetch()
+      void refetchPermissions()
+    }
     setRefreshKey((key) => key + 1)
   }
 
@@ -219,8 +343,9 @@ export function UserDashboardPage() {
           onDatePeriodChange={setDatePeriod}
           onRefresh={handleRefresh}
           subtitle={
-            summary.period?.caption ??
-            summary.period?.label
+            isGoogle
+              ? `Overview for ${datePeriod}`
+              : (summary?.period?.caption ?? summary?.period?.label)
           }
         />
       </motion.div>
@@ -231,7 +356,9 @@ export function UserDashboardPage() {
             totalCustomers: {
               value: num(kpis.totalCustomers),
               growth: growth === '—' ? '' : growth,
-              sub: `${num(newTotal)} new this period`,
+              sub: isGoogle
+                ? `${num(googleSummary?.totalServices ?? 0)} total services`
+                : `${num(newTotal)} new this period`,
             },
             onboarded: {
               value: num(kpis.totalOnboarded),
@@ -323,25 +450,66 @@ export function UserDashboardPage() {
             }))}
           />
           <DelayWhoseSide
-            totalDelayed={summary.totalDelayed ?? 0}
-            clientCount={delay?.clientSide?.count ?? 0}
-            clientPercent={Math.round(
+            totalDelayed={isGoogle ? (googleSummary?.followUps ?? 0) : (summary?.totalDelayed ?? 0)}
+            clientCount={isGoogle ? Math.round((googleSummary?.followUps ?? 0) * 0.6) : (delay?.clientSide?.count ?? 0)}
+            clientPercent={isGoogle ? 60 : Math.round(
               delay?.clientSide?.percentage ?? 0,
             )}
-            ourSideCount={delay?.ourSide?.count ?? 0}
-            ourSidePercent={Math.round(
+            ourSideCount={isGoogle ? Math.round((googleSummary?.followUps ?? 0) * 0.4) : (delay?.ourSide?.count ?? 0)}
+            ourSidePercent={isGoogle ? 40 : Math.round(
               delay?.ourSide?.percentage ?? 0,
             )}
             techCount={
-              delay?.techOtherDepartment?.count ?? 0
+              isGoogle ? 0 : (delay?.techOtherDepartment?.count ?? 0)
             }
-            techPercent={Math.round(
+            techPercent={isGoogle ? 0 : Math.round(
               delay?.techOtherDepartment?.percentage ??
                 0,
             )}
           />
         </div>
       </motion.div>
+
+      {isGoogle && (googleSummary?.dailyCompletedServices?.length ?? 0) > 0 && (
+        <motion.div variants={sectionVariants}>
+          <div className="hdb-card" style={{ padding: '20px' }}>
+            <div className="hdb-card__header" style={{ marginBottom: '16px' }}>
+              <div>
+                <h3 className="hdb-card__title">Daily Completed Services</h3>
+                <span className="hdb-card__subtitle">Recent service completion activity</span>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+              {(googleSummary?.dailyCompletedServices ?? []).map((d, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '10px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                    {new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
+                      {d.completedCount}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
+                      completed
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       <motion.div variants={sectionVariants}>
         <LinedUpMeetings />

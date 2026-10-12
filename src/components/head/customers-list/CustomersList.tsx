@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import type { IconName } from '../shared/iconPaths'
+import { getCustomerFormUrl } from '../../../utils/urlEncryption'
 
 /* ── Public types ─────────────────────────────────────────── */
 
@@ -49,9 +50,14 @@ export interface OnboardingCustomer {
   packageName?: string
   serviceMonths?: string
   salesPerson?: string
+  serviceType?: string
   services?: { name: string; status: OnboardingStatus }[]
   activityCount?: number
   remarkCount?: number
+  serviceTags?: Record<string, string> | any
+  subServiceInfo?: any[]
+  flowSteps?: any[]
+  rawCustomer?: any
 }
 
 export interface CustomersListProps {
@@ -60,13 +66,18 @@ export interface CustomersListProps {
   onStatusChange: (id: string, status: OnboardingStatus) => void
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
-  onOpenDetail: (customer: OnboardingCustomer) => void
+  onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
+  onOpenServiceFlow?: (customer: OnboardingCustomer) => void
+  onOpenServiceTags?: (customer: OnboardingCustomer) => void
+  onOpenGoogleInfo?: (customer: OnboardingCustomer) => void
   canEdit?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
   canEditAssignTo?: boolean
+  showServiceType?: boolean
+  isGoogle?: boolean
   /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
@@ -147,6 +158,11 @@ export function CustomersList({
   canEditStatus,
   showAssignTo = true,
   canEditAssignTo,
+  showServiceType = false,
+  onOpenServiceFlow,
+  onOpenServiceTags,
+  isGoogle = false,
+  onOpenGoogleInfo,
   showRemark = true,
   canEditRemark,
   showContact = true,
@@ -172,11 +188,22 @@ export function CustomersList({
   return (
     <div className="cl-table-wrapper">
       <table className="cl-table">
+        <colgroup>
+          <col className="cl-col cl-col--num" />
+          {showBusiness && <col className="cl-col cl-col--biz" />}
+          {showContact && <col className="cl-col cl-col--contact" />}
+          {showServiceType && <col className="cl-col cl-col--service" />}
+          {showStatus && <col className="cl-col cl-col--status" />}
+          {showAssignTo && <col className="cl-col cl-col--assign" />}
+          {showRemark && <col className="cl-col cl-col--remark" />}
+          {showUpdated && <col className="cl-col cl-col--updated" />}
+        </colgroup>
         <thead>
           <tr>
             <th className="cl-th cl-th--num">#</th>
             {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
             {showContact && <th className="cl-th cl-th--contact">Contact</th>}
+            {showServiceType && <th className="cl-th cl-th--service">Service Type</th>}
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
@@ -202,11 +229,16 @@ export function CustomersList({
               onRemarkChange={(remark) =>
                 onRemarkChange(customer.id, remark)
               }
-              onOpenDetail={() => onOpenDetail(customer)}
+              onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
+              onOpenServiceFlow={onOpenServiceFlow ? () => onOpenServiceFlow(customer) : undefined}
+              onOpenServiceTags={onOpenServiceTags ? () => onOpenServiceTags(customer) : undefined}
+              onOpenGoogleInfo={onOpenGoogleInfo ? () => onOpenGoogleInfo(customer) : undefined}
               canEdit={canEdit}
               showBusiness={showBusiness}
               showContact={showContact}
+              showServiceType={showServiceType}
+              isGoogle={isGoogle}
               showStatus={showStatus}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
@@ -222,6 +254,277 @@ export function CustomersList({
   )
 }
 
+/* ── AssigneeDropdown (with Search & Pagination) ────────── */
+
+interface AssigneeDropdownProps {
+  assigneeId: string | null
+  assignees: OnboardingAssignee[]
+  isEditable: boolean
+  onAssigneeChange: (assigneeId: string | null) => void
+}
+
+function AssigneeDropdown({
+  assigneeId,
+  assignees,
+  isEditable,
+  onAssigneeChange,
+}: AssigneeDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(0)
+
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const PAGE_SIZE = 5
+
+  const matchedAssignee = useMemo(() => {
+    if (!assigneeId) return null
+    const target = assigneeId.toLowerCase()
+    return (
+      assignees.find(
+        (a) =>
+          a.id === assigneeId ||
+          a.id.toLowerCase() === target ||
+          a.name.toLowerCase().includes(target)
+      ) || null
+    )
+  }, [assignees, assigneeId])
+
+  const filteredAssignees = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return assignees
+    return assignees.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.id.toLowerCase().includes(q)
+    )
+  }, [assignees, searchQuery])
+
+  const showUnassigned = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return 'unassigned'.includes(q)
+  }, [searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const paginatedAssignees = useMemo(() => {
+    const start = safePage * PAGE_SIZE
+    return filteredAssignees.slice(start, start + PAGE_SIZE)
+  }, [filteredAssignees, safePage])
+
+  // Close menus on outside click or escape
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handleOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  // Focus search input when menu opens, reset on close
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
+    } else {
+      setSearchQuery('')
+      setPage(0)
+    }
+  }, [isOpen])
+
+  const isUnassignedSelected = !assigneeId
+
+  return (
+    <div className="cl-assign-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="cl-assign-btn"
+        title={matchedAssignee ? matchedAssignee.name : assigneeId || 'Unassigned'}
+        onClick={() => setIsOpen((o) => !o)}
+        disabled={!isEditable}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+      >
+        {matchedAssignee ? (
+          <Avatar name={matchedAssignee.name} size={20} tone="brand" />
+        ) : (
+          <Avatar
+            name={assigneeId ? assigneeId.charAt(0).toUpperCase() : '?'}
+            size={20}
+            tone={assigneeId ? 'brand' : 'muted'}
+          />
+        )}
+        <span className="cl-assign-name">
+          {matchedAssignee
+            ? matchedAssignee.name
+            : assigneeId || 'Unassigned'}
+        </span>
+        {isEditable && (
+          <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+        )}
+      </button>
+
+      {isEditable && isOpen && (
+        <motion.div
+          className="cl-assign-menu"
+          role="listbox"
+          variants={menuVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Search Box */}
+          <div className="cl-assign-search-wrap">
+            <Icon name="search" size={13} strokeWidth={2} className="cl-assign-search-icon" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="cl-assign-search-input"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setPage(0)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search assignee..."
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="cl-assign-search-clear"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSearchQuery('')
+                  setPage(0)
+                  searchInputRef.current?.focus()
+                }}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <Icon name="x" size={11} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+
+          {/* Unassigned Option */}
+          {showUnassigned && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={isUnassignedSelected}
+              className={`cl-assign-opt ${isUnassignedSelected ? 'cl-assign-opt--active' : ''}`}
+              onClick={() => {
+                onAssigneeChange(null)
+                setIsOpen(false)
+              }}
+            >
+              <Avatar name="?" size={20} tone="muted" />
+              <span className="cl-assign-opt-name">Unassigned</span>
+              {isUnassignedSelected && (
+                <Icon name="check" size={13} strokeWidth={2.5} className="cl-assign-check" />
+              )}
+            </button>
+          )}
+
+          {showUnassigned && paginatedAssignees.length > 0 && (
+            <div className="cl-assign-divider" />
+          )}
+
+          {/* Paginated Assignees List */}
+          <div className="cl-assign-list">
+            {paginatedAssignees.map((a) => {
+              const isSelected =
+                assigneeId === a.id ||
+                assigneeId?.toLowerCase() === a.id.toLowerCase()
+
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={`cl-assign-opt ${isSelected ? 'cl-assign-opt--active' : ''}`}
+                  onClick={() => {
+                    onAssigneeChange(a.id)
+                    setIsOpen(false)
+                  }}
+                >
+                  <Avatar name={a.name} size={20} tone="brand" />
+                  <span className="cl-assign-opt-name" title={a.name}>
+                    {a.name}
+                  </span>
+                  {isSelected && (
+                    <Icon name="check" size={13} strokeWidth={2.5} className="cl-assign-check" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Empty state */}
+          {!showUnassigned && filteredAssignees.length === 0 && (
+            <div className="cl-assign-empty">No assignees found</div>
+          )}
+
+          {/* Pagination Controls */}
+          {filteredAssignees.length > 0 && (
+            <div className="cl-assign-pagination">
+              <button
+                type="button"
+                className="cl-assign-page-btn"
+                disabled={safePage === 0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPage((p) => Math.max(0, p - 1))
+                }}
+                title="Previous page"
+              >
+                <Icon name="chevronLeft" size={13} strokeWidth={2.5} />
+                <span>Prev</span>
+              </button>
+              <span className="cl-assign-page-info">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="cl-assign-page-btn"
+                disabled={safePage >= totalPages - 1}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPage((p) => Math.min(totalPages - 1, p + 1))
+                }}
+                title="Next page"
+              >
+                <span>Next</span>
+                <Icon name="chevronRight" size={13} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
 /* ── CustomerRow (private, same file) ────────────────────── */
 
 interface CustomerRowProps {
@@ -230,11 +533,16 @@ interface CustomerRowProps {
   onStatusChange: (status: OnboardingStatus) => void
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
-  onOpenDetail: () => void
+  onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
+  onOpenServiceFlow?: () => void
+  onOpenServiceTags?: () => void
+  isGoogle?: boolean
+  onOpenGoogleInfo?: () => void
   canEdit: boolean
   showBusiness?: boolean
   showContact?: boolean
+  showServiceType?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
@@ -252,9 +560,14 @@ function CustomerRow({
   onRemarkChange,
   onOpenDetail,
   onOpenDuplicate,
+  onOpenServiceFlow,
+  onOpenServiceTags,
+  isGoogle = false,
+  onOpenGoogleInfo,
   canEdit,
   showBusiness = true,
   showContact = true,
+  showServiceType = false,
   showStatus = true,
   canEditStatus,
   showAssignTo = true,
@@ -264,16 +577,14 @@ function CustomerRow({
   showUpdated = false,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
 
   const statusRef = useRef<HTMLDivElement>(null)
-  const assignRef = useRef<HTMLDivElement>(null)
 
   /* Close menus on outside click */
   useEffect(() => {
-    if (!statusOpen && !assignOpen) return
+    if (!statusOpen) return
 
     function handler(e: MouseEvent) {
       if (
@@ -282,22 +593,16 @@ function CustomerRow({
       ) {
         setStatusOpen(false)
       }
-      if (
-        assignRef.current &&
-        !assignRef.current.contains(e.target as Node)
-      ) {
-        setAssignOpen(false)
-      }
     }
 
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [statusOpen, assignOpen])
+  }, [statusOpen])
 
   const statusMeta = STATUS_META[customer.status]
 
   function startEditing() {
-    if (!canEdit) return
+    if (!(canEditRemark !== undefined ? canEditRemark : canEdit)) return
     setRemarkDraft(customer.remark)
     setRemarkEditing(true)
   }
@@ -311,11 +616,59 @@ function CustomerRow({
     setRemarkEditing(false)
   }
 
-  /** Opens the client form in a new tab; falls back to the drawer until a link exists */
+  /** Opens the client form in a new tab matching SMSF /customer-details parity */
   function openForm() {
-    if (!customer.formUrl) return
-    window.open(customer.formUrl, '_blank', 'noopener,noreferrer')
+    const isDuplicate = Boolean(
+      customer.hasDuplicateCustomer || (customer.duplicateCount ?? 0) > 0,
+    )
+    const url =
+      getCustomerFormUrl(customer.phone, isDuplicate) ||
+      customer.formUrl
+
+    if (!url) {
+      alert('Phone number missing: Unable to open details without a contact number.')
+      return
+    }
+
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
+
+    window.open(fullUrl, '_blank')
   }
+
+  const renderedTags = useMemo(() => {
+    if (!customer.serviceTags) return []
+    if (typeof customer.serviceTags === 'string') {
+      try {
+        const parsed = JSON.parse(customer.serviceTags)
+        if (typeof parsed === 'object' && parsed !== null) {
+          return Object.entries(parsed).map(([k, v]) => ({
+            key: k,
+            label: String(v || k),
+          }))
+        }
+      } catch {
+        return [{ key: customer.serviceTags, label: customer.serviceTags }]
+      }
+    }
+    if (Array.isArray(customer.serviceTags)) {
+      return (customer.serviceTags as any[]).map((t, idx) => {
+        const label = typeof t === 'object' && t ? (t.tagName || t.name || Object.values(t)[0]) : t
+        return {
+          key: `tag_${idx}`,
+          label: String(label || `tag_${idx}`),
+        }
+      })
+    }
+    if (typeof customer.serviceTags === 'object') {
+      return Object.entries(customer.serviceTags).map(([k, v]) => ({
+        key: k,
+        label: String(v || k),
+      }))
+    }
+    return []
+  }, [customer.serviceTags])
 
   return (
     <motion.tr className="cl-row" variants={rowVariants}>
@@ -330,8 +683,8 @@ function CustomerRow({
             <button
               type="button"
               className="cl-biz-name cl-biz-name--link"
-              onClick={onOpenDetail}
-              title="View customer detail"
+              onClick={() => onOpenDetail()}
+              title={customer.businessName}
             >
               {customer.businessName}
             </button>
@@ -341,27 +694,55 @@ function CustomerRow({
               className="cl-biz-eye"
               title="View customer detail"
               aria-label="View customer detail"
-              onClick={onOpenDetail}
+              onClick={() => onOpenDetail()}
             >
               <Icon name="eye" size={14} strokeWidth={1.8} />
             </button>
 
-            <button
-              type="button"
-              className="cl-form-pill"
-              title="Open client form"
-              onClick={openForm}
-            >
-              <Icon
-                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
-                name="eye"
-                size={12}
-                strokeWidth={2}
-              />
-              Form
-            </button>
+            {isGoogle ? (
+              <>
+                <button
+                  type="button"
+                  className="cl-form-pill"
+                  title="Open requirement form"
+                  onClick={openForm}
+                >
+                  <Icon
+                    d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                    name="eye"
+                    size={12}
+                    strokeWidth={2}
+                  />
+                  Requirement
+                </button>
+                <button
+                  type="button"
+                  className="cl-form-pill cl-form-pill--google"
+                  title="Open Google Info"
+                  onClick={() => onOpenGoogleInfo?.()}
+                >
+                  <Icon name="eye" size={12} strokeWidth={2} />
+                  Google Info
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="cl-form-pill"
+                title="Open client form"
+                onClick={openForm}
+              >
+                <Icon
+                  d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                  name="eye"
+                  size={12}
+                  strokeWidth={2}
+                />
+                Form
+              </button>
+            )}
 
-            {(customer.hasDuplicateCustomer || (customer.duplicateCount && customer.duplicateCount > 0)) && (
+            {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
               <button
                 type="button"
                 className="cl-dup-pill-btn"
@@ -398,7 +779,7 @@ function CustomerRow({
             )}
           </div>
 
-          <div className="cl-biz-meta">
+          <div className="cl-biz-meta" title={`${customer.contactName} · ${customer.contactDate}`}>
             {customer.contactName} · {customer.contactDate}
           </div>
         </td>
@@ -407,10 +788,10 @@ function CustomerRow({
       {/* Contact */}
       {showContact && (
         <td className="cl-td" data-label="Contact">
-          <div className="cl-email">{customer.email}</div>
+          <div className="cl-email" title={customer.email}>{customer.email}</div>
 
           <div className="cl-phone-row">
-            <span className="cl-phone-text">{customer.phone}</span>
+            <span className="cl-phone-text" title={customer.phone}>{customer.phone}</span>
             <button
               type="button"
               className="cl-icon-micro"
@@ -455,6 +836,107 @@ function CustomerRow({
         </td>
       )}
 
+      {/* Service Type */}
+      {showServiceType && (
+        <td className="cl-td" data-label="Service Type">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="cl-service-type-badge"
+              onClick={() => onOpenServiceFlow?.()}
+              title="Manage sub-service details"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 8px',
+                borderRadius: '8px',
+                border: '1px solid #fed7aa',
+                backgroundColor: '#fff7ed',
+                color: '#c2410c',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="alert" size={11} strokeWidth={2.4} />
+              <span>Phase 1</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenServiceTags?.()
+              }}
+              title="Manage service tags"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                padding: '2px 7px',
+                borderRadius: '9999px',
+                fontSize: '11px',
+                fontWeight: 600,
+                backgroundColor: '#faf5ff',
+                color: '#7e22ce',
+                border: '1px solid #d8b4fe',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="plus" size={10} strokeWidth={2.5} />
+              <span>Tag</span>
+            </button>
+          </div>
+          {renderedTags.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {renderedTags.slice(0, 2).map(({ key, label }) => (
+                <span
+                  key={key}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenServiceTags?.()
+                  }}
+                  title="Click to manage service tags"
+                  style={{
+                    display: 'inline-block',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '9999px',
+                    backgroundColor: '#fff7ed',
+                    color: '#c2410c',
+                    border: '1px solid #fed7aa',
+                    cursor: 'pointer',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label.replace(/_/g, ' ')}
+                </span>
+              ))}
+              {renderedTags.length > 2 && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenServiceTags?.()
+                  }}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#6366f1',
+                    cursor: 'pointer',
+                  }}
+                >
+                  +{renderedTags.length - 2}
+                </span>
+              )}
+            </div>
+          )}
+        </td>
+      )}
+
       {/* Status */}
       {showStatus && (
         <td className="cl-td" data-label="Status">
@@ -469,7 +951,9 @@ function CustomerRow({
             >
               <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
               {statusMeta.label}
-              <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+              {(canEditStatus !== undefined ? canEditStatus : canEdit) && (
+                <Icon name="chevronDown" size={12} strokeWidth={2.5} />
+              )}
             </button>
 
             {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && (
@@ -480,26 +964,55 @@ function CustomerRow({
                 initial="hidden"
                 animate="visible"
               >
-                {STATUS_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    role="option"
-                    aria-selected={customer.status === opt}
-                    className="cl-status-opt"
-                    onClick={() => {
-                      onStatusChange(opt)
-                      setStatusOpen(false)
-                    }}
-                  >
-                    <Icon
-                      name={STATUS_META[opt].icon}
-                      size={13}
-                      strokeWidth={1.8}
-                    />
-                    {STATUS_META[opt].label}
-                  </button>
-                ))}
+                {STATUS_OPTIONS.map((opt) => {
+                  let isOptDisabled = false
+                  if (opt === 'completed') {
+                    let allDone = false
+                    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+                      allDone = customer.subServiceInfo.every((sub: any) => {
+                        const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
+                        return String(st).toUpperCase() === 'COMPLETED'
+                      })
+                    } else if (Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0) {
+                      allDone = customer.flowSteps.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                    } else if (Array.isArray(customer.services) && customer.services.length > 0) {
+                      allDone = customer.services.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                    }
+
+                    if (!allDone && customer.status !== 'completed') {
+                      isOptDisabled = true
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      role="option"
+                      aria-selected={customer.status === opt}
+                      className="cl-status-opt"
+                      style={isOptDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      onClick={() => {
+                        if (isOptDisabled) {
+                          alert(
+                            'All sub-services must be completed and acknowledgement sent before marking the main service as completed.',
+                          )
+                          setStatusOpen(false)
+                          return
+                        }
+                        onStatusChange(opt)
+                        setStatusOpen(false)
+                      }}
+                    >
+                      <Icon
+                        name={STATUS_META[opt].icon}
+                        size={13}
+                        strokeWidth={1.8}
+                      />
+                      {STATUS_META[opt].label}
+                    </button>
+                  )
+                })}
               </motion.div>
             )}
           </div>
@@ -509,90 +1022,12 @@ function CustomerRow({
       {/* Assign To */}
       {showAssignTo && (
         <td className="cl-td" data-label="Assign To">
-          {(() => {
-            const isAssignEditable = canEditAssignTo !== undefined ? canEditAssignTo : canEdit
-            const matchedAssignee = assignees.find(
-              (a) =>
-                a.id === customer.assigneeId ||
-                a.id.toLowerCase() === (customer.assigneeId || '').toLowerCase() ||
-                a.name.toLowerCase().includes((customer.assigneeId || '').toLowerCase())
-            )
-
-            return (
-              <div className="cl-assign-wrap" ref={assignRef}>
-                <button
-                  type="button"
-                  className="cl-assign-btn"
-                  onClick={() => setAssignOpen((o) => !o)}
-                  disabled={!isAssignEditable}
-                  aria-expanded={assignOpen}
-                  aria-haspopup="listbox"
-                >
-                  {matchedAssignee ? (
-                    <Avatar name={matchedAssignee.name} size={20} tone="brand" />
-                  ) : (
-                    <Avatar
-                      name={customer.assigneeId ? customer.assigneeId.charAt(0).toUpperCase() : '?'}
-                      size={20}
-                      tone={customer.assigneeId ? 'brand' : 'muted'}
-                    />
-                  )}
-                  <span className="cl-assign-name">
-                    {matchedAssignee
-                      ? matchedAssignee.name
-                      : customer.assigneeId || 'Unassigned'}
-                  </span>
-                  {isAssignEditable && (
-                    <Icon name="chevronDown" size={12} strokeWidth={2.5} />
-                  )}
-                </button>
-
-                {isAssignEditable && assignOpen && (
-                  <motion.div
-                    className="cl-assign-menu"
-                    role="listbox"
-                    variants={menuVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={!customer.assigneeId}
-                      className="cl-assign-opt"
-                      onClick={() => {
-                        onAssigneeChange(null)
-                        setAssignOpen(false)
-                      }}
-                    >
-                      <Avatar name="?" size={20} tone="muted" />
-                      Unassigned
-                    </button>
-
-                    {assignees.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        role="option"
-                        aria-selected={
-                          customer.assigneeId === a.id ||
-                          customer.assigneeId?.toLowerCase() === a.id.toLowerCase()
-                        }
-                        className="cl-assign-opt"
-                        onClick={() => {
-                          onAssigneeChange(a.id)
-                          setAssignOpen(false)
-                        }}
-                      >
-                        <Avatar name={a.name} size={20} tone="brand" />
-                        {a.name}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </div>
-            )
-          })()}
+          <AssigneeDropdown
+            assigneeId={customer.assigneeId}
+            assignees={assignees}
+            isEditable={canEditAssignTo !== undefined ? canEditAssignTo : canEdit}
+            onAssigneeChange={onAssigneeChange}
+          />
         </td>
       )}
 
@@ -649,31 +1084,87 @@ function CustomerRow({
                   className="cl-action"
                   title="View customer detail"
                   aria-label="View customer detail"
-                  onClick={onOpenDetail}
+                  onClick={() => onOpenDetail()}
                 >
                   <Icon name="eye" size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
           ) : (
-            <span
-              className={`cl-remark${
-                !customer.remark ? ' cl-remark--placeholder' : ''
-              }`}
-              role="button"
-              tabIndex={canEditRemark !== undefined ? (canEditRemark ? 0 : -1) : (canEdit ? 0 : -1)}
-              onClick={startEditing}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') startEditing()
-              }}
-              title={
-                (canEditRemark !== undefined ? canEditRemark : canEdit)
-                  ? 'Click to edit remark'
-                  : 'Read-only remark'
-              }
-            >
-              {customer.remark || 'Add remark...'}
-            </span>
+            <div className="cl-remark-display-container" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div
+                className={`cl-remark${
+                  !customer.remark ? ' cl-remark--placeholder' : ''
+                }`}
+                style={{
+                  position: 'relative',
+                  padding: '6px 8px',
+                  paddingRight: (canEditRemark !== undefined ? canEditRemark : canEdit) ? '28px' : '8px',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '6px',
+                  minHeight: '32px',
+                  cursor: (canEditRemark !== undefined ? canEditRemark : canEdit) ? 'pointer' : 'default',
+                }}
+                role="button"
+                tabIndex={(canEditRemark !== undefined ? canEditRemark : canEdit) ? 0 : -1}
+                onClick={(canEditRemark !== undefined ? canEditRemark : canEdit) ? startEditing : undefined}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && (canEditRemark !== undefined ? canEditRemark : canEdit)) {
+                    startEditing()
+                  }
+                }}
+                title={customer.remark || 'Add remark...'}
+              >
+                {customer.remark || 'Add remark...'}
+                
+                {(canEditRemark !== undefined ? canEditRemark : canEdit) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      startEditing()
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      color: '#475569',
+                    }}
+                    title="Edit internal remark"
+                  >
+                    <Icon name="pencil" size={12} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenDetail('internal-remarks')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  color: '#94a3b8',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  width: 'fit-content'
+                }}
+              >
+                <Icon name="messageSquare" size={10} strokeWidth={2} />
+                view remark history
+              </button>
+            </div>
           )}
         </td>
       )}

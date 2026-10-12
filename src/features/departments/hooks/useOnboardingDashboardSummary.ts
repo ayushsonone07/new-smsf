@@ -14,6 +14,7 @@ export const onboardingSummaryQueryKey = (
 
 export function useOnboardingDashboardSummary(
   params: OnboardingSummaryParams,
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: onboardingSummaryQueryKey(params),
@@ -21,5 +22,6 @@ export function useOnboardingDashboardSummary(
       getOnboardingDashboardSummary(params),
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: options?.enabled,
   })
 }

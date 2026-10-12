@@ -27,6 +27,7 @@ export function isUserGoogle(departmentType?: string | null): boolean {
   if (
     typeof window !== 'undefined' &&
     (window.location.pathname.startsWith('/google-head') ||
+     window.location.pathname.startsWith('/google-user') ||
      window.location.pathname.startsWith('/google'))
   ) {
     return true
@@ -34,12 +35,14 @@ export function isUserGoogle(departmentType?: string | null): boolean {
   return false
 }
 
-export function buildGoogleRoute(slug: string, _role?: string): string {
+export function buildGoogleRoute(slug: string, role?: string): string {
+  const isUser = role === 'USER'
   const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
+  const base = isUser ? '/google-user' : '/google-head'
   if (normalizedSlug === 'dashboard') {
-    return '/google-head'
+    return base
   }
-  return `/google-head/${normalizedSlug}`
+  return `${base}/${normalizedSlug}`
 }
 
 export function buildDepartmentRoute(
@@ -63,6 +66,20 @@ export function resolveSlugFromPath(
   portalRole?: HeadRole | string,
 ): string {
   const p = pathname.replace(/\/+$/, '')
+
+  if (p === '/google-user' || p === '/google-user/dashboard') {
+    return 'dashboard'
+  }
+
+  if (p.startsWith('/google-user/')) {
+    const s = p.replace('/google-user/', '')
+    return s === 'customer-list' ? 'customers' : s
+  }
+
+  if (p.startsWith('/google-user-')) {
+    const s = p.replace('/google-user-', '')
+    return s === 'customer-list' ? 'customers' : s
+  }
 
   if (p === '/google-head' || p === '/google-head/dashboard') {
     return 'dashboard'

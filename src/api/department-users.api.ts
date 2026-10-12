@@ -144,10 +144,25 @@ export async function getDepartmentUsers(params: {
   )
 
   // Backend returns data as List<DepartmentUsersResponse> with one element
-  // The actual users are in data[0].users
-  const responseData = Array.isArray(res?.data) ? res.data : []
-  const headUserResponse = responseData[0]
-  const items = headUserResponse?.users ?? []
+  // The actual users are in data[0].users or directly in data
+  let rawUsers: DepartmentUserApiItem[] = []
+  if (Array.isArray(res?.data) && res.data.length > 0) {
+    const first: any = res.data[0]
+    if (Array.isArray(first?.users)) {
+      rawUsers = first.users
+    } else if (Array.isArray(first?.departmentSubUsers)) {
+      rawUsers = first.departmentSubUsers
+    } else if (first?.email || first?.username) {
+      rawUsers = res.data as any
+    }
+  } else if (Array.isArray((res as any)?.users)) {
+    rawUsers = (res as any).users
+  }
+
+  const items = rawUsers.map((u: any) => ({
+    ...u,
+    isSeniorUser: u.seniorUser !== undefined ? u.seniorUser : u.isSeniorUser,
+  }))
 
   return {
     data: items,
@@ -422,6 +437,96 @@ export async function createDepartmentUser(
   })
 }
 
+export interface UpdateDepartmentUserRequest {
+  id: string | number
+  username?: string
+  email?: string
+  password?: string
+  phoneNumber?: string
+  target?: number
+  departmentType?: string
+  role?: string
+  isHead?: boolean
+}
+
+export interface UpdateDepartmentUserResponse {
+  id: string
+  username: string
+  email: string
+  role: string
+  departmentType: string
+  createdAt: string
+  updatedAt: string
+  isHead: boolean
+  headUser: string
+}
+
+/**
+ * `PUT /api/auth/department/update?action=edit`
+ * Updates department user under a head.
+ */
+export async function updateDepartmentUser(
+  data: UpdateDepartmentUserRequest,
+): Promise<UpdateDepartmentUserResponse> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+  const rawDepartment = session?.user?.departmentType || ''
+  const isGoogle =
+    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google'))
+  const departmentType =
+    data.departmentType || (isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT'))
+
+  const body = {
+    ...data,
+    departmentType,
+    headUser: headEmail,
+  }
+
+  return authedApiRequest<any>('/api/auth/department/update?action=edit', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      username: headEmail,
+    },
+    body: JSON.stringify(body),
+  }).then((res) => {
+    if (res && res.success === false) {
+      throw new Error(res.message || 'Failed to update user')
+    }
+    return res.data || res
+  })
+}
+
+export interface DeleteDepartmentUserRequest {
+  id: string | number
+}
+
+/**
+ * `PUT /api/auth/department/update?action=delete`
+ * Deletes department user.
+ */
+export async function deleteDepartmentUser(
+  data: DeleteDepartmentUserRequest,
+): Promise<any> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+
+  return authedApiRequest<any>('/api/auth/department/update?action=delete', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      username: headEmail,
+    },
+    body: JSON.stringify(data),
+  }).then((res) => {
+    if (res && res.success === false) {
+      throw new Error(res.message || 'Failed to delete user')
+    }
+    return res.data || res
+  })
+}
+
 export interface AssignCustomerRequest {
   customerId: number | string
   assignedUserEmail: string
@@ -456,6 +561,63 @@ export async function assignCustomerUser(params: AssignCustomerRequest): Promise
       username,
     },
     body: JSON.stringify(body),
+  })
+}
+
+/**
+ * `PUT /api/auth/onboarding/update/{customerId}?updatedStatus={updatedStatus}`
+ * Updates customer onboarding status in backend DB.
+ */
+export async function updateOnboardingStatus(
+  customerId: string | number,
+  updatedStatus: string,
+): Promise<any> {
+  const newStatusStr = updatedStatus.toUpperCase().replace(/-/g, '_')
+  const endpoint = `/api/auth/onboarding/update/${customerId}?updatedStatus=${encodeURIComponent(newStatusStr)}`
+  try {
+    return await authedApiRequest<any>(endpoint, {
+      method: 'PUT',
+    })
+  } catch (err: any) {
+    if (err?.status === 405) {
+      return await authedApiRequest<any>(endpoint, {
+        method: 'POST',
+      })
+    }
+    throw err
+  }
+}
+
+export interface SendOnboardingConfirmationParams {
+  recipientUsername: string
+  contact: string
+  isDuplicate?: boolean
+  domainConnect?: boolean
+  themeSelection?: boolean
+}
+
+/**
+ * `POST /api/smtp/onboarding/confirmation`
+ * Sends an onboarding acknowledgement email to the customer with confirmation link.
+ */
+export async function sendOnboardingConfirmationMail(
+  params: SendOnboardingConfirmationParams,
+): Promise<any> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const search = new URLSearchParams({
+    recipientUsername: params.recipientUsername,
+    contact: params.contact,
+    isDuplicate: String(Boolean(params.isDuplicate)),
+    domainConnect: String(Boolean(params.domainConnect)),
+    themeSelection: String(Boolean(params.themeSelection)),
+  })
+
+  return authedApiRequest<any>(`/api/smtp/onboarding/confirmation?${search.toString()}`, {
+    method: 'POST',
+    headers: {
+      username,
+    },
   })
 }
 

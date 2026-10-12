@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Outlet, useLocation, useNavigate } from '@tanstack/react-router'
 import { HeadShell } from '../../../../components/head/layout/HeadShell'
 import { useHeadNav } from '../hooks/useHeadNav'
@@ -19,6 +19,7 @@ import { resolveSlugFromPath } from '../utils/routeUtils'
 
 interface HeadConsoleLayoutProps {
   portalRole: HeadRole
+  children?: ReactNode
 }
 
 /**
@@ -26,7 +27,7 @@ interface HeadConsoleLayoutProps {
  * from the admin-managed feature permissions; the
  * topbar title follows the current slug.
  */
-export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
+export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const session = getSession()
@@ -103,7 +104,7 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
         )
       }
     >
-      <Outlet />
+      {children ?? <Outlet />}
     </HeadShell>
   )
 }

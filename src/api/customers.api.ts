@@ -1,3 +1,6 @@
+import { authedApiRequest } from './client'
+import { getSession } from '../app/auth/session'
+import { updateOnboardingStatus } from './department-users.api'
 import {
   delay,
   customers,
@@ -52,20 +55,77 @@ export async function createCustomer(
 export async function updateCustomer(
   id: string,
   data: UpdateCustomerRequest,
-): Promise<Customer> {
-  await delay()
+): Promise<any> {
+  const session = getSession()
+  const customer = customers.find((c) => c.id === id)
 
-  const customer = customers.find(
-    (item) => item.id === id,
-  )
+  const departmentType = session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const username = session?.user?.email || session?.user?.username || ''
 
-  if (!customer) {
-    throw new Error('Customer not found')
+  // Remark Update
+  if (data.remark !== undefined) {
+    const remarkPayload = {
+      customerId: id,
+      action: 'EDIT',
+      departmentType,
+      username,
+      remark: data.remark,
+    }
+    await authedApiRequest<any>('/api/auth/customers/manage', {
+      method: 'POST',
+      body: JSON.stringify(remarkPayload)
+    })
   }
 
-  Object.assign(customer, data)
+  // Status Update
+  const rawStatus = data.onboardingStatus ?? data.status
+  if (rawStatus !== undefined) {
+    const newStatusStr = rawStatus.toUpperCase().replace(/-/g, '_')
 
-  return structuredClone(customer)
+    try {
+      await updateOnboardingStatus(id, newStatusStr)
+    } catch (e) {
+      console.error('Failed to update status via /api/auth/onboarding/update:', e)
+      try {
+        const oldStatusStr = (customer?.onboardingStatus || customer?.status || '').toUpperCase().replace(/-/g, '_')
+        const statusPayload = {
+          customerId: id,
+          newStatus: newStatusStr,
+          username,
+          departmentType,
+          oldStatus: oldStatusStr
+        }
+        await authedApiRequest<any>('/api/auth/update/service', {
+          method: 'POST',
+          body: JSON.stringify(statusPayload)
+        })
+      } catch (serviceErr) {
+        console.error('Failed to update status via /api/auth/update/service:', serviceErr)
+        throw e
+      }
+    }
+  }
+
+  // Assignee Update
+  if (data.assigneeId !== undefined) {
+    const assignPayload = {
+      customerId: id,
+      departmentUserId: data.assigneeId,
+      departmentType
+    }
+    
+    await authedApiRequest<any>('/api/auth/customer-service/assign-user', {
+      method: 'POST',
+      body: JSON.stringify(assignPayload)
+    })
+  }
+
+  if (customer) {
+    Object.assign(customer, data)
+    return structuredClone(customer)
+  }
+
+  return { id, ...data }
 }
 
 export async function deleteCustomer(
