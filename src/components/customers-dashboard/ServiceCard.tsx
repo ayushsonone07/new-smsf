@@ -8,7 +8,8 @@ interface ServiceCardProps {
 export function ServiceCard({ service }: ServiceCardProps) {
   const { categoryName, dotColor = 'blue', status, completedCount, totalCount, tasks } = service
 
-  const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const hasProgress = completedCount !== undefined && totalCount !== undefined && totalCount > 0
+  const percent = hasProgress ? Math.round((completedCount / totalCount) * 100) : 0
 
   function renderTaskStatusIcon(taskStatus: ServiceTaskStatus) {
     if (taskStatus === 'Completed') {
@@ -53,17 +54,19 @@ export function ServiceCard({ service }: ServiceCardProps) {
       </div>
 
       {/* Progress Track */}
-      <div className="cdb-svc-progress-row">
-        <div className="cdb-svc-track">
-          <div className="cdb-svc-fill" style={{ width: `${percent}%` }} />
+      {hasProgress ? (
+        <div className="cdb-svc-progress-row">
+          <div className="cdb-svc-track">
+            <div className="cdb-svc-fill" style={{ width: `${percent}%` }} />
+          </div>
+          <span className="cdb-svc-fraction">
+            {completedCount}/{totalCount}
+          </span>
         </div>
-        <span className="cdb-svc-fraction">
-          {completedCount}/{totalCount}
-        </span>
-      </div>
+      ) : null}
 
       {/* Tasks List */}
-      <div className="cdb-svc-tasks">
+      {tasks.length ? <div className="cdb-svc-tasks">
         {tasks.map((t) => (
           <div key={t.id} className="cdb-svc-task-item">
             <div className="cdb-svc-task-left">
@@ -76,7 +79,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
             </span>
           </div>
         ))}
-      </div>
+      </div> : null}
     </div>
   )
 }

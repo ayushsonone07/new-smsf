@@ -14,6 +14,7 @@ import {
   homeForRole,
   setSession,
 } from '../../../app/auth/session'
+import { setCustomerSessionFromAuth } from '../../customers/hooks/useCustomerSession'
 import type { AuthSession } from '../types/auth.types'
 
 export function LoginPage() {
@@ -32,6 +33,9 @@ export function LoginPage() {
   const handleSessionCreated = useCallback(
     (session: AuthSession) => {
       setSession(session)
+      if (session.user.role === 'CUSTOMER') {
+        setCustomerSessionFromAuth(session)
+      }
       navigate({
         to: homeForRole(
           session.user.role as never,
@@ -184,7 +188,6 @@ export function LoginPage() {
     </main>
   )
 }
-
 
 
 

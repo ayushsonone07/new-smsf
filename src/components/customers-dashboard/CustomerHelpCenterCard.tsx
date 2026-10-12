@@ -44,8 +44,8 @@ export function CustomerHelpCenterCard({
       setSubject('')
       setDescription('')
       setIsFormOpen(false)
-    } catch {
-      setErrorMsg('Failed to submit ticket. Please try again.')
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Failed to submit ticket. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

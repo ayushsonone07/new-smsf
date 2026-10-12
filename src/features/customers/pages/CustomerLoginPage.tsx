@@ -3,43 +3,22 @@ import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Icon } from '../../../components/head/shared/Icon'
-import { useCustomerSession } from '../hooks/useCustomerSession'
+import { setCustomerSessionFromAuth } from '../hooks/useCustomerSession'
+import { setSession } from '../../../app/auth/session'
+import { useLoginWithCredentials } from '../../auth/hooks/useLoginWithCredentials'
 import './CustomerLoginPage.css'
-
-const TEST_CREDENTIALS = {
-  email: 'customer@demo.com',
-  password: 'demo123',
-}
-
-const DEMO_CUSTOMERS = [
-  {
-    id: 'cust-1',
-    departmentId: 'dept-1',
-    name: 'Aarav Sharma',
-    email: 'customer@demo.com',
-    phone: '+1 555 0101',
-    company: 'Northwind Traders',
-    status: 'ACTIVE' as const,
-    createdAt: '2026-01-15T09:15:00.000Z',
-    onboardingStatus: 'in-progress' as const,
-    callStatus: 'connected' as const,
-    assigneeId: 'u-1',
-    remark: '',
-    updatedLabel: 'Just now',
-  },
-]
 
 export function CustomerLoginPage() {
   const navigate = useNavigate()
-  const { login } = useCustomerSession()
+  const credentialsMutation = useLoginWithCredentials()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const isLoading = credentialsMutation.isPending
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
 
@@ -53,18 +32,17 @@ export function CustomerLoginPage() {
       return
     }
 
-    setIsLoading(true)
-
-    setTimeout(() => {
-      if (email === TEST_CREDENTIALS.email && password === TEST_CREDENTIALS.password) {
-        const customer = DEMO_CUSTOMERS[0]
-        login(customer)
-        navigate({ to: '/customers' })
-      } else {
-        setError('Invalid email or password. Use customer@demo.com / demo123')
+    try {
+      const session = await credentialsMutation.mutateAsync({ email, password })
+      if (session.user.role !== 'CUSTOMER') {
+        throw new Error('This account is not a customer account.')
       }
-      setIsLoading(false)
-    }, 500)
+      setSession(session)
+      setCustomerSessionFromAuth(session)
+      navigate({ to: '/customers' })
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Sign in failed. Please try again.')
+    }
   }
 
   return (
@@ -101,7 +79,7 @@ export function CustomerLoginPage() {
               required
               value={email}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              placeholder="customer@demo.com"
+              placeholder="name@example.com"
               autoComplete="email"
               disabled={isLoading}
             />
@@ -140,10 +118,6 @@ export function CustomerLoginPage() {
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
-
-        <div className="cust-auth-demo-hint">
-          <strong>Demo:</strong> customer@demo.com / demo123
-        </div>
       </div>
     </main>
   )
