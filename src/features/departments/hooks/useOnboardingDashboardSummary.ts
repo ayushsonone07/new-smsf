@@ -20,6 +20,7 @@ export function useOnboardingDashboardSummary(
     queryKey: onboardingSummaryQueryKey(params),
     queryFn: () =>
       getOnboardingDashboardSummary(params),
+    staleTime: 30_000,
     enabled: options?.enabled,
   })
 }
