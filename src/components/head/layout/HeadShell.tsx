@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HeadSidebar } from './HeadSidebar'
 import { HeadTopbar } from './HeadTopbar'
 import { NotificationCenter } from './NotificationCenter'
+import { HeadShellContext } from './HeadShellContext'
 import type {
   HeadAccount,
   HeadNavItem,
@@ -61,7 +62,21 @@ export function HeadShell({
   defaultSidebarOpen = true,
   dashboardHeaderMode = false,
 }: HeadShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen)
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () =>
+      defaultSidebarOpen &&
+      (typeof window === 'undefined' || window.innerWidth > 1024),
+  )
+
+  const toggleSidebar = useCallback(
+    () => setSidebarOpen((value) => !value),
+    [],
+  )
+
+  const shellContext = useMemo(
+    () => ({ toggleSidebar }),
+    [toggleSidebar],
+  )
 
   return (
     <NotificationCenter
@@ -69,6 +84,7 @@ export function HeadShell({
       roleLabel={roleLabel}
       onMarkAllRead={onMarkAllRead}
     >
+    <HeadShellContext.Provider value={shellContext}>
     <div className="hshell">
       {/* Mobile backdrop — closes sidebar on tap */}
       <div
@@ -79,7 +95,7 @@ export function HeadShell({
 
       <HeadSidebar
         open={sidebarOpen}
-        onToggle={() => setSidebarOpen((value) => !value)}
+        onToggle={toggleSidebar}
         roleLabel={roleLabel}
         items={navItems}
         secondaryItems={secondaryNavItems}
@@ -101,7 +117,7 @@ export function HeadShell({
             title={title}
             subtitle={subtitle}
             actions={topbarActions}
-            onToggleSidebar={() => setSidebarOpen((v) => !v)}
+            onToggleSidebar={toggleSidebar}
           >
             {topbarContent}
           </HeadTopbar>
@@ -110,6 +126,7 @@ export function HeadShell({
         <div className={`hbody${dashboardHeaderMode ? ' hbody--dashboard' : ''}`}>{children}</div>
       </main>
     </div>
+    </HeadShellContext.Provider>
     </NotificationCenter>
   )
 }

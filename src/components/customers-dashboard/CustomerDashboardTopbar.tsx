@@ -3,15 +3,28 @@ import { useNotificationCenter } from '../head/layout/NotificationCenter'
 
 interface CustomerDashboardTopbarProps {
   notificationCount?: number
+  onToggleSidebar?: () => void
 }
 
 export function CustomerDashboardTopbar({
   notificationCount = 3,
+  onToggleSidebar,
 }: CustomerDashboardTopbarProps) {
   const notificationCenter = useNotificationCenter()
   const count = notificationCenter?.unreadCount ?? notificationCount
   return (
     <header className="cdb-topbar">
+      {onToggleSidebar ? (
+        <button
+          type="button"
+          className="cdb-topbar-menu"
+          aria-label="Toggle navigation"
+          onClick={onToggleSidebar}
+        >
+          <Icon name="menu" size={18} />
+        </button>
+      ) : null}
+
       <div className="cdb-topbar-left">
         <h1 className="cdb-topbar-title">Customer Dashboard</h1>
         <p className="cdb-topbar-subtitle">
