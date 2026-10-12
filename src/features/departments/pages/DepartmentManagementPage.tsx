@@ -104,6 +104,7 @@ export function DepartmentManagementPage() {
       onSuccess: () => {
         setShowCreateModal(false)
         setPreselectedService(null)
+        setActiveTab('departments')
       },
     })
   }
@@ -273,7 +274,7 @@ export function DepartmentManagementPage() {
             cursor: 'pointer',
           }}
         >
-          🛠 Service List (Step 1: Create Service)
+          ➕ Create Department
         </button>
       </div>
 
@@ -287,7 +288,7 @@ export function DepartmentManagementPage() {
       {activeTab === 'services' ? (
         <AdminServiceListCard
           onCreateDepartmentForService={(service) => {
-            setPreselectedService(service)
+            setPreselectedService(service ?? null)
             setShowCreateModal(true)
           }}
         />
@@ -317,18 +318,9 @@ export function DepartmentManagementPage() {
                 <span>＋</span> Add Dynamic Column
               </Button>
               <Button
-                variant="secondary"
-                onClick={() => setShowAddServiceModal(true)}
+                onClick={() => setActiveTab('services')}
               >
-                <span>＋</span> Step 1: Create Service
-              </Button>
-              <Button
-                onClick={() => {
-                  setPreselectedService(null)
-                  setShowCreateModal(true)
-                }}
-              >
-                <span>＋</span> Step 2: Create Department Login
+                <span>➕</span> Create Department
               </Button>
             </div>
           </div>

@@ -34,8 +34,8 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     to: '/admin/services',
-    label: 'Services List',
-    icon: '🛠',
+    label: 'Create Department',
+    icon: '➕',
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/services') ||

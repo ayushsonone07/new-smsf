@@ -93,18 +93,38 @@ export function DepartmentFormModal({
   )
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
+  const [lastInitialServiceId, setLastInitialServiceId] = useState<
+    number | string | null
+  >(null)
 
   const isEdit = Boolean(department)
 
   // Build dropdown options from all created Services in Superadmin -> ServiceList,
-  // plus any fallback department types so every service & department is selectable.
+  // plus initialService (if newly created) and any fallback department types.
   const serviceDropdownOptions = useMemo<ServiceDropdownOption[]>(() => {
     const options: ServiceDropdownOption[] = []
+    const seenServiceKeys = new Set<string>()
     const seenDeptTypes = new Set<string>()
 
-    for (const srv of adminServices) {
+    const allServices = initialService
+      ? [
+          initialService,
+          ...adminServices.filter(
+            (s) =>
+              !(
+                s.id === initialService.id ||
+                (s.serviceType === initialService.serviceType &&
+                  s.departmentType === initialService.departmentType)
+              ),
+          ),
+        ]
+      : adminServices
+
+    for (const srv of allServices) {
       if (!srv.departmentType) continue
       const key = `srv:${srv.id}:${srv.serviceType}:${srv.departmentType}`
+      if (seenServiceKeys.has(key)) continue
+      seenServiceKeys.add(key)
       options.push({
         key,
         label: `${srv.serviceType} — (${srv.departmentType})${
@@ -132,10 +152,15 @@ export function DepartmentFormModal({
     }
 
     return options
-  }, [adminServices, departmentTypes])
+  }, [adminServices, departmentTypes, initialService])
 
-  if (open !== wasOpen) {
+  const currentInitialKey = initialService
+    ? `${initialService.id}:${initialService.serviceType}:${initialService.departmentType}`
+    : null
+
+  if (open !== wasOpen || (open && currentInitialKey !== lastInitialServiceId)) {
     setWasOpen(open)
+    setLastInitialServiceId(currentInitialKey)
 
     if (open) {
       setName(department?.name ?? '')
