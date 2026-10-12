@@ -152,6 +152,25 @@
   position: relative;
 }
 
+/* Mobile-only sidebar toggle shown inside the dashboard banner. */
+.hdb-banner__menu {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.hdb-banner__menu:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .hdb-banner__badge {
   position: absolute;
   top: -4px;
@@ -1790,6 +1809,9 @@
 
 /* ── 1024px: tablet landscape ── */
 @media (max-width: 1024px) {
+  .hdb-banner__menu {
+    display: grid;
+  }
   .hdb-banner {
     flex-wrap: wrap;
   }
