@@ -57,7 +57,10 @@ const indexRoute = createRoute({
 
     throw redirect({
       to: session
-        ? homeForRole(session.user.role as never) as never
+        ? (homeForRole(
+            session.user.role as never,
+            session.user.departmentType,
+          ) as never)
         : '/login',
     })
   },

@@ -29,7 +29,6 @@ import { useMemberDetails } from '../../hooks/useMemberDetails'
 import { generateDepartmentSession } from '../../../../api/auth.api'
 import {
   getSession,
-  saveAdminBackup,
   homeForRole,
   openSessionInNewTab,
 } from '../../../../app/auth/session'
@@ -107,11 +106,10 @@ export function DepartmentUsersPage() {
       return
     }
 
+    const newWindow = window.open('', '_blank')
+
     try {
       const currentSession = getSession()
-      if (currentSession) {
-        saveAdminBackup(currentSession)
-      }
 
       const newSession = await generateDepartmentSession(email)
       const targetRoute = homeForRole(
@@ -119,8 +117,11 @@ export function DepartmentUsersPage() {
         newSession.user.departmentType,
       )
 
-      openSessionInNewTab(newSession, targetRoute)
+      openSessionInNewTab(newSession, targetRoute, newWindow, currentSession)
     } catch (err: unknown) {
+      if (newWindow) {
+        newWindow.close()
+      }
       console.error('Failed to log in as department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to log in as user'
       alert(`Login failed: ${msg}`)

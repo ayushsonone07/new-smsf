@@ -9,8 +9,7 @@ const ADMIN_BACKUP_KEY = 'smsf.auth.admin-backup'
 
 export function getSession(): AuthSession | null {
   try {
-    const raw =
-      sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY)
+    const raw = sessionStorage.getItem(SESSION_KEY)
 
     if (!raw) {
       return null
@@ -29,18 +28,36 @@ export function setSession(
     SESSION_KEY,
     JSON.stringify(session),
   )
-  // Also store in localStorage as fallback for cold tab loads
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify(session),
-  )
+  sessionStorage.setItem('token', session.token)
+  sessionStorage.setItem('role', session.user.role)
+  if (session.user.departmentType) {
+    sessionStorage.setItem('departmentType', session.user.departmentType)
+  }
+
+  // Clear any legacy localStorage session to avoid cross-tab bleeding
+  try {
+    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(ADMIN_BACKUP_KEY)
+    localStorage.removeItem('token')
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY)
   sessionStorage.removeItem(ADMIN_BACKUP_KEY)
-  localStorage.removeItem(SESSION_KEY)
-  localStorage.removeItem(ADMIN_BACKUP_KEY)
+  sessionStorage.removeItem('token')
+  sessionStorage.removeItem('role')
+  sessionStorage.removeItem('departmentType')
+
+  try {
+    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(ADMIN_BACKUP_KEY)
+    localStorage.removeItem('token')
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 /** Parks the current (admin) session before switching to a department. */
@@ -51,18 +68,11 @@ export function saveAdminBackup(
     ADMIN_BACKUP_KEY,
     JSON.stringify(session),
   )
-  localStorage.setItem(
-    ADMIN_BACKUP_KEY,
-    JSON.stringify(session),
-  )
 }
 
 export function getAdminBackup(): AuthSession | null {
   try {
-    const raw =
-      sessionStorage.getItem(ADMIN_BACKUP_KEY) ||
-      localStorage.getItem(ADMIN_BACKUP_KEY)
-
+    const raw = sessionStorage.getItem(ADMIN_BACKUP_KEY)
     return raw ? (JSON.parse(raw) as AuthSession) : null
   } catch {
     return null
@@ -82,7 +92,6 @@ export function restoreAdminSession(): boolean {
 
   setSession(backup)
   sessionStorage.removeItem(ADMIN_BACKUP_KEY)
-  localStorage.removeItem(ADMIN_BACKUP_KEY)
 
   return true
 }
@@ -94,17 +103,28 @@ export function restoreAdminSession(): boolean {
 export function openSessionInNewTab(
   session: AuthSession,
   targetRoute: string,
+  existingWindow?: Window | null,
+  backupSession?: AuthSession | null,
 ): void {
-  const newWindow = window.open('', '_blank')
+  let targetWin = existingWindow
 
-  if (!newWindow) {
-    // Popup was blocked by browser, fallback to same tab
+  if (!targetWin) {
+    try {
+      targetWin = window.open('', '_blank')
+    } catch {
+      targetWin = null
+    }
+  }
+
+  if (!targetWin) {
+    // Popup was blocked by browser or unavailable, fallback to same tab
     setSession(session)
     window.location.href = targetRoute
     return
   }
 
   const sessionJson = JSON.stringify(session)
+  const backupJson = backupSession ? JSON.stringify(backupSession) : null
 
   const htmlContent = `<!DOCTYPE html>
 <html>
@@ -151,6 +171,10 @@ export function openSessionInNewTab(
     <script>
       try {
         sessionStorage.setItem('smsf.auth.session', ${JSON.stringify(sessionJson)});
+        sessionStorage.setItem('token', ${JSON.stringify(session.token)});
+        sessionStorage.setItem('role', ${JSON.stringify(session.user.role)});
+        ${session.user.departmentType ? `sessionStorage.setItem('departmentType', ${JSON.stringify(session.user.departmentType)});` : ''}
+        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});` : ''}
         window.location.replace('${targetRoute}');
       } catch (e) {
         console.error('Failed to set session in sessionStorage', e);
@@ -160,9 +184,13 @@ export function openSessionInNewTab(
   </body>
 </html>`
 
-  newWindow.document.open()
-  newWindow.document.write(htmlContent)
-  newWindow.document.close()
+  try {
+    targetWin.document.open()
+    targetWin.document.write(htmlContent)
+    targetWin.document.close()
+  } catch {
+    targetWin.location.href = targetRoute
+  }
 }
 
 export type HomeRoute =

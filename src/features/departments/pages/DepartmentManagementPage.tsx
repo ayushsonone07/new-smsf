@@ -8,8 +8,7 @@ import { useLoginAsDepartment } from '../../auth/hooks/useLoginAsDepartment'
 import {
   getSession,
   homeForRole,
-  saveAdminBackup,
-  setSession,
+  openSessionInNewTab,
 } from '../../../app/auth/session'
 import type {
   CreateDepartmentRequest,
@@ -131,28 +130,34 @@ export function DepartmentManagementPage() {
 
   /**
    * Home button: generate a token for the department's email
-   * (GET /api/auth/generate-token?username=<email>) and sign
-   * the admin in as that department.
+   * (GET /api/auth/generate-token?username=<email>) and open
+   * that department in a NEW tab with its own isolated sessionStorage.
+   * The admin page stays intact in the current tab with all data!
    */
   function handleLoginAsDepartment(
     department: Department,
   ) {
     loginAsMutation.reset()
 
+    // Open a blank window synchronously during the user click event to prevent popup blockers
+    const newWindow = window.open('', '_blank')
+    const adminSession = getSession()
+
     loginAsMutation.mutate(department.email, {
       onSuccess: (session) => {
-        const adminSession = getSession()
+        const targetRoute = homeForRole(
+          session.user.role,
+          session.user.departmentType,
+        )
 
-        // Keep the admin session so "Back to my account" works.
-        if (adminSession?.user.role === 'ADMIN') {
-          saveAdminBackup(adminSession)
+        openSessionInNewTab(session, targetRoute, newWindow, adminSession)
+      },
+      onError: (err) => {
+        if (newWindow) {
+          newWindow.close()
         }
-
-        setSession(session)
-
-        navigate({
-          to: homeForRole(session.user.role) as never,
-        })
+        console.error('Failed to log in as department:', err)
+        alert(`Login failed: ${err.message}`)
       },
     })
   }
