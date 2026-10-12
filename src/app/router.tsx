@@ -14,6 +14,7 @@ import { clearSession, getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
+import { ServicesListPage } from '../features/departments/pages/ServicesListPage'
 import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
 import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
 import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
@@ -138,6 +139,20 @@ const adminRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin',
   component: DepartmentManagementPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminServicesRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/services',
+  component: ServicesListPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const servicesAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/services',
+  component: ServicesListPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -706,6 +721,8 @@ const routeTree = rootRoute.addChildren([
   ]),
   authedLayoutRoute.addChildren([
     adminRoute,
+    adminServicesRoute,
+    servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
     accessTokensRoute,

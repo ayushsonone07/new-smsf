@@ -212,6 +212,41 @@ export async function getOnboardingDashboardSummary(
 ): Promise<OnboardingDashboardSummary> {
   const dept = params.department ?? summaryDepartment()
 
+  // 1. Primary: fetch from /api/auth/onboarding/summary
+  try {
+    const authData = await getAuthOnboardingSummary({
+      department: dept,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      allTime: params.allTime,
+    })
+
+    if (
+      authData &&
+      (authData.totalCustomers !== undefined ||
+        authData.total !== undefined ||
+        authData.teamTarget !== undefined)
+    ) {
+      return normalizeAuthSummaryToDashboardSummary(authData, {
+        startDate: params.startDate,
+        endDate: params.endDate,
+        allTime: params.allTime,
+      })
+    }
+    // If /api/auth/onboarding/summary returned 200 OK with data: null (e.g. newly created department),
+    // return a valid zero-initialized summary without throwing an error
+    if (authData === null) {
+      return normalizeAuthSummaryToDashboardSummary({}, {
+        startDate: params.startDate,
+        endDate: params.endDate,
+        allTime: params.allTime,
+      })
+    }
+  } catch (err) {
+    console.warn('Could not fetch from /api/auth/onboarding/summary, falling back:', err)
+  }
+
+  // 2. Fallback: /api/onboarding/dashboard/summary
   const search = new URLSearchParams()
 
   search.set(
@@ -234,6 +269,14 @@ export async function getOnboardingDashboardSummary(
   const res = await authedApiRequest<
     ApiDataWrapper<OnboardingDashboardSummary> & OnboardingDashboardSummary
   >(`/api/onboarding/dashboard/summary?${search.toString()}`)
+
+  if (res && 'data' in res && res.data === null) {
+    return normalizeAuthSummaryToDashboardSummary({}, {
+      startDate: params.startDate,
+      endDate: params.endDate,
+      allTime: params.allTime,
+    })
+  }
 
   return (res?.data ?? res) as OnboardingDashboardSummary
 }
@@ -330,8 +373,12 @@ export async function getAuthOnboardingSummary(
   }
 
   const res = await authedApiRequest<
-    { data?: AuthOnboardingSummary } & AuthOnboardingSummary
+    { data?: AuthOnboardingSummary | null } & AuthOnboardingSummary
   >(`/api/auth/onboarding/summary?${search.toString()}`)
+
+  if (res && 'data' in res && res.data === null) {
+    return null as unknown as AuthOnboardingSummary
+  }
 
   return (res?.data ?? res) as AuthOnboardingSummary
 }
