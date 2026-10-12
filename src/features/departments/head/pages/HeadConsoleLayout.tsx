@@ -103,6 +103,7 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
           items.map((item) => ({ ...item, unread: false })),
         )
       }
+      dashboardHeaderMode={feature?.screen === 'dashboard'}
     >
       {children ?? <Outlet />}
     </HeadShell>

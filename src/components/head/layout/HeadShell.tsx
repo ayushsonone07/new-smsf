@@ -33,6 +33,7 @@ interface HeadShellProps {
   /* page */
   children: ReactNode
   defaultSidebarOpen?: boolean
+  dashboardHeaderMode?: boolean
 }
 
 /**
@@ -59,6 +60,7 @@ export function HeadShell({
   impersonating,
   children,
   defaultSidebarOpen = true,
+  dashboardHeaderMode = false,
 }: HeadShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen)
 
@@ -90,16 +92,18 @@ export function HeadShell({
       />
 
       <main className="hmain">
-        <HeadTopbar
-          title={title}
-          subtitle={subtitle}
-          actions={topbarActions}
-          notifications={notifications}
-          onMarkAllRead={onMarkAllRead}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        >
-          {topbarContent}
-        </HeadTopbar>
+        {!dashboardHeaderMode && (
+          <HeadTopbar
+            title={title}
+            subtitle={subtitle}
+            actions={topbarActions}
+            notifications={notifications}
+            onMarkAllRead={onMarkAllRead}
+            onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          >
+            {topbarContent}
+          </HeadTopbar>
+        )}
 
         {impersonating ? (
           <ImpersonationBanner
@@ -108,7 +112,7 @@ export function HeadShell({
           />
         ) : null}
 
-        <div className="hbody">{children}</div>
+        <div className={`hbody${dashboardHeaderMode ? ' hbody--dashboard' : ''}`}>{children}</div>
       </main>
     </div>
   )
