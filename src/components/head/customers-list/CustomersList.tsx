@@ -188,6 +188,16 @@ export function CustomersList({
   return (
     <div className="cl-table-wrapper">
       <table className="cl-table">
+        <colgroup>
+          <col className="cl-col cl-col--num" />
+          {showBusiness && <col className="cl-col cl-col--biz" />}
+          {showContact && <col className="cl-col cl-col--contact" />}
+          {showServiceType && <col className="cl-col cl-col--service" />}
+          {showStatus && <col className="cl-col cl-col--status" />}
+          {showAssignTo && <col className="cl-col cl-col--assign" />}
+          {showRemark && <col className="cl-col cl-col--remark" />}
+          {showUpdated && <col className="cl-col cl-col--updated" />}
+        </colgroup>
         <thead>
           <tr>
             <th className="cl-th cl-th--num">#</th>
@@ -348,6 +358,7 @@ function AssigneeDropdown({
       <button
         type="button"
         className="cl-assign-btn"
+        title={matchedAssignee ? matchedAssignee.name : assigneeId || 'Unassigned'}
         onClick={() => setIsOpen((o) => !o)}
         disabled={!isEditable}
         aria-expanded={isOpen}
@@ -673,7 +684,7 @@ function CustomerRow({
               type="button"
               className="cl-biz-name cl-biz-name--link"
               onClick={() => onOpenDetail()}
-              title="View customer detail"
+              title={customer.businessName}
             >
               {customer.businessName}
             </button>
@@ -768,7 +779,7 @@ function CustomerRow({
             )}
           </div>
 
-          <div className="cl-biz-meta">
+          <div className="cl-biz-meta" title={`${customer.contactName} · ${customer.contactDate}`}>
             {customer.contactName} · {customer.contactDate}
           </div>
         </td>
@@ -777,10 +788,10 @@ function CustomerRow({
       {/* Contact */}
       {showContact && (
         <td className="cl-td" data-label="Contact">
-          <div className="cl-email">{customer.email}</div>
+          <div className="cl-email" title={customer.email}>{customer.email}</div>
 
           <div className="cl-phone-row">
-            <span className="cl-phone-text">{customer.phone}</span>
+            <span className="cl-phone-text" title={customer.phone}>{customer.phone}</span>
             <button
               type="button"
               className="cl-icon-micro"
@@ -1102,11 +1113,7 @@ function CustomerRow({
                     startEditing()
                   }
                 }}
-                title={
-                  (canEditRemark !== undefined ? canEditRemark : canEdit)
-                    ? 'Click to edit remark'
-                    : 'Read-only remark'
-                }
+                title={customer.remark || 'Add remark...'}
               >
                 {customer.remark || 'Add remark...'}
                 

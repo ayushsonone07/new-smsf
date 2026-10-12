@@ -395,6 +395,7 @@
 .cl-table {
   width: 100%;
   min-width: 1000px;   /* below this the wrapper scrolls; under 768px it becomes cards */
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13.5px;
 }
@@ -418,18 +419,18 @@
 }
 
 .cl-th--num {
-  width: 52px;
   padding-left: 18px;
 }
 
-/* percentages so the columns share the width the same way on every screen */
-.cl-th--biz     { width: 24%; }
-.cl-th--contact { width: 20%; }
-.cl-th--status  { width: 13%; }
-.cl-th--assign  { width: 16%; }
-.cl-th--remark  { width: 17%; }
-/* .cl-th--updated uses remaining space */
-/* .cl-th--updated uses remaining space */
+/* Keep the number column compact. Business is the flexible column that
+   absorbs spare width, preventing empty space from appearing before it. */
+.cl-col--num     { width: 60px; }
+.cl-col--contact { width: 22%; }
+.cl-col--service { width: 14%; }
+.cl-col--status  { width: 13%; }
+.cl-col--assign  { width: 17%; }
+.cl-col--remark  { width: 18%; }
+.cl-col--updated { width: 11%; }
 
 /* ── Table body ───────────────────────────────────────────── */
 
@@ -437,6 +438,19 @@
   padding: 10px 16px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Framer Motion gives each row its own stacking context. Raise the row that
+   owns an open/focused control so its menus render over adjacent rows. */
+.cl-row {
+  position: relative;
+  z-index: 0;
+}
+
+.cl-row:focus-within {
+  z-index: 30;
 }
 
 .cl-td--num {
@@ -494,14 +508,16 @@
 .cl-biz-line {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px 8px;
   margin-bottom: 3px;
+  min-width: 0;
 }
 
 .cl-biz-line .cl-biz-name {
   margin: 0;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .cl-biz-eye {
@@ -595,6 +611,8 @@
   font-size: 12px;
   color: #64748b;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Contact cell ─────────────────────────────────────────── */
@@ -614,12 +632,17 @@
   align-items: center;
   gap: 4px;
   margin-bottom: 6px;
+  min-width: 0;
 }
 
 .cl-phone-text {
   font-size: 13px;
   color: #334155;
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-icon-micro {
@@ -695,6 +718,7 @@
 
 .cl-status-wrap {
   position: relative;
+  z-index: 1;
 }
 
 .cl-status-btn {
@@ -737,7 +761,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 150px;
   padding: 4px;
   border: 1px solid #e2e8f0;
@@ -773,6 +797,9 @@
 
 .cl-assign-wrap {
   position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .cl-assign-btn {
@@ -790,6 +817,7 @@
   white-space: nowrap;
   color: #334155;
   transition: border-color 0.12s, background 0.12s;
+  max-width: 100%;
 }
 
 .cl-assign-btn:hover {
@@ -798,6 +826,7 @@
 }
 
 .cl-assign-name {
+  min-width: 0;
   max-width: 108px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -809,7 +838,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 224px;
   width: 236px;
   padding: 6px;
@@ -997,7 +1026,12 @@
   color: #334155;
   line-height: 1.45;
   cursor: pointer;
-  word-break: break-word;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-remark:hover {
@@ -1140,7 +1174,7 @@
 .cl-drawer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 2000;
   background: rgba(15, 23, 42, 0.25);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -1152,7 +1186,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 41;
+  z-index: 2001;
   width: 56vw;
   min-width: 560px;
   max-width: 100vw;
@@ -2566,7 +2600,7 @@
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 3000;
   display: grid;
   place-items: center;
   padding: 16px;
