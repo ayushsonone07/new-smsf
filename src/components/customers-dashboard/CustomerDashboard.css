@@ -303,6 +303,25 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+  gap: 12px;
+}
+
+/* Mobile-only hamburger that reopens the slide-out sidebar. */
+.cdb-topbar-menu {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.cdb-topbar-menu:hover {
+  background: #f8fafc;
 }
 
 .cdb-topbar-left {
@@ -1140,6 +1159,10 @@
 }
 
 @media (max-width: 768px) {
+  .cdb-topbar-menu {
+    display: grid;
+  }
+
   .cdb-sidebar {
     position: fixed;
     left: 0;

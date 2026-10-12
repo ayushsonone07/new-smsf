@@ -45,6 +45,8 @@ export interface CustomersListFiltersProps {
   onAssigneeChange?: (id: string | null | 'all') => void
   onReset?: () => void
   onRefresh?: () => void
+  /** Extra action buttons rendered after "Date filters" (e.g. round-robin toggle). */
+  actionsSlot?: ReactNode
 }
 
 const TABS: { key: CustomerTab; label: string }[] = [
@@ -356,6 +358,7 @@ export function CustomersListFilters({
   completedTo,
   onCompletedChange,
   showStatusTabs = true,
+  actionsSlot,
 }: CustomersListFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [localCompleted, setLocalCompleted] = useState({ from: '', to: '' })
@@ -432,6 +435,8 @@ export function CustomersListFilters({
             <span className="cl-filter-badge">{activeFilterCount}</span>
           )}
         </motion.button>
+
+        {actionsSlot}
       </div>
 
       {/* ── Date filters panel ── */}

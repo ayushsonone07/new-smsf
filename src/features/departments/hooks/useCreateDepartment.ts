@@ -11,9 +11,14 @@ export function useCreateDepartment() {
       createDepartment(data),
 
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: departmentsQueryKey,
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: departmentsQueryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['dynamic-permissions'],
+        }),
+      ])
     },
   })
 }

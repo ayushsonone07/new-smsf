@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -20,6 +21,8 @@ import { ServiceTagsModal } from '../../../../components/head/customers-list/Ser
 import {
   updateDepartmentServiceStatus,
   extractServiceTags,
+  getDepartmentConfig,
+  getServiceFlows,
 } from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
@@ -32,15 +35,17 @@ import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
   useDepartmentCustomerRows,
+  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
 import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
+import { useRoundRobinStatus, useUpdateRoundRobinStatus } from '../../hooks/useRoundRobin'
+import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
-import { Icon } from '../../../../components/head/shared/Icon'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -51,8 +56,15 @@ const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
 )
 
 /**
- * Department customer list. Google uses the department rows endpoint;
- * onboarding uses its dedicated customers endpoint.
+ * Head panel — Customer List. Renders the customers-list UI
+ * composed from components/head/customers-list, wired to:
+ * - Onboarding dept: GET /api/auth/onboarding/customers?page=0&size=10
+ * - Any other (dynamic) department: GET
+ *   /api/auth/department/customer/rows?page=0&size=10&compatible=true
+ *   (used whenever the admin picks customer columns for the dept)
+ * - Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100
+ * - Round robin: GET/PUT /api/round-robin/department?departmentType=X
+ * - GET /api/meetings/users/assigning-list?departmentType=X
  */
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
@@ -66,8 +78,12 @@ export function CustomerListPage() {
       window.location.pathname.startsWith('/google')
     ))
   const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT')
+  const isOnboardingDept = currentDepartment === 'ONBOARDING_DEPARTMENT'
+  // Any non-onboarding (incl. dynamically added) department drives its
+  // customer table from the generic rows endpoint once columns are picked.
+  const useRowsEndpoint = !isOnboardingDept
 
-  const customersQuery = useDepartmentCustomers(departmentId, { enabled: !isGoogle })
+  const customersQuery = useDepartmentCustomers(departmentId, { enabled: isOnboardingDept })
   const updateMutation = useUpdateCustomer(departmentId)
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
@@ -88,14 +104,35 @@ export function CustomerListPage() {
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), 4000)
-    return () => window.clearTimeout(timer)
-  }, [toast])
+  // 1. Department Config: GET /api/dept-config/{departmentType}
+  useQuery({
+    queryKey: ['deptConfig', currentDepartment],
+    queryFn: () => getDepartmentConfig(currentDepartment),
+    enabled: useRowsEndpoint,
+  })
+
+  // 2. Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100
+  const serviceFlowsQuery = useQuery({
+    queryKey: ['serviceFlows', currentDepartment],
+    queryFn: () => getServiceFlows({ page: 0, size: 100 }),
+    enabled: useRowsEndpoint,
+  })
+  const hasSubServiceFlow = (serviceFlowsQuery.data?.data.length ?? 0) > 0
+
+  // 3. Department Users: GET /api/auth/department/users?page=0&size=100
+  useDepartmentUsersList({ page: 0, size: 100 }, { enabled: useRowsEndpoint })
+
+  // 4. Round robin status: GET /api/round-robin/department?departmentType=X
+  const roundRobinQuery = useRoundRobinStatus(currentDepartment, {
+    enabled: useRowsEndpoint,
+  })
+  const roundRobinMutation = useUpdateRoundRobinStatus(currentDepartment)
+  const roundRobinEnabled = roundRobinQuery.data ?? false
+  const [roundRobinDialogOpen, setRoundRobinDialogOpen] = useState(false)
+  const [roundRobinError, setRoundRobinError] = useState<string | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -206,7 +243,7 @@ export function CustomerListPage() {
       endDate: dateTo || undefined,
       allTime: !dateFrom && !dateTo,
     },
-    { enabled: !isGoogle },
+    { enabled: isOnboardingDept },
   )
 
   // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
@@ -222,10 +259,11 @@ export function CustomerListPage() {
         : activeTab === 'in-progress'
           ? 'IN_PROGRESS'
           : activeTab.toUpperCase(),
-  }, { enabled: !isGoogle })
+  }, { enabled: isOnboardingDept })
 
-  // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
-  const googleCustomerRowsQuery = useDepartmentCustomerRows(
+  // 3b. Department customer rows (any non-onboarding dept):
+  // /api/auth/department/customer/rows?page=0&size=10&compatible=true
+  const departmentRowsQuery = useDepartmentCustomerRows(
     {
       page,
       size,
@@ -244,14 +282,15 @@ export function CustomerListPage() {
       endDate: dateTo || undefined,
       compatible: true,
     },
-    { enabled: isGoogle },
+    { enabled: useRowsEndpoint },
   )
 
-  const activeCustomerQuery = isGoogle ? googleCustomerRowsQuery : onboardingApiQuery
+  const activeCustomerQuery = useRowsEndpoint ? departmentRowsQuery : onboardingApiQuery
 
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
-    if (isGoogle) {
-      const rows = googleCustomerRowsQuery.data?.customers ?? []
+    if (useRowsEndpoint) {
+      const rows = departmentRowsQuery.data?.customers ?? []
+      const serviceFallback = `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
       return rows.map((c, index) => {
         const id = String(c.id ?? c.customerId ?? `c-${index}`)
         const bName =
@@ -311,10 +350,11 @@ export function CustomerListPage() {
             c.onboardingLink ||
             (c.customerDetails as any)?.onboardingLink ||
             '',
-          serviceType: c.serviceType || '—',
+          serviceType: c.serviceType || serviceFallback,
+          callStatus: 'connected',
           status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
-          remark: getLatestInternalRemark(c, ['GOOGLE_DEPARTMENT', 'ONBOARDING_DEPARTMENT']) || c.remark || '',
+          remark: getLatestInternalRemark(c, [currentDepartment, 'ONBOARDING_DEPARTMENT']) || c.remark || '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
@@ -420,8 +460,9 @@ export function CustomerListPage() {
       rawCustomer: customer,
     }))
   }, [
-    isGoogle,
-    googleCustomerRowsQuery.data?.customers,
+    useRowsEndpoint,
+    currentDepartment,
+    departmentRowsQuery.data?.customers,
     onboardingApiQuery.data?.customers,
     customersQuery.data,
     localAssigneeMap,
@@ -431,9 +472,9 @@ export function CustomerListPage() {
   ])
 
   const tabCounts = useMemo(() => {
-    if (isGoogle) {
-      const rows = googleCustomerRowsQuery.data?.customers ?? []
-      const total = googleCustomerRowsQuery.data?.totalElements ?? rows.length
+    if (useRowsEndpoint) {
+      const rows = departmentRowsQuery.data?.customers ?? []
+      const total = departmentRowsQuery.data?.totalElements ?? rows.length
       return {
         all: activeTab === 'all' ? total : undefined,
         pending: activeTab === 'pending' ? total : undefined,
@@ -488,15 +529,7 @@ export function CustomerListPage() {
       inProgress: activeTab === 'in-progress' ? activeApiCount : inProgress,
       completed: activeTab === 'completed' ? activeApiCount : completed,
     }
-  }, [
-    isGoogle,
-    activeTab,
-    googleCustomerRowsQuery.data,
-    authSummaryQuery.data,
-    onboardingApiQuery.data?.summary,
-    onboardingApiQuery.data?.totalElements,
-    onboardingCustomers.length,
-  ])
+  }, [useRowsEndpoint, departmentRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -522,7 +555,7 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
 
-  const isLoading = isGoogle
+  const isLoading = useRowsEndpoint
     ? activeCustomerQuery.isPending
     : customersQuery.isPending && activeCustomerQuery.isPending
 
@@ -530,7 +563,7 @@ export function CustomerListPage() {
     return <LoadingState message="Loading customers..." />
   }
 
-  const isError = isGoogle
+  const isError = useRowsEndpoint
     ? activeCustomerQuery.isError
     : customersQuery.isError && activeCustomerQuery.isError
 
@@ -545,7 +578,7 @@ export function CustomerListPage() {
         }
         onRetry={() => {
           activeCustomerQuery.refetch()
-          if (!isGoogle) customersQuery.refetch()
+          if (isOnboardingDept) customersQuery.refetch()
         }}
       />
     )
@@ -599,7 +632,7 @@ export function CustomerListPage() {
     }
 
     // Customer acknowledgement is strictly required before marking Completed for Onboarding department
-    if (!isGoogle && status === 'completed') {
+    if (!useRowsEndpoint && status === 'completed') {
       const target =
         filteredCustomers.find((c) => c.id === customerId) ||
         onboardingCustomers.find((c) => c.id === customerId)
@@ -609,8 +642,8 @@ export function CustomerListPage() {
       }
     }
 
-    // For Google Department, all sub-services must be completed before marking Completed
-    if (isGoogle && status === 'completed') {
+    // When sub-service flows exist, all sub-services must be completed before marking Completed
+    if (hasSubServiceFlow && status === 'completed') {
       const target =
         filteredCustomers.find((c) => c.id === customerId) ||
         onboardingCustomers.find((c) => c.id === customerId)
@@ -635,15 +668,12 @@ export function CustomerListPage() {
     setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
 
     try {
-      if (isGoogle) {
+      if (useRowsEndpoint) {
         const target =
           filteredCustomers.find((c) => c.id === customerId) ||
           onboardingCustomers.find((c) => c.id === customerId)
-        const sType = target?.serviceType
-        if (!sType || sType === '—') {
-          throw new Error('Google service type is missing from the customer response')
-        }
-        const oldStatus = target.status
+        const oldStatus = target?.status || 'PENDING'
+        const sType = target?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
 
         await updateDepartmentServiceStatus({
           customerId,
@@ -657,14 +687,7 @@ export function CustomerListPage() {
       }
 
       await activeCustomerQuery.refetch()
-      if (!isGoogle) await authSummaryQuery.refetch()
-
-      if (!isGoogle && status === 'in-progress') {
-        const target =
-          filteredCustomers.find((customer) => customer.id === customerId) ||
-          onboardingCustomers.find((customer) => customer.id === customerId)
-        if (target) setConfirmingCustomer(target)
-      }
+      if (isOnboardingDept) await authSummaryQuery.refetch()
     } catch (err: unknown) {
       console.error('Failed to update status:', err)
       const msg = err instanceof Error ? err.message : 'Unable to update status'
@@ -685,6 +708,22 @@ export function CustomerListPage() {
     updateMutation.mutate({ id, data: patch })
   }
 
+  const showRoundRobinToggle = useRowsEndpoint && !isDeptUser && !isUser
+
+  function handleConfirmRoundRobin() {
+    setRoundRobinError(null)
+    roundRobinMutation.mutate(!roundRobinEnabled, {
+      onSuccess: () => {
+        setRoundRobinDialogOpen(false)
+      },
+      onError: (err: unknown) => {
+        setRoundRobinError(
+          err instanceof Error ? err.message : 'Failed to update round robin status',
+        )
+      },
+    })
+  }
+
   return (
     <>
       <CustomersListFilters
@@ -696,6 +735,22 @@ export function CustomerListPage() {
             value={search}
             onChange={handleSearchChange}
           />
+        }
+        actionsSlot={
+          showRoundRobinToggle ? (
+            <button
+              type="button"
+              className={`cl-filter-btn${roundRobinEnabled ? ' is-open' : ''}`}
+              title={roundRobinEnabled ? 'Disable round robin assignment' : 'Enable round robin assignment'}
+              onClick={() => {
+                setRoundRobinError(null)
+                setRoundRobinDialogOpen(true)
+              }}
+              disabled={roundRobinQuery.isPending}
+            >
+              ⇄ Round Robin: {roundRobinQuery.isPending ? '…' : roundRobinEnabled ? 'ON' : 'OFF'}
+            </button>
+          ) : undefined
         }
         assignees={assignees}
         selectedAssigneeId={selectedAssigneeId}
@@ -719,7 +774,7 @@ export function CustomerListPage() {
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        showServiceType={isGoogle}
+        showServiceType={useRowsEndpoint}
         isGoogle={isGoogle}
         onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
         onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
@@ -820,13 +875,21 @@ export function CustomerListPage() {
           authSummaryQuery.refetch()
         }}
       />
-      {toast && (
-        <div className={`cl-toast cl-toast--${toast.type}`} role="status" aria-live="polite">
-          <Icon name={toast.type === 'success' ? 'done' : 'alert'} size={17} strokeWidth={2} />
-          <span>{toast.message}</span>
-          <button type="button" onClick={() => setToast(null)} aria-label="Dismiss notification">×</button>
-        </div>
-      )}
+
+      <ConfirmDialog
+        open={roundRobinDialogOpen}
+        title={roundRobinEnabled ? 'Disable Round Robin' : 'Enable Round Robin'}
+        message={
+          roundRobinEnabled
+            ? 'Stop automatic customer distribution among your team members?'
+            : 'Automatically distribute customers evenly among your team members?'
+        }
+        confirmLabel={roundRobinEnabled ? 'Disable' : 'Enable'}
+        isLoading={roundRobinMutation.isPending}
+        error={roundRobinError ?? undefined}
+        onClose={() => setRoundRobinDialogOpen(false)}
+        onConfirm={handleConfirmRoundRobin}
+      />
     </>
   )
 }
