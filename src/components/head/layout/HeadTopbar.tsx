@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { NotificationsMenu } from './NotificationsMenu'
 import { Icon } from '../shared/Icon'
-import type { HeadNotification } from '../../../features/departments/head/types/head.types'
 
 interface HeadTopbarProps {
   title?: ReactNode
@@ -13,8 +12,6 @@ interface HeadTopbarProps {
   children?: ReactNode
   /** Buttons rendered before the bell (refresh, etc). */
   actions?: ReactNode
-  notifications?: HeadNotification[]
-  onMarkAllRead?: () => void
   onToggleSidebar?: () => void
 }
 
@@ -24,8 +21,6 @@ export function HeadTopbar({
   subtitle,
   children,
   actions,
-  notifications = [],
-  onMarkAllRead,
   onToggleSidebar,
 }: HeadTopbarProps) {
   return (
@@ -50,10 +45,7 @@ export function HeadTopbar({
 
       {actions}
 
-      <NotificationsMenu
-        items={notifications}
-        onMarkAllRead={onMarkAllRead}
-      />
+      <NotificationsMenu />
     </header>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { CustomerDashboardSidebar } from './CustomerDashboardSidebar'
 import { CustomerDashboardTopbar } from './CustomerDashboardTopbar'
+import { NotificationCenter } from '../head/layout/NotificationCenter'
 import './CustomerDashboard.css'
 
 interface CustomerDashboardLayoutProps {
@@ -14,7 +15,13 @@ export function CustomerDashboardLayout({
 }: CustomerDashboardLayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
 
+  const notifications = [
+    { id: 'customer-1', text: 'Your onboarding status has been updated.', timeLabel: 'Today', unread: true },
+    { id: 'customer-2', text: 'A new update was added to your service.', timeLabel: 'Yesterday', unread: true },
+  ]
+
   return (
+    <NotificationCenter items={notifications} roleLabel="Customer">
     <div className="cdb-shell">
       <CustomerDashboardSidebar
         collapsed={collapsed}
@@ -27,5 +34,6 @@ export function CustomerDashboardLayout({
         {children}
       </main>
     </div>
+    </NotificationCenter>
   )
 }
