@@ -433,15 +433,16 @@
   padding-left: 18px;
 }
 
-/* Keep the number column compact. Business is the flexible column that
-   absorbs spare width, preventing empty space from appearing before it. */
-.cl-col--num     { width: 60px; }
-.cl-col--contact { width: 22%; }
+/* Keep all table columns explicitly sized so the fixed-layout table cannot
+   collapse the Business column when the other columns are present. */
+.cl-col--num     { width: 5%; }
+.cl-col--biz     { width: 16%; }
+.cl-col--contact { width: 17%; }
 .cl-col--service { width: 14%; }
 .cl-col--status  { width: 13%; }
 .cl-col--assign  { width: 17%; }
-.cl-col--remark  { width: 18%; }
-.cl-col--updated { width: 11%; }
+.cl-col--remark  { width: 12%; }
+.cl-col--updated { width: 6%; }
 
 /* ── Table body ───────────────────────────────────────────── */
 
@@ -515,11 +516,11 @@
   text-decoration: none;
 }
 
-/* name + eye + Form pill on one line */
+/* Keep the business name and action pills within the allocated column. */
 .cl-biz-line {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 4px 8px;
   margin-bottom: 3px;
   min-width: 0;
@@ -528,7 +529,13 @@
 .cl-biz-line .cl-biz-name {
   margin: 0;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 1 1 calc(100% - 30px);
+}
+
+.cl-biz-line .cl-form-pill {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
 }
 
 .cl-biz-eye {

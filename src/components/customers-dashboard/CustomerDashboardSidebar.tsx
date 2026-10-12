@@ -30,9 +30,9 @@ export function CustomerDashboardSidebar({
   const { session, logout } = useCustomerSession()
 
   // Dynamic customer values with fallback
-  const customerName = session?.name ?? 'Hemant Dubey'
-  const customerEmail = session?.email ?? 'hemantdubey.mic@gmail.com'
-  const customerId = session?.customerId ?? 'cust-101'
+  const customerName = session?.name ?? 'Customer'
+  const customerEmail = session?.email ?? 'Not signed in'
+  const customerId = session?.customerId ?? '—'
   const initial = customerName
     .split(' ')
     .map((n) => n[0])

@@ -293,7 +293,7 @@
 }
 
 .cdb-topbar {
-  height: 64px;
+  height: 52px;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -302,7 +302,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 16px;
 }
 
 .cdb-topbar-left {
@@ -312,7 +312,7 @@
 }
 
 .cdb-topbar-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -358,10 +358,10 @@
 
 /* Page Body */
 .cdb-body {
-  padding: 16px 20px 28px;
+  padding: 12px 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
@@ -372,7 +372,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: #64748b;
   margin-bottom: 2px;
 }
@@ -390,12 +390,12 @@
 .cdb-welcome-banner {
   background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
   border-radius: 12px;
-  padding: 16px 20px;
+  padding: 12px 18px;
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
   box-shadow: 0 4px 16px rgba(29, 78, 216, 0.18);
 }
 
@@ -449,7 +449,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 280px;
+  min-width: 0;
+  flex: 1 1 0;
 }
 
 .cdb-wb-progress-header {
@@ -459,7 +460,7 @@
 }
 
 .cdb-wb-percent {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 800;
   color: #ffffff;
   line-height: 1;
@@ -489,8 +490,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(8px);
@@ -559,9 +560,9 @@
 .cdb-meeting-banner {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
   background: #fefce8;
   border: 1px solid #fde047;
 }
@@ -571,9 +572,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 48px;
-  border-radius: 10px;
+  width: 46px;
+  height: 42px;
+  border-radius: 9px;
   background: #fef3c7;
   color: #92400e;
   flex-shrink: 0;
@@ -621,7 +622,7 @@
 .cdb-services-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .cdb-services-header {
@@ -631,7 +632,7 @@
 }
 
 .cdb-services-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -652,19 +653,20 @@
 
 .cdb-services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 840px;
 }
 
 /* Service Card */
 .cdb-svc-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -692,7 +694,7 @@
 }
 
 .cdb-svc-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
@@ -736,8 +738,8 @@
 .cdb-svc-tasks {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
+  gap: 6px;
+  padding-top: 2px;
 }
 
 .cdb-svc-task-item {
@@ -799,7 +801,7 @@
 .cdb-bottom-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -807,11 +809,11 @@
 .cdb-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 18px;
+  border-radius: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -854,7 +856,7 @@
 .cdb-updates-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .cdb-update-item {
@@ -1101,11 +1103,15 @@
 
 @media (max-width: 1280px) {
   .cdb-services-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 1024px) {
+  .cdb-services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .cdb-sidebar-backdrop {
     display: block;
     position: fixed;
@@ -1153,6 +1159,10 @@
 
   .cdb-services-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cdb-services-grid {
+    max-width: none;
   }
 
   .cdb-topbar {
