@@ -44,6 +44,8 @@ import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
+import { Icon } from '../../../../components/head/shared/Icon'
+import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
   (user) => ({
@@ -92,6 +94,14 @@ export function CustomerListPage() {
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 4000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
 
   // 1. Google Department Config: GET /api/dept-config/GOOGLE_DEPARTMENT
   useQuery({
@@ -462,12 +472,14 @@ export function CustomerListPage() {
 
     const pending =
       authData?.totalPendingOnboarding ??
+      authData?.pendingCustomers ??
       authData?.pending ??
       authData?.summary?.pending ??
       apiSummary?.pending
 
     const inProgress =
       authData?.totalInProgressOnboarding ??
+      authData?.inProgressCustomers ??
       authData?.inProgress ??
       authData?.summary?.inProgress ??
       apiSummary?.inProgress
@@ -475,17 +487,35 @@ export function CustomerListPage() {
     const completed =
       authData?.totalCompletedOnboarding ??
       authData?.totalOnboardedCustomers ??
+      authData?.onboardedCustomers ??
       authData?.completed ??
       authData?.summary?.completed ??
       apiSummary?.completed
 
+    // The customer-list endpoint is already filtered by the selected status.
+    // Its total is authoritative for the active tab; the summary endpoint can
+    // lag behind and has been observed returning 0 while matching rows exist.
+    const filteredApiTotal = onboardingApiQuery.data?.totalElements
+    const activeApiCount =
+      typeof filteredApiTotal === 'number' && filteredApiTotal > 0
+        ? filteredApiTotal
+        : onboardingCustomers.length
+
     return {
       all,
-      pending,
-      inProgress,
-      completed,
+      pending: activeTab === 'pending' ? activeApiCount : pending,
+      inProgress: activeTab === 'in-progress' ? activeApiCount : inProgress,
+      completed: activeTab === 'completed' ? activeApiCount : completed,
     }
-  }, [isGoogle, googleCustomerRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
+  }, [
+    isGoogle,
+    activeTab,
+    googleCustomerRowsQuery.data,
+    authSummaryQuery.data,
+    onboardingApiQuery.data?.summary,
+    onboardingApiQuery.data?.totalElements,
+    onboardingCustomers.length,
+  ])
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -562,6 +592,25 @@ export function CustomerListPage() {
     }
   }
 
+  async function handleCallCustomer(customer: OnboardingCustomer) {
+    setCallingCustomerId(customer.id)
+    try {
+      const result = await initiateAirtelClickToCall(customer.phone)
+      if (result?.success === false) {
+        throw new Error(result.message || 'Unable to initiate call')
+      }
+      setToast({
+        type: 'success',
+        message: `Call initiated to ${customer.contactName || customer.phone}. Please pick up when your phone rings.`,
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to initiate call'
+      setToast({ type: 'error', message })
+    } finally {
+      setCallingCustomerId(null)
+    }
+  }
+
   async function handleStatusChange(customerId: string, status: OnboardingStatus) {
     if (!isDeptUser && !canEditStatus) {
       alert("You don't have permission to update status.")
@@ -625,6 +674,13 @@ export function CustomerListPage() {
 
       await activeCustomerQuery.refetch()
       if (!isGoogle) await authSummaryQuery.refetch()
+
+      if (!isGoogle && status === 'in-progress') {
+        const target =
+          filteredCustomers.find((customer) => customer.id === customerId) ||
+          onboardingCustomers.find((customer) => customer.id === customerId)
+        if (target) setConfirmingCustomer(target)
+      }
     } catch (err: unknown) {
       console.error('Failed to update status:', err)
       const msg = err instanceof Error ? err.message : 'Unable to update status'
@@ -693,6 +749,9 @@ export function CustomerListPage() {
           setModalTab('duplicates')
         }}
         onStatusChange={(id, status) => handleStatusChange(id, status)}
+        onCallCustomer={handleCallCustomer}
+        callingCustomerId={callingCustomerId}
+        onSendAcknowledgement={setConfirmingCustomer}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) =>
           patchCustomer(id, { remark })
@@ -703,7 +762,19 @@ export function CustomerListPage() {
       <TablePagination
         page={page}
         pageSize={size}
-        totalResults={activeCustomerQuery.data?.totalElements ?? onboardingCustomers.length}
+        totalResults={(() => {
+          const apiTotal = activeCustomerQuery.data?.totalElements
+          if (typeof apiTotal === 'number' && apiTotal > 0) return apiTotal
+          const activeCount =
+            activeTab === 'all'
+              ? tabCounts.all
+              : activeTab === 'in-progress'
+                ? tabCounts.inProgress
+                : tabCounts[activeTab]
+          return typeof activeCount === 'number' && activeCount > 0
+            ? activeCount
+            : filteredCustomers.length
+        })()}
         onPageChange={(newPage) => setPage(newPage)}
         onPageSizeChange={(newSize) => {
           setSize(newSize)
@@ -760,10 +831,18 @@ export function CustomerListPage() {
         onClose={() => setConfirmingCustomer(null)}
         onSuccess={() => {
           setConfirmingCustomer(null)
+          setToast({ type: 'success', message: 'Acknowledgement sent successfully' })
           activeCustomerQuery.refetch()
           authSummaryQuery.refetch()
         }}
       />
+      {toast && (
+        <div className={`cl-toast cl-toast--${toast.type}`} role="status" aria-live="polite">
+          <Icon name={toast.type === 'success' ? 'done' : 'alert'} size={17} strokeWidth={2} />
+          <span>{toast.message}</span>
+          <button type="button" onClick={() => setToast(null)} aria-label="Dismiss notification">×</button>
+        </div>
+      )}
     </>
   )
 }

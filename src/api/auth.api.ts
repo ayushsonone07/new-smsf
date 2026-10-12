@@ -25,6 +25,8 @@ interface BackendLoginData {
   accessToken?: string
   refreshToken?: string
   departmentType?: string
+  phoneNumber?: string
+  contact?: string
   isHead?: boolean
 }
 
@@ -92,6 +94,11 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
   const claimRole = typeof claims.role === 'string' ? claims.role : undefined
   const claimIsHead = typeof claims.isHead === 'boolean' ? claims.isHead : undefined
   const claimDept = typeof claims.departmentType === 'string' ? claims.departmentType : undefined
+  const claimPhone = typeof claims.phoneNumber === 'string'
+    ? claims.phoneNumber
+    : typeof claims.contact === 'string'
+      ? claims.contact
+      : undefined
 
   const email = (claimEmail || data.email || data.username || '').trim()
 
@@ -106,6 +113,8 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
     username: claimEmail || email,
     role: mapBackendRole(data.role ?? claimRole, data.isHead ?? claimIsHead),
     departmentType: data.departmentType || claimDept || undefined,
+    phoneNumber: data.phoneNumber || data.contact || claimPhone,
+    contact: data.contact || data.phoneNumber || claimPhone,
   }
 
   return {

@@ -7,7 +7,6 @@ import type { UserRole } from '../../features/auth/types/auth.types'
 
 type NavPath =
   | '/admin'
-  | '/admin/tokens'
   | '/head'
   | '/users'
 
@@ -28,14 +27,6 @@ const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) =>
       pathname === '/admin' ||
       pathname.startsWith('/admin/departments'),
-  },
-  {
-    to: '/admin/tokens',
-    label: 'Access Tokens',
-    icon: '⚿',
-    roles: ['ADMIN'],
-    isActive: (pathname) =>
-      pathname.startsWith('/admin/tokens'),
   },
   {
     to: '/head',
