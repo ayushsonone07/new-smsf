@@ -406,6 +406,10 @@ export function UserDashboardPage() {
           <OnboardingTrend
             total={newTotal}
             growth={growth}
+            labels={isGoogle ? [] : trend?.labels}
+            newCustomers={isGoogle ? [] : trend?.newCustomers}
+            completed={isGoogle ? [] : trend?.completed}
+            previousPeriod={isGoogle ? [] : trend?.previousPeriod}
           />
           <TeamTargetAchievement
             title="My Target Achievement"
