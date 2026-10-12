@@ -18,7 +18,6 @@ import {
 } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
-import { ErrorState } from '../components/ui/ErrorState'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
 import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
 import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
@@ -38,16 +37,35 @@ import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashb
 import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
 import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
 
+function NotFoundPage() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <AvailableSoonPage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <AvailableSoonPage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return (
+    <PageLayout>
+      <AvailableSoonPage />
+    </PageLayout>
+  )
+}
+
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
-  notFoundComponent: () => (
-    <PageLayout>
-      <ErrorState
-        title="Page not found"
-        message="The page you are looking for does not exist."
-      />
-    </PageLayout>
-  ),
+  notFoundComponent: NotFoundPage,
 })
 
 const indexRoute = createRoute({
