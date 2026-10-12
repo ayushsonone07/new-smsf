@@ -35,19 +35,23 @@ export function CustomerWelcomeBanner({
       </div>
 
       {/* Center Progress */}
-      <div className="cdb-wb-center">
-        <div className="cdb-wb-progress-header">
-          <span className="cdb-wb-percent">{onboardingProgressPercent}%</span>
-          <span className="cdb-wb-progress-sub">{onboardingStepText}</span>
-        </div>
+      {onboardingProgressPercent !== undefined ? (
+        <div className="cdb-wb-center">
+          <div className="cdb-wb-progress-header">
+            <span className="cdb-wb-percent">{onboardingProgressPercent}%</span>
+            {onboardingStepText ? (
+              <span className="cdb-wb-progress-sub">{onboardingStepText}</span>
+            ) : null}
+          </div>
 
-        <div className="cdb-wb-track">
-          <div
-            className="cdb-wb-fill"
-            style={{ width: `${Math.min(100, Math.max(0, onboardingProgressPercent))}%` }}
-          />
+          <div className="cdb-wb-track">
+            <div
+              className="cdb-wb-fill"
+              style={{ width: `${Math.min(100, Math.max(0, onboardingProgressPercent))}%` }}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Right Executive Box */}
       <div className="cdb-wb-exec-card">
