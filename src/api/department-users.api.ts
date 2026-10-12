@@ -438,7 +438,7 @@ export async function createDepartmentUser(
 }
 
 export interface UpdateDepartmentUserRequest {
-  id: string | number
+  id?: string | number
   username?: string
   email?: string
   password?: string
@@ -463,7 +463,7 @@ export interface UpdateDepartmentUserResponse {
 
 /**
  * `PUT /api/auth/department/update?action=edit`
- * Updates department user under a head.
+ * Updates department user under a head (or head's own phone number).
  */
 export async function updateDepartmentUser(
   data: UpdateDepartmentUserRequest,
@@ -477,8 +477,15 @@ export async function updateDepartmentUser(
   const departmentType =
     data.departmentType || (isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT'))
 
-  const body = {
-    ...data,
+  const { id, ...rest } = data
+  const numericId =
+    id !== undefined && id !== null && String(id).trim() !== '' && Number.isFinite(Number(id))
+      ? Number(id)
+      : undefined
+
+  const body: Record<string, unknown> = {
+    ...rest,
+    ...(numericId !== undefined ? { id: numericId } : {}),
     departmentType,
     headUser: headEmail,
   }
@@ -496,6 +503,61 @@ export async function updateDepartmentUser(
     }
     return res.data || res
   })
+}
+
+/**
+ * Fetches the current logged-in department head/user's contact number and numeric ID
+ * from `GET /api/auth/department/users?page=0&size=50` when not already in sessionStorage.
+ */
+export async function fetchCurrentUserProfileMeta(): Promise<{
+  id?: number
+  phoneNumber?: string
+}> {
+  const session = getSession()
+  const email = (session?.user?.email || session?.user?.username || '').toLowerCase()
+  if (!email || session?.user?.role === 'ADMIN' || session?.user?.role === 'CUSTOMER') {
+    return {}
+  }
+
+  try {
+    const res = await authedApiRequest<CustomPageResponseRaw<DepartmentUsersResponse>>(
+      '/api/auth/department/users?page=0&size=50',
+    )
+    if (Array.isArray(res?.data) && res.data.length > 0) {
+      const first: any = res.data[0]
+      if (first?.email && String(first.email).toLowerCase() === email) {
+        const contact = first.contact || first.phoneNumber
+        return {
+          id: Number.isFinite(Number(first.departmentId ?? first.id))
+            ? Number(first.departmentId ?? first.id)
+            : undefined,
+          phoneNumber:
+            contact && contact !== 'XXXXXXXXXX' ? String(contact).trim() : undefined,
+        }
+      }
+      const list: any[] = Array.isArray(first?.users)
+        ? first.users
+        : Array.isArray(first?.departmentSubUsers)
+          ? first.departmentSubUsers
+          : []
+      const match = list.find(
+        (u) => u?.email && String(u.email).toLowerCase() === email,
+      )
+      if (match) {
+        const contact = match.contact || match.phoneNumber
+        return {
+          id: Number.isFinite(Number(match.id ?? match.departmentId))
+            ? Number(match.id ?? match.departmentId)
+            : undefined,
+          phoneNumber:
+            contact && contact !== 'XXXXXXXXXX' ? String(contact).trim() : undefined,
+        }
+      }
+    }
+  } catch {
+    // Non-fatal fallback
+  }
+  return {}
 }
 
 export interface DeleteDepartmentUserRequest {

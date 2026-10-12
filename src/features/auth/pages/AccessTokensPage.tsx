@@ -8,6 +8,7 @@ import { useRevokeLoginToken } from '../hooks/useRevokeLoginToken'
 import { useUsers } from '../hooks/useUsers'
 import { buildLoginLink } from '../utils/loginLink'
 import { getSession } from '../../../app/auth/session'
+import { ProfileChip } from '../../../components/common/ProfileChip'
 import type { IssuedLoginToken } from '../types/auth.types'
 
 export function AccessTokensPage() {
@@ -124,20 +125,11 @@ export function AccessTokensPage() {
             ← Back to Departments
           </Link>
 
-          <div className="profile-chip">
-            <div className="admin-avatar small">
-              A
-            </div>
-
-            <div>
-              <strong>
-                {session?.user.name ?? 'Admin'}
-              </strong>
-              <span>
-                {session?.user.role ?? 'ADMIN'}
-              </span>
-            </div>
-          </div>
+          <ProfileChip
+            initials={(session?.user.name ?? 'A').slice(0, 2).toUpperCase()}
+            name={session?.user.name ?? 'Admin'}
+            role={session?.user.role ?? 'ADMIN'}
+          />
         </div>
       </header>
 

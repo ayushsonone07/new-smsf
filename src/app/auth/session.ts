@@ -21,9 +21,87 @@ export function getSession(): AuthSession | null {
   }
 }
 
+export function getCurrentPhoneNumber(): string {
+  try {
+    const stored = sessionStorage.getItem('phoneNumber')
+    if (stored && stored !== 'XXXXXXXXXX' && stored.trim()) {
+      return stored.trim()
+    }
+    const session = getSession()
+    if (
+      session?.user.phoneNumber &&
+      session.user.phoneNumber !== 'XXXXXXXXXX'
+    ) {
+      sessionStorage.setItem('phoneNumber', session.user.phoneNumber)
+      return session.user.phoneNumber
+    }
+    if (session?.token && session.token.includes('.')) {
+      const payload = session.token.split('.')[1]
+      if (payload) {
+        const base64 = payload
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+        const claims = JSON.parse(atob(base64)) as Record<string, unknown>
+        const claimPhone =
+          typeof claims.phoneNumber === 'string'
+            ? claims.phoneNumber
+            : typeof claims.contact === 'string'
+              ? claims.contact
+              : ''
+        if (claimPhone && claimPhone !== 'XXXXXXXXXX' && claimPhone.trim()) {
+          sessionStorage.setItem('phoneNumber', claimPhone.trim())
+          return claimPhone.trim()
+        }
+      }
+    }
+  } catch {
+    // Ignore storage/decode errors
+  }
+  return ''
+}
+
+export function updateSessionPhoneNumber(phone: string): void {
+  const trimmed = phone.trim()
+  sessionStorage.setItem('phoneNumber', trimmed)
+  const session = getSession()
+  if (session) {
+    session.user.phoneNumber = trimmed
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  }
+}
+
 export function setSession(
   session: AuthSession,
 ): void {
+  const resolvedPhone =
+    session.user.phoneNumber ||
+    (() => {
+      try {
+        if (session.token && session.token.includes('.')) {
+          const payload = session.token.split('.')[1]
+          if (payload) {
+            const base64 = payload
+              .replace(/-/g, '+')
+              .replace(/_/g, '/')
+              .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+            const claims = JSON.parse(atob(base64)) as Record<string, unknown>
+            return typeof claims.phoneNumber === 'string'
+              ? claims.phoneNumber
+              : ''
+          }
+        }
+      } catch {
+        // Ignore
+      }
+      return ''
+    })()
+
+  if (resolvedPhone && resolvedPhone !== 'XXXXXXXXXX') {
+    session.user.phoneNumber = resolvedPhone
+    sessionStorage.setItem('phoneNumber', resolvedPhone)
+  }
+
   sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify(session),
@@ -50,6 +128,7 @@ export function clearSession(): void {
   sessionStorage.removeItem('token')
   sessionStorage.removeItem('role')
   sessionStorage.removeItem('departmentType')
+  sessionStorage.removeItem('phoneNumber')
 
   try {
     localStorage.removeItem(SESSION_KEY)
@@ -174,6 +253,7 @@ export function openSessionInNewTab(
         sessionStorage.setItem('token', ${JSON.stringify(session.token)});
         sessionStorage.setItem('role', ${JSON.stringify(session.user.role)});
         ${session.user.departmentType ? `sessionStorage.setItem('departmentType', ${JSON.stringify(session.user.departmentType)});` : ''}
+        ${session.user.phoneNumber ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(session.user.phoneNumber)});` : ''}
         ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});` : ''}
         window.location.replace('${targetRoute}');
       } catch (e) {

@@ -15,6 +15,9 @@ import { AnalyticsPage } from '../pages/AnalyticsPage'
 import { ServiceFlowPage } from '../pages/ServiceFlowPage'
 import { MemberFlowPage } from '../pages/MemberFlowPage'
 import { CustomFeaturePage } from '../pages/CustomFeaturePage'
+import { MyAirtelCallsPage } from '../pages/MyAirtelCallsPage'
+import { ManageServicesPage } from '../pages/ManageServicesPage'
+import { SalaryManagementPage } from '../pages/SalaryManagementPage'
 
 interface ScreenEntry {
   component: ComponentType<{ feature: FeaturePermission }>
@@ -41,5 +44,8 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   'service-flow': { component: ServiceFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Service Flow' },
   'member-flow': { component: MemberFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Member Flow' },
   'help-support': { component: HelpCenterPage, title: 'Help & Support' },
+  'airtel-calls': { component: MyAirtelCallsPage as ComponentType<{ feature: FeaturePermission }>, title: 'My Airtel Calls' },
+  'manage-services': { component: ManageServicesPage as ComponentType<{ feature: FeaturePermission }>, title: 'Manage Services' },
+  'salary-management': { component: SalaryManagementPage as ComponentType<{ feature: FeaturePermission }>, title: 'Salary Management' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>
