@@ -2622,6 +2622,103 @@
   .cl-drawer__tab-btn {
     white-space: nowrap;
   }
+  .cl-drawer__header {
+    padding: 12px 12px 10px;
+  }
+  .cl-drawer__name-row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .cl-drawer__name-text h2 {
+    font-size: 15px;
+  }
+  .cl-drawer__name-text span {
+    font-size: 9px;
+  }
+  .cl-drawer__close {
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+  }
+  .cl-drawer__spill {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__body {
+    gap: 9px;
+    padding: 8px 10px 14px;
+  }
+  .cl-drawer__stats {
+    gap: 6px;
+  }
+  .cl-drawer__stat {
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .cl-drawer__stat-label {
+    font-size: 10px;
+  }
+  .cl-drawer__stat-value {
+    font-size: 18px;
+  }
+  .cl-drawer__stat-sub {
+    font-size: 9px;
+  }
+  .cl-drawer__tab-btn {
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__tab-count {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    font-size: 9px;
+  }
+  .cl-drawer__stack {
+    gap: 9px;
+  }
+  .cl-drawer__card {
+    padding: 10px;
+    border-radius: 11px;
+  }
+  .cl-drawer__card-head {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__card-head h3 {
+    font-size: 12px;
+  }
+  .cl-drawer__card-meta {
+    font-size: 10px;
+  }
+  .cl-drawer__fields {
+    gap: 9px 12px;
+  }
+  .cl-drawer__field-label {
+    font-size: 9px;
+  }
+  .cl-drawer__field-value {
+    font-size: 11px;
+  }
+  .cl-drawer__services {
+    gap: 5px;
+  }
+  .cl-drawer__service {
+    gap: 6px;
+    font-size: 11px;
+  }
+  .cl-drawer__service-pill {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
 }
 
 /* ── 480px: small phone ── */
@@ -2662,7 +2759,7 @@
     font-size: 12px;
   }
   .cl-drawer__fields {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cl-drawer__stat-value {
     font-size: 18px;
