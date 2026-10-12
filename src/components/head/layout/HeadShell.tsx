@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { HeadSidebar } from './HeadSidebar'
 import { HeadTopbar } from './HeadTopbar'
-import { ImpersonationBanner } from './ImpersonationBanner'
 import { NotificationCenter } from './NotificationCenter'
 import type {
   HeadAccount,
@@ -58,7 +57,6 @@ export function HeadShell({
   topbarActions,
   notifications,
   onMarkAllRead,
-  impersonating,
   children,
   defaultSidebarOpen = true,
   dashboardHeaderMode = false,
@@ -108,13 +106,6 @@ export function HeadShell({
             {topbarContent}
           </HeadTopbar>
         )}
-
-        {impersonating ? (
-          <ImpersonationBanner
-            name={impersonating.name}
-            onExit={impersonating.onExit}
-          />
-        ) : null}
 
         <div className={`hbody${dashboardHeaderMode ? ' hbody--dashboard' : ''}`}>{children}</div>
       </main>
