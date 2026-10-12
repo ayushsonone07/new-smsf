@@ -8,6 +8,133 @@ export interface AirtelClickToCallResponse {
   success?: boolean
 }
 
+export interface AirtelCallsQuery {
+  search?: string
+  status?: string
+  callType?: string
+  fromDate?: string
+  toDate?: string
+  page?: number
+  size?: number
+  sortBy?: string
+  sortDir?: string
+}
+
+export interface AirtelParticipant {
+  id: number
+  participantIndex?: number
+  participantAddress?: string
+  participantName?: string
+  participantType?: string
+  status?: string
+  durationMs?: number
+}
+
+export interface AirtelCallSummary {
+  id: number
+  callTimestamp?: string
+  overallCallStatus?: string
+  callType?: string
+  customerName?: string
+  callerNumber?: string
+  callerCircleName?: string
+  airtelCallerId?: string
+  destinationNumber?: string
+  destinationName?: string
+  overallCallDuration?: string
+  durationMs?: number
+  conversationDurationMs?: number
+  hasRecording?: boolean
+  recordingUrl?: string
+  participantCount?: number
+  sessionId?: string
+}
+
+export interface AirtelCallDetail extends AirtelCallSummary {
+  callerOperatorName?: string
+  hangupCause?: string
+  participants?: AirtelParticipant[]
+}
+
+export interface AirtelAnalytics {
+  totalCalls?: number
+  uniqueCallers?: number
+  answeredCalls?: number
+  answerRate?: number
+  missedCalls?: number
+  otherCalls?: number
+  avgDurationMs?: number
+  totalConversationMs?: number
+  recordedCalls?: number
+}
+
+export interface AirtelPagination {
+  pageNumber: number
+  elementSize: number
+  totalElements: number
+  totalPage: number
+  first: boolean
+  last: boolean
+}
+
+export interface AirtelCallsPage extends AirtelPagination {
+  data: AirtelCallSummary[]
+}
+
+function queryString(query: AirtelCallsQuery): string {
+  const search = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
+  })
+  return search.toString()
+}
+
+function unwrap<T>(response: T | { data?: T }): T {
+  if (response && typeof response === 'object' && 'data' in response) {
+    const nested = (response as { data?: T }).data
+    if (nested !== undefined) return nested
+  }
+  return response as T
+}
+
+export async function getMyAirtelCalls(query: AirtelCallsQuery): Promise<AirtelCallsPage> {
+  return unwrap(await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `/v1/airtel/my-calls?${queryString(query)}`,
+  ))
+}
+
+export async function getMyAirtelAnalytics(query: AirtelCallsQuery): Promise<AirtelAnalytics> {
+  return unwrap(await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
+    `/v1/airtel/my-calls/analytics?${queryString(query)}`,
+  ))
+}
+
+export async function getDepartmentAirtelCalls(
+  query: AirtelCallsQuery,
+  departmentType: string,
+): Promise<AirtelCallsPage> {
+  const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
+  return unwrap(await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `/v1/airtel/department/calls?${search}`,
+  ))
+}
+
+export async function getDepartmentAirtelAnalytics(
+  query: AirtelCallsQuery,
+  departmentType: string,
+): Promise<AirtelAnalytics> {
+  const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
+  return unwrap(await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
+    `/v1/airtel/department/calls/analytics?${search}`,
+  ))
+}
+
+export async function getAirtelCallDetail(id: number): Promise<AirtelCallDetail> {
+  return unwrap(await authedApiRequest<AirtelCallDetail | { data: AirtelCallDetail }>(
+    `/v1/airtel/calls/${id}`,
+  ))
+}
+
 function sanitizePhone(raw?: string | null): string | null {
   if (!raw) return null
   const digits = String(raw).replace(/\D/g, '')

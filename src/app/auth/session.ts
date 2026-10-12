@@ -9,8 +9,7 @@ const ADMIN_BACKUP_KEY = 'smsf.auth.admin-backup'
 
 export function getSession(): AuthSession | null {
   try {
-    const raw =
-      sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY)
+    const raw = sessionStorage.getItem(SESSION_KEY)
 
     if (!raw) {
       return null
@@ -22,25 +21,122 @@ export function getSession(): AuthSession | null {
   }
 }
 
+export function getCurrentPhoneNumber(): string {
+  try {
+    const stored = sessionStorage.getItem('phoneNumber')
+    if (stored && stored !== 'XXXXXXXXXX' && stored.trim()) {
+      return stored.trim()
+    }
+    const session = getSession()
+    if (
+      session?.user.phoneNumber &&
+      session.user.phoneNumber !== 'XXXXXXXXXX'
+    ) {
+      sessionStorage.setItem('phoneNumber', session.user.phoneNumber)
+      return session.user.phoneNumber
+    }
+    if (session?.token && session.token.includes('.')) {
+      const payload = session.token.split('.')[1]
+      if (payload) {
+        const base64 = payload
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+        const claims = JSON.parse(atob(base64)) as Record<string, unknown>
+        const claimPhone =
+          typeof claims.phoneNumber === 'string'
+            ? claims.phoneNumber
+            : typeof claims.contact === 'string'
+              ? claims.contact
+              : ''
+        if (claimPhone && claimPhone !== 'XXXXXXXXXX' && claimPhone.trim()) {
+          sessionStorage.setItem('phoneNumber', claimPhone.trim())
+          return claimPhone.trim()
+        }
+      }
+    }
+  } catch {
+    // Ignore storage/decode errors
+  }
+  return ''
+}
+
+export function updateSessionPhoneNumber(phone: string): void {
+  const trimmed = phone.trim()
+  sessionStorage.setItem('phoneNumber', trimmed)
+  const session = getSession()
+  if (session) {
+    session.user.phoneNumber = trimmed
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  }
+}
+
 export function setSession(
   session: AuthSession,
 ): void {
+  const resolvedPhone =
+    session.user.phoneNumber ||
+    (() => {
+      try {
+        if (session.token && session.token.includes('.')) {
+          const payload = session.token.split('.')[1]
+          if (payload) {
+            const base64 = payload
+              .replace(/-/g, '+')
+              .replace(/_/g, '/')
+              .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+            const claims = JSON.parse(atob(base64)) as Record<string, unknown>
+            return typeof claims.phoneNumber === 'string'
+              ? claims.phoneNumber
+              : ''
+          }
+        }
+      } catch {
+        // Ignore
+      }
+      return ''
+    })()
+
+  if (resolvedPhone && resolvedPhone !== 'XXXXXXXXXX') {
+    session.user.phoneNumber = resolvedPhone
+    sessionStorage.setItem('phoneNumber', resolvedPhone)
+  }
+
   sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify(session),
   )
-  // Also store in localStorage as fallback for cold tab loads
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify(session),
-  )
+  sessionStorage.setItem('token', session.token)
+  sessionStorage.setItem('role', session.user.role)
+  if (session.user.departmentType) {
+    sessionStorage.setItem('departmentType', session.user.departmentType)
+  }
+
+  // Clear any legacy localStorage session to avoid cross-tab bleeding
+  try {
+    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(ADMIN_BACKUP_KEY)
+    localStorage.removeItem('token')
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY)
   sessionStorage.removeItem(ADMIN_BACKUP_KEY)
-  localStorage.removeItem(SESSION_KEY)
-  localStorage.removeItem(ADMIN_BACKUP_KEY)
+  sessionStorage.removeItem('token')
+  sessionStorage.removeItem('role')
+  sessionStorage.removeItem('departmentType')
+  sessionStorage.removeItem('phoneNumber')
+
+  try {
+    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(ADMIN_BACKUP_KEY)
+    localStorage.removeItem('token')
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 /** Parks the current (admin) session before switching to a department. */
@@ -51,18 +147,11 @@ export function saveAdminBackup(
     ADMIN_BACKUP_KEY,
     JSON.stringify(session),
   )
-  localStorage.setItem(
-    ADMIN_BACKUP_KEY,
-    JSON.stringify(session),
-  )
 }
 
 export function getAdminBackup(): AuthSession | null {
   try {
-    const raw =
-      sessionStorage.getItem(ADMIN_BACKUP_KEY) ||
-      localStorage.getItem(ADMIN_BACKUP_KEY)
-
+    const raw = sessionStorage.getItem(ADMIN_BACKUP_KEY)
     return raw ? (JSON.parse(raw) as AuthSession) : null
   } catch {
     return null
@@ -82,7 +171,6 @@ export function restoreAdminSession(): boolean {
 
   setSession(backup)
   sessionStorage.removeItem(ADMIN_BACKUP_KEY)
-  localStorage.removeItem(ADMIN_BACKUP_KEY)
 
   return true
 }
@@ -94,17 +182,28 @@ export function restoreAdminSession(): boolean {
 export function openSessionInNewTab(
   session: AuthSession,
   targetRoute: string,
+  existingWindow?: Window | null,
+  backupSession?: AuthSession | null,
 ): void {
-  const newWindow = window.open('', '_blank')
+  let targetWin = existingWindow
 
-  if (!newWindow) {
-    // Popup was blocked by browser, fallback to same tab
+  if (!targetWin) {
+    try {
+      targetWin = window.open('', '_blank')
+    } catch {
+      targetWin = null
+    }
+  }
+
+  if (!targetWin) {
+    // Popup was blocked by browser or unavailable, fallback to same tab
     setSession(session)
     window.location.href = targetRoute
     return
   }
 
   const sessionJson = JSON.stringify(session)
+  const backupJson = backupSession ? JSON.stringify(backupSession) : null
 
   const htmlContent = `<!DOCTYPE html>
 <html>
@@ -151,6 +250,11 @@ export function openSessionInNewTab(
     <script>
       try {
         sessionStorage.setItem('smsf.auth.session', ${JSON.stringify(sessionJson)});
+        sessionStorage.setItem('token', ${JSON.stringify(session.token)});
+        sessionStorage.setItem('role', ${JSON.stringify(session.user.role)});
+        ${session.user.departmentType ? `sessionStorage.setItem('departmentType', ${JSON.stringify(session.user.departmentType)});` : ''}
+        ${session.user.phoneNumber ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(session.user.phoneNumber)});` : ''}
+        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});` : ''}
         window.location.replace('${targetRoute}');
       } catch (e) {
         console.error('Failed to set session in sessionStorage', e);
@@ -160,9 +264,13 @@ export function openSessionInNewTab(
   </body>
 </html>`
 
-  newWindow.document.open()
-  newWindow.document.write(htmlContent)
-  newWindow.document.close()
+  try {
+    targetWin.document.open()
+    targetWin.document.write(htmlContent)
+    targetWin.document.close()
+  } catch {
+    targetWin.location.href = targetRoute
+  }
 }
 
 export type HomeRoute =

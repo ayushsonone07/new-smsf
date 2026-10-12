@@ -774,6 +774,47 @@
   color: #dc2626;
 }
 
+/* Clickable account row opens the profile settings menu. */
+.haccount__row--clickable {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.haccount__row--clickable:hover {
+  background: #fff;
+}
+
+.haccount__row--clickable:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 2px;
+}
+
+.haccount__row--clickable .haccount__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.haccount__chevron {
+  color: var(--c-faint);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.haccount__chevron.is-open {
+  transform: rotate(90deg);
+}
+
 .head-brand {
   display: flex;
   align-items: center;

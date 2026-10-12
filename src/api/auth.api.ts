@@ -63,7 +63,7 @@ function mapBackendRole(
   return 'USER'
 }
 
-function decodeJwtClaims(
+export function decodeJwtClaims(
   token: string,
 ): Record<string, unknown> {
   try {
@@ -91,6 +91,11 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
 
   const claims = decodeJwtClaims(token)
   const claimEmail = typeof claims.sub === 'string' ? claims.sub : undefined
+  const claimId = typeof claims.id === 'string' || typeof claims.id === 'number'
+    ? claims.id
+    : typeof claims.userId === 'string' || typeof claims.userId === 'number'
+      ? claims.userId
+      : undefined
   const claimRole = typeof claims.role === 'string' ? claims.role : undefined
   const claimIsHead = typeof claims.isHead === 'boolean' ? claims.isHead : undefined
   const claimDept = typeof claims.departmentType === 'string' ? claims.departmentType : undefined
@@ -106,15 +111,19 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
     throw new Error('Login response did not include an email/username')
   }
 
+  const rawPhone = (data.phoneNumber || data.contact || claimPhone || '').trim()
+  const phoneNumber =
+    rawPhone && rawPhone !== 'XXXXXXXXXX' ? rawPhone : undefined
+
   const user: AuthUser = {
-    id: String(data.id ?? email),
+    id: String(data.id ?? claimId ?? email),
     name: data.username || email,
     email,
     username: claimEmail || email,
     role: mapBackendRole(data.role ?? claimRole, data.isHead ?? claimIsHead),
     departmentType: data.departmentType || claimDept || undefined,
-    phoneNumber: data.phoneNumber || data.contact || claimPhone,
-    contact: data.contact || data.phoneNumber || claimPhone,
+    phoneNumber,
+    contact: phoneNumber,
   }
 
   return {

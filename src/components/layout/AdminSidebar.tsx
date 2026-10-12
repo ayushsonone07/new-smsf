@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import {
   clearSession,
   getSession,
 } from '../../app/auth/session'
 import type { UserRole } from '../../features/auth/types/auth.types'
+import { ProfileMenu } from '../common/ProfileMenu'
 
 type NavPath =
   | '/admin'
@@ -57,6 +59,7 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const session = getSession()
   const role = session?.user.role
@@ -76,7 +79,8 @@ export function AdminSidebar({
   }
 
   return (
-    <aside className="sidebar">
+    <>
+      <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">S</div>
 
@@ -128,7 +132,31 @@ export function AdminSidebar({
         })}
       </nav>
 
-      <div className="sidebar-footer">
+      {panelOpen ? (
+        <ProfileMenu
+          variant="dark"
+          onNavigate={() => {
+            setPanelOpen(false)
+            onNavigate?.()
+          }}
+        />
+      ) : null}
+
+      <div
+        className="sidebar-footer sidebar-footer--clickable"
+        role="button"
+        tabIndex={0}
+        title="Open profile settings"
+        aria-label="Open profile settings"
+        aria-expanded={panelOpen}
+        onClick={() => setPanelOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setPanelOpen((value) => !value)
+          }
+        }}
+      >
         <div className="admin-avatar">
           {role === 'HEAD'
             ? 'H'
@@ -144,15 +172,26 @@ export function AdminSidebar({
           <span>{role ?? '—'}</span>
         </div>
 
+        <span
+          className={`sidebar-footer__chevron${panelOpen ? ' is-open' : ''}`}
+          aria-hidden="true"
+        >
+          ›
+        </span>
+
         <button
           className="logout-button"
           aria-label="Logout"
           title="Logout"
-          onClick={handleLogout}
+          onClick={(event) => {
+            event.stopPropagation()
+            handleLogout()
+          }}
         >
           ↪
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }
