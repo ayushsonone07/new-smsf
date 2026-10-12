@@ -13,7 +13,9 @@ export function CustomerDashboardLayout({
   activeKey = 'dashboard',
   children,
 }: CustomerDashboardLayoutProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768,
+  )
 
   const notifications = [
     { id: 'customer-1', text: 'Your onboarding status has been updated.', timeLabel: 'Today', unread: true },
@@ -30,7 +32,10 @@ export function CustomerDashboardLayout({
       />
 
       <main className="cdb-main">
-        <CustomerDashboardTopbar notificationCount={3} />
+        <CustomerDashboardTopbar
+          notificationCount={3}
+          onToggleSidebar={() => setCollapsed((v) => !v)}
+        />
         {children}
       </main>
     </div>

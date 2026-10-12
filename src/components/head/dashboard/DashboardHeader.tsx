@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../shared/Icon'
 import { useNotificationCenter } from '../layout/NotificationCenter'
+import { useHeadShell } from '../layout/HeadShellContext'
 
 export interface DashboardHeaderProps {
   onRefresh?: () => void
@@ -36,6 +37,7 @@ export function DashboardHeader({
   subtitle,
 }: DashboardHeaderProps) {
   const notificationCenter = useNotificationCenter()
+  const shell = useHeadShell()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -65,6 +67,17 @@ export function DashboardHeader({
   return (
     <div className="hdb-banner">
       <div className="hdb-banner__left">
+        {shell ? (
+          <button
+            type="button"
+            className="hdb-banner__menu"
+            title="Toggle navigation"
+            aria-label="Toggle navigation"
+            onClick={shell.toggleSidebar}
+          >
+            <Icon name="menu" size={18} strokeWidth={2} />
+          </button>
+        ) : null}
         <div className="hdb-banner__icon-box">
           <Icon name="bar" size={22} strokeWidth={2.2} />
         </div>
