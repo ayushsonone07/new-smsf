@@ -208,32 +208,6 @@ export async function getOnboardingDashboardSummary(
 ): Promise<OnboardingDashboardSummary> {
   const dept = params.department ?? summaryDepartment()
 
-  // 1. Primary: fetch from /api/auth/onboarding/summary
-  try {
-    const authData = await getAuthOnboardingSummary({
-      department: dept,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      allTime: params.allTime,
-    })
-
-    if (
-      authData &&
-      (authData.totalCustomers !== undefined ||
-        authData.total !== undefined ||
-        authData.teamTarget !== undefined)
-    ) {
-      return normalizeAuthSummaryToDashboardSummary(authData, {
-        startDate: params.startDate,
-        endDate: params.endDate,
-        allTime: params.allTime,
-      })
-    }
-  } catch (err) {
-    console.warn('Could not fetch from /api/auth/onboarding/summary, falling back:', err)
-  }
-
-  // 2. Fallback: /api/onboarding/dashboard/summary
   const search = new URLSearchParams()
 
   search.set(

@@ -4,16 +4,6 @@ export interface ActiveDayData {
   isActive?: boolean
 }
 
-const DEFAULT_DAYS: ActiveDayData[] = [
-  { day: 'Mon', value: 28 },
-  { day: 'Tue', value: 36 },
-  { day: 'Wed', value: 58, isActive: true },
-  { day: 'Thu', value: 32 },
-  { day: 'Fri', value: 34 },
-  { day: 'Sat', value: 24 },
-  { day: 'Sun', value: 20 },
-]
-
 export interface MostActiveDayProps {
   days?: ActiveDayData[]
 }
@@ -21,8 +11,13 @@ export interface MostActiveDayProps {
 /**
  * Most Active Day weekly completions bar chart widget.
  */
-export function MostActiveDay({ days = DEFAULT_DAYS }: MostActiveDayProps) {
-  const maxVal = Math.max(...days.map((d) => d.value), 60)
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+export function MostActiveDay({ days = [] }: MostActiveDayProps) {
+  const maxVal = Math.max(...days.map((d) => d.value), 1)
+  const chartDays: ActiveDayData[] = days.length > 0
+    ? days
+    : WEEKDAYS.map((day) => ({ day, value: 0 }))
 
   return (
     <div className="hdb-card">
@@ -34,7 +29,7 @@ export function MostActiveDay({ days = DEFAULT_DAYS }: MostActiveDayProps) {
       </div>
 
       <div className="hdb-active-day__chart">
-        {days.map((item) => {
+        {chartDays.map((item) => {
           const heightPercent = Math.round((item.value / maxVal) * 100)
 
           return (

@@ -33,7 +33,7 @@ export interface OnboardingCustomer {
   /** Contact column */
   email: string
   phone: string
-  callStatus: CallStatus
+  callStatus?: CallStatus
   /** Status column */
   status: OnboardingStatus
   /** Assign To column — null = Unassigned */
@@ -811,28 +811,22 @@ function CustomerRow({
             </button>
           </div>
 
-        <span
-          className={`cl-contact-pill cl-contact-pill--${
-            customer.callStatus === 'connected' ? 'connected' : 'not-answered'
-          }`}
-        >
+        {customer.callStatus ? (
           <span
-            className={`cl-contact-dot cl-contact-dot--${
-              customer.callStatus === 'connected'
-                ? 'connected'
-                : 'not-answered'
+            className={`cl-contact-pill cl-contact-pill--${
+              customer.callStatus === 'connected' ? 'connected' : 'not-answered'
             }`}
           >
             <span
               className={`cl-contact-dot cl-contact-dot--${
-                customer.callStatus === 'connected'
-                  ? 'connected'
-                  : 'not-answered'
+                customer.callStatus === 'connected' ? 'connected' : 'not-answered'
               }`}
             />
             {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
           </span>
-        </span>
+        ) : (
+          <span className="cl-contact-pill">Not recorded</span>
+        )}
         </td>
       )}
 

@@ -29,7 +29,6 @@ import { getSession } from '../../../../app/auth/session'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
-import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { useAuthOnboardingSummary } from '../../hooks/useAuthOnboardingSummary'
 import {
   summaryDepartment,
@@ -62,18 +61,14 @@ function shiftDays(date: Date, days: number): Date {
   return next
 }
 
-/** Convert local date to ISO datetime string (start of day: 00:00:00). */
+/** Format local date-time boundaries expected by the backend (without UTC conversion). */
 function toStartOfDayIso(date: Date): string {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString().slice(0, 19) // "2026-10-10T00:00:00"
+  return `${toIsoDate(date)}T00:00:00`
 }
 
-/** Convert local date to ISO datetime string (end of day: 23:59:59). */
+/** Format local date-time boundaries expected by the backend (without UTC conversion). */
 function toEndOfDayIso(date: Date): string {
-  const d = new Date(date)
-  d.setHours(23, 59, 59, 0)
-  return d.toISOString().slice(0, 19) // "2026-10-10T23:59:59"
+  return `${toIsoDate(date)}T23:59:59`
 }
 
 function rangeFor(period: string): {
@@ -205,7 +200,9 @@ function HeadDashboard() {
     [authRange, department],
   )
 
-  const authSummaryQuery = useAuthOnboardingSummary(authSummaryParams)
+  const authSummaryQuery = useAuthOnboardingSummary(authSummaryParams, {
+    enabled: !isGoogle,
+  })
 
   const membersParams = useMemo(
     () => ({
@@ -219,7 +216,6 @@ function HeadDashboard() {
   )
 
   const infiniteMembersQuery = useInfiniteOnboardingDashboardMembers(membersParams)
-  const assigningUsersQuery = useAssigningUsers(currentDepartment)
   const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
 
@@ -227,23 +223,23 @@ function HeadDashboard() {
     setRefreshKey((k) => k + 1)
     summaryQuery.refetch()
     infiniteMembersQuery.refetch()
-    assigningUsersQuery.refetch()
-    authSummaryQuery.refetch()
+    if (!isGoogle) authSummaryQuery.refetch()
     refetchPermissions()
   }
 
-  const authKpis = authSummaryQuery.data
+  const authSummaryData = isGoogle ? undefined : authSummaryQuery.data
+  const authKpis = authSummaryData
 
-  // Merge KPIs from both APIs, preferring auth summary when available
+  // Keep dashboard totals and chart data on the same endpoint when available.
   const mergedKpis = {
-    totalCustomers: authKpis?.totalCustomers ?? summaryQuery.data?.kpis?.totalCustomers ?? 0,
-    totalOnboarded: authKpis?.totalOnboardedCustomers ?? summaryQuery.data?.kpis?.totalOnboarded ?? 0,
-    totalCompleted: authKpis?.totalCompletedOnboarding ?? summaryQuery.data?.kpis?.totalCompleted ?? 0,
-    totalInProgress: authKpis?.totalInProgressOnboarding ?? summaryQuery.data?.kpis?.totalInProgress ?? 0,
-    totalPending: authKpis?.totalPendingOnboarding ?? summaryQuery.data?.kpis?.totalPending ?? 0,
-    totalDelayed: authKpis?.totalOnboardingTimeExceedingCustomers ?? summaryQuery.data?.kpis?.totalDelayed ?? 0,
-    presentUsers: authKpis?.presentUsers ?? summaryQuery.data?.kpis?.presentUsers ?? 0,
-    absentUsers: authKpis?.absentUsers ?? summaryQuery.data?.kpis?.absentUsers ?? 0,
+    totalCustomers: summaryQuery.data?.kpis?.totalCustomers ?? authKpis?.totalCustomers ?? 0,
+    totalOnboarded: summaryQuery.data?.kpis?.totalOnboarded ?? authKpis?.totalOnboardedCustomers ?? 0,
+    totalCompleted: summaryQuery.data?.kpis?.totalCompleted ?? authKpis?.totalCompletedOnboarding ?? 0,
+    totalInProgress: summaryQuery.data?.kpis?.totalInProgress ?? authKpis?.totalInProgressOnboarding ?? 0,
+    totalPending: summaryQuery.data?.kpis?.totalPending ?? authKpis?.totalPendingOnboarding ?? 0,
+    totalDelayed: summaryQuery.data?.kpis?.totalDelayed ?? authKpis?.totalOnboardingTimeExceedingCustomers ?? 0,
+    presentUsers: summaryQuery.data?.kpis?.presentUsers ?? authKpis?.presentUsers ?? 0,
+    absentUsers: summaryQuery.data?.kpis?.absentUsers ?? authKpis?.absentUsers ?? 0,
   }
 
   const statsData: Partial<DashboardStatsData> | undefined = mergedKpis
@@ -304,7 +300,7 @@ function HeadDashboard() {
     }
 
     // Fallback to auth summary team members if infiniteMembersQuery returned 0 items
-    const authMembers = authSummaryQuery.data?.teamMembers
+    const authMembers = authSummaryData?.teamMembers
     const sourceList =
       allMembers.length > 0
         ? allMembers
@@ -339,7 +335,7 @@ function HeadDashboard() {
       })
     }
     return []
-  }, [infiniteMembersQuery.data, authSummaryQuery.data?.teamMembers])
+  }, [infiniteMembersQuery.data, authSummaryData?.teamMembers])
 
   const totalMembers = infiniteMembersQuery.data?.pages?.[0]?.totalMembers
 
@@ -377,14 +373,20 @@ function HeadDashboard() {
   }))
 
   // Use auth summary for delay breakdown and team target
-  const delayBreakdown = authSummaryQuery.data?.delayBreakdown ?? summaryQuery.data?.delayBreakdown
+  const delayBreakdown = summaryQuery.data?.delayBreakdown ?? authSummaryData?.delayBreakdown
   const totalDelayed =
-    authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers ??
     summaryQuery.data?.totalDelayed ??
     mergedKpis?.totalDelayed ??
-    9
+    authSummaryData?.totalOnboardingTimeExceedingCustomers
 
-  const teamTarget = authSummaryQuery.data?.teamTarget ?? summaryQuery.data?.teamTarget
+  const teamTarget = summaryQuery.data?.teamTarget ?? authSummaryData?.teamTarget
+  const hasDelayBreakdown =
+    delayBreakdown?.available !== false &&
+    Boolean(
+      delayBreakdown?.clientSide ||
+      delayBreakdown?.ourSide ||
+      delayBreakdown?.techOtherDepartment,
+    )
 
   return (
     <motion.div
@@ -434,7 +436,7 @@ function HeadDashboard() {
         <div className="hdb-row-three-col">
           <StatusBreakdown
             pendingCount={
-              authSummaryQuery.data?.totalPendingOnboarding ??
+              authSummaryData?.totalPendingOnboarding ??
               summaryQuery.data?.statusBreakdown?.pending?.count ??
               mergedKpis?.totalPending
             }
@@ -442,7 +444,7 @@ function HeadDashboard() {
               summaryQuery.data?.statusBreakdown?.pending?.percentage
             }
             inProgressCount={
-              authSummaryQuery.data?.totalInProgressOnboarding ??
+              authSummaryData?.totalInProgressOnboarding ??
               summaryQuery.data?.statusBreakdown?.inProgress?.count ??
               mergedKpis?.totalInProgress
             }
@@ -450,7 +452,7 @@ function HeadDashboard() {
               summaryQuery.data?.statusBreakdown?.inProgress?.percentage
             }
             completedCount={
-              authSummaryQuery.data?.totalCompletedOnboarding ??
+              authSummaryData?.totalCompletedOnboarding ??
               summaryQuery.data?.statusBreakdown?.completed?.count ??
               mergedKpis?.totalCompleted
             }
@@ -458,7 +460,7 @@ function HeadDashboard() {
               summaryQuery.data?.statusBreakdown?.completed?.percentage
             }
             delayedCount={
-              authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers ??
+              authSummaryData?.totalOnboardingTimeExceedingCustomers ??
               summaryQuery.data?.statusBreakdown?.delayed?.count ??
               mergedKpis?.totalDelayed
             }
@@ -466,9 +468,10 @@ function HeadDashboard() {
               summaryQuery.data?.statusBreakdown?.delayed?.percentage
             }
           />
-          <MostActiveDay days={activeDays} />
+          <MostActiveDay days={activeDays ?? []} />
           <DelayWhoseSide
             totalDelayed={totalDelayed}
+            available={hasDelayBreakdown}
             clientCount={delayBreakdown?.clientSide?.count}
             clientPercent={delayBreakdown?.clientSide?.percentage}
             ourSideCount={delayBreakdown?.ourSide?.count}
