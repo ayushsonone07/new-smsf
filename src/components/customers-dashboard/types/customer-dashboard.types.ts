@@ -13,8 +13,8 @@ export interface CustomerServiceItem {
   categoryName: string
   dotColor?: 'blue' | 'green' | 'purple' | 'amber'
   status: 'In progress' | 'Completed' | 'Pending'
-  completedCount: number
-  totalCount: number
+  completedCount?: number
+  totalCount?: number
   tasks: ServiceTask[]
 }
 
@@ -33,8 +33,8 @@ export interface CustomerProfile {
   status: 'Pending' | 'Active' | 'Completed'
   packageName: string
   packageDuration: string
-  onboardingStepText: string
-  onboardingProgressPercent: number
+  onboardingStepText?: string
+  onboardingProgressPercent?: number
   executive: ExecutiveInfo
 }
 
@@ -75,7 +75,7 @@ export interface CreateTicketInput {
 
 export interface CustomerDashboardData {
   profile: CustomerProfile
-  meeting: UpcomingMeeting
+  meeting?: UpcomingMeeting
   services: CustomerServiceItem[]
   updates: RecentUpdate[]
   tickets: SupportTicket[]
