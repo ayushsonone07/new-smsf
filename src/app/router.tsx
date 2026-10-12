@@ -206,6 +206,12 @@ const customerDetailsRoute = createRoute({
   component: CustomerDetailsPage,
 })
 
+const directCustomerDetailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/customer-details',
+  component: CustomerDetailsPage,
+})
+
 const forbiddenRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/forbidden',
@@ -456,6 +462,67 @@ const googleHeadDynamicScreenRoute = createRoute({
   component: HeadScreenPage,
 })
 
+const googleUserLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_google_user',
+  component: () => <HeadConsoleLayout portalRole="USER" />,
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+})
+
+const googleUserIndexRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const googleUserDashboardRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/dashboard',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const googleUserAttendanceRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/attendance',
+  component: () => <HeadScreenPage screenOverride="attendance" />,
+})
+
+const googleUserCustomersRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/customers',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const googleUserCustomerListRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/customer-list',
+  component: () => <HeadScreenPage screenOverride="customers" />,
+})
+
+const googleUserHistoryRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/history',
+  component: () => <HeadScreenPage screenOverride="history" />,
+})
+
+const googleUserHelpSupportRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/help-support',
+  component: () => <HeadScreenPage screenOverride="help-support" />,
+})
+
+const googleUserHelpCenterRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/help-center',
+  component: () => <HeadScreenPage screenOverride="help-support" />,
+})
+
+const googleUserDynamicScreenRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/$screen',
+  component: HeadScreenPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -472,6 +539,17 @@ const routeTree = rootRoute.addChildren([
     googleHeadHelpSupportRoute,
     googleHeadHelpCenterRoute,
     googleHeadDynamicScreenRoute,
+  ]),
+  googleUserLayoutRoute.addChildren([
+    googleUserIndexRoute,
+    googleUserDashboardRoute,
+    googleUserAttendanceRoute,
+    googleUserCustomersRoute,
+    googleUserCustomerListRoute,
+    googleUserHistoryRoute,
+    googleUserHelpSupportRoute,
+    googleUserHelpCenterRoute,
+    googleUserDynamicScreenRoute,
   ]),
   onboardingLayoutRoute.addChildren([
     onboardingIndexRoute,
@@ -517,6 +595,7 @@ const routeTree = rootRoute.addChildren([
     customerDashboardRoute,
     customerDetailsRoute,
   ]),
+  directCustomerDetailsRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,
   departmentHelpCenterRoute,

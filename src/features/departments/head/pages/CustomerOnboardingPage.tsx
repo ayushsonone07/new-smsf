@@ -13,6 +13,7 @@ import {
 } from '../../../../components/head/customers-list/CustomersListFilters'
 import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import { OnboardingConfirmationModal } from '../../../../components/head/customers-list/OnboardingConfirmationModal'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { getSession } from '../../../../app/auth/session'
@@ -21,6 +22,8 @@ import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
+import { updateOnboardingStatus } from '../../../../api/department-users.api'
+import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 
 const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
   id: user.id,
@@ -47,6 +50,8 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const [overrides, setOverrides] = useState<Record<string, OnboardingOverrides>>({})
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
+  const [modalTab, setModalTab] = useState<any>(undefined)
+  const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
 
   const screenPermission = getSession()?.user.role === 'USER'
     ? feature.roleBPermission
@@ -57,23 +62,32 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = getSession()?.user.role === 'USER'
+
+  const role = (getSession()?.user.role || '').toUpperCase()
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.includes('/google-user') ||
+        window.location.pathname.includes('/onboarding-user') ||
+        window.location.pathname.includes('/users')))
 
   const isAssignToVisible =
-    isColumnEnabled('Assign To') ||
-    isColumnEnabled('Assign') ||
-    isColumnEnabled('Assignee')
+    !isDeptUser &&
+    (isColumnEnabled('Assign To') ||
+      isColumnEnabled('Assign') ||
+      isColumnEnabled('Assignee'))
   const canEditAssignTo =
-    canEditColumn('Assign To') ||
-    canEditColumn('Assign') ||
-    canEditColumn('Assignee')
+    !isDeptUser &&
+    (canEditColumn('Assign To') ||
+      canEditColumn('Assign') ||
+      canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark =
-    canEditColumn('Internal Remark') ||
-    canEditColumn('Remark')
+  const canEditRemark = getSession()?.user.role === 'USER'
 
   const isContactVisible =
     isColumnEnabled('Contact') ||
@@ -100,6 +114,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
           }),
           email: customer.email,
           phone: customer.phone,
+          formUrl: getCustomerFormUrl(customer.phone, (customer.duplicateCount ?? 0) > 0),
           callStatus: index % 3 === 1 ? 'not-answered' : 'connected',
           status: override?.status ?? (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
           assigneeId:
@@ -157,7 +172,6 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   }
 
   function patchCustomer(id: string, patch: OnboardingOverrides) {
-    if (!canEdit) return
     setOverrides((current) => ({
       ...current,
       [id]: { ...current[id], ...patch },
@@ -204,11 +218,29 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        onStatusChange={(id, status) => patchCustomer(id, { status })}
+        onStatusChange={(id, status) => {
+          if (status === 'completed') {
+            const target =
+              filteredCustomers.find((c) => c.id === id) ||
+              onboardingCustomers.find((c) => c.id === id)
+            if (target) {
+              setConfirmingCustomer(target)
+              return
+            }
+          }
+          patchCustomer(id, { status })
+          updateOnboardingStatus(id, status).catch(console.error)
+        }}
         onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
         onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
-        onOpenDetail={setSelectedCustomer}
-        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
+        onOpenDetail={(cust, tab) => {
+          setSelectedCustomer(cust)
+          setModalTab(tab)
+        }}
+        onOpenDuplicate={(cust) => {
+          setSelectedCustomer(cust)
+          setModalTab('duplicates')
+        }}
       />
       <CustomersListModal
         customer={selectedCustomer}
@@ -216,7 +248,20 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         departmentType="ONBOARDING_DEPARTMENT"
-        onClose={() => setSelectedCustomer(null)}
+        initialTab={modalTab}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
+      />
+      <OnboardingConfirmationModal
+        open={Boolean(confirmingCustomer)}
+        customer={confirmingCustomer}
+        onClose={() => setConfirmingCustomer(null)}
+        onSuccess={() => {
+          setConfirmingCustomer(null)
+          customersQuery.refetch()
+        }}
       />
     </>
   )

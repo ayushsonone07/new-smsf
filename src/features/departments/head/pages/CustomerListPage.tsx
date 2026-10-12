@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
   CustomersList,
   type OnboardingAssignee,
   type OnboardingCustomer,
+  type OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
 import {
   CustomersListFilters,
@@ -12,11 +14,20 @@ import {
 } from '../../../../components/head/customers-list/CustomersListFilters'
 import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import { OnboardingConfirmationModal } from '../../../../components/head/customers-list/OnboardingConfirmationModal'
+import { ServiceFlowModal } from '../../../../components/head/customers-list/ServiceFlowModal'
+import { GoogleInfoModal } from '../../../../components/head/customers-list/GoogleInfoModal'
+import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
+import {
+  getDepartmentConfig,
+  getServiceFlows,
+  updateDepartmentServiceStatus,
+  extractServiceTags,
+} from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
-import { useCustomerDrawerDetails } from '../../hooks/useCustomerDrawerDetails'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
@@ -24,11 +35,14 @@ import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
   useDepartmentCustomerRows,
+  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
-import { assignCustomerUser } from '../../../../api/department-users.api'
+import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
 import { TablePagination } from '../../../../components/ui/TablePagination'
+import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
+import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -50,7 +64,11 @@ export function CustomerListPage() {
   const rawDepartment = session?.user.departmentType || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
-    (typeof window !== 'undefined' && window.location.pathname.startsWith('/google-head'))
+    (typeof window !== 'undefined' && (
+      window.location.pathname.startsWith('/google-head') ||
+      window.location.pathname.startsWith('/google-user') ||
+      window.location.pathname.startsWith('/google')
+    ))
   const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT')
 
   const customersQuery = useDepartmentCustomers(departmentId, { enabled: !isGoogle })
@@ -65,33 +83,64 @@ export function CustomerListPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
-  const customerDrawerDetails = useCustomerDrawerDetails(selectedCustomer)
+  const [modalTab, setModalTab] = useState<any>(undefined)
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
+  const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
+  const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
+  const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
+  const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
+  const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
+
+  // 1. Google Department Config: GET /api/dept-config/GOOGLE_DEPARTMENT
+  useQuery({
+    queryKey: ['deptConfig', 'GOOGLE_DEPARTMENT'],
+    queryFn: () => getDepartmentConfig('GOOGLE_DEPARTMENT'),
+    enabled: isGoogle,
+  })
+
+  // 2. Google Service Flows: GET /api/service/flows?page=0&size=1000
+  useQuery({
+    queryKey: ['serviceFlows', 'all'],
+    queryFn: () => getServiceFlows({ page: 0, size: 1000 }),
+    enabled: isGoogle,
+  })
+
+  // 3. Google Department Users: GET /api/auth/department/users?page=0&size=100
+  useDepartmentUsersList({ page: 0, size: 100 }, { enabled: isGoogle })
 
   const canEdit = columnFeatures.canEdit('actions')
+
+  const role = (session?.user?.role || '').toUpperCase()
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.includes('/google-user') ||
+        window.location.pathname.includes('/onboarding-user') ||
+        window.location.pathname.includes('/users')))
 
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment)
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = isDeptUser || canEditColumn('Status')
 
   const isAssignToVisible =
-    isColumnEnabled('Assign To') ||
-    isColumnEnabled('Assign') ||
-    isColumnEnabled('Assignee')
+    !isDeptUser &&
+    (isColumnEnabled('Assign To') ||
+      isColumnEnabled('Assign') ||
+      isColumnEnabled('Assignee'))
   const canEditAssignTo =
-    canEditColumn('Assign To') ||
-    canEditColumn('Assign') ||
-    canEditColumn('Assignee')
+    !isDeptUser &&
+    (canEditColumn('Assign To') ||
+      canEditColumn('Assign') ||
+      canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark =
-    canEditColumn('Internal Remark') ||
-    canEditColumn('Remark')
+  const canEditRemark = session?.user.role === 'USER'
 
   const isContactVisible =
     isColumnEnabled('Contact') ||
@@ -265,13 +314,23 @@ export function CustomerListPage() {
             : 'Recent',
           email,
           phone,
+          formUrl:
+            getCustomerFormUrl(phone || (c as any).contact, hasDuplicates) ||
+            c.onboardingLink ||
+            (c.customerDetails as any)?.onboardingLink ||
+            '',
+          serviceType: c.serviceType || 'GOOGLE SERVICE',
           callStatus: 'connected',
-          status,
+          status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
-          remark: c.remark ?? '',
+          remark: getLatestInternalRemark(c, ['GOOGLE_DEPARTMENT', 'ONBOARDING_DEPARTMENT']) || c.remark || '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
+          serviceTags: extractServiceTags(c),
+          subServiceInfo: (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
+          services: (c as any).services || [],
+          rawCustomer: c,
         }
       })
     }
@@ -312,19 +371,26 @@ export function CustomerListPage() {
             : 'Recent',
           email: c.email || '',
           phone: c.phoneNumber || c.contact || '',
-          formUrl: c.onboardingLink,
+          formUrl:
+            getCustomerFormUrl(c.phoneNumber || c.contact, hasDuplicates) ||
+            c.onboardingLink ||
+            '',
           callStatus: 'connected',
           status:
-            c.onboardingStatus?.toLowerCase() === 'completed'
-              ? 'completed'
-              : c.onboardingStatus?.toLowerCase() === 'in_progress'
-                ? 'in-progress'
-                : 'pending',
+            localStatusMap[id] !== undefined
+              ? localStatusMap[id]
+              : c.onboardingStatus?.toLowerCase() === 'completed'
+                ? 'completed'
+                : c.onboardingStatus?.toLowerCase() === 'in_progress'
+                  ? 'in-progress'
+                  : 'pending',
           assigneeId: assigned,
-          remark: c.remark ?? c.internalRemark ?? '',
+          remark: getLatestInternalRemark(c, ['ONBOARDING_DEPARTMENT']) || c.remark || c.internalRemark || '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
+          serviceTags: extractServiceTags(c),
+          rawCustomer: c,
         }
       })
     }
@@ -343,12 +409,15 @@ export function CustomerListPage() {
         }),
       email: customer.email,
       phone: customer.phone,
+      formUrl: getCustomerFormUrl(customer.phone, (customer.duplicateCount ?? 0) > 0),
       callStatus:
         customer.callStatus ??
         (index % 3 === 1 ? 'not-answered' : 'connected'),
       status:
-        customer.onboardingStatus ??
-        (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
+        localStatusMap[customer.id] !== undefined
+          ? localStatusMap[customer.id]
+          : customer.onboardingStatus ??
+            (customer.status === 'ACTIVE' ? 'in-progress' : 'pending'),
       assigneeId: localAssigneeMap[customer.id] ?? customer.assigneeId ?? null,
       remark: customer.remark ?? '',
       businessRelationType: customer.businessRelationType,
@@ -356,6 +425,8 @@ export function CustomerListPage() {
       businessIndex: customer.businessIndex,
       duplicateCount: customer.duplicateCount,
       hasDuplicateCustomer: (customer.duplicateCount ?? 0) > 0,
+      serviceTags: extractServiceTags(customer),
+      rawCustomer: customer,
     }))
   }, [
     isGoogle,
@@ -363,6 +434,7 @@ export function CustomerListPage() {
     onboardingApiQuery.data?.customers,
     customersQuery.data,
     localAssigneeMap,
+    localStatusMap,
     page,
     size,
   ])
@@ -490,8 +562,86 @@ export function CustomerListPage() {
     }
   }
 
+  async function handleStatusChange(customerId: string, status: OnboardingStatus) {
+    if (!isDeptUser && !canEditStatus) {
+      alert("You don't have permission to update status.")
+      return
+    }
+
+    // Customer acknowledgement is strictly required before marking Completed for Onboarding department
+    if (!isGoogle && status === 'completed') {
+      const target =
+        filteredCustomers.find((c) => c.id === customerId) ||
+        onboardingCustomers.find((c) => c.id === customerId)
+      if (target) {
+        setConfirmingCustomer(target)
+        return
+      }
+    }
+
+    // For Google Department, all sub-services must be completed before marking Completed
+    if (isGoogle && status === 'completed') {
+      const target =
+        filteredCustomers.find((c) => c.id === customerId) ||
+        onboardingCustomers.find((c) => c.id === customerId)
+
+      let allDone = false
+      if (Array.isArray(target?.subServiceInfo) && target.subServiceInfo.length > 0) {
+        allDone = target.subServiceInfo.every((sub: any) => {
+          const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
+          return String(st).toUpperCase() === 'COMPLETED'
+        })
+      } else if (Array.isArray(target?.services) && target.services.length > 0) {
+        allDone = target.services.every((s: any) => String(s?.status).toUpperCase() === 'COMPLETED')
+      }
+
+      if (!allDone) {
+        alert('All sub-services must be completed and acknowledgement sent before marking the main service as completed.')
+        return
+      }
+    }
+
+    const prevStatus = localStatusMap[customerId]
+    setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
+
+    try {
+      if (isGoogle) {
+        const target =
+          filteredCustomers.find((c) => c.id === customerId) ||
+          onboardingCustomers.find((c) => c.id === customerId)
+        const oldStatus = target?.status || 'PENDING'
+        const sType = target?.serviceType || 'GOOGLE SERVICE'
+
+        await updateDepartmentServiceStatus({
+          customerId,
+          serviceType: sType,
+          newStatus: status,
+          oldStatus,
+          departmentType: currentDepartment,
+        })
+      } else {
+        await updateOnboardingStatus(customerId, status)
+      }
+
+      await activeCustomerQuery.refetch()
+      if (!isGoogle) await authSummaryQuery.refetch()
+    } catch (err: unknown) {
+      console.error('Failed to update status:', err)
+      const msg = err instanceof Error ? err.message : 'Unable to update status'
+      alert(`Status update failed: ${msg}`)
+      setLocalStatusMap((prev) => {
+        const next = { ...prev }
+        if (prevStatus !== undefined) {
+          next[customerId] = prevStatus
+        } else {
+          delete next[customerId]
+        }
+        return next
+      })
+    }
+  }
+
   function patchCustomer(id: string, patch: UpdateCustomerRequest) {
-    if (!canEdit) return
     updateMutation.mutate({ id, data: patch })
   }
 
@@ -529,11 +679,20 @@ export function CustomerListPage() {
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        onOpenDetail={setSelectedCustomer}
-        onOpenDuplicate={(cust) => setSelectedCustomer(cust)}
-        onStatusChange={(id, status) =>
-          patchCustomer(id, { onboardingStatus: status })
-        }
+        showServiceType={isGoogle}
+        isGoogle={isGoogle}
+        onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
+        onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
+        onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
+        onOpenDetail={(cust, tab) => {
+          setSelectedCustomer(cust)
+          setModalTab(tab)
+        }}
+        onOpenDuplicate={(cust) => {
+          setSelectedCustomer(cust)
+          setModalTab('duplicates')
+        }}
+        onStatusChange={(id, status) => handleStatusChange(id, status)}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) =>
           patchCustomer(id, { remark })
@@ -557,11 +716,53 @@ export function CustomerListPage() {
       <CustomersListModal
         customer={selectedCustomer}
         assignees={assignees}
-        apiDetails={customerDrawerDetails}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
         departmentType={currentDepartment}
-        onClose={() => setSelectedCustomer(null)}
+        initialTab={modalTab}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
+      />
+
+      <ServiceFlowModal
+        customer={serviceFlowCustomer}
+        isOpen={Boolean(serviceFlowCustomer)}
+        onClose={() => setServiceFlowCustomer(null)}
+        departmentType={currentDepartment}
+        onStepsUpdated={() => {
+          activeCustomerQuery.refetch()
+        }}
+        onSubServiceStatusUpdated={() => {
+          activeCustomerQuery.refetch()
+        }}
+      />
+
+      <ServiceTagsModal
+        isOpen={Boolean(serviceTagsCustomer)}
+        customer={serviceTagsCustomer}
+        onClose={() => setServiceTagsCustomer(null)}
+        onTagsUpdated={() => {
+          activeCustomerQuery.refetch()
+        }}
+      />
+
+      <GoogleInfoModal
+        customer={googleInfoCustomer}
+        isOpen={Boolean(googleInfoCustomer)}
+        onClose={() => setGoogleInfoCustomer(null)}
+      />
+
+      <OnboardingConfirmationModal
+        open={Boolean(confirmingCustomer)}
+        customer={confirmingCustomer}
+        onClose={() => setConfirmingCustomer(null)}
+        onSuccess={() => {
+          setConfirmingCustomer(null)
+          activeCustomerQuery.refetch()
+          authSummaryQuery.refetch()
+        }}
       />
     </>
   )

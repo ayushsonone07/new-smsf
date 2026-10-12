@@ -13,16 +13,20 @@ import {
   type AuthOnboardingSummaryParams,
 } from '../../../api/onboarding-dashboard.api'
 
-export function useDepartmentUsersList(params: {
-  page?: number
-  size?: number
-  search?: string
-} = {}) {
+export function useDepartmentUsersList(
+  params: {
+    page?: number
+    size?: number
+    search?: string
+  } = {},
+  options?: { enabled?: boolean },
+) {
   return useQuery<DepartmentUsersPageResponse>({
     queryKey: ['department-users-list', params],
     queryFn: () => getDepartmentUsers(params),
     staleTime: 30_000,
     placeholderData: (previousData) => previousData,
+    enabled: options?.enabled,
   })
 }
 

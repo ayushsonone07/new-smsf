@@ -12,8 +12,13 @@ import { SectionCard } from '../../../../components/head/shared/SectionCard'
 import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
+import { Icon } from '../../../../components/head/shared/Icon'
+import { FlowBuilderModal } from '../components/FlowBuilderModal'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import './MeetingPage.css'
+
+const PENCIL_ICON = 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'
+const GIT_BRANCH_ICON = 'M6 3v6m0 0a3 3 0 1 0 3 3V9a3 3 0 0 0-3-3Zm12 6v6m0 0a3 3 0 1 0 3 3v-6a3 3 0 0 0-3-3ZM6 9h12'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -32,6 +37,7 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const [editingFlow, setEditingFlow] = useState<ServiceFlowItem | null>(null)
   const pageSize = 10
 
   // 1. Service Flows API: /api/service/flows?page=0&size=10
@@ -130,18 +136,59 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <div>
-                          <h4 style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                            {flow.departmentServiceName}
-                          </h4>
-                          <span style={{ fontSize: 12, color: '#64748b' }}>
-                            Service ID: {flow.departmentServiceId} • {flow.departmentType}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span
+                            style={{
+                              display: 'grid',
+                              placeItems: 'center',
+                              width: 40,
+                              height: 40,
+                              borderRadius: 10,
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon name="flow" d={GIT_BRANCH_ICON} size={20} strokeWidth={2} />
                           </span>
+                          <div>
+                            <h4 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                              {flow.departmentServiceName}
+                            </h4>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>
+                              {steps.length} {steps.length === 1 ? 'step' : 'steps'} • {flow.departmentType}
+                            </span>
+                          </div>
                         </div>
-                        <Pill tone="neutral" size="sm">
-                          {steps.length} Steps
-                        </Pill>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Pill tone="neutral" size="sm">
+                            {steps.length} Steps
+                          </Pill>
+                          <button
+                            type="button"
+                            onClick={() => setEditingFlow(flow)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '7px 14px',
+                              borderRadius: 8,
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#1e293b',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Icon name="pencil" d={PENCIL_ICON} size={13} strokeWidth={2} />
+                            Edit sequence
+                          </button>
+                        </div>
                       </div>
 
                       {/* Step sequence */}
@@ -241,6 +288,15 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
           </SectionCard>
         </motion.div>
       )}
+
+      <FlowBuilderModal
+        isOpen={Boolean(editingFlow)}
+        onClose={() => setEditingFlow(null)}
+        flow={editingFlow}
+        departmentType={currentDepartment}
+        departmentConfig={configQuery.data}
+        onSuccess={handleRefresh}
+      />
     </motion.div>
   )
 }

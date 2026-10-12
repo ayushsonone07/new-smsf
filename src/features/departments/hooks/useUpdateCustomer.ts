@@ -25,6 +25,15 @@ export function useUpdateCustomer(
         queryKey:
           departmentCustomersQueryKey(departmentId),
       })
+      await queryClient.invalidateQueries({
+        queryKey: ['onboarding-customers-list'],
+      })
+      await queryClient.invalidateQueries({
+        queryKey: ['auth-onboarding-summary'],
+      })
+      await queryClient.invalidateQueries({
+        queryKey: ['department-customer-rows'],
+      })
     },
   })
 }

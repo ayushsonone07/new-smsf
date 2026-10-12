@@ -174,6 +174,7 @@ export type HomeRoute =
   | '/onboarding'
   | '/onboarding-user'
   | '/google-head'
+  | '/google-user'
 
 export function homeForRole(
   role: UserRole,
@@ -192,6 +193,9 @@ export function homeForRole(
   }
 
   if (dept.includes('GOOGLE')) {
+    if (role === 'USER') {
+      return '/google-user'
+    }
     return '/google-head'
   }
 

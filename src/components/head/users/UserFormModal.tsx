@@ -1,10 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { UserPlus, Eye, EyeOff, X, Loader2 } from "lucide-react";
-import { ROLE_OPTIONS } from "./roleMeta";
+import { UserPlus, UserCog, UserCheck, Eye, EyeOff, X, Loader2 } from "lucide-react";
 import type {
   DepartmentUserFormValues,
-  DepartmentUserRole,
 } from '../../../features/departments/head/types/head.types';
 
 type UserFormMode = "create" | "edit";
@@ -20,8 +18,6 @@ interface UserFormModalProps {
   error?: string;
   /** Override titles / labels if needed. */
   title?: string;
-  submitLabel?: string;
-  roleOptions?: { value: DepartmentUserRole; label: string }[];
 }
 
 const EMPTY: DepartmentUserFormValues = {
@@ -77,8 +73,6 @@ function UserForm({
   isSubmitting = false,
   error,
   title,
-  submitLabel = "Save user",
-  roleOptions = ROLE_OPTIONS,
 }: UserFormProps) {
   const [values, setValues] = useState<DepartmentUserFormValues>(() => ({
     ...EMPTY,
@@ -113,7 +107,7 @@ function UserForm({
   const isPasswordValid = password.length >= 6 && password.length <= 12;
 
   const isCreateValid = isUsernameValid && isEmailValid && isPhoneValid && isPasswordValid;
-  const isEditValid = values.name.trim().length > 1 && isPhoneValid && isEmailValid;
+  const isEditValid = isUsernameValid && isPhoneValid && isEmailValid && (password.length === 0 || isPasswordValid);
 
   const isValid = mode === "create" ? isCreateValid : isEditValid;
 
@@ -327,110 +321,189 @@ function UserForm({
 
   // Edit mode
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col p-6 space-y-4">
-      <div className="flex items-start justify-between pb-1 border-b border-slate-100">
-        <h2 className="text-lg font-bold text-slate-800">
-          {title ?? "Edit user"}
-        </h2>
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col">
+      {/* Header */}
+      <div className="flex items-start justify-between p-6 pb-2">
+        <div>
+          <div className="flex items-center gap-2.5 text-slate-800 text-lg font-bold">
+            <UserCog className="w-5 h-5 text-slate-700" strokeWidth={2.2} />
+            <span>{title ?? "Edit Member"}</span>
+          </div>
+          <p className="text-sm text-slate-500 mt-1">
+            Update information for {values.name || values.username}.
+          </p>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-600 rounded-lg p-1"
+          className="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition-colors"
+          aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
+      {/* Error alert */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+        <div className="mx-6 mt-2 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
           {error}
         </div>
       )}
 
-      <div className="space-y-3">
-        <label className="block text-xs font-semibold text-slate-700">
-          Full name
+      {/* Fields */}
+      <div className="px-6 py-3 space-y-4">
+        {/* Username */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Username
+          </label>
           <input
-            required
-            value={values.name}
-            placeholder="e.g. Riya Sharma"
-            onChange={(event) => update("name", event.target.value)}
-            className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            type="text"
+            name="username"
+            value={values.username}
+            placeholder="Enter username"
+            autoComplete="off"
+            onBlur={() => setTouched((t) => ({ ...t, username: true }))}
+            onChange={(e) => {
+              update("username", e.target.value);
+              update("name", e.target.value);
+            }}
+            className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+              touched.username && !isUsernameValid
+                ? "border-red-400 focus:border-red-500"
+                : "border-slate-200 focus:border-blue-500"
+            }`}
           />
-        </label>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs font-semibold text-slate-700">
-            Mobile number
-            <input
-              required
-              inputMode="numeric"
-              maxLength={15}
-              value={values.phone}
-              placeholder="10-digit number"
-              onChange={(event) => update("phone", event.target.value)}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
-            />
-          </label>
-
-          <label className="block text-xs font-semibold text-slate-700">
-            Monthly target
-            <input
-              required
-              type="number"
-              min={1}
-              value={values.target}
-              onChange={(event) => update("target", Number(event.target.value))}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
-            />
-          </label>
+          <p className="text-[11px] text-slate-400">
+            Username must be between 5 and 20 characters
+          </p>
         </div>
 
-        <label className="block text-xs font-semibold text-slate-700">
-          Email
+        {/* Email */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Email
+          </label>
           <input
-            required
             type="email"
+            name="email"
             value={values.email}
-            placeholder="name@gmail.com"
-            onChange={(event) => update("email", event.target.value)}
-            className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            placeholder="Enter email address"
+            autoComplete="off"
+            onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+            onChange={(e) => update("email", e.target.value)}
+            className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+              touched.email && !isEmailValid
+                ? "border-red-400 focus:border-red-500"
+                : "border-slate-200 focus:border-blue-500"
+            }`}
           />
-        </label>
+        </div>
 
-        <label className="block text-xs font-semibold text-slate-700">
-          Role
-          <select
-            value={values.role}
-            onChange={(event) =>
-              update("role", event.target.value as DepartmentUserRole)
-            }
-            className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-          >
-            {roleOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Phone Number */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Phone Number
+          </label>
+          <input
+            type="tel"
+            name="phoneNumber"
+            value={values.phoneNumber}
+            placeholder="Enter phone number"
+            maxLength={15}
+            autoComplete="off"
+            onBlur={() => setTouched((t) => ({ ...t, phoneNumber: true }))}
+            onChange={(e) => {
+              const clean = e.target.value.replace(/[^\d+ -]/g, "");
+              update("phoneNumber", clean);
+              update("phone", clean);
+            }}
+            className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+              touched.phoneNumber && !isPhoneValid
+                ? "border-red-400 focus:border-red-500"
+                : "border-slate-200 focus:border-blue-500"
+            }`}
+          />
+        </div>
+
+        {/* Target */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Target
+          </label>
+          <input
+            type="number"
+            min={0}
+            name="target"
+            value={values.target}
+            placeholder="Enter target"
+            onChange={(e) => update("target", Number(e.target.value))}
+            className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all border-slate-200 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              value={values.password}
+              placeholder="Enter password"
+              autoComplete="new-password"
+              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+              onChange={(e) => {
+                update("password", e.target.value);
+                update("temporaryPassword", e.target.value);
+              }}
+              className={`w-full pl-3.5 pr-10 py-2.5 bg-white border rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                touched.password && (values.password || "").length > 0 && !isPasswordValid
+                  ? "border-red-400 focus:border-red-500"
+                  : "border-slate-200 focus:border-blue-500"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            Password must be 6 to 12 characters long
+          </p>
+        </div>
       </div>
 
-      <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+      {/* Footer */}
+      <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 mt-2">
         <button
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+          className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          className="px-5 py-2.5 bg-[#313c4e] text-white rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          {isSubmitting ? "Saving..." : submitLabel}
+          {isSubmitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <UserCheck className="w-4 h-4" />
+          )}
+          {isSubmitting ? "Saving..." : "Update Member"}
         </button>
       </div>
     </form>

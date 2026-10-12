@@ -1,0 +1,459 @@
+/* ── Sub-Service Details Modal (.ssd-*) Matching SMSF Parity ── */
+
+.ssd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.ssd-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.2), 0 0 1px 1px rgba(15, 23, 42, 0.05);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.ssd-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.ssd-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ssd-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ssd-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.ssd-close-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ssd-close-icon-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ssd-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Sub-Service Card */
+.ssd-subservice-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.ssd-subservice-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ssd-subservice-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #2563eb;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ssd-subservice-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ssd-subservice-label {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ssd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.ssd-badge--pending {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.ssd-badge--in-progress {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.ssd-badge--ack {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+  color: #7e22ce;
+}
+
+.ssd-badge--completed {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+/* Service Flow Section */
+.ssd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssd-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+
+.ssd-flow-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssd-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ssd-step-item--completed {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.ssd-step-item--next {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  cursor: pointer;
+}
+
+.ssd-step-item--next:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.ssd-step-item--pending {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  cursor: pointer;
+}
+
+.ssd-step-item--pending:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.ssd-step-indicator {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.ssd-radio-outer {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #3b82f6;
+  display: grid;
+  place-items: center;
+}
+
+.ssd-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+}
+
+.ssd-circle-pending {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+}
+
+.ssd-step-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b;
+  flex: 1;
+  min-width: 0;
+}
+
+.ssd-step-item--completed .ssd-step-name {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.ssd-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.ssd-pill--next {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.ssd-pill--completed {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+/* Status Change Section */
+.ssd-select {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.ssd-select:focus {
+  border-color: #3b82f6;
+}
+
+.ssd-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.ssd-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.ssd-ack-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.ssd-ack-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.ssd-ack-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ssd-status-msg {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ssd-status-msg--success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.ssd-status-msg--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+/* Footer */
+.ssd-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.ssd-btn-secondary {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.ssd-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Step Confirmation Dialog */
+.ssd-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.ssd-confirm-modal {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.25);
+  width: 100%;
+  max-width: 420px;
+  padding: 22px;
+  border: 1px solid #e2e8f0;
+}
+
+.ssd-confirm-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ssd-confirm-desc {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.ssd-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ssd-btn-confirm {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #16a34a;
+  border: 1px solid #15803d;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ssd-btn-confirm:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.ssd-btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
