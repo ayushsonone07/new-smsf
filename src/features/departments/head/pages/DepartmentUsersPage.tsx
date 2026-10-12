@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -29,7 +29,6 @@ import { useMemberDetails } from '../../hooks/useMemberDetails'
 import { generateDepartmentSession } from '../../../../api/auth.api'
 import {
   getSession,
-  saveAdminBackup,
   homeForRole,
   openSessionInNewTab,
 } from '../../../../app/auth/session'
@@ -107,11 +106,10 @@ export function DepartmentUsersPage() {
       return
     }
 
+    const newWindow = window.open('', '_blank')
+
     try {
       const currentSession = getSession()
-      if (currentSession) {
-        saveAdminBackup(currentSession)
-      }
 
       const newSession = await generateDepartmentSession(email)
       const targetRoute = homeForRole(
@@ -119,8 +117,11 @@ export function DepartmentUsersPage() {
         newSession.user.departmentType,
       )
 
-      openSessionInNewTab(newSession, targetRoute)
+      openSessionInNewTab(newSession, targetRoute, newWindow, currentSession)
     } catch (err: unknown) {
+      if (newWindow) {
+        newWindow.close()
+      }
       console.error('Failed to log in as department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to log in as user'
       alert(`Login failed: ${msg}`)
@@ -137,6 +138,34 @@ export function DepartmentUsersPage() {
     size: 10,
     search: search.trim() || undefined,
   })
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = departmentUsersQuery
+  const loadingNextPageRef = useRef(false)
+  const loadNextUsersPage = useCallback(async () => {
+    if (
+      loadingNextPageRef.current ||
+      !hasNextPage ||
+      isFetchingNextPage
+    ) {
+      return
+    }
+
+    loadingNextPageRef.current = true
+    try {
+      await fetchNextPage({
+        cancelRefetch: false,
+      })
+    } finally {
+      loadingNextPageRef.current = false
+    }
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  ])
 
   // Get today's date range in ISO format for the member details API
   const todayStart = useMemo(() => {
@@ -440,11 +469,7 @@ export function DepartmentUsersPage() {
           canEditActions={canManageUsers}
           hasNextPage={departmentUsersQuery.hasNextPage}
           isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
-          onLoadMore={() => {
-            if (departmentUsersQuery.hasNextPage && !departmentUsersQuery.isFetchingNextPage) {
-              departmentUsersQuery.fetchNextPage()
-            }
-          }}
+          onLoadMore={loadNextUsersPage}
           totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}

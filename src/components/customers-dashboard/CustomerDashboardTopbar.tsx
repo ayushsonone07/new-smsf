@@ -1,4 +1,5 @@
 import { Icon } from '../head/shared/Icon'
+import { useNotificationCenter } from '../head/layout/NotificationCenter'
 
 interface CustomerDashboardTopbarProps {
   notificationCount?: number
@@ -7,6 +8,8 @@ interface CustomerDashboardTopbarProps {
 export function CustomerDashboardTopbar({
   notificationCount = 3,
 }: CustomerDashboardTopbarProps) {
+  const notificationCenter = useNotificationCenter()
+  const count = notificationCenter?.unreadCount ?? notificationCount
   return (
     <header className="cdb-topbar">
       <div className="cdb-topbar-left">
@@ -21,10 +24,11 @@ export function CustomerDashboardTopbar({
           type="button"
           className="cdb-topbar-notif"
           aria-label="Notifications"
+          onClick={notificationCenter?.open}
         >
           <Icon name="bell" size={18} />
-          {notificationCount > 0 ? (
-            <span className="cdb-topbar-badge">{notificationCount}</span>
+          {count > 0 ? (
+            <span className="cdb-topbar-badge">{count}</span>
           ) : null}
         </button>
       </div>

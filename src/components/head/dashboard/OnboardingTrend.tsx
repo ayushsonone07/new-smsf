@@ -1,31 +1,97 @@
+import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+
 export interface OnboardingTrendProps {
   total?: number
   growth?: string
+  labels?: string[]
+  newCustomers?: number[]
+  completed?: number[]
+  previousPeriod?: number[]
+}
+
+const chartLeft = 40
+const chartRight = 520
+const chartTop = 16
+const chartBottom = 125
+const chartHeight = chartBottom - chartTop
+
+function makeLinePath(values: number[], maxValue: number) {
+  const points = values.map((value, index) => ({
+    x: chartLeft + (values.length <= 1 ? 0 : (index / (values.length - 1)) * (chartRight - chartLeft)),
+    y: chartBottom - (Math.max(0, value) / maxValue) * chartHeight,
+  }))
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+
+  return points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x} ${point.y}`
+    const previous = points[index - 1]
+    const middleX = (previous.x + point.x) / 2
+    return `${path} Q ${middleX} ${previous.y}, ${middleX} ${(previous.y + point.y) / 2} T ${point.x} ${point.y}`
+  }, '')
+}
+
+function formatValue(value: number) {
+  return Number.isFinite(value) ? Math.round(value) : 0
 }
 
 /**
- * Onboarding Trend widget with smooth SVG curves matching the reference design.
+ * Onboarding trend chart with a hover tooltip for the selected time point.
  */
 export function OnboardingTrend({
-  total = 45,
-  growth = '▲ 4.7%',
+  total = 0,
+  growth = '—',
+  labels = [],
+  newCustomers = [],
+  completed = [],
+  previousPeriod = [],
 }: OnboardingTrendProps) {
-  // Chart coordinates (viewBox 0 0 540 140)
-  // X: 9am (40), 11am (135), 1pm (230), 3pm (325), 5pm (420), 7pm (515)
-  // Y: 0 (125), 2 (95), 3 (80), 5 (45), 7 (15)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const series = [
+    { name: 'New', values: newCustomers, color: '#2563eb' },
+    { name: 'Completed', values: completed, color: '#eab308' },
+    { name: 'Prev. period', values: previousPeriod, color: '#94a3b8', dashed: true },
+  ].filter((item) => item.values.length > 0)
+  const pointCount = Math.max(
+    labels.length,
+    ...series.map((item) => item.values.length),
+    0,
+  )
+  const maxValue = Math.max(
+    1,
+    ...series.flatMap((item) => item.values.filter(Number.isFinite)),
+  )
+  const hasData = pointCount > 0 && series.length > 0
+  const activeX =
+    activeIndex === null || pointCount <= 1
+      ? chartLeft
+      : chartLeft + (activeIndex / (pointCount - 1)) * (chartRight - chartLeft)
+  const activeReferenceSeries = series.find((item) => item.name === 'New') ?? series[0]
+  const activeValue =
+    activeIndex === null ? 0 : (activeReferenceSeries?.values[activeIndex] ?? 0)
+  const activeY = chartBottom - (Math.max(0, activeValue) / maxValue) * chartHeight
+  const activeLabel =
+    activeIndex === null
+      ? ''
+      : labels[activeIndex] || `Point ${activeIndex + 1}`
+  const axisIndexes = Array.from(
+    new Set(
+      Array.from({ length: Math.min(pointCount, 6) }, (_, index) =>
+        Math.round((index / Math.max(1, Math.min(pointCount, 6) - 1)) * (pointCount - 1)),
+      ),
+    ),
+  )
 
-  // Blue line (New customers): starts around y=5(45), stays flat to 11am, dips, rises high at 1pm (y=6, 30), levels to 3pm, drops at 5pm, rises at 7pm
-  const bluePath =
-    'M 40 45 C 90 45, 110 45, 135 60 C 160 75, 190 28, 230 28 C 270 28, 290 85, 335 85 C 375 85, 400 95, 435 105 C 470 115, 490 60, 515 50'
-  const blueArea = `${bluePath} L 515 125 L 40 125 Z`
-
-  // Yellow line (Completed): starts around y=3(80), rises to peak at 1pm (y=5, 45), drops sharply at 3pm (y=2, 105), dips to 5pm (y=1.5, 115), rises to 7pm (y=3.5, 75)
-  const yellowPath =
-    'M 40 80 C 90 80, 115 80, 140 70 C 175 55, 200 45, 230 45 C 265 45, 290 105, 335 105 C 375 105, 400 115, 435 115 C 470 115, 490 90, 515 65'
-
-  // Gray dashed line (Previous period): starts at 40 (105), rises gently, peaks around 1pm (y=4, 55), descends gently to 5pm, rises to 7pm
-  const grayDashedPath =
-    'M 40 100 C 80 95, 110 45, 150 45 C 190 45, 200 65, 240 50 C 280 35, 300 85, 350 85 C 390 85, 420 90, 460 75 C 485 65, 500 55, 515 45'
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!hasData) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const plotX = ((event.clientX - bounds.left) / bounds.width) * 540
+    const relativeX = Math.max(
+      0,
+      Math.min(1, (plotX - chartLeft) / (chartRight - chartLeft)),
+    )
+    setActiveIndex(Math.round(relativeX * (pointCount - 1)))
+  }
 
   return (
     <div className="hdb-card">
@@ -36,23 +102,20 @@ export function OnboardingTrend({
         </div>
 
         <div className="hdb-trend__legend">
-          <div className="hdb-trend__legend-item">
-            <span className="hdb-trend__legend-line hdb-trend__legend-line--blue" />
-            <span>New customers</span>
-          </div>
-          <div className="hdb-trend__legend-item">
-            <span className="hdb-trend__legend-line hdb-trend__legend-line--yellow" />
-            <span>Completed</span>
-          </div>
-          <div className="hdb-trend__legend-item">
-            <span className="hdb-trend__legend-line hdb-trend__legend-line--dashed" />
-            <span>Previous period</span>
-          </div>
+          {series.map((item) => (
+            <div className="hdb-trend__legend-item" key={item.name}>
+              <span
+                className={`hdb-trend__legend-line${item.dashed ? ' hdb-trend__legend-line--dashed' : ''}`}
+                style={item.dashed ? undefined : { backgroundColor: item.color }}
+              />
+              <span>{item.name === 'Prev. period' ? 'Previous period' : item.name === 'New' ? 'New customers' : item.name}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       <div className="hdb-trend__metrics">
-        <span className="hdb-trend__number">{total}</span>
+        <span className="hdb-trend__number">{formatValue(total)}</span>
         <span className="hdb-stat-card__pill hdb-stat-card__pill--green">
           {growth}
         </span>
@@ -61,150 +124,126 @@ export function OnboardingTrend({
         </span>
       </div>
 
-      <div className="hdb-trend__chart-wrap">
-        <svg viewBox="0 0 540 145" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="hdbBlueGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
+      <div
+        className="hdb-trend__chart-wrap"
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => setActiveIndex(null)}
+      >
+        {hasData ? (
+          <>
+            <svg viewBox="0 0 540 160" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="hdbBlueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
 
-          {/* Grid lines */}
-          <line
-            x1="35"
-            y1="15"
-            x2="520"
-            y2="15"
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-          <line
-            x1="35"
-            y1="45"
-            x2="520"
-            y2="45"
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-          <line
-            x1="35"
-            y1="80"
-            x2="520"
-            y2="80"
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-          <line
-            x1="35"
-            y1="95"
-            x2="520"
-            y2="95"
-            stroke="#f1f5f9"
-            strokeWidth="1"
-          />
-          <line
-            x1="35"
-            y1="125"
-            x2="520"
-            y2="125"
-            stroke="#e2e8f0"
-            strokeWidth="1"
-          />
+              {Array.from({ length: 5 }, (_, index) => {
+                const y = chartTop + (index / 4) * chartHeight
+                const label = Math.round(maxValue * (1 - index / 4))
+                return (
+                  <g key={index}>
+                    <line x1="35" y1={y} x2="520" y2={y} stroke="#e8edf5" strokeDasharray="2 3" />
+                    <text x="24" y={y + 4} fill="#94a3b8" fontSize="10" textAnchor="end">
+                      {label}
+                    </text>
+                  </g>
+                )
+              })}
+              <line x1="35" y1={chartBottom} x2="520" y2={chartBottom} stroke="#e2e8f0" />
 
-          {/* Y Axis Labels */}
-          <text x="20" y="18" fill="#94a3b8" fontSize="10" textAnchor="end">
-            7
-          </text>
-          <text x="20" y="48" fill="#94a3b8" fontSize="10" textAnchor="end">
-            5
-          </text>
-          <text x="20" y="83" fill="#94a3b8" fontSize="10" textAnchor="end">
-            3
-          </text>
-          <text x="20" y="98" fill="#94a3b8" fontSize="10" textAnchor="end">
-            2
-          </text>
-          <text x="20" y="128" fill="#94a3b8" fontSize="10" textAnchor="end">
-            0
-          </text>
+              {series.map((item) => {
+                const path = makeLinePath(item.values, maxValue)
+                const area =
+                  item.name === 'New' && path
+                    ? `${path} L ${chartRight} ${chartBottom} L ${chartLeft} ${chartBottom} Z`
+                    : ''
+                return (
+                  <g key={item.name}>
+                    {area && <path d={area} fill="url(#hdbBlueGrad)" />}
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={item.color}
+                      strokeWidth={item.name === 'New' ? 2.8 : 2.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray={item.dashed ? '4 4' : undefined}
+                    />
+                  </g>
+                )
+              })}
 
-          {/* Area fill */}
-          <path d={blueArea} fill="url(#hdbBlueGrad)" />
+              {activeIndex !== null && (
+                <g>
+                  <line x1={activeX} y1={chartTop} x2={activeX} y2={chartBottom} stroke="#94a3b8" strokeDasharray="2 3" />
+                  {series.map((item) => {
+                    const value = item.values[activeIndex]
+                    if (!Number.isFinite(value)) return null
+                    const y = chartBottom - (Math.max(0, value) / maxValue) * chartHeight
+                    return (
+                      <circle
+                        key={item.name}
+                        cx={activeX}
+                        cy={y}
+                        r="4"
+                        fill="#fff"
+                        stroke={item.color}
+                        strokeWidth="2"
+                      />
+                    )
+                  })}
+                </g>
+              )}
 
-          {/* Lines */}
-          <path
-            d={grayDashedPath}
-            fill="none"
-            stroke="#94a3b8"
-            strokeWidth="2"
-            strokeDasharray="4 4"
-          />
-          <path
-            d={yellowPath}
-            fill="none"
-            stroke="#eab308"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-          <path
-            d={bluePath}
-            fill="none"
-            stroke="#2563eb"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
+              {axisIndexes.map((index) => {
+                const x = chartLeft + (pointCount <= 1 ? 0 : (index / (pointCount - 1)) * (chartRight - chartLeft))
+                return (
+                  <text
+                    key={index}
+                    x={x}
+                    y="151"
+                    fill={index === activeIndex ? '#1d4ed8' : '#94a3b8'}
+                    fontSize="10.5"
+                    fontWeight={index === activeIndex ? '700' : '400'}
+                    textAnchor="middle"
+                  >
+                    {labels[index] ?? ''}
+                  </text>
+                )
+              })}
+            </svg>
 
-          {/* X Axis Labels */}
-          <text x="40" y="142" fill="#94a3b8" fontSize="10.5" textAnchor="middle">
-            9 am
-          </text>
-          <text
-            x="135"
-            y="142"
-            fill="#94a3b8"
-            fontSize="10.5"
-            textAnchor="middle"
-          >
-            11 am
-          </text>
-          <text
-            x="230"
-            y="142"
-            fill="#94a3b8"
-            fontSize="10.5"
-            textAnchor="middle"
-          >
-            1 pm
-          </text>
-          <text
-            x="325"
-            y="142"
-            fill="#94a3b8"
-            fontSize="10.5"
-            textAnchor="middle"
-          >
-            3 pm
-          </text>
-          <text
-            x="420"
-            y="142"
-            fill="#94a3b8"
-            fontSize="10.5"
-            textAnchor="middle"
-          >
-            5 pm
-          </text>
-          <text
-            x="515"
-            y="142"
-            fill="#94a3b8"
-            fontSize="10.5"
-            textAnchor="middle"
-          >
-            7 pm
-          </text>
-        </svg>
+            {activeIndex !== null && (
+              <div
+                className="hdb-trend__tooltip"
+                style={{
+                  left: `${(activeX / 540) * 100}%`,
+                  top: `${Math.max(4, (activeY / 160) * 100 - 10)}%`,
+                  transform: activeX > 300 ? 'translate(-100%, -50%)' : 'translate(12px, -50%)',
+                }}
+              >
+                <strong className="hdb-trend__tooltip-title">{activeLabel}</strong>
+                {series.map((item) => {
+                  const value = item.values[activeIndex]
+                  if (!Number.isFinite(value)) return null
+                  return (
+                    <div className="hdb-trend__tooltip-row" key={item.name}>
+                      <span className="hdb-trend__tooltip-name">
+                        <i style={{ backgroundColor: item.color }} />
+                        {item.name === 'Prev. period' ? 'Prev. period' : item.name}
+                      </span>
+                      <b>{formatValue(value)}</b>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="hdb-trend__empty">No trend data available</div>
+        )}
       </div>
     </div>
   )

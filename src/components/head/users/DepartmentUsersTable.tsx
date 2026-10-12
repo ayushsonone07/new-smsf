@@ -88,7 +88,7 @@ export function DepartmentUsersTable({
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLTableRowElement>(null)
 
-  // 1. IntersectionObserver on sentinel row at table bottom
+  // Use a single load trigger so the same next page is not requested twice.
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
 
@@ -99,7 +99,7 @@ export function DepartmentUsersTable({
         }
       },
       {
-        root: null,
+        root: containerRef.current,
         rootMargin: '250px',
         threshold: 0,
       },
@@ -112,32 +112,6 @@ export function DepartmentUsersTable({
       if (el) observer.unobserve(el)
       observer.disconnect()
     }
-  }, [hasNextPage, isFetchingNextPage, onLoadMore])
-
-  // 2. Container scroll listener on table wrapper
-  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    if (scrollHeight - scrollTop - clientHeight < 150) {
-      if (hasNextPage && !isFetchingNextPage && onLoadMore) {
-        onLoadMore()
-      }
-    }
-  }
-
-  // 3. Window scroll listener when scrolling down the page
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
-
-    const handleWindowScroll = () => {
-      if (!sentinelRef.current) return
-      const rect = sentinelRef.current.getBoundingClientRect()
-      if (rect.top <= window.innerHeight + 250) {
-        onLoadMore()
-      }
-    }
-
-    window.addEventListener('scroll', handleWindowScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleWindowScroll)
   }, [hasNextPage, isFetchingNextPage, onLoadMore])
 
   const visible = (key: DepartmentUserColumnKey) =>
@@ -172,7 +146,6 @@ export function DepartmentUsersTable({
     <div
       className="table-wrapper users-table"
       ref={containerRef}
-      onScroll={handleContainerScroll}
       style={{ maxHeight: '720px', overflowY: 'auto' }}
     >
       <table>

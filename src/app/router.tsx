@@ -18,8 +18,8 @@ import {
 } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
-import { ErrorState } from '../components/ui/ErrorState'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
+import { ServicesListPage } from '../features/departments/pages/ServicesListPage'
 import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
 import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
 import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
@@ -36,17 +36,60 @@ import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPag
 import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage'
 import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
 import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
+import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
+import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
+
+function NotFoundPage() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <AvailableSoonPage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <AvailableSoonPage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return (
+    <PageLayout>
+      <AvailableSoonPage />
+    </PageLayout>
+  )
+}
+
+function ProfileUpdateWithShell() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <ProfileUpdatePage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <ProfileUpdatePage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return <ProfileUpdatePage />
+}
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
-  notFoundComponent: () => (
-    <PageLayout>
-      <ErrorState
-        title="Page not found"
-        message="The page you are looking for does not exist."
-      />
-    </PageLayout>
-  ),
+  notFoundComponent: NotFoundPage,
 })
 
 const indexRoute = createRoute({
@@ -57,7 +100,10 @@ const indexRoute = createRoute({
 
     throw redirect({
       to: session
-        ? homeForRole(session.user.role as never) as never
+        ? (homeForRole(
+            session.user.role as never,
+            session.user.departmentType,
+          ) as never)
         : '/login',
     })
   },
@@ -108,6 +154,20 @@ const adminRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin',
   component: DepartmentManagementPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminServicesRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/services',
+  component: ServicesListPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const servicesAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/services',
+  component: ServicesListPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -210,6 +270,13 @@ const directCustomerDetailsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/customer-details',
   component: CustomerDetailsPage,
+})
+
+const profileUpdateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profile-update',
+  component: ProfileUpdateWithShell,
+  beforeLoad: requireAuth,
 })
 
 const forbiddenRoute = createRoute({
@@ -377,6 +444,43 @@ const onboardingUserHistoryRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="history" />,
 })
 
+
+const onboardingHeadAirtelCallsRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-airtel-calls',
+  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
+})
+
+const onboardingUserAirtelCallsRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-airtel-calls',
+  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
+})
+
+const onboardingHeadManageServicesRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-manage-services',
+  component: () => <HeadScreenPage screenOverride="manage-services" />,
+})
+
+const onboardingUserManageServicesRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-manage-services',
+  component: () => <HeadScreenPage screenOverride="manage-services" />,
+})
+
+const onboardingHeadSalaryManagementRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-salary-management',
+  component: () => <HeadScreenPage screenOverride="salary-management" />,
+})
+
+const onboardingUserSalaryManagementRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-salary-management',
+  component: () => <HeadScreenPage screenOverride="salary-management" />,
+})
+
 const onboardingDynamicScreenRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding/$screen',
@@ -517,6 +621,42 @@ const googleUserHelpCenterRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="help-support" />,
 })
 
+const googleHeadAirtelCallsRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/airtel-calls',
+  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
+})
+
+const googleHeadManageServicesRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/manage-services',
+  component: () => <HeadScreenPage screenOverride="manage-services" />,
+})
+
+const googleHeadSalaryManagementRoute = createRoute({
+  getParentRoute: () => googleLayoutRoute,
+  path: '/google-head/salary-management',
+  component: () => <HeadScreenPage screenOverride="salary-management" />,
+})
+
+const googleUserAirtelCallsRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/airtel-calls',
+  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
+})
+
+const googleUserManageServicesRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/manage-services',
+  component: () => <HeadScreenPage screenOverride="manage-services" />,
+})
+
+const googleUserSalaryManagementRoute = createRoute({
+  getParentRoute: () => googleUserLayoutRoute,
+  path: '/google-user/salary-management',
+  component: () => <HeadScreenPage screenOverride="salary-management" />,
+})
+
 const googleUserDynamicScreenRoute = createRoute({
   getParentRoute: () => googleUserLayoutRoute,
   path: '/google-user/$screen',
@@ -538,6 +678,9 @@ const routeTree = rootRoute.addChildren([
     googleHeadMemberFlowRoute,
     googleHeadHelpSupportRoute,
     googleHeadHelpCenterRoute,
+    googleHeadAirtelCallsRoute,
+    googleHeadManageServicesRoute,
+    googleHeadSalaryManagementRoute,
     googleHeadDynamicScreenRoute,
   ]),
   googleUserLayoutRoute.addChildren([
@@ -549,6 +692,9 @@ const routeTree = rootRoute.addChildren([
     googleUserHistoryRoute,
     googleUserHelpSupportRoute,
     googleUserHelpCenterRoute,
+    googleUserAirtelCallsRoute,
+    googleUserManageServicesRoute,
+    googleUserSalaryManagementRoute,
     googleUserDynamicScreenRoute,
   ]),
   onboardingLayoutRoute.addChildren([
@@ -572,6 +718,12 @@ const routeTree = rootRoute.addChildren([
     onboardingUserHelpCenterRoute,
     onboardingHeadHistoryRoute,
     onboardingUserHistoryRoute,
+    onboardingHeadAirtelCallsRoute,
+    onboardingUserAirtelCallsRoute,
+    onboardingHeadManageServicesRoute,
+    onboardingUserManageServicesRoute,
+    onboardingHeadSalaryManagementRoute,
+    onboardingUserSalaryManagementRoute,
     onboardingDynamicScreenRoute,
   ]),
   headLayoutRoute.addChildren([
@@ -584,6 +736,8 @@ const routeTree = rootRoute.addChildren([
   ]),
   authedLayoutRoute.addChildren([
     adminRoute,
+    adminServicesRoute,
+    servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
     accessTokensRoute,
@@ -596,6 +750,7 @@ const routeTree = rootRoute.addChildren([
     customerDetailsRoute,
   ]),
   directCustomerDetailsRoute,
+  profileUpdateRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,
   departmentHelpCenterRoute,

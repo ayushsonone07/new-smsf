@@ -392,9 +392,21 @@
   background: #fff;
 }
 
+/* An absolutely positioned menu does not increase the table's height. When
+   there are only one or two customers, reserve enough room inside the scroll
+   container so the menu is not clipped at its bottom edge. */
+.cl-table-wrapper:has(.cl-assign-btn[aria-expanded='true']) {
+  min-height: 430px;
+}
+
+.cl-table-wrapper:has(.cl-status-btn[aria-expanded='true']) {
+  min-height: 280px;
+}
+
 .cl-table {
   width: 100%;
   min-width: 1000px;   /* below this the wrapper scrolls; under 768px it becomes cards */
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13.5px;
 }
@@ -418,18 +430,18 @@
 }
 
 .cl-th--num {
-  width: 52px;
   padding-left: 18px;
 }
 
-/* percentages so the columns share the width the same way on every screen */
-.cl-th--biz     { width: 24%; }
-.cl-th--contact { width: 20%; }
-.cl-th--status  { width: 13%; }
-.cl-th--assign  { width: 16%; }
-.cl-th--remark  { width: 17%; }
-/* .cl-th--updated uses remaining space */
-/* .cl-th--updated uses remaining space */
+/* Keep the number column compact. Business is the flexible column that
+   absorbs spare width, preventing empty space from appearing before it. */
+.cl-col--num     { width: 60px; }
+.cl-col--contact { width: 22%; }
+.cl-col--service { width: 14%; }
+.cl-col--status  { width: 13%; }
+.cl-col--assign  { width: 17%; }
+.cl-col--remark  { width: 18%; }
+.cl-col--updated { width: 11%; }
 
 /* ── Table body ───────────────────────────────────────────── */
 
@@ -437,6 +449,19 @@
   padding: 10px 16px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Framer Motion gives each row its own stacking context. Raise the row that
+   owns an open/focused control so its menus render over adjacent rows. */
+.cl-row {
+  position: relative;
+  z-index: 0;
+}
+
+.cl-row:focus-within {
+  z-index: 30;
 }
 
 .cl-td--num {
@@ -494,14 +519,16 @@
 .cl-biz-line {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px 8px;
   margin-bottom: 3px;
+  min-width: 0;
 }
 
 .cl-biz-line .cl-biz-name {
   margin: 0;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .cl-biz-eye {
@@ -595,6 +622,8 @@
   font-size: 12px;
   color: #64748b;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Contact cell ─────────────────────────────────────────── */
@@ -614,12 +643,17 @@
   align-items: center;
   gap: 4px;
   margin-bottom: 6px;
+  min-width: 0;
 }
 
 .cl-phone-text {
   font-size: 13px;
   color: #334155;
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-icon-micro {
@@ -695,6 +729,94 @@
 
 .cl-status-wrap {
   position: relative;
+  z-index: 1;
+}
+
+.cl-ack-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cl-ack-btn > svg {
+  flex: 0 0 auto;
+}
+
+.cl-ack-btn > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-ack-btn:hover:not(:disabled) {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.cl-ack-btn:disabled {
+  color: #94a3b8;
+  cursor: wait;
+}
+
+.cl-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cl-toast--success {
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.cl-toast--error {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.cl-toast > span {
+  flex: 1;
+}
+
+.cl-toast > button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  font-size: 18px;
+  cursor: pointer;
 }
 
 .cl-status-btn {
@@ -737,7 +859,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 150px;
   padding: 4px;
   border: 1px solid #e2e8f0;
@@ -769,10 +891,27 @@
   background: #f1f5f9;
 }
 
+.cl-status-opt--locked {
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.cl-status-opt--ready {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.cl-status-opt--ready:hover {
+  background: #dcfce7;
+}
+
 /* ── Assign To ────────────────────────────────────────────── */
 
 .cl-assign-wrap {
   position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .cl-assign-btn {
@@ -790,6 +929,7 @@
   white-space: nowrap;
   color: #334155;
   transition: border-color 0.12s, background 0.12s;
+  max-width: 100%;
 }
 
 .cl-assign-btn:hover {
@@ -798,6 +938,7 @@
 }
 
 .cl-assign-name {
+  min-width: 0;
   max-width: 108px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -809,7 +950,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 50;
+  z-index: 1000;
   min-width: 224px;
   width: 236px;
   padding: 6px;
@@ -997,7 +1138,12 @@
   color: #334155;
   line-height: 1.45;
   cursor: pointer;
-  word-break: break-word;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-remark:hover {
@@ -1140,7 +1286,7 @@
 .cl-drawer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 2000;
   background: rgba(15, 23, 42, 0.25);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -1152,7 +1298,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 41;
+  z-index: 2001;
   width: 56vw;
   min-width: 560px;
   max-width: 100vw;
@@ -2234,6 +2380,265 @@
   box-shadow: 0 0 0 3px rgba(36, 89, 224, 0.12);
 }
 
+.cl-range-picker {
+  position: relative;
+}
+
+.cl-range-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cl-range-picker__trigger:hover,
+.cl-range-picker__trigger.is-open {
+  background: #f8fafc;
+  border-color: #93c5fd;
+  color: #334155;
+}
+
+.cl-range-picker__trigger.has-range {
+  color: #2459e0;
+}
+
+.cl-date-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  width: min(760px, calc(100vw - 32px));
+  min-height: 360px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.cl-date-picker__presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  background: #f1f5f9;
+}
+
+.cl-date-picker__presets button {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-date-picker__presets button:hover {
+  background: #e2e8f0;
+}
+
+.cl-date-picker__presets .cl-date-picker__reset {
+  margin-top: auto;
+  border-top: 1px solid #dbe3ed;
+  border-radius: 0;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.cl-date-picker__calendar {
+  min-width: 0;
+  padding: 14px 16px 10px;
+}
+
+.cl-date-picker__month-nav {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.cl-date-picker__month-nav > span {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.cl-date-picker__month-nav button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+}
+
+.cl-date-picker__month-nav button:hover {
+  background: #f1f5f9;
+}
+
+.cl-date-picker__months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cl-calendar-month {
+  min-width: 0;
+}
+
+.cl-calendar-month__title {
+  display: none;
+}
+
+.cl-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+  gap: 4px 2px;
+}
+
+.cl-calendar-grid--weekdays {
+  margin-bottom: 8px;
+}
+
+.cl-calendar-grid--weekdays span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cl-calendar-day {
+  display: grid;
+  place-items: center;
+  width: min(32px, 100%);
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cl-calendar-day:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.cl-calendar-day.is-outside {
+  color: #cbd5e1;
+}
+
+.cl-calendar-day.is-in-range {
+  border-radius: 0;
+  background: #eff6ff;
+}
+
+.cl-calendar-day.is-selected {
+  border-color: #60a5fa;
+  background: #2459e0;
+  color: #fff;
+}
+
+.cl-calendar-day:disabled {
+  color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.cl-date-picker__hint {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .cl-date-picker {
+    grid-template-columns: 140px minmax(0, 1fr);
+    min-height: 330px;
+  }
+  .cl-date-picker__presets {
+    padding: 10px;
+  }
+  .cl-date-picker__presets button {
+    min-height: 42px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  .cl-date-picker__calendar {
+    padding: 12px 8px 8px;
+  }
+  .cl-date-picker__month-nav {
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+  }
+  .cl-date-picker__month-nav > span:nth-of-type(2) {
+    display: none;
+  }
+  .cl-date-picker__months {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cl-date-picker__months .cl-calendar-month:nth-child(2) {
+    display: none;
+  }
+  .cl-calendar-day {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 420px) {
+  .cl-date-picker {
+    grid-template-columns: 112px minmax(0, 1fr);
+    width: calc(100vw - 24px);
+    min-height: 310px;
+  }
+  .cl-date-picker__presets {
+    padding: 8px;
+  }
+  .cl-date-picker__presets button {
+    min-height: 38px;
+    padding: 0 7px;
+    font-size: 12px;
+  }
+  .cl-date-picker__calendar {
+    padding: 10px 4px 8px;
+  }
+  .cl-date-picker__month-nav > span {
+    font-size: 14px;
+  }
+  .cl-calendar-grid {
+    gap: 3px 0;
+  }
+  .cl-calendar-day {
+    width: 26px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
 /* =============================================================
    RESPONSIVE — CustomersList
    Breakpoints: 1024 / 768 / 480
@@ -2363,6 +2768,103 @@
   .cl-drawer__tab-btn {
     white-space: nowrap;
   }
+  .cl-drawer__header {
+    padding: 12px 12px 10px;
+  }
+  .cl-drawer__name-row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .cl-drawer__name-text h2 {
+    font-size: 15px;
+  }
+  .cl-drawer__name-text span {
+    font-size: 9px;
+  }
+  .cl-drawer__close {
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+  }
+  .cl-drawer__spill {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__body {
+    gap: 9px;
+    padding: 8px 10px 14px;
+  }
+  .cl-drawer__stats {
+    gap: 6px;
+  }
+  .cl-drawer__stat {
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .cl-drawer__stat-label {
+    font-size: 10px;
+  }
+  .cl-drawer__stat-value {
+    font-size: 18px;
+  }
+  .cl-drawer__stat-sub {
+    font-size: 9px;
+  }
+  .cl-drawer__tab-btn {
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__tab-count {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    font-size: 9px;
+  }
+  .cl-drawer__stack {
+    gap: 9px;
+  }
+  .cl-drawer__card {
+    padding: 10px;
+    border-radius: 11px;
+  }
+  .cl-drawer__card-head {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__card-head h3 {
+    font-size: 12px;
+  }
+  .cl-drawer__card-meta {
+    font-size: 10px;
+  }
+  .cl-drawer__fields {
+    gap: 9px 12px;
+  }
+  .cl-drawer__field-label {
+    font-size: 9px;
+  }
+  .cl-drawer__field-value {
+    font-size: 11px;
+  }
+  .cl-drawer__services {
+    gap: 5px;
+  }
+  .cl-drawer__service {
+    gap: 6px;
+    font-size: 11px;
+  }
+  .cl-drawer__service-pill {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
 }
 
 /* ── 480px: small phone ── */
@@ -2380,8 +2882,30 @@
   .cl-range__inputs {
     grid-template-columns: minmax(0, 1fr);
   }
+  .cl-date-picker {
+    grid-template-columns: 150px minmax(0, 1fr);
+    width: min(680px, calc(100vw - 28px));
+  }
+  .cl-date-picker__presets {
+    padding: 10px;
+  }
+  .cl-date-picker__presets button {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .cl-date-picker__calendar {
+    padding: 12px;
+  }
+  .cl-date-picker__months {
+    gap: 8px;
+  }
+  .cl-calendar-day {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
   .cl-drawer__fields {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cl-drawer__stat-value {
     font-size: 18px;
@@ -2566,7 +3090,7 @@
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 3000;
   display: grid;
   place-items: center;
   padding: 16px;

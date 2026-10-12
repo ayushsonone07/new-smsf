@@ -9,7 +9,7 @@ export const DEPARTMENT_TYPES = [
   'Other',
 ] as const
 
-export type DepartmentType = (typeof DEPARTMENT_TYPES)[number]
+export type DepartmentType = string
 
 export interface Department {
   id: string
@@ -17,6 +17,7 @@ export interface Department {
   type?: DepartmentType
   username: string
   email: string
+  contact?: string
   status: DepartmentStatus
   createdAt: string
   role?: string
@@ -25,14 +26,21 @@ export interface Department {
 export interface CreateDepartmentRequest {
   name: string
   type?: DepartmentType
+  departmentType?: string
   username: string
   email: string
   password: string
+  contact?: string
+  initialRoutes?: string[]
 }
 
 export interface UpdateDepartmentRequest {
   name: string
   type?: DepartmentType
+  departmentType?: string
   username: string
+  oldEmail?: string
   email: string
+  password?: string
+  contact?: string
 }

@@ -21,7 +21,17 @@ export const FALLBACK_DEPARTMENT_TYPES = [
   'RECURRING_DEPARTMENT',
 ] as const
 
-export type DepartmentType = (typeof FALLBACK_DEPARTMENT_TYPES)[number]
+export type DepartmentType = (typeof FALLBACK_DEPARTMENT_TYPES)[number] | (string & {})
+
+export function normalizeDepartmentTypeName(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  if (!cleaned) return ''
+  return cleaned.endsWith('_DEPARTMENT') ? cleaned : `${cleaned}_DEPARTMENT`
+}
 
 export interface CreateDynamicRoutePayload {
   departmentType: string
@@ -75,6 +85,39 @@ export interface DepartmentDetailsResponse {
   totalColumns: number
   routes: DynamicRouteResponse[]
   columns: DynamicColumnResponse[]
+}
+
+export interface CreateDynamicDepartmentResponse {
+  departmentType: string
+  departmentId: number | null
+  alreadyExists?: boolean
+  totalDepartments?: number
+}
+
+/**
+ * Register a new or existing dynamic department type in SMSB (DepartmentType registry + service_types table).
+ * Idempotent: if the department already exists, existing configuration is preserved untouched.
+ */
+export async function createDynamicDepartmentType(
+  departmentType: string,
+): Promise<CreateDynamicDepartmentResponse | null> {
+  const normalized = normalizeDepartmentTypeName(departmentType)
+  if (!normalized) return null
+  try {
+    const res = await authedApiRequest<
+      CreateDynamicDepartmentResponse | { data: CreateDynamicDepartmentResponse }
+    >('/api/dynamic-permission/departments', {
+      method: 'POST',
+      body: JSON.stringify({ departmentType: normalized }),
+    })
+    if (res && 'data' in res && res.data) {
+      return res.data
+    }
+    return res as CreateDynamicDepartmentResponse
+  } catch (err) {
+    console.warn('Could not register dynamic department type on backend:', err)
+    return null
+  }
 }
 
 /**

@@ -15,6 +15,8 @@ export interface AuthUser {
    * `department` query param of the onboarding APIs.
    */
   departmentType?: string
+  phoneNumber?: string
+  contact?: string
 }
 
 export interface AuthSession {

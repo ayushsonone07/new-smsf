@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../shared/Icon'
+import { useNotificationCenter } from '../layout/NotificationCenter'
 
 export interface DashboardHeaderProps {
   onRefresh?: () => void
@@ -34,6 +35,7 @@ export function DashboardHeader({
   greetingName = 'Onboarding Department',
   subtitle,
 }: DashboardHeaderProps) {
+  const notificationCenter = useNotificationCenter()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -131,12 +133,14 @@ export function DashboardHeader({
             className="hdb-banner__btn"
             title="Notifications"
             aria-label="Notifications"
-            onClick={onToggleNotifications}
+            onClick={onToggleNotifications ?? notificationCenter?.open}
           >
             <Icon name="bell" size={16} strokeWidth={2} />
           </button>
-          {unreadNotifications > 0 && (
-            <span className="hdb-banner__badge">{unreadNotifications}</span>
+          {(notificationCenter?.unreadCount ?? unreadNotifications) > 0 && (
+            <span className="hdb-banner__badge">
+              {notificationCenter?.unreadCount ?? unreadNotifications}
+            </span>
           )}
         </div>
       </div>

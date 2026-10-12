@@ -33,7 +33,7 @@ export interface OnboardingCustomer {
   /** Contact column */
   email: string
   phone: string
-  callStatus: CallStatus
+  callStatus?: CallStatus
   /** Status column */
   status: OnboardingStatus
   /** Assign To column — null = Unassigned */
@@ -66,6 +66,9 @@ export interface CustomersListProps {
   onStatusChange: (id: string, status: OnboardingStatus) => void
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
+  onCallCustomer?: (customer: OnboardingCustomer) => void
+  callingCustomerId?: string | null
+  onSendAcknowledgement?: (customer: OnboardingCustomer) => void
   onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
   onOpenServiceFlow?: (customer: OnboardingCustomer) => void
@@ -151,6 +154,9 @@ export function CustomersList({
   onStatusChange,
   onAssigneeChange,
   onRemarkChange,
+  onCallCustomer,
+  callingCustomerId,
+  onSendAcknowledgement,
   onOpenDetail,
   onOpenDuplicate,
   canEdit = true,
@@ -188,6 +194,16 @@ export function CustomersList({
   return (
     <div className="cl-table-wrapper">
       <table className="cl-table">
+        <colgroup>
+          <col className="cl-col cl-col--num" />
+          {showBusiness && <col className="cl-col cl-col--biz" />}
+          {showContact && <col className="cl-col cl-col--contact" />}
+          {showServiceType && <col className="cl-col cl-col--service" />}
+          {showStatus && <col className="cl-col cl-col--status" />}
+          {showAssignTo && <col className="cl-col cl-col--assign" />}
+          {showRemark && <col className="cl-col cl-col--remark" />}
+          {showUpdated && <col className="cl-col cl-col--updated" />}
+        </colgroup>
         <thead>
           <tr>
             <th className="cl-th cl-th--num">#</th>
@@ -219,6 +235,9 @@ export function CustomersList({
               onRemarkChange={(remark) =>
                 onRemarkChange(customer.id, remark)
               }
+              onCallCustomer={onCallCustomer ? () => onCallCustomer(customer) : undefined}
+              isCalling={callingCustomerId === customer.id}
+              onSendAcknowledgement={onSendAcknowledgement ? () => onSendAcknowledgement(customer) : undefined}
               onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
               onOpenServiceFlow={onOpenServiceFlow ? () => onOpenServiceFlow(customer) : undefined}
@@ -348,6 +367,7 @@ function AssigneeDropdown({
       <button
         type="button"
         className="cl-assign-btn"
+        title={matchedAssignee ? matchedAssignee.name : assigneeId || 'Unassigned'}
         onClick={() => setIsOpen((o) => !o)}
         disabled={!isEditable}
         aria-expanded={isOpen}
@@ -522,6 +542,9 @@ interface CustomerRowProps {
   onStatusChange: (status: OnboardingStatus) => void
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
+  onCallCustomer?: () => void
+  isCalling?: boolean
+  onSendAcknowledgement?: () => void
   onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
   onOpenServiceFlow?: () => void
@@ -547,6 +570,9 @@ function CustomerRow({
   onStatusChange,
   onAssigneeChange,
   onRemarkChange,
+  onCallCustomer,
+  isCalling = false,
+  onSendAcknowledgement,
   onOpenDetail,
   onOpenDuplicate,
   onOpenServiceFlow,
@@ -673,7 +699,7 @@ function CustomerRow({
               type="button"
               className="cl-biz-name cl-biz-name--link"
               onClick={() => onOpenDetail()}
-              title="View customer detail"
+              title={customer.businessName}
             >
               {customer.businessName}
             </button>
@@ -768,7 +794,7 @@ function CustomerRow({
             )}
           </div>
 
-          <div className="cl-biz-meta">
+          <div className="cl-biz-meta" title={`${customer.contactName} · ${customer.contactDate}`}>
             {customer.contactName} · {customer.contactDate}
           </div>
         </td>
@@ -777,10 +803,10 @@ function CustomerRow({
       {/* Contact */}
       {showContact && (
         <td className="cl-td" data-label="Contact">
-          <div className="cl-email">{customer.email}</div>
+          <div className="cl-email" title={customer.email}>{customer.email}</div>
 
           <div className="cl-phone-row">
-            <span className="cl-phone-text">{customer.phone}</span>
+            <span className="cl-phone-text" title={customer.phone}>{customer.phone}</span>
             <button
               type="button"
               className="cl-icon-micro"
@@ -793,35 +819,31 @@ function CustomerRow({
             <button
               type="button"
               className="cl-call-icon"
-              title="Call customer"
-              aria-label="Call customer"
+              title={isCalling ? 'Initiating call...' : `Call ${customer.contactName || customer.phone}`}
+              aria-label={isCalling ? 'Initiating call' : 'Call customer'}
+              onClick={onCallCustomer}
+              disabled={!onCallCustomer || isCalling || !customer.phone}
             >
               <Icon name="phone" size={13} strokeWidth={2} />
             </button>
           </div>
 
-        <span
-          className={`cl-contact-pill cl-contact-pill--${
-            customer.callStatus === 'connected' ? 'connected' : 'not-answered'
-          }`}
-        >
+        {customer.callStatus ? (
           <span
-            className={`cl-contact-dot cl-contact-dot--${
-              customer.callStatus === 'connected'
-                ? 'connected'
-                : 'not-answered'
+            className={`cl-contact-pill cl-contact-pill--${
+              customer.callStatus === 'connected' ? 'connected' : 'not-answered'
             }`}
           >
             <span
               className={`cl-contact-dot cl-contact-dot--${
-                customer.callStatus === 'connected'
-                  ? 'connected'
-                  : 'not-answered'
+                customer.callStatus === 'connected' ? 'connected' : 'not-answered'
               }`}
             />
             {customer.callStatus === 'connected' ? 'Connected' : 'Not answered'}
           </span>
-        </span>
+        ) : (
+          <span className="cl-contact-pill">Not recorded</span>
+        )}
         </td>
       )}
 
@@ -979,7 +1001,7 @@ function CustomerRow({
                       type="button"
                       role="option"
                       aria-selected={customer.status === opt}
-                      className="cl-status-opt"
+                      className={`cl-status-opt${opt === 'completed' ? (isOptDisabled ? ' cl-status-opt--locked' : ' cl-status-opt--ready') : ''}`}
                       style={isOptDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                       onClick={() => {
                         if (isOptDisabled) {
@@ -1003,6 +1025,17 @@ function CustomerRow({
                   )
                 })}
               </motion.div>
+            )}
+            {!isGoogle && onSendAcknowledgement && (
+              <button
+                type="button"
+                className="cl-ack-btn"
+                onClick={onSendAcknowledgement}
+                title="Send acknowledgement link"
+              >
+                <Icon name="mail" size={12} strokeWidth={1.9} />
+                <span>Send acknowledgement</span>
+              </button>
             )}
           </div>
         </td>
@@ -1102,11 +1135,7 @@ function CustomerRow({
                     startEditing()
                   }
                 }}
-                title={
-                  (canEditRemark !== undefined ? canEditRemark : canEdit)
-                    ? 'Click to edit remark'
-                    : 'Read-only remark'
-                }
+                title={customer.remark || 'Add remark...'}
               >
                 {customer.remark || 'Add remark...'}
                 

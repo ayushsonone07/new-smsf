@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import type { AdminServiceItem } from '../../../api/admin-services.api'
 import { useDepartments } from '../hooks/useDepartments'
 import { useCreateDepartment } from '../hooks/useCreateDepartment'
 import { useUpdateDepartment } from '../hooks/useUpdateDepartment'
@@ -8,14 +9,15 @@ import { useLoginAsDepartment } from '../../auth/hooks/useLoginAsDepartment'
 import {
   getSession,
   homeForRole,
-  saveAdminBackup,
-  setSession,
+  openSessionInNewTab,
 } from '../../../app/auth/session'
 import type {
   CreateDepartmentRequest,
   Department,
   UpdateDepartmentRequest,
 } from '../types/department.types'
+import { AddAdminServiceModal } from '../../../components/departments/AddAdminServiceModal'
+import { AdminServiceListCard } from '../../../components/departments/AdminServiceListCard'
 import { DepartmentStats } from '../../../components/departments/DepartmentStats'
 import { DepartmentTable } from '../../../components/departments/DepartmentTable'
 import { DepartmentFormModal } from '../../../components/departments/DepartmentFormModal'
@@ -33,13 +35,18 @@ import { CreateColumnModal } from '../../../components/permissions/CreateColumnM
 
 export function DepartmentManagementPage() {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<'departments' | 'services'>(
+    'departments',
+  )
   const [search, setSearch] = useState('')
   const [editingDepartment, setEditingDepartment] =
     useState<Department | null>(null)
   const [departmentToDelete, setDepartmentToDelete] =
     useState<Department | null>(null)
-  const [showCreateModal, setShowCreateModal] =
-    useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showAddServiceModal, setShowAddServiceModal] = useState(false)
+  const [preselectedService, setPreselectedService] =
+    useState<AdminServiceItem | null>(null)
   const [showRouteModal, setShowRouteModal] = useState(false)
   const [showColumnModal, setShowColumnModal] = useState(false)
 
@@ -57,7 +64,7 @@ export function DepartmentManagementPage() {
   // Deduplicate: only show department heads, grouped by department type
   const departments = useMemo(() => {
     const headMap = new Map<string, Department>()
-    
+
     for (const dept of allDepartments) {
       if (dept.role === 'DEPARTMENT_HEAD') {
         // Use department type as key to deduplicate
@@ -67,7 +74,7 @@ export function DepartmentManagementPage() {
         }
       }
     }
-    
+
     return Array.from(headMap.values())
   }, [allDepartments])
 
@@ -92,19 +99,16 @@ export function DepartmentManagementPage() {
     )
   }, [departments, search])
 
-  function handleCreate(
-    data: CreateDepartmentRequest,
-  ) {
+  function handleCreate(data: CreateDepartmentRequest) {
     createMutation.mutate(data, {
       onSuccess: () => {
         setShowCreateModal(false)
+        setPreselectedService(null)
       },
     })
   }
 
-  function handleUpdate(
-    data: UpdateDepartmentRequest,
-  ) {
+  function handleUpdate(data: UpdateDepartmentRequest) {
     if (!editingDepartment) return
 
     updateMutation.mutate(
@@ -120,9 +124,7 @@ export function DepartmentManagementPage() {
     )
   }
 
-  function handleViewFeatures(
-    department: Department,
-  ) {
+  function handleViewFeatures(department: Department) {
     navigate({
       to: '/admin/departments/$departmentId',
       params: { departmentId: department.id },
@@ -131,28 +133,32 @@ export function DepartmentManagementPage() {
 
   /**
    * Home button: generate a token for the department's email
-   * (GET /api/auth/generate-token?username=<email>) and sign
-   * the admin in as that department.
+   * (GET /api/auth/generate-token?username=<email>) and open
+   * that department in a NEW tab with its own isolated sessionStorage.
+   * The admin page stays intact in the current tab with all data!
    */
-  function handleLoginAsDepartment(
-    department: Department,
-  ) {
+  function handleLoginAsDepartment(department: Department) {
     loginAsMutation.reset()
+
+    // Open a blank window synchronously during the user click event to prevent popup blockers
+    const newWindow = window.open('', '_blank')
+    const adminSession = getSession()
 
     loginAsMutation.mutate(department.email, {
       onSuccess: (session) => {
-        const adminSession = getSession()
+        const targetRoute = homeForRole(
+          session.user.role,
+          session.user.departmentType,
+        )
 
-        // Keep the admin session so "Back to my account" works.
-        if (adminSession?.user.role === 'ADMIN') {
-          saveAdminBackup(adminSession)
+        openSessionInNewTab(session, targetRoute, newWindow, adminSession)
+      },
+      onError: (err) => {
+        if (newWindow) {
+          newWindow.close()
         }
-
-        setSession(session)
-
-        navigate({
-          to: homeForRole(session.user.role) as never,
-        })
+        console.error('Failed to log in as department:', err)
+        alert(`Login failed: ${err.message}`)
       },
     })
   }
@@ -161,7 +167,7 @@ export function DepartmentManagementPage() {
     if (!departmentToDelete) return
 
     deleteMutation.mutate(
-      departmentToDelete.id,
+      departmentToDelete.email || departmentToDelete.id,
       {
         onSuccess: () => {
           setDepartmentToDelete(null)
@@ -198,9 +204,9 @@ export function DepartmentManagementPage() {
   return (
     <PageLayout>
       <PageHeader
-        breadcrumb="Administration / Departments"
-        title="Department Management"
-        description="Create and manage department login accounts."
+        breadcrumb="Administration / Departments & Services"
+        title="Department & Service Management"
+        description="Step 1: Create a Service in Service List -> Step 2: Create Department Head Login."
         actions={
           <>
             <Button
@@ -217,6 +223,60 @@ export function DepartmentManagementPage() {
 
       <DepartmentStats departments={departments} />
 
+      {/* Top Navigation Tabs: Department Accounts vs Service List (Superadmin -> ServiceList) */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '1rem',
+          borderBottom: '1px solid #e2e8f0',
+          paddingBottom: '0.5rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setActiveTab('departments')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            border:
+              activeTab === 'departments'
+                ? '1px solid #2563eb'
+                : '1px solid transparent',
+            backgroundColor:
+              activeTab === 'departments' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'departments' ? '#1d4ed8' : '#475569',
+            cursor: 'pointer',
+          }}
+        >
+          🏢 Department Accounts ({departments.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('services')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            border:
+              activeTab === 'services'
+                ? '1px solid #2563eb'
+                : '1px solid transparent',
+            backgroundColor:
+              activeTab === 'services' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'services' ? '#1d4ed8' : '#475569',
+            cursor: 'pointer',
+          }}
+        >
+          🛠 Service List (Step 1: Create Service)
+        </button>
+      </div>
+
       {loginAsMutation.isError ? (
         <p className="auth-error" role="alert">
           Could not log in as department:{' '}
@@ -224,59 +284,86 @@ export function DepartmentManagementPage() {
         </p>
       ) : null}
 
-      <Card>
-        <div className="table-toolbar">
-          <div>
-            <h2>Department Accounts</h2>
+      {activeTab === 'services' ? (
+        <AdminServiceListCard
+          onCreateDepartmentForService={(service) => {
+            setPreselectedService(service)
+            setShowCreateModal(true)
+          }}
+        />
+      ) : (
+        <Card>
+          <div className="table-toolbar">
+            <div>
+              <h2>Department Accounts</h2>
 
-            <p>
-              Manage login credentials and access
-              for each department.
-            </p>
+              <p>
+                Manage login credentials and access
+                for each department.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowRouteModal(true)}
+              >
+                <span>＋</span> Add Dynamic Route
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowColumnModal(true)}
+              >
+                <span>＋</span> Add Dynamic Column
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowAddServiceModal(true)}
+              >
+                <span>＋</span> Step 1: Create Service
+              </Button>
+              <Button
+                onClick={() => {
+                  setPreselectedService(null)
+                  setShowCreateModal(true)
+                }}
+              >
+                <span>＋</span> Step 2: Create Department Login
+              </Button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <Button
-              variant="secondary"
-              onClick={() => setShowRouteModal(true)}
-            >
-              <span>＋</span> Add Dynamic Route
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowColumnModal(true)}
-            >
-              <span>＋</span> Add Dynamic Column
-            </Button>
-            <Button
-              onClick={() => setShowCreateModal(true)}
-            >
-              <span>＋</span> Create Department Login
-            </Button>
-          </div>
-        </div>
+          <DepartmentFilters
+            search={search}
+            onSearchChange={setSearch}
+          />
 
-        <DepartmentFilters
-          search={search}
-          onSearchChange={setSearch}
-        />
+          <DepartmentTable
+            departments={filteredDepartments}
+            onEdit={setEditingDepartment}
+            onDelete={setDepartmentToDelete}
+            onViewFeatures={handleViewFeatures}
+            onViewDashboard={handleLoginAsDepartment}
+            loggingInId={
+              loginAsMutation.isPending
+                ? (departments.find(
+                    (item) =>
+                      item.email === loginAsMutation.variables,
+                  )?.id ?? '')
+                : null
+            }
+          />
+        </Card>
+      )}
 
-        <DepartmentTable
-          departments={filteredDepartments}
-          onEdit={setEditingDepartment}
-          onDelete={setDepartmentToDelete}
-          onViewFeatures={handleViewFeatures}
-          onViewDashboard={handleLoginAsDepartment}
-          loggingInId={
-            loginAsMutation.isPending
-              ? (departments.find(
-                  (item) =>
-                    item.email === loginAsMutation.variables,
-                )?.id ?? '')
-              : null
-          }
-        />
-      </Card>
+      <AddAdminServiceModal
+        open={showAddServiceModal}
+        onClose={() => setShowAddServiceModal(false)}
+        onCreated={(createdService) => {
+          setPreselectedService(createdService)
+          setShowCreateModal(true)
+        }}
+      />
 
       <DepartmentFormModal
         open={
@@ -284,21 +371,24 @@ export function DepartmentManagementPage() {
           Boolean(editingDepartment)
         }
         department={editingDepartment}
+        initialService={preselectedService}
+        existingDepartments={departments}
         isSubmitting={
           createMutation.isPending ||
           updateMutation.isPending
         }
-        error={
-          mutationError?.message
-        }
+        error={mutationError?.message}
         onClose={() => {
           setShowCreateModal(false)
           setEditingDepartment(null)
+          setPreselectedService(null)
           createMutation.reset()
           updateMutation.reset()
         }}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
+        onViewFeatures={handleViewFeatures}
+        onViewDashboard={handleLoginAsDepartment}
       />
 
       <DeleteDepartmentDialog
