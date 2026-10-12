@@ -9,6 +9,7 @@ import { ProfileMenu } from '../common/ProfileMenu'
 
 type NavPath =
   | '/admin'
+  | '/admin/services'
   | '/admin/tokens'
   | '/head'
   | '/users'
@@ -30,6 +31,15 @@ const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) =>
       pathname === '/admin' ||
       pathname.startsWith('/admin/departments'),
+  },
+  {
+    to: '/admin/services',
+    label: 'Services List',
+    icon: '🛠',
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/services') ||
+      pathname === '/services',
   },
   {
     to: '/admin/tokens',

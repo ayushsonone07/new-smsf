@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createDynamicColumn,
+  createDynamicDepartmentType,
   createDynamicRoute,
   getDepartmentDetails,
   getDepartmentTypes,
@@ -21,7 +22,20 @@ export function useDepartmentTypes() {
   return useQuery({
     queryKey: ['dynamic-permissions', 'departments'],
     queryFn: getDepartmentTypes,
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateDynamicDepartmentType() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (departmentType: string) =>
+      createDynamicDepartmentType(departmentType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'departments'],
+      })
+    },
   })
 }
 
