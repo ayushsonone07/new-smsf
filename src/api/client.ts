@@ -4,6 +4,23 @@ const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002'
 ).replace(/\/$/, '')
 
+type ApiActivityListener = (activeRequests: number) => void
+let activeApiRequests = 0
+const apiActivityListeners = new Set<ApiActivityListener>()
+
+function publishApiActivity(delta: number) {
+  activeApiRequests = Math.max(0, activeApiRequests + delta)
+  apiActivityListeners.forEach((listener) => listener(activeApiRequests))
+}
+
+export function subscribeToApiActivity(listener: ApiActivityListener) {
+  apiActivityListeners.add(listener)
+  listener(activeApiRequests)
+  return () => {
+    apiActivityListeners.delete(listener)
+  }
+}
+
 interface ApiErrorResponse {
   message?: string
   error?: string
@@ -44,15 +61,21 @@ export async function apiRequest<T>(
   const url = endpoint.startsWith('http')
     ? endpoint
     : `${API_BASE_URL}${normalizedEndpoint}`
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-      ...options.headers,
-    },
-  })
+  publishApiActivity(1)
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        ...options.headers,
+      },
+    })
+  } finally {
+    publishApiActivity(-1)
+  }
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`

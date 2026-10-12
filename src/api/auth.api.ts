@@ -25,9 +25,9 @@ interface BackendLoginData {
   accessToken?: string
   refreshToken?: string
   departmentType?: string
-  isHead?: boolean
   phoneNumber?: string
   contact?: string
+  isHead?: boolean
 }
 
 interface BackendLoginEnvelope {
@@ -91,18 +91,18 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
 
   const claims = decodeJwtClaims(token)
   const claimEmail = typeof claims.sub === 'string' ? claims.sub : undefined
+  const claimId = typeof claims.id === 'string' || typeof claims.id === 'number'
+    ? claims.id
+    : typeof claims.userId === 'string' || typeof claims.userId === 'number'
+      ? claims.userId
+      : undefined
   const claimRole = typeof claims.role === 'string' ? claims.role : undefined
   const claimIsHead = typeof claims.isHead === 'boolean' ? claims.isHead : undefined
   const claimDept = typeof claims.departmentType === 'string' ? claims.departmentType : undefined
-  const claimPhone =
-    typeof claims.phoneNumber === 'string'
-      ? claims.phoneNumber
-      : typeof claims.contact === 'string'
-        ? claims.contact
-        : undefined
-  const claimId =
-    typeof claims.id === 'number' || typeof claims.id === 'string'
-      ? claims.id
+  const claimPhone = typeof claims.phoneNumber === 'string'
+    ? claims.phoneNumber
+    : typeof claims.contact === 'string'
+      ? claims.contact
       : undefined
 
   const email = (claimEmail || data.email || data.username || '').trim()
@@ -123,6 +123,7 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
     role: mapBackendRole(data.role ?? claimRole, data.isHead ?? claimIsHead),
     departmentType: data.departmentType || claimDept || undefined,
     phoneNumber,
+    contact: phoneNumber,
   }
 
   return {

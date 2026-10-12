@@ -66,6 +66,9 @@ export interface CustomersListProps {
   onStatusChange: (id: string, status: OnboardingStatus) => void
   onAssigneeChange: (id: string, assigneeId: string | null) => void
   onRemarkChange: (id: string, remark: string) => void
+  onCallCustomer?: (customer: OnboardingCustomer) => void
+  callingCustomerId?: string | null
+  onSendAcknowledgement?: (customer: OnboardingCustomer) => void
   onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
   onOpenServiceFlow?: (customer: OnboardingCustomer) => void
@@ -151,6 +154,9 @@ export function CustomersList({
   onStatusChange,
   onAssigneeChange,
   onRemarkChange,
+  onCallCustomer,
+  callingCustomerId,
+  onSendAcknowledgement,
   onOpenDetail,
   onOpenDuplicate,
   canEdit = true,
@@ -229,6 +235,9 @@ export function CustomersList({
               onRemarkChange={(remark) =>
                 onRemarkChange(customer.id, remark)
               }
+              onCallCustomer={onCallCustomer ? () => onCallCustomer(customer) : undefined}
+              isCalling={callingCustomerId === customer.id}
+              onSendAcknowledgement={onSendAcknowledgement ? () => onSendAcknowledgement(customer) : undefined}
               onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
               onOpenServiceFlow={onOpenServiceFlow ? () => onOpenServiceFlow(customer) : undefined}
@@ -533,6 +542,9 @@ interface CustomerRowProps {
   onStatusChange: (status: OnboardingStatus) => void
   onAssigneeChange: (assigneeId: string | null) => void
   onRemarkChange: (remark: string) => void
+  onCallCustomer?: () => void
+  isCalling?: boolean
+  onSendAcknowledgement?: () => void
   onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
   onOpenServiceFlow?: () => void
@@ -558,6 +570,9 @@ function CustomerRow({
   onStatusChange,
   onAssigneeChange,
   onRemarkChange,
+  onCallCustomer,
+  isCalling = false,
+  onSendAcknowledgement,
   onOpenDetail,
   onOpenDuplicate,
   onOpenServiceFlow,
@@ -804,8 +819,10 @@ function CustomerRow({
             <button
               type="button"
               className="cl-call-icon"
-              title="Call customer"
-              aria-label="Call customer"
+              title={isCalling ? 'Initiating call...' : `Call ${customer.contactName || customer.phone}`}
+              aria-label={isCalling ? 'Initiating call' : 'Call customer'}
+              onClick={onCallCustomer}
+              disabled={!onCallCustomer || isCalling || !customer.phone}
             >
               <Icon name="phone" size={13} strokeWidth={2} />
             </button>
@@ -984,7 +1001,7 @@ function CustomerRow({
                       type="button"
                       role="option"
                       aria-selected={customer.status === opt}
-                      className="cl-status-opt"
+                      className={`cl-status-opt${opt === 'completed' ? (isOptDisabled ? ' cl-status-opt--locked' : ' cl-status-opt--ready') : ''}`}
                       style={isOptDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                       onClick={() => {
                         if (isOptDisabled) {
@@ -1008,6 +1025,17 @@ function CustomerRow({
                   )
                 })}
               </motion.div>
+            )}
+            {!isGoogle && onSendAcknowledgement && (
+              <button
+                type="button"
+                className="cl-ack-btn"
+                onClick={onSendAcknowledgement}
+                title="Send acknowledgement link"
+              >
+                <Icon name="mail" size={12} strokeWidth={1.9} />
+                <span>Send acknowledgement</span>
+              </button>
             )}
           </div>
         </td>

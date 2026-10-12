@@ -599,7 +599,7 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
                           </tr>
                         </thead>
                         <tbody>
-                          {detail.participants.map((p) => (
+                          {(detail.participants ?? []).map((p) => (
                             <tr key={p.id} className="border-t">
                               <td className="px-3 py-2">{p.participantIndex ?? '—'}</td>
                               <td className="px-3 py-2">

@@ -44,6 +44,9 @@ export interface AuthOnboardingSummary {
   totalPendingOnboarding?: number
   totalInProgressOnboarding?: number
   totalCompletedOnboarding?: number
+  pendingCustomers?: number
+  inProgressCustomers?: number
+  onboardedCustomers?: number
   totalOnboardingTimeExceedingCustomers?: number
   presentUsers?: number
   absentUsers?: number

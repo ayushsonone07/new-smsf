@@ -392,6 +392,17 @@
   background: #fff;
 }
 
+/* An absolutely positioned menu does not increase the table's height. When
+   there are only one or two customers, reserve enough room inside the scroll
+   container so the menu is not clipped at its bottom edge. */
+.cl-table-wrapper:has(.cl-assign-btn[aria-expanded='true']) {
+  min-height: 430px;
+}
+
+.cl-table-wrapper:has(.cl-status-btn[aria-expanded='true']) {
+  min-height: 280px;
+}
+
 .cl-table {
   width: 100%;
   min-width: 1000px;   /* below this the wrapper scrolls; under 768px it becomes cards */
@@ -721,6 +732,93 @@
   z-index: 1;
 }
 
+.cl-ack-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cl-ack-btn > svg {
+  flex: 0 0 auto;
+}
+
+.cl-ack-btn > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-ack-btn:hover:not(:disabled) {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.cl-ack-btn:disabled {
+  color: #94a3b8;
+  cursor: wait;
+}
+
+.cl-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cl-toast--success {
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.cl-toast--error {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.cl-toast > span {
+  flex: 1;
+}
+
+.cl-toast > button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  font-size: 18px;
+  cursor: pointer;
+}
+
 .cl-status-btn {
   display: inline-flex;
   align-items: center;
@@ -791,6 +889,20 @@
 
 .cl-status-opt:hover {
   background: #f1f5f9;
+}
+
+.cl-status-opt--locked {
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.cl-status-opt--ready {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.cl-status-opt--ready:hover {
+  background: #dcfce7;
 }
 
 /* ── Assign To ────────────────────────────────────────────── */
