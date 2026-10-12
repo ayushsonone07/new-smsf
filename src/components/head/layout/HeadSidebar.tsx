@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import { SegmentedControl } from '../shared/SegmentedControl'
+import { ProfileMenu } from '../../common/ProfileMenu'
 import type {
   HeadAccount,
   HeadNavItem,
@@ -24,7 +26,10 @@ interface HeadSidebarProps {
 
 /**
  * Collapsible white sidebar: brand, nav, account card
- * with Head/User switch and logout.
+ * with Head/User switch and logout. Clicking the
+ * account row expands the SMSF-style profile
+ * settings menu (Profile Update, My Airtel Calls,
+ * Manage Services, Salary Management).
  */
 export function HeadSidebar({
   open,
@@ -39,6 +44,8 @@ export function HeadSidebar({
   onRoleChange,
   onLogout,
 }: HeadSidebarProps) {
+  const [panelOpen, setPanelOpen] = useState(false)
+
   function renderItem(item: HeadNavItem) {
     const on = item.key === activeKey
 
@@ -59,6 +66,7 @@ export function HeadSidebar({
   }
 
   return (
+    <>
     <aside className={`hside${open ? '' : ' is-collapsed'}`}>
       <div className="hbrand">
         {open ? (
@@ -102,18 +110,38 @@ export function HeadSidebar({
 
       {open ? (
         <div className="haccount">
-          <div className="haccount__row">
+          <button
+            type="button"
+            className="haccount__row haccount__row--clickable"
+            title="Open profile settings"
+            aria-label="Open profile settings"
+            aria-expanded={panelOpen}
+            onClick={() => setPanelOpen((value) => !value)}
+          >
             <Avatar
               name={account.initial ?? account.label}
               size={30}
               tone="brand"
             />
 
-            <div className="haccount__text">
-              <div className="haccount__name">{account.label}</div>
-              <div className="haccount__role">{account.roleLabel}</div>
-            </div>
-          </div>
+            <span className="haccount__text">
+              <span className="haccount__name">{account.label}</span>
+              <span className="haccount__role">{account.roleLabel}</span>
+            </span>
+
+            <span
+              className={`haccount__chevron${panelOpen ? ' is-open' : ''}`}
+              aria-hidden="true"
+            >
+              ›
+            </span>
+          </button>
+
+          {panelOpen ? (
+            <ProfileMenu
+              onNavigate={() => setPanelOpen(false)}
+            />
+          ) : null}
 
           {role && onRoleChange ? (
             <SegmentedControl
@@ -141,5 +169,6 @@ export function HeadSidebar({
         </div>
       ) : null}
     </aside>
+    </>
   )
 }

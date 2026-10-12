@@ -23,7 +23,12 @@ export function redirectAuthenticatedUser(): void {
   const session = getSession()
 
   if (session) {
-    throw redirect({ to: homeForRole(session.user.role as never) as never })
+    throw redirect({
+      to: homeForRole(
+        session.user.role as never,
+        session.user.departmentType,
+      ) as never,
+    })
   }
 }
 
@@ -59,7 +64,12 @@ export function requireRoleDashboard(
     }
 
     if (!roles.includes(session.user.role)) {
-      throw redirect({ to: homeForRole(session.user.role as never) as never })
+      throw redirect({
+        to: homeForRole(
+          session.user.role as never,
+          session.user.departmentType,
+        ) as never,
+      })
     }
   }
 }

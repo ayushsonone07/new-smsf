@@ -12,7 +12,7 @@ export interface CustomerSession {
 
 export function getCustomerSession(): CustomerSession | null {
   try {
-    const raw = localStorage.getItem('smsf.customer.session')
+    const raw = sessionStorage.getItem('smsf.customer.session')
     if (!raw) return null
     return JSON.parse(raw) as CustomerSession
   } catch {
@@ -21,11 +21,11 @@ export function getCustomerSession(): CustomerSession | null {
 }
 
 export function setCustomerSession(session: CustomerSession): void {
-  localStorage.setItem('smsf.customer.session', JSON.stringify(session))
+  sessionStorage.setItem('smsf.customer.session', JSON.stringify(session))
 }
 
 export function clearCustomerSession(): void {
-  localStorage.removeItem('smsf.customer.session')
+  sessionStorage.removeItem('smsf.customer.session')
 }
 
 export function useCustomerSession() {
@@ -40,12 +40,12 @@ export function useCustomerSession() {
       company: customer.company,
       loggedInAt: new Date().toISOString(),
     }
-    localStorage.setItem('smsf.customer.session', JSON.stringify(session))
+    sessionStorage.setItem('smsf.customer.session', JSON.stringify(session))
     setSessionState(session)
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('smsf.customer.session')
+    sessionStorage.removeItem('smsf.customer.session')
     setSessionState(null)
     navigate({ to: '/customers/login' })
   }, [navigate])

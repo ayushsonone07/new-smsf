@@ -15,6 +15,8 @@ export interface AuthUser {
    * `department` query param of the onboarding APIs.
    */
   departmentType?: string
+  /** User's 10-digit phone number (from JWT claim or profile update). */
+  phoneNumber?: string
 }
 
 export interface AuthSession {

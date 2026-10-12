@@ -183,8 +183,52 @@ export function useHeadNav(departmentId: string) {
     }))
   }, [isGoogle, isUser, features, basePath, isOnboarding, role, routePerms])
 
+  const PROFILE_MENU_SCREENS: Record<
+    string,
+    { name: string; description: string; screen: HeadScreenKey; icon: IconName }
+  > = {
+    'airtel-calls': {
+      name: 'My Airtel Calls',
+      description: 'Call history and analytics',
+      screen: 'airtel-calls',
+      icon: 'phone',
+    },
+    'manage-services': {
+      name: 'Manage Services',
+      description: 'Manage department service offerings and plans',
+      screen: 'manage-services',
+      icon: 'settings',
+    },
+    'salary-management': {
+      name: 'Salary Management',
+      description: 'Manage employee salaries, targets, and incentives',
+      screen: 'salary-management',
+      icon: 'dollar',
+    },
+  }
+
   const bySlug = (slug: string): FeaturePermission | undefined => {
     const s = slug === 'customer-list' ? 'customers' : slug
+
+    if (PROFILE_MENU_SCREENS[s]) {
+      const meta = PROFILE_MENU_SCREENS[s]
+      return {
+        id: `feature-${s}`,
+        departmentId,
+        name: meta.name,
+        description: meta.description,
+        screen: meta.screen,
+        slug: s,
+        icon: meta.icon,
+        enabled: true,
+        kind: 'screen',
+        order: 99,
+        roleAPermission: 'CAN_EDIT',
+        roleBPermission: 'CAN_READ',
+        category: 'screens',
+      }
+    }
+
     if (!isGoogle && !routePerms.isRouteEnabled(s)) {
       return undefined
     }
@@ -241,6 +285,13 @@ export function useHeadNav(departmentId: string) {
 
   const isRouteEnabled = (slugOrPath: string): boolean => {
     if (isGoogle) return true
+    if (
+      slugOrPath === 'airtel-calls' ||
+      slugOrPath === 'manage-services' ||
+      slugOrPath === 'salary-management'
+    ) {
+      return true
+    }
     return routePerms.isRouteEnabled(slugOrPath)
   }
 

@@ -30,6 +30,7 @@ export type HeadScreenKey =
   | 'dashboard'
   | 'users'
   | 'customers'
+  | 'customer-list'
   | 'attendance'
   | 'meeting'
   | 'sop'
@@ -39,6 +40,9 @@ export type HeadScreenKey =
   | 'service-flow'
   | 'member-flow'
   | 'help-support'
+  | 'airtel-calls'
+  | 'manage-services'
+  | 'salary-management'
   | 'custom'
 
 /**
