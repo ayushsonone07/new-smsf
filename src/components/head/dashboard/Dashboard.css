@@ -460,15 +460,76 @@
 }
 
 .hdb-trend__chart-wrap {
+  position: relative;
   width: 100%;
-  height: 160px;
+  height: clamp(190px, 22vw, 280px);
   margin-top: 6px;
 }
 
 .hdb-trend__chart-wrap svg {
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.hdb-trend__tooltip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #111c38;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+  color: #fff;
+  pointer-events: none;
+}
+
+.hdb-trend__tooltip-title {
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hdb-trend__tooltip-row,
+.hdb-trend__tooltip-name {
+  display: flex;
+  align-items: center;
+}
+
+.hdb-trend__tooltip-row {
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 12px;
+}
+
+.hdb-trend__tooltip-name {
+  gap: 7px;
+  color: #e2e8f0;
+}
+
+.hdb-trend__tooltip-name i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+}
+
+.hdb-trend__tooltip-row b {
+  color: #fff;
+  font-size: 13px;
+}
+
+.hdb-trend__empty {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #94a3b8;
+  font-size: 13px;
 }
 
 /* ── Team Target Achievement Gauge ────────────────────────── */
@@ -585,9 +646,18 @@
   color: #64748b;
 }
 
+.hdb-breakdown-item__val strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.hdb-breakdown-item__val > span {
+  font-weight: 400;
+}
+
 .hdb-breakdown-bar-bg {
   width: 100%;
-  height: 7px;
+  height: 8px;
   border-radius: 999px;
   background: #f1f5f9;
   overflow: hidden;
@@ -600,8 +670,8 @@
 }
 
 .hdb-breakdown-bar-fill--yellow { background: #f59e0b; }
-.hdb-breakdown-bar-fill--blue   { background: #3b82f6; }
-.hdb-breakdown-bar-fill--green  { background: #22c55e; }
+.hdb-breakdown-bar-fill--blue   { background: #4f46e5; }
+.hdb-breakdown-bar-fill--green  { background: #16a34a; }
 .hdb-breakdown-bar-fill--red    { background: #ef4444; }
 
 /* ── Most Active Day ──────────────────────────────────────── */
@@ -1879,5 +1949,165 @@
   .hdb-banner__dropdown-btn {
     font-size: 12px;
     padding: 0 10px;
+  }
+}
+
+/* Dashboard typography aligned with the supplied dashboard reference. */
+.hdb-container {
+  font-family: "Jost Variable", Jost, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.hdb-container .hdb-banner__text h1 {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.hdb-container .hdb-banner__text p,
+.hdb-container .hdb-banner__dropdown-btn,
+.hdb-container .hdb-banner__dropdown-item {
+  font-size: 14px;
+}
+
+.hdb-container .hdb-stat-card__label {
+  font-size: 15px;
+}
+
+.hdb-container .hdb-stat-card__value {
+  font-size: 26px;
+}
+
+.hdb-container .hdb-stat-card__pill {
+  font-size: 12px;
+}
+
+.hdb-container .hdb-stat-card__sub {
+  font-size: 14px;
+}
+
+.hdb-container .hdb-card__title,
+.hdb-container .hdb-team-table__title-area .hdb-card__title {
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.hdb-container .hdb-card__subtitle,
+.hdb-container .hdb-trend__legend {
+  font-size: 14px;
+}
+
+.hdb-container .hdb-card__badge,
+.hdb-container .hdb-breakdown-item__head,
+.hdb-container .hdb-donut-legend-item,
+.hdb-container .hdb-meeting-name,
+.hdb-container .hdb-member-info strong,
+.hdb-container .hdb-table {
+  font-size: 15px;
+}
+
+.hdb-container .hdb-trend__number {
+  font-size: 30px;
+}
+
+.hdb-container .hdb-gauge__percent,
+.hdb-container .hdb-perf-num {
+  font-size: 38px;
+}
+
+.hdb-container .hdb-gauge__subtext,
+.hdb-container .hdb-gauge__stat-lbl,
+.hdb-container .hdb-breakdown-item__val,
+.hdb-container .hdb-active-day__lbl,
+.hdb-container .hdb-donut-legend-vals,
+.hdb-container .hdb-delay-helper-note,
+.hdb-container .hdb-member-info span,
+.hdb-container .hdb-meeting-time,
+.hdb-container .hdb-meeting-exec,
+.hdb-container .hdb-team-table__footer {
+  font-size: 13px;
+}
+
+.hdb-container .hdb-gauge__stat-val {
+  font-size: 22px;
+}
+
+.hdb-container .hdb-active-day__val {
+  font-size: 14px;
+}
+
+.hdb-container .hdb-donut-center strong {
+  font-size: 25px;
+}
+
+.hdb-container .hdb-donut-center span {
+  font-size: 12px;
+}
+
+.hdb-container .hdb-team-search input,
+.hdb-container .hdb-team-search input::placeholder {
+  font-size: 15px;
+}
+
+.hdb-container .hdb-table th {
+  font-size: 12px;
+}
+
+.hdb-container .hdb-pill,
+.hdb-container .hdb-achieved-percent {
+  font-size: 13px;
+}
+
+.hdb-container .hdb-meeting-item {
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .hdb-container .hdb-banner__text h1 {
+    font-size: 16px;
+  }
+
+  .hdb-container .hdb-card__title {
+    font-size: 17px;
+  }
+
+  .hdb-container .hdb-stat-card__label {
+    font-size: 14px;
+  }
+
+  .hdb-container .hdb-stat-card__value {
+    font-size: 24px;
+  }
+
+  .hdb-container .hdb-stat-card__sub {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hdb-container .hdb-banner__text h1 {
+    font-size: 15px;
+  }
+
+  .hdb-container .hdb-banner__text p,
+  .hdb-container .hdb-banner__dropdown-btn {
+    font-size: 12px;
+  }
+
+  .hdb-container .hdb-stat-card__label {
+    font-size: 13px;
+  }
+
+  .hdb-container .hdb-stat-card__value {
+    font-size: 22px;
+  }
+
+  .hdb-container .hdb-stat-card__sub,
+  .hdb-container .hdb-card__subtitle,
+  .hdb-container .hdb-breakdown-item__head,
+  .hdb-container .hdb-donut-legend-item,
+  .hdb-container .hdb-member-info strong,
+  .hdb-container .hdb-table {
+    font-size: 12px;
   }
 }

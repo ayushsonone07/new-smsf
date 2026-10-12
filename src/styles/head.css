@@ -22,7 +22,7 @@
 
   display: flex;
   min-height: 100vh;
-  font-family: Jost, system-ui, sans-serif;
+  font-family: "Jost Variable", Jost, system-ui, sans-serif;
   font-size: 12px;
   line-height: 1.35;
   color: var(--c-text);

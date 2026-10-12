@@ -15,21 +15,26 @@ export interface StatusBreakdownProps {
  * Status Breakdown progress widget for Head Dashboard.
  */
 export function StatusBreakdown({
-  pendingCount = 5,
-  pendingPercent = 11,
-  inProgressCount = 7,
-  inProgressPercent = 16,
-  completedCount = 33,
-  completedPercent = 73,
-  delayedCount = 9,
-  delayedPercent = 20,
+  pendingCount = 0,
+  pendingPercent = 0,
+  inProgressCount = 0,
+  inProgressPercent = 0,
+  completedCount = 0,
+  completedPercent = 0,
+  delayedCount = 0,
+  delayedPercent = 0,
 }: StatusBreakdownProps) {
+  const displayPercent = (percent: number) =>
+    Number.isFinite(percent) ? Math.round(percent) : 0
+  const barWidth = (percent: number) =>
+    `${Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0))}%`
+
   return (
     <div className="hdb-card">
       <div className="hdb-card__header">
         <h3 className="hdb-card__title">Status Breakdown</h3>
         <span className="hdb-card__badge hdb-card__badge--green">
-          {completedPercent}% done
+          {displayPercent(completedPercent)}% done
         </span>
       </div>
 
@@ -42,13 +47,14 @@ export function StatusBreakdown({
               <span>Pending</span>
             </div>
             <span className="hdb-breakdown-item__val">
-              {pendingCount} · {pendingPercent}%
+              <strong>{pendingCount}</strong>
+              <span> · {displayPercent(pendingPercent)}%</span>
             </span>
           </div>
           <div className="hdb-breakdown-bar-bg">
             <div
               className="hdb-breakdown-bar-fill hdb-breakdown-bar-fill--yellow"
-              style={{ width: `${pendingPercent}%` }}
+              style={{ width: barWidth(pendingPercent) }}
             />
           </div>
         </div>
@@ -61,13 +67,14 @@ export function StatusBreakdown({
               <span>In Progress</span>
             </div>
             <span className="hdb-breakdown-item__val">
-              {inProgressCount} · {inProgressPercent}%
+              <strong>{inProgressCount}</strong>
+              <span> · {displayPercent(inProgressPercent)}%</span>
             </span>
           </div>
           <div className="hdb-breakdown-bar-bg">
             <div
               className="hdb-breakdown-bar-fill hdb-breakdown-bar-fill--blue"
-              style={{ width: `${inProgressPercent}%` }}
+              style={{ width: barWidth(inProgressPercent) }}
             />
           </div>
         </div>
@@ -80,13 +87,14 @@ export function StatusBreakdown({
               <span>Completed</span>
             </div>
             <span className="hdb-breakdown-item__val">
-              {completedCount} · {completedPercent}%
+              <strong>{completedCount}</strong>
+              <span> · {displayPercent(completedPercent)}%</span>
             </span>
           </div>
           <div className="hdb-breakdown-bar-bg">
             <div
               className="hdb-breakdown-bar-fill hdb-breakdown-bar-fill--green"
-              style={{ width: `${completedPercent}%` }}
+              style={{ width: barWidth(completedPercent) }}
             />
           </div>
         </div>
@@ -99,13 +107,14 @@ export function StatusBreakdown({
               <span>Delayed</span>
             </div>
             <span className="hdb-breakdown-item__val">
-              {delayedCount} · {delayedPercent}%
+              <strong>{delayedCount}</strong>
+              <span> · {displayPercent(delayedPercent)}%</span>
             </span>
           </div>
           <div className="hdb-breakdown-bar-bg">
             <div
               className="hdb-breakdown-bar-fill hdb-breakdown-bar-fill--red"
-              style={{ width: `${delayedPercent}%` }}
+              style={{ width: barWidth(delayedPercent) }}
             />
           </div>
         </div>

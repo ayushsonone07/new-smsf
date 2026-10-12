@@ -421,6 +421,10 @@ function HeadDashboard() {
                 0,
               )
             }
+            labels={summaryQuery.data?.trend?.labels}
+            newCustomers={summaryQuery.data?.trend?.newCustomers}
+            completed={summaryQuery.data?.trend?.completed}
+            previousPeriod={summaryQuery.data?.trend?.previousPeriod}
           />
           <TeamTargetAchievement
             percentage={teamTarget?.percentage}

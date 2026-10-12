@@ -18,7 +18,14 @@ export function TeamTargetAchievement({
 }: TeamTargetAchievementProps) {
   // Number of radial segments in the gauge
   const totalSegments = 36
-  const activeSegments = Math.round((percentage / 100) * totalSegments)
+  const safePercentage = Number.isFinite(percentage) ? percentage : 0
+  const displayPercentage = safePercentage.toLocaleString('en-US', {
+    maximumFractionDigits: safePercentage > 0 && safePercentage < 1 ? 1 : 0,
+  })
+  const activeSegments = Math.max(
+    0,
+    Math.min(totalSegments, Math.round((safePercentage / 100) * totalSegments)),
+  )
   const yellowSegmentsCount = 4
   const blueSegmentsCount = activeSegments - yellowSegmentsCount
 
@@ -77,7 +84,7 @@ export function TeamTargetAchievement({
           </svg>
 
           <div className="hdb-gauge__center">
-            <div className="hdb-gauge__percent">{percentage}%</div>
+            <div className="hdb-gauge__percent">{displayPercentage}%</div>
             <div className="hdb-gauge__subtext">On track for target</div>
           </div>
         </div>
