@@ -36,6 +36,7 @@ import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage
 import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
 import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
 import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
+import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
 
 function NotFoundPage() {
   const session = getSession()
@@ -61,6 +62,28 @@ function NotFoundPage() {
       <AvailableSoonPage />
     </PageLayout>
   )
+}
+
+function ProfileUpdateWithShell() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <ProfileUpdatePage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <ProfileUpdatePage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return <ProfileUpdatePage />
 }
 
 const rootRoute = createRootRoute({
@@ -237,7 +260,7 @@ const directCustomerDetailsRoute = createRoute({
 const profileUpdateRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile-update',
-  component: ProfileUpdatePage,
+  component: ProfileUpdateWithShell,
   beforeLoad: requireAuth,
 })
 

@@ -89,24 +89,18 @@ function queryString(query: AirtelCallsQuery): string {
   return search.toString()
 }
 
-function unwrap<T>(response: T | { data?: T }): T {
-  if (response && typeof response === 'object' && 'data' in response) {
-    const nested = (response as { data?: T }).data
-    if (nested !== undefined) return nested
-  }
-  return response as T
-}
-
 export async function getMyAirtelCalls(query: AirtelCallsQuery): Promise<AirtelCallsPage> {
-  return unwrap(await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
     `/v1/airtel/my-calls?${queryString(query)}`,
-  ))
+  )
+  return 'pageNumber' in response ? response : response.data
 }
 
 export async function getMyAirtelAnalytics(query: AirtelCallsQuery): Promise<AirtelAnalytics> {
-  return unwrap(await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
+  const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
     `/v1/airtel/my-calls/analytics?${queryString(query)}`,
-  ))
+  )
+  return 'data' in response ? response.data : response
 }
 
 export async function getDepartmentAirtelCalls(
@@ -114,9 +108,10 @@ export async function getDepartmentAirtelCalls(
   departmentType: string,
 ): Promise<AirtelCallsPage> {
   const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
-  return unwrap(await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
     `/v1/airtel/department/calls?${search}`,
-  ))
+  )
+  return 'pageNumber' in response ? response : response.data
 }
 
 export async function getDepartmentAirtelAnalytics(
@@ -124,15 +119,17 @@ export async function getDepartmentAirtelAnalytics(
   departmentType: string,
 ): Promise<AirtelAnalytics> {
   const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
-  return unwrap(await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
+  const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
     `/v1/airtel/department/calls/analytics?${search}`,
-  ))
+  )
+  return 'data' in response ? response.data : response
 }
 
 export async function getAirtelCallDetail(id: number): Promise<AirtelCallDetail> {
-  return unwrap(await authedApiRequest<AirtelCallDetail | { data: AirtelCallDetail }>(
+  const response = await authedApiRequest<AirtelCallDetail | { data: AirtelCallDetail }>(
     `/v1/airtel/calls/${id}`,
-  ))
+  )
+  return 'id' in response ? response : response.data
 }
 
 function sanitizePhone(raw?: string | null): string | null {
