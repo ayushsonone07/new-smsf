@@ -74,9 +74,6 @@ export function OnboardingConfirmationModal({
         themeSelection,
       })
 
-      alert(
-        `Acknowledgement email sent to ${email.trim()} successfully!\n\nThe status will automatically update to Completed once the customer reviews and confirms via the link.`,
-      )
       onSuccess?.()
       onClose()
     } catch (err: unknown) {
@@ -148,6 +145,7 @@ export function OnboardingConfirmationModal({
                 disabled={isSubmitting}
                 required
                 className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                style={{ paddingLeft: '2.25rem', paddingRight: '0.75rem', marginTop: 0 }}
               />
             </div>
           </div>
@@ -166,6 +164,7 @@ export function OnboardingConfirmationModal({
                 disabled={isSubmitting}
                 required
                 className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                style={{ paddingLeft: '2.25rem', paddingRight: '0.75rem', marginTop: 0 }}
               />
             </div>
           </div>

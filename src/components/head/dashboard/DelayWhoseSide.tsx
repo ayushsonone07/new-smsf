@@ -1,5 +1,6 @@
 export interface DelayWhoseSideProps {
   totalDelayed?: number
+  available?: boolean
   clientCount?: number
   clientPercent?: number
   ourSideCount?: number
@@ -12,13 +13,14 @@ export interface DelayWhoseSideProps {
  * Delay — Whose Side? Donut chart widget.
  */
 export function DelayWhoseSide({
-  totalDelayed = 9,
-  clientCount = 5,
-  clientPercent = 52,
-  ourSideCount = 3,
-  ourSidePercent = 31,
-  techCount = 2,
-  techPercent = 17,
+  totalDelayed = 0,
+  available = true,
+  clientCount = 0,
+  clientPercent = 0,
+  ourSideCount = 0,
+  ourSidePercent = 0,
+  techCount = 0,
+  techPercent = 0,
 }: DelayWhoseSideProps) {
   // SVG Donut calculation with r=44, circumference = 2 * PI * 44 = 276.46
   const r = 44
@@ -41,101 +43,103 @@ export function DelayWhoseSide({
       </div>
 
       <div className="hdb-delay-donut-row">
-        {/* Donut Chart */}
-        <div className="hdb-donut-box">
-          <svg viewBox="0 0 118 118">
-            {/* Background ring */}
-            <circle
-              cx="59"
-              cy="59"
-              r={r}
-              fill="none"
-              stroke="#f1f5f9"
-              strokeWidth="14"
-            />
+          {/* Donut Chart */}
+          <div className="hdb-donut-box">
+            <svg viewBox="0 0 118 118">
+              {/* Background ring */}
+              <circle
+                cx="59"
+                cy="59"
+                r={r}
+                fill="none"
+                stroke="#f1f5f9"
+                strokeWidth="14"
+              />
 
-            {/* Slice 1: Client side (Yellow) */}
-            <circle
-              cx="59"
-              cy="59"
-              r={r}
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth="14"
-              strokeDasharray={`${clientDash} ${c}`}
-              strokeDashoffset={0}
-            />
+              {/* Slice 1: Client side (Yellow) */}
+              <circle
+                cx="59"
+                cy="59"
+                r={r}
+                fill="none"
+                stroke={available ? '#f59e0b' : '#f1f5f9'}
+                strokeWidth="14"
+                strokeDasharray={`${clientDash} ${c}`}
+                strokeDashoffset={0}
+              />
 
-            {/* Slice 2: Our side (Blue) */}
-            <circle
-              cx="59"
-              cy="59"
-              r={r}
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="14"
-              strokeDasharray={`${ourDash} ${c}`}
-              strokeDashoffset={ourOffset}
-            />
+              {/* Slice 2: Our side (Blue) */}
+              <circle
+                cx="59"
+                cy="59"
+                r={r}
+                fill="none"
+                stroke={available ? '#3b82f6' : '#f1f5f9'}
+                strokeWidth="14"
+                strokeDasharray={`${ourDash} ${c}`}
+                strokeDashoffset={ourOffset}
+              />
 
-            {/* Slice 3: Tech / other (Red) */}
-            <circle
-              cx="59"
-              cy="59"
-              r={r}
-              fill="none"
-              stroke="#ef4444"
-              strokeWidth="14"
-              strokeDasharray={`${techDash} ${c}`}
-              strokeDashoffset={techOffset}
-            />
-          </svg>
+              {/* Slice 3: Tech / other (Red) */}
+              <circle
+                cx="59"
+                cy="59"
+                r={r}
+                fill="none"
+                stroke={available ? '#ef4444' : '#f1f5f9'}
+                strokeWidth="14"
+                strokeDasharray={`${techDash} ${c}`}
+                strokeDashoffset={techOffset}
+              />
+            </svg>
 
-          <div className="hdb-donut-center">
-            <strong>{clientPercent}%</strong>
-            <span>client side</span>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="hdb-donut-legend">
-          <div className="hdb-donut-legend-item">
-            <div className="hdb-donut-legend-name">
-              <span className="hdb-donut-dot hdb-donut-dot--yellow" />
-              <span>Client side</span>
-            </div>
-            <div className="hdb-donut-legend-vals">
-              <span>{clientCount}</span>
-              <span>{clientPercent}%</span>
+            <div className="hdb-donut-center">
+              <strong>{available ? `${clientPercent}%` : '—'}</strong>
+              <span>{available ? 'client side' : 'breakdown unavailable'}</span>
             </div>
           </div>
 
-          <div className="hdb-donut-legend-item">
-            <div className="hdb-donut-legend-name">
-              <span className="hdb-donut-dot hdb-donut-dot--blue" />
-              <span>Our side</span>
+          {/* Legend */}
+          <div className="hdb-donut-legend">
+            <div className="hdb-donut-legend-item">
+              <div className="hdb-donut-legend-name">
+                <span className="hdb-donut-dot hdb-donut-dot--yellow" />
+                <span>Client side</span>
+              </div>
+              <div className="hdb-donut-legend-vals">
+                <span>{available ? clientCount : '—'}</span>
+                <span>{available ? `${clientPercent}%` : '—'}</span>
+              </div>
             </div>
-            <div className="hdb-donut-legend-vals">
-              <span>{ourSideCount}</span>
-              <span>{ourSidePercent}%</span>
-            </div>
-          </div>
 
-          <div className="hdb-donut-legend-item">
-            <div className="hdb-donut-legend-name">
-              <span className="hdb-donut-dot hdb-donut-dot--red" />
-              <span>Tech / other dept</span>
+            <div className="hdb-donut-legend-item">
+              <div className="hdb-donut-legend-name">
+                <span className="hdb-donut-dot hdb-donut-dot--blue" />
+                <span>Our side</span>
+              </div>
+              <div className="hdb-donut-legend-vals">
+                <span>{available ? ourSideCount : '—'}</span>
+                <span>{available ? `${ourSidePercent}%` : '—'}</span>
+              </div>
             </div>
-            <div className="hdb-donut-legend-vals">
-              <span>{techCount}</span>
-              <span>{techPercent}%</span>
+
+            <div className="hdb-donut-legend-item">
+              <div className="hdb-donut-legend-name">
+                <span className="hdb-donut-dot hdb-donut-dot--red" />
+                <span>Tech / other dept</span>
+              </div>
+              <div className="hdb-donut-legend-vals">
+                <span>{available ? techCount : '—'}</span>
+                <span>{available ? `${techPercent}%` : '—'}</span>
+              </div>
             </div>
           </div>
-        </div>
       </div>
 
       <p className="hdb-delay-helper-note">
-        Open a member to see the reason on each customer.
+        {available
+          ? 'Open a member to see the reason on each customer.'
+          : 'Delay-side details are not provided by the backend yet.'}
       </p>
     </div>
   )

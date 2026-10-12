@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Outlet, useLocation, useNavigate } from '@tanstack/react-router'
 import { HeadShell } from '../../../../components/head/layout/HeadShell'
 import { useHeadNav } from '../hooks/useHeadNav'
@@ -19,14 +19,30 @@ import { resolveSlugFromPath } from '../utils/routeUtils'
 
 interface HeadConsoleLayoutProps {
   portalRole: HeadRole
+  children?: ReactNode
 }
+
+const userNotifications: HeadNotification[] = [
+  {
+    id: 'user-1',
+    text: 'A new customer has been assigned to you.',
+    timeLabel: '10 min ago',
+    unread: true,
+  },
+  {
+    id: 'user-2',
+    text: 'A customer added a new remark.',
+    timeLabel: '1 h ago',
+    unread: true,
+  },
+]
 
 /**
  * Frame for every /head/* and /onboarding* route. Sidebar items come
  * from the admin-managed feature permissions; the
  * topbar title follows the current slug.
  */
-export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
+export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const session = getSession()
@@ -38,8 +54,9 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
   const feature = nav.bySlug(slug)
   const registry = feature ? SCREEN_REGISTRY[feature.screen] : undefined
 
-  const [notifications, setNotifications] =
-    useState<HeadNotification[]>(sampleNotifications)
+  const [notifications, setNotifications] = useState<HeadNotification[]>(() =>
+    portalRole === 'USER' ? userNotifications : sampleNotifications,
+  )
 
   const isImpersonating = getAdminBackup() !== null
 
@@ -102,8 +119,9 @@ export function HeadConsoleLayout({ portalRole }: HeadConsoleLayoutProps) {
           items.map((item) => ({ ...item, unread: false })),
         )
       }
+      dashboardHeaderMode={feature?.screen === 'dashboard'}
     >
-      <Outlet />
+      {children ?? <Outlet />}
     </HeadShell>
   )
 }

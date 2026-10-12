@@ -18,7 +18,6 @@ import {
 } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
-import { ErrorState } from '../components/ui/ErrorState'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
 import { ServicesListPage } from '../features/departments/pages/ServicesListPage'
 import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
@@ -38,17 +37,59 @@ import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage
 import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
 import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
 import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
+import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
+
+function NotFoundPage() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <AvailableSoonPage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <AvailableSoonPage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return (
+    <PageLayout>
+      <AvailableSoonPage />
+    </PageLayout>
+  )
+}
+
+function ProfileUpdateWithShell() {
+  const session = getSession()
+
+  if (session?.user.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <ProfileUpdatePage />
+      </AdminLayout>
+    )
+  }
+
+  if (session?.user.role === 'HEAD' || session?.user.role === 'USER') {
+    return (
+      <HeadConsoleLayout portalRole={session.user.role}>
+        <ProfileUpdatePage />
+      </HeadConsoleLayout>
+    )
+  }
+
+  return <ProfileUpdatePage />
+}
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
-  notFoundComponent: () => (
-    <PageLayout>
-      <ErrorState
-        title="Page not found"
-        message="The page you are looking for does not exist."
-      />
-    </PageLayout>
-  ),
+  notFoundComponent: NotFoundPage,
 })
 
 const indexRoute = createRoute({
@@ -234,7 +275,7 @@ const directCustomerDetailsRoute = createRoute({
 const profileUpdateRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profile-update',
-  component: ProfileUpdatePage,
+  component: ProfileUpdateWithShell,
   beforeLoad: requireAuth,
 })
 

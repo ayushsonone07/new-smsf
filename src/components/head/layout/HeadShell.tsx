@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { HeadSidebar } from './HeadSidebar'
 import { HeadTopbar } from './HeadTopbar'
-import { ImpersonationBanner } from './ImpersonationBanner'
+import { NotificationCenter } from './NotificationCenter'
 import type {
   HeadAccount,
   HeadNavItem,
@@ -33,6 +33,7 @@ interface HeadShellProps {
   /* page */
   children: ReactNode
   defaultSidebarOpen?: boolean
+  dashboardHeaderMode?: boolean
 }
 
 /**
@@ -56,13 +57,18 @@ export function HeadShell({
   topbarActions,
   notifications,
   onMarkAllRead,
-  impersonating,
   children,
   defaultSidebarOpen = true,
+  dashboardHeaderMode = false,
 }: HeadShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen)
 
   return (
+    <NotificationCenter
+      items={notifications ?? []}
+      roleLabel={roleLabel}
+      onMarkAllRead={onMarkAllRead}
+    >
     <div className="hshell">
       {/* Mobile backdrop — closes sidebar on tap */}
       <div
@@ -90,26 +96,20 @@ export function HeadShell({
       />
 
       <main className="hmain">
-        <HeadTopbar
-          title={title}
-          subtitle={subtitle}
-          actions={topbarActions}
-          notifications={notifications}
-          onMarkAllRead={onMarkAllRead}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        >
-          {topbarContent}
-        </HeadTopbar>
+        {!dashboardHeaderMode && (
+          <HeadTopbar
+            title={title}
+            subtitle={subtitle}
+            actions={topbarActions}
+            onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          >
+            {topbarContent}
+          </HeadTopbar>
+        )}
 
-        {impersonating ? (
-          <ImpersonationBanner
-            name={impersonating.name}
-            onExit={impersonating.onExit}
-          />
-        ) : null}
-
-        <div className="hbody">{children}</div>
+        <div className={`hbody${dashboardHeaderMode ? ' hbody--dashboard' : ''}`}>{children}</div>
       </main>
     </div>
+    </NotificationCenter>
   )
 }

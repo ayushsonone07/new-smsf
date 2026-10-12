@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -19,8 +18,6 @@ import { ServiceFlowModal } from '../../../../components/head/customers-list/Ser
 import { GoogleInfoModal } from '../../../../components/head/customers-list/GoogleInfoModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
 import {
-  getDepartmentConfig,
-  getServiceFlows,
   updateDepartmentServiceStatus,
   extractServiceTags,
 } from '../../../../api/service-flow.api'
@@ -35,7 +32,6 @@ import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
   useDepartmentCustomerRows,
-  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
@@ -46,6 +42,8 @@ import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
+import { Icon } from '../../../../components/head/shared/Icon'
+import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
   (user) => ({
@@ -103,6 +101,8 @@ export function CustomerListPage() {
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
 
   // 1. Department Config: GET /api/dept-config/{departmentType}
   useQuery({
@@ -202,8 +202,8 @@ export function CustomerListPage() {
         name: u.username ? `${u.username} (${u.email})` : u.email,
       }))
     }
-    return FALLBACK_ASSIGNEES
-  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
+    return isGoogle ? [] : FALLBACK_ASSIGNEES
+  }, [isGoogle, isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {
@@ -265,7 +265,12 @@ export function CustomerListPage() {
       page,
       size,
       searchParam: search || undefined,
-      statusFilter: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+      statusFilter:
+        activeTab === 'all'
+          ? undefined
+          : activeTab === 'in-progress'
+            ? 'IN_PROGRESS'
+            : activeTab.toUpperCase(),
       userFilter:
         selectedAssigneeId !== 'all'
           ? selectedAssigneeId ?? undefined
@@ -334,7 +339,7 @@ export function CustomerListPage() {
                 month: 'short',
                 year: 'numeric',
               })
-            : 'Recent',
+            : '—',
           email,
           phone,
           formUrl:
@@ -468,10 +473,10 @@ export function CustomerListPage() {
       const rows = departmentRowsQuery.data?.customers ?? []
       const total = departmentRowsQuery.data?.totalElements ?? rows.length
       return {
-        all: total,
-        pending: rows.filter((r) => (r.status || '').toLowerCase().includes('pending')).length,
-        inProgress: rows.filter((r) => (r.status || '').toLowerCase().includes('progress') || (r.status || '').toUpperCase() === 'ACTIVE').length,
-        completed: rows.filter((r) => (r.status || '').toLowerCase().includes('complete')).length,
+        all: activeTab === 'all' ? total : undefined,
+        pending: activeTab === 'pending' ? total : undefined,
+        inProgress: activeTab === 'in-progress' ? total : undefined,
+        completed: activeTab === 'completed' ? total : undefined,
       }
     }
 
@@ -486,12 +491,14 @@ export function CustomerListPage() {
 
     const pending =
       authData?.totalPendingOnboarding ??
+      authData?.pendingCustomers ??
       authData?.pending ??
       authData?.summary?.pending ??
       apiSummary?.pending
 
     const inProgress =
       authData?.totalInProgressOnboarding ??
+      authData?.inProgressCustomers ??
       authData?.inProgress ??
       authData?.summary?.inProgress ??
       apiSummary?.inProgress
@@ -499,15 +506,25 @@ export function CustomerListPage() {
     const completed =
       authData?.totalCompletedOnboarding ??
       authData?.totalOnboardedCustomers ??
+      authData?.onboardedCustomers ??
       authData?.completed ??
       authData?.summary?.completed ??
       apiSummary?.completed
 
+    // The customer-list endpoint is already filtered by the selected status.
+    // Its total is authoritative for the active tab; the summary endpoint can
+    // lag behind and has been observed returning 0 while matching rows exist.
+    const filteredApiTotal = onboardingApiQuery.data?.totalElements
+    const activeApiCount =
+      typeof filteredApiTotal === 'number' && filteredApiTotal > 0
+        ? filteredApiTotal
+        : onboardingCustomers.length
+
     return {
       all,
-      pending,
-      inProgress,
-      completed,
+      pending: activeTab === 'pending' ? activeApiCount : pending,
+      inProgress: activeTab === 'in-progress' ? activeApiCount : inProgress,
+      completed: activeTab === 'completed' ? activeApiCount : completed,
     }
   }, [useRowsEndpoint, departmentRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
@@ -583,6 +600,25 @@ export function CustomerListPage() {
         delete next[customerId]
         return next
       })
+    }
+  }
+
+  async function handleCallCustomer(customer: OnboardingCustomer) {
+    setCallingCustomerId(customer.id)
+    try {
+      const result = await initiateAirtelClickToCall(customer.phone)
+      if (result?.success === false) {
+        throw new Error(result.message || 'Unable to initiate call')
+      }
+      setToast({
+        type: 'success',
+        message: `Call initiated to ${customer.contactName || customer.phone}. Please pick up when your phone rings.`,
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to initiate call'
+      setToast({ type: 'error', message })
+    } finally {
+      setCallingCustomerId(null)
     }
   }
 
@@ -749,6 +785,9 @@ export function CustomerListPage() {
           setModalTab('duplicates')
         }}
         onStatusChange={(id, status) => handleStatusChange(id, status)}
+        onCallCustomer={handleCallCustomer}
+        callingCustomerId={callingCustomerId}
+        onSendAcknowledgement={setConfirmingCustomer}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) =>
           patchCustomer(id, { remark })
@@ -759,7 +798,19 @@ export function CustomerListPage() {
       <TablePagination
         page={page}
         pageSize={size}
-        totalResults={activeCustomerQuery.data?.totalElements ?? onboardingCustomers.length}
+        totalResults={(() => {
+          const apiTotal = activeCustomerQuery.data?.totalElements
+          if (typeof apiTotal === 'number' && apiTotal > 0) return apiTotal
+          const activeCount =
+            activeTab === 'all'
+              ? tabCounts.all
+              : activeTab === 'in-progress'
+                ? tabCounts.inProgress
+                : tabCounts[activeTab]
+          return typeof activeCount === 'number' && activeCount > 0
+            ? activeCount
+            : filteredCustomers.length
+        })()}
         onPageChange={(newPage) => setPage(newPage)}
         onPageSizeChange={(newSize) => {
           setSize(newSize)
@@ -816,6 +867,7 @@ export function CustomerListPage() {
         onClose={() => setConfirmingCustomer(null)}
         onSuccess={() => {
           setConfirmingCustomer(null)
+          setToast({ type: 'success', message: 'Acknowledgement sent successfully' })
           activeCustomerQuery.refetch()
           authSummaryQuery.refetch()
         }}

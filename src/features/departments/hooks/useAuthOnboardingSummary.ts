@@ -12,10 +12,12 @@ export const authOnboardingSummaryQueryKey = (
 
 export function useAuthOnboardingSummary(
   params: AuthOnboardingSummaryParams = {},
+  options?: { enabled?: boolean },
 ) {
   return useQuery<AuthOnboardingSummary>({
     queryKey: authOnboardingSummaryQueryKey(params),
     queryFn: () => getAuthOnboardingSummary(params),
     staleTime: 30_000,
+    enabled: options?.enabled,
   })
 }

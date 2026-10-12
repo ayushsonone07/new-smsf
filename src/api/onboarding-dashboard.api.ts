@@ -44,6 +44,9 @@ export interface AuthOnboardingSummary {
   totalPendingOnboarding?: number
   totalInProgressOnboarding?: number
   totalCompletedOnboarding?: number
+  pendingCustomers?: number
+  inProgressCustomers?: number
+  onboardedCustomers?: number
   totalOnboardingTimeExceedingCustomers?: number
   presentUsers?: number
   absentUsers?: number
@@ -71,6 +74,7 @@ export interface OnboardingTrendDTO {
   interval?: string
   labels: string[]
   newCustomers: number[]
+  completed?: number[]
   previousPeriod: number[]
 }
 
@@ -170,7 +174,7 @@ export function normalizeAuthSummaryToDashboardSummary(
     interval: dto.trend.interval,
     labels: Array.isArray(dto.trend.labels) ? dto.trend.labels : [],
     newCustomers: Array.isArray(dto.trend.newCustomers) ? dto.trend.newCustomers : [],
-    completed: [],
+    completed: Array.isArray(dto.trend.completed) ? dto.trend.completed : [],
     previousPeriod: Array.isArray(dto.trend.previousPeriod) ? dto.trend.previousPeriod : [],
   } : undefined
 

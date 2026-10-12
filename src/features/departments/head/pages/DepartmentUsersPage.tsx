@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -138,6 +138,34 @@ export function DepartmentUsersPage() {
     size: 10,
     search: search.trim() || undefined,
   })
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = departmentUsersQuery
+  const loadingNextPageRef = useRef(false)
+  const loadNextUsersPage = useCallback(async () => {
+    if (
+      loadingNextPageRef.current ||
+      !hasNextPage ||
+      isFetchingNextPage
+    ) {
+      return
+    }
+
+    loadingNextPageRef.current = true
+    try {
+      await fetchNextPage({
+        cancelRefetch: false,
+      })
+    } finally {
+      loadingNextPageRef.current = false
+    }
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  ])
 
   // Get today's date range in ISO format for the member details API
   const todayStart = useMemo(() => {
@@ -441,11 +469,7 @@ export function DepartmentUsersPage() {
           canEditActions={canManageUsers}
           hasNextPage={departmentUsersQuery.hasNextPage}
           isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
-          onLoadMore={() => {
-            if (departmentUsersQuery.hasNextPage && !departmentUsersQuery.isFetchingNextPage) {
-              departmentUsersQuery.fetchNextPage()
-            }
-          }}
+          onLoadMore={loadNextUsersPage}
           totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
           onView={(user) => setModal({ kind: 'report', user })}
           onEdit={(user) => setModal({ kind: 'edit', user })}
