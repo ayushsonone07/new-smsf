@@ -22,6 +22,21 @@ interface HeadConsoleLayoutProps {
   children?: ReactNode
 }
 
+const userNotifications: HeadNotification[] = [
+  {
+    id: 'user-1',
+    text: 'A new customer has been assigned to you.',
+    timeLabel: '10 min ago',
+    unread: true,
+  },
+  {
+    id: 'user-2',
+    text: 'A customer added a new remark.',
+    timeLabel: '1 h ago',
+    unread: true,
+  },
+]
+
 /**
  * Frame for every /head/* and /onboarding* route. Sidebar items come
  * from the admin-managed feature permissions; the
@@ -39,8 +54,9 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
   const feature = nav.bySlug(slug)
   const registry = feature ? SCREEN_REGISTRY[feature.screen] : undefined
 
-  const [notifications, setNotifications] =
-    useState<HeadNotification[]>(sampleNotifications)
+  const [notifications, setNotifications] = useState<HeadNotification[]>(() =>
+    portalRole === 'USER' ? userNotifications : sampleNotifications,
+  )
 
   const isImpersonating = getAdminBackup() !== null
 
@@ -103,6 +119,7 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
           items.map((item) => ({ ...item, unread: false })),
         )
       }
+      dashboardHeaderMode={feature?.screen === 'dashboard'}
     >
       {children ?? <Outlet />}
     </HeadShell>
