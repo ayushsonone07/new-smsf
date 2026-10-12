@@ -61,13 +61,17 @@ export async function apiRequest<T>(
   const url = endpoint.startsWith('http')
     ? endpoint
     : `${API_BASE_URL}${normalizedEndpoint}`
+  // Let the browser set the multipart boundary for FormData bodies;
+  // forcing application/json breaks file uploads.
+  const isFormData =
+    typeof FormData !== 'undefined' && options.body instanceof FormData
   publishApiActivity(1)
   let response: Response
   try {
     response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         Accept: 'application/json',
         'ngrok-skip-browser-warning': 'true',
         ...options.headers,
