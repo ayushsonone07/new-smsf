@@ -47,9 +47,9 @@ export function ServicesListPage() {
   return (
     <PageLayout>
       <PageHeader
-        breadcrumb="Administration / Services List"
-        title="Services Management"
-        description="View and manage your available services and plans (Step 1: Add Service -> Step 2: Create Department)."
+        breadcrumb="Administration / Create Department"
+        title="Create Department"
+        description="Step 1: Create a new Service in Services Management (Service List) -> Step 2: Create Department Login opens automatically."
         actions={
           <>
             <Button
@@ -68,7 +68,7 @@ export function ServicesListPage() {
 
       <AdminServiceListCard
         onCreateDepartmentForService={(service) => {
-          setSelectedServiceForDept(service)
+          setSelectedServiceForDept(service ?? null)
           setShowCreateDeptModal(true)
         }}
       />
@@ -87,6 +87,12 @@ export function ServicesListPage() {
         }}
         onCreate={handleCreateDepartment}
         onUpdate={() => {}}
+        onViewFeatures={(dept) =>
+          navigate({
+            to: '/admin/departments/$departmentId',
+            params: { departmentId: dept.id },
+          })
+        }
       />
     </PageLayout>
   )
