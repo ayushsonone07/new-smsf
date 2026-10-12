@@ -17,6 +17,7 @@ import type {
 export function CustomerDashboardView() {
   const [data, setData] = useState<CustomerDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -28,6 +29,9 @@ export function CustomerDashboardView() {
         }
       } catch (err) {
         console.error('Failed to load customer dashboard data:', err)
+        if (isMounted) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load dashboard data.')
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -51,10 +55,18 @@ export function CustomerDashboardView() {
     })
   }
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="cdb-body" style={{ opacity: 0.7, padding: '40px 0', textAlign: 'center' }}>
         Loading dashboard...
+      </div>
+    )
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className="cdb-body" role="alert" style={{ padding: '40px 0', textAlign: 'center' }}>
+        {loadError || 'Dashboard data is unavailable.'}
       </div>
     )
   }
@@ -75,7 +87,7 @@ export function CustomerDashboardView() {
       <CustomerWelcomeBanner profile={data.profile} />
 
       {/* 2. Upcoming Meeting Banner */}
-      <UpcomingMeetingBanner meeting={data.meeting} />
+      {data.meeting ? <UpcomingMeetingBanner meeting={data.meeting} /> : null}
 
       {/* 3. Services Section */}
       <CustomerServicesSection services={data.services} />

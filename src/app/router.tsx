@@ -3,7 +3,6 @@ import {
   createRoute,
   createRouter,
   Outlet,
-  redirect,
 } from '@tanstack/react-router'
 import {
   requireAuth,
@@ -11,11 +10,7 @@ import {
   requireRoleDashboard,
   redirectAuthenticatedUser,
 } from './middleware/auth.middleware'
-import {
-  clearSession,
-  getSession,
-  homeForRole,
-} from './auth/session'
+import { clearSession, getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
@@ -34,6 +29,7 @@ import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsol
 import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
 import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
 import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage'
+import { RegisterBusinessPage } from '../features/customers/pages/RegisterBusinessPage'
 import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
 import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
 import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
@@ -95,18 +91,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    const session = getSession()
-
-    throw redirect({
-      to: session
-        ? (homeForRole(
-            session.user.role as never,
-            session.user.departmentType,
-          ) as never)
-        : '/login',
-    })
-  },
+  component: RegisterBusinessPage,
 })
 
 const loginRoute = createRoute({
