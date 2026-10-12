@@ -66,10 +66,10 @@ export function useInfiniteDepartmentUsersList(params: {
         return undefined
       }
 
-      const currentPage = lastPage.pageNumber ?? (allPages.length - 1)
+      const currentPage = allPages.length - 1
       const totalPages = lastPage.totalPage
 
-      if (totalPages !== undefined && currentPage + 1 >= totalPages) {
+      if (totalPages !== undefined && allPages.length >= totalPages) {
         return undefined
       }
 
@@ -131,4 +131,3 @@ export function useDepartmentCustomerRows(
     staleTime: 30_000,
   })
 }
-

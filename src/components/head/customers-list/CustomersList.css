@@ -2380,6 +2380,265 @@
   box-shadow: 0 0 0 3px rgba(36, 89, 224, 0.12);
 }
 
+.cl-range-picker {
+  position: relative;
+}
+
+.cl-range-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cl-range-picker__trigger:hover,
+.cl-range-picker__trigger.is-open {
+  background: #f8fafc;
+  border-color: #93c5fd;
+  color: #334155;
+}
+
+.cl-range-picker__trigger.has-range {
+  color: #2459e0;
+}
+
+.cl-date-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  width: min(760px, calc(100vw - 32px));
+  min-height: 360px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.cl-date-picker__presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  background: #f1f5f9;
+}
+
+.cl-date-picker__presets button {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cl-date-picker__presets button:hover {
+  background: #e2e8f0;
+}
+
+.cl-date-picker__presets .cl-date-picker__reset {
+  margin-top: auto;
+  border-top: 1px solid #dbe3ed;
+  border-radius: 0;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.cl-date-picker__calendar {
+  min-width: 0;
+  padding: 14px 16px 10px;
+}
+
+.cl-date-picker__month-nav {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.cl-date-picker__month-nav > span {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.cl-date-picker__month-nav button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+}
+
+.cl-date-picker__month-nav button:hover {
+  background: #f1f5f9;
+}
+
+.cl-date-picker__months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cl-calendar-month {
+  min-width: 0;
+}
+
+.cl-calendar-month__title {
+  display: none;
+}
+
+.cl-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+  gap: 4px 2px;
+}
+
+.cl-calendar-grid--weekdays {
+  margin-bottom: 8px;
+}
+
+.cl-calendar-grid--weekdays span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cl-calendar-day {
+  display: grid;
+  place-items: center;
+  width: min(32px, 100%);
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cl-calendar-day:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.cl-calendar-day.is-outside {
+  color: #cbd5e1;
+}
+
+.cl-calendar-day.is-in-range {
+  border-radius: 0;
+  background: #eff6ff;
+}
+
+.cl-calendar-day.is-selected {
+  border-color: #60a5fa;
+  background: #2459e0;
+  color: #fff;
+}
+
+.cl-calendar-day:disabled {
+  color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.cl-date-picker__hint {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .cl-date-picker {
+    grid-template-columns: 140px minmax(0, 1fr);
+    min-height: 330px;
+  }
+  .cl-date-picker__presets {
+    padding: 10px;
+  }
+  .cl-date-picker__presets button {
+    min-height: 42px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  .cl-date-picker__calendar {
+    padding: 12px 8px 8px;
+  }
+  .cl-date-picker__month-nav {
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+  }
+  .cl-date-picker__month-nav > span:nth-of-type(2) {
+    display: none;
+  }
+  .cl-date-picker__months {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cl-date-picker__months .cl-calendar-month:nth-child(2) {
+    display: none;
+  }
+  .cl-calendar-day {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 420px) {
+  .cl-date-picker {
+    grid-template-columns: 112px minmax(0, 1fr);
+    width: calc(100vw - 24px);
+    min-height: 310px;
+  }
+  .cl-date-picker__presets {
+    padding: 8px;
+  }
+  .cl-date-picker__presets button {
+    min-height: 38px;
+    padding: 0 7px;
+    font-size: 12px;
+  }
+  .cl-date-picker__calendar {
+    padding: 10px 4px 8px;
+  }
+  .cl-date-picker__month-nav > span {
+    font-size: 14px;
+  }
+  .cl-calendar-grid {
+    gap: 3px 0;
+  }
+  .cl-calendar-day {
+    width: 26px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
 /* =============================================================
    RESPONSIVE — CustomersList
    Breakpoints: 1024 / 768 / 480
@@ -2509,6 +2768,103 @@
   .cl-drawer__tab-btn {
     white-space: nowrap;
   }
+  .cl-drawer__header {
+    padding: 12px 12px 10px;
+  }
+  .cl-drawer__name-row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .cl-drawer__name-text h2 {
+    font-size: 15px;
+  }
+  .cl-drawer__name-text span {
+    font-size: 9px;
+  }
+  .cl-drawer__close {
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+  }
+  .cl-drawer__spill {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__body {
+    gap: 9px;
+    padding: 8px 10px 14px;
+  }
+  .cl-drawer__stats {
+    gap: 6px;
+  }
+  .cl-drawer__stat {
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .cl-drawer__stat-label {
+    font-size: 10px;
+  }
+  .cl-drawer__stat-value {
+    font-size: 18px;
+  }
+  .cl-drawer__stat-sub {
+    font-size: 9px;
+  }
+  .cl-drawer__tab-btn {
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+  .cl-drawer__tab-count {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    font-size: 9px;
+  }
+  .cl-drawer__stack {
+    gap: 9px;
+  }
+  .cl-drawer__card {
+    padding: 10px;
+    border-radius: 11px;
+  }
+  .cl-drawer__card-head {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .cl-drawer__card-head h3 {
+    font-size: 12px;
+  }
+  .cl-drawer__card-meta {
+    font-size: 10px;
+  }
+  .cl-drawer__fields {
+    gap: 9px 12px;
+  }
+  .cl-drawer__field-label {
+    font-size: 9px;
+  }
+  .cl-drawer__field-value {
+    font-size: 11px;
+  }
+  .cl-drawer__services {
+    gap: 5px;
+  }
+  .cl-drawer__service {
+    gap: 6px;
+    font-size: 11px;
+  }
+  .cl-drawer__service-pill {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
 }
 
 /* ── 480px: small phone ── */
@@ -2526,8 +2882,30 @@
   .cl-range__inputs {
     grid-template-columns: minmax(0, 1fr);
   }
+  .cl-date-picker {
+    grid-template-columns: 150px minmax(0, 1fr);
+    width: min(680px, calc(100vw - 28px));
+  }
+  .cl-date-picker__presets {
+    padding: 10px;
+  }
+  .cl-date-picker__presets button {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .cl-date-picker__calendar {
+    padding: 12px;
+  }
+  .cl-date-picker__months {
+    gap: 8px;
+  }
+  .cl-calendar-day {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
   .cl-drawer__fields {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cl-drawer__stat-value {
     font-size: 18px;

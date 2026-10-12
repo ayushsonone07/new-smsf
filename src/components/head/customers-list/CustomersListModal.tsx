@@ -318,13 +318,17 @@ export function CustomersListModal({
   const assignee =
     assignees.find((a) => a.id === current?.assigneeId) ?? null
 
-  const serviceRow =
-    apiDetails.serviceRows.find(
-      (row) => String(row.customerId) === String(current?.id),
-    ) ?? apiDetails.serviceRows[0]
+  const serviceRow = apiDetails.serviceRows.find(
+    (row) => String(row.customerId) === String(current?.id),
+  )
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
-  const services = getCustomerServices(apiDetails.serviceRows)
+  const hasDepartmentServiceSummary = serviceRow?.departmentStatuses != null
+  const services = getDepartmentServices(
+    serviceRow?.departmentStatuses,
+    serviceRow,
+    departmentType,
+  )
   const doneCount = services.filter((s) => s.status === 'completed').length
   const internalRemarkEntries = useMemo(() => {
     const list =
@@ -453,7 +457,10 @@ export function CustomersListModal({
     {
       id: 'deliverables',
       label: 'Deliverables',
-      count: apiDetails.serviceRowsLoading ? undefined : services.length,
+      count:
+        apiDetails.serviceRowsLoading || !hasDepartmentServiceSummary
+          ? undefined
+          : services.length,
     },
     { id: 'business-form', label: 'Business form' },
     { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
@@ -655,9 +662,13 @@ export function CustomersListModal({
               <div className="cl-drawer__stat-value">
                 {apiDetails.serviceRowsLoading
                   ? '—/—'
-                  : `${doneCount}/${services.length}`}
+                  : hasDepartmentServiceSummary
+                    ? `${doneCount}/${services.length}`
+                    : '—/—'}
               </div>
-              <div className="cl-drawer__stat-sub">completed</div>
+              <div className="cl-drawer__stat-sub">
+                {hasDepartmentServiceSummary ? 'completed' : 'summary unavailable'}
+              </div>
             </div>
             <div className="cl-drawer__stat">
               <div className="cl-drawer__stat-label">Activity</div>
@@ -790,11 +801,17 @@ export function CustomersListModal({
                 <div className="cl-drawer__card-head">
                   <h3>Included services</h3>
                   <span className="cl-drawer__card-meta">
-                    {doneCount}/{services.length} completed
+                    {hasDepartmentServiceSummary
+                      ? `${doneCount}/${services.length} completed`
+                      : 'Summary unavailable'}
                   </span>
                 </div>
 
-                {services.length === 0 ? (
+                {!hasDepartmentServiceSummary ? (
+                  <div className="cl-drawer__card-meta">
+                    Service status summary was not returned by the backend.
+                  </div>
+                ) : services.length === 0 ? (
                   <div className="cl-drawer__card-meta">
                     No services added yet.
                   </div>
@@ -1006,23 +1023,27 @@ export function CustomersListModal({
                   <strong>
                     {apiDetails.serviceRowsLoading
                       ? 'Loading services...'
-                      : `${doneCount} of ${services.length} services completed`}
+                      : hasDepartmentServiceSummary
+                        ? `${doneCount} of ${services.length} services completed`
+                        : 'Service summary unavailable'}
                   </strong>
                   <strong>
                     {apiDetails.serviceRowsLoading
                       ? '—'
-                      : `${services.length ? Math.round((doneCount / services.length) * 100) : 0}%`}
+                      : hasDepartmentServiceSummary
+                        ? `${services.length ? Math.round((doneCount / services.length) * 100) : 0}%`
+                        : '—'}
                   </strong>
                 </div>
                 <div className="cl-drawer__progress-track">
                   <span
                     style={{
-                      width: `${services.length && !apiDetails.serviceRowsLoading ? (doneCount / services.length) * 100 : 0}%`,
+                      width: `${services.length && hasDepartmentServiceSummary && !apiDetails.serviceRowsLoading ? (doneCount / services.length) * 100 : 0}%`,
                     }}
                   />
                 </div>
               </div>
-              {apiDetails.serviceRowsLoading ? null : services.length > 0 ? (
+              {apiDetails.serviceRowsLoading || !hasDepartmentServiceSummary ? null : services.length > 0 ? (
                 <ul className="cl-drawer__deliverable-grid">
                   {services.map((service, index) => (
                     <li
@@ -1361,12 +1382,69 @@ function toOnboardingStatus(status?: string): OnboardingStatus | undefined {
   return undefined
 }
 
-function getCustomerServices(rows: CustomerServiceRow[]) {
-  return rows.map((row) => ({
-    name: formatServiceName(row.serviceType),
-    status: toOnboardingStatus(row.status || row.onboardingStatus),
-    row,
-  }))
+const DEPARTMENT_SERVICE_ORDER = [
+  'SUPPORT_DEPARTMENT',
+  'RECURRING_DEPARTMENT',
+  'BILLING_DEPARTMENT',
+  'SMO_DEPARTMENT',
+  'SEO_DEPARTMENT',
+  'WEBSITE_DEPARTMENT',
+  'AUTOMATION_DEPARTMENT',
+  'ADVERTISEMENT_DEPARTMENT',
+  'ONBOARDING_DEPARTMENT',
+  'GOOGLE_DEPARTMENT',
+]
+
+const DEPARTMENT_SERVICE_LABELS: Record<string, string> = {
+  SUPPORT_DEPARTMENT: 'Support',
+  RECURRING_DEPARTMENT: 'Support',
+  BILLING_DEPARTMENT: 'Billing',
+  SMO_DEPARTMENT: 'SMO',
+  SEO_DEPARTMENT: 'SEO',
+  WEBSITE_DEPARTMENT: 'Website',
+  AUTOMATION_DEPARTMENT: 'Automation',
+  ADVERTISEMENT_DEPARTMENT: 'Advertisement',
+  ONBOARDING_DEPARTMENT: 'Onboarding',
+  GOOGLE_DEPARTMENT: 'Google',
+  AUTOWEBSION_DEPARTMENT: 'Website & Automation',
+}
+
+function getDepartmentServices(
+  departmentStatuses: CustomerServiceRow['departmentStatuses'],
+  serviceRow: CustomerServiceRow | undefined,
+  currentDepartment: string,
+) {
+  if (!departmentStatuses) return []
+
+  const normalizedCurrentDepartment = currentDepartment.toUpperCase()
+  return Object.entries(departmentStatuses)
+    .sort(([a], [b]) => {
+      const aOrder = DEPARTMENT_SERVICE_ORDER.indexOf(a.toUpperCase())
+      const bOrder = DEPARTMENT_SERVICE_ORDER.indexOf(b.toUpperCase())
+      return (aOrder < 0 ? Number.MAX_SAFE_INTEGER : aOrder) -
+        (bOrder < 0 ? Number.MAX_SAFE_INTEGER : bOrder)
+    })
+    .map(([department, details]) => {
+      const normalizedDepartment = department.toUpperCase()
+      const isCurrentDepartment =
+        normalizedDepartment === normalizedCurrentDepartment ||
+        (normalizedDepartment === 'RECURRING_DEPARTMENT' &&
+          normalizedCurrentDepartment === 'SUPPORT_DEPARTMENT') ||
+        (normalizedDepartment === 'AUTOWEBSION_DEPARTMENT' &&
+          ['WEBSITE_DEPARTMENT', 'AUTOMATION_DEPARTMENT'].includes(
+            normalizedCurrentDepartment,
+          ))
+
+      return {
+        name:
+          DEPARTMENT_SERVICE_LABELS[normalizedDepartment] ??
+          formatServiceName(department.replace(/_DEPARTMENT$/i, '')),
+        status: toOnboardingStatus(
+          details?.status || (details?.onboarded ? 'COMPLETED' : undefined),
+        ),
+        row: isCurrentDepartment ? serviceRow : undefined,
+      }
+    })
 }
 
 export function stringValue(value: unknown): string {

@@ -17,8 +17,6 @@ export function useAssigningUsers(
     queryKey: ['assigning-users', departmentType],
     queryFn: () => getAssigningUsers(departmentType),
     enabled: isEnabled,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 30_000,
   })
 }
-

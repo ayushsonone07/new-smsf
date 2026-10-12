@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -19,8 +18,6 @@ import { ServiceFlowModal } from '../../../../components/head/customers-list/Ser
 import { GoogleInfoModal } from '../../../../components/head/customers-list/GoogleInfoModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
 import {
-  getDepartmentConfig,
-  getServiceFlows,
   updateDepartmentServiceStatus,
   extractServiceTags,
 } from '../../../../api/service-flow.api'
@@ -35,7 +32,6 @@ import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
   useDepartmentCustomerRows,
-  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
@@ -55,10 +51,8 @@ const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
 )
 
 /**
- * Head panel — Customer List. Renders the customers-list UI
- * composed from components/head/customers-list, wired to:
- * - GET /api/auth/onboarding/customers?page=0&size=10
- * - GET /api/meetings/users/assigning-list?departmentType=ONBOARDING_DEPARTMENT
+ * Department customer list. Google uses the department rows endpoint;
+ * onboarding uses its dedicated customers endpoint.
  */
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
@@ -102,23 +96,6 @@ export function CustomerListPage() {
     const timer = window.setTimeout(() => setToast(null), 4000)
     return () => window.clearTimeout(timer)
   }, [toast])
-
-  // 1. Google Department Config: GET /api/dept-config/GOOGLE_DEPARTMENT
-  useQuery({
-    queryKey: ['deptConfig', 'GOOGLE_DEPARTMENT'],
-    queryFn: () => getDepartmentConfig('GOOGLE_DEPARTMENT'),
-    enabled: isGoogle,
-  })
-
-  // 2. Google Service Flows: GET /api/service/flows?page=0&size=1000
-  useQuery({
-    queryKey: ['serviceFlows', 'all'],
-    queryFn: () => getServiceFlows({ page: 0, size: 1000 }),
-    enabled: isGoogle,
-  })
-
-  // 3. Google Department Users: GET /api/auth/department/users?page=0&size=100
-  useDepartmentUsersList({ page: 0, size: 100 }, { enabled: isGoogle })
 
   const canEdit = columnFeatures.canEdit('actions')
 
@@ -191,8 +168,8 @@ export function CustomerListPage() {
         name: u.username ? `${u.username} (${u.email})` : u.email,
       }))
     }
-    return FALLBACK_ASSIGNEES
-  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
+    return isGoogle ? [] : FALLBACK_ASSIGNEES
+  }, [isGoogle, isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {
@@ -245,7 +222,7 @@ export function CustomerListPage() {
         : activeTab === 'in-progress'
           ? 'IN_PROGRESS'
           : activeTab.toUpperCase(),
-  })
+  }, { enabled: !isGoogle })
 
   // 3b. Google Department customer rows API: /api/auth/department/customer/rows?page=0&size=10&compatible=true
   const googleCustomerRowsQuery = useDepartmentCustomerRows(
@@ -253,7 +230,12 @@ export function CustomerListPage() {
       page,
       size,
       searchParam: search || undefined,
-      statusFilter: activeTab === 'all' ? undefined : activeTab.toUpperCase(),
+      statusFilter:
+        activeTab === 'all'
+          ? undefined
+          : activeTab === 'in-progress'
+            ? 'IN_PROGRESS'
+            : activeTab.toUpperCase(),
       userFilter:
         selectedAssigneeId !== 'all'
           ? selectedAssigneeId ?? undefined
@@ -321,7 +303,7 @@ export function CustomerListPage() {
                 month: 'short',
                 year: 'numeric',
               })
-            : 'Recent',
+            : '—',
           email,
           phone,
           formUrl:
@@ -329,8 +311,7 @@ export function CustomerListPage() {
             c.onboardingLink ||
             (c.customerDetails as any)?.onboardingLink ||
             '',
-          serviceType: c.serviceType || 'GOOGLE SERVICE',
-          callStatus: 'connected',
+          serviceType: c.serviceType || '—',
           status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
           remark: getLatestInternalRemark(c, ['GOOGLE_DEPARTMENT', 'ONBOARDING_DEPARTMENT']) || c.remark || '',
@@ -454,10 +435,10 @@ export function CustomerListPage() {
       const rows = googleCustomerRowsQuery.data?.customers ?? []
       const total = googleCustomerRowsQuery.data?.totalElements ?? rows.length
       return {
-        all: total,
-        pending: rows.filter((r) => (r.status || '').toLowerCase().includes('pending')).length,
-        inProgress: rows.filter((r) => (r.status || '').toLowerCase().includes('progress') || (r.status || '').toUpperCase() === 'ACTIVE').length,
-        completed: rows.filter((r) => (r.status || '').toLowerCase().includes('complete')).length,
+        all: activeTab === 'all' ? total : undefined,
+        pending: activeTab === 'pending' ? total : undefined,
+        inProgress: activeTab === 'in-progress' ? total : undefined,
+        completed: activeTab === 'completed' ? total : undefined,
       }
     }
 
@@ -658,8 +639,11 @@ export function CustomerListPage() {
         const target =
           filteredCustomers.find((c) => c.id === customerId) ||
           onboardingCustomers.find((c) => c.id === customerId)
-        const oldStatus = target?.status || 'PENDING'
-        const sType = target?.serviceType || 'GOOGLE SERVICE'
+        const sType = target?.serviceType
+        if (!sType || sType === '—') {
+          throw new Error('Google service type is missing from the customer response')
+        }
+        const oldStatus = target.status
 
         await updateDepartmentServiceStatus({
           customerId,
