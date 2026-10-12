@@ -62,18 +62,14 @@ function shiftDays(date: Date, days: number): Date {
   return next
 }
 
-/** Convert local date to ISO datetime string (start of day: 00:00:00). */
+/** Format local date-time boundaries expected by the backend (without UTC conversion). */
 function toStartOfDayIso(date: Date): string {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString().slice(0, 19) // "2026-10-10T00:00:00"
+  return `${toIsoDate(date)}T00:00:00`
 }
 
-/** Convert local date to ISO datetime string (end of day: 23:59:59). */
+/** Format local date-time boundaries expected by the backend (without UTC conversion). */
 function toEndOfDayIso(date: Date): string {
-  const d = new Date(date)
-  d.setHours(23, 59, 59, 0)
-  return d.toISOString().slice(0, 19) // "2026-10-10T23:59:59"
+  return `${toIsoDate(date)}T23:59:59`
 }
 
 function rangeFor(period: string): {
@@ -234,16 +230,16 @@ function HeadDashboard() {
 
   const authKpis = authSummaryQuery.data
 
-  // Merge KPIs from both APIs, preferring auth summary when available
+  // Keep dashboard totals and chart data on the same endpoint when available.
   const mergedKpis = {
-    totalCustomers: authKpis?.totalCustomers ?? summaryQuery.data?.kpis?.totalCustomers ?? 0,
-    totalOnboarded: authKpis?.totalOnboardedCustomers ?? summaryQuery.data?.kpis?.totalOnboarded ?? 0,
-    totalCompleted: authKpis?.totalCompletedOnboarding ?? summaryQuery.data?.kpis?.totalCompleted ?? 0,
-    totalInProgress: authKpis?.totalInProgressOnboarding ?? summaryQuery.data?.kpis?.totalInProgress ?? 0,
-    totalPending: authKpis?.totalPendingOnboarding ?? summaryQuery.data?.kpis?.totalPending ?? 0,
-    totalDelayed: authKpis?.totalOnboardingTimeExceedingCustomers ?? summaryQuery.data?.kpis?.totalDelayed ?? 0,
-    presentUsers: authKpis?.presentUsers ?? summaryQuery.data?.kpis?.presentUsers ?? 0,
-    absentUsers: authKpis?.absentUsers ?? summaryQuery.data?.kpis?.absentUsers ?? 0,
+    totalCustomers: summaryQuery.data?.kpis?.totalCustomers ?? authKpis?.totalCustomers ?? 0,
+    totalOnboarded: summaryQuery.data?.kpis?.totalOnboarded ?? authKpis?.totalOnboardedCustomers ?? 0,
+    totalCompleted: summaryQuery.data?.kpis?.totalCompleted ?? authKpis?.totalCompletedOnboarding ?? 0,
+    totalInProgress: summaryQuery.data?.kpis?.totalInProgress ?? authKpis?.totalInProgressOnboarding ?? 0,
+    totalPending: summaryQuery.data?.kpis?.totalPending ?? authKpis?.totalPendingOnboarding ?? 0,
+    totalDelayed: summaryQuery.data?.kpis?.totalDelayed ?? authKpis?.totalOnboardingTimeExceedingCustomers ?? 0,
+    presentUsers: summaryQuery.data?.kpis?.presentUsers ?? authKpis?.presentUsers ?? 0,
+    absentUsers: summaryQuery.data?.kpis?.absentUsers ?? authKpis?.absentUsers ?? 0,
   }
 
   const statsData: Partial<DashboardStatsData> | undefined = mergedKpis
@@ -377,14 +373,20 @@ function HeadDashboard() {
   }))
 
   // Use auth summary for delay breakdown and team target
-  const delayBreakdown = authSummaryQuery.data?.delayBreakdown ?? summaryQuery.data?.delayBreakdown
+  const delayBreakdown = summaryQuery.data?.delayBreakdown ?? authSummaryQuery.data?.delayBreakdown
   const totalDelayed =
-    authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers ??
     summaryQuery.data?.totalDelayed ??
     mergedKpis?.totalDelayed ??
-    9
+    authSummaryQuery.data?.totalOnboardingTimeExceedingCustomers
 
-  const teamTarget = authSummaryQuery.data?.teamTarget ?? summaryQuery.data?.teamTarget
+  const teamTarget = summaryQuery.data?.teamTarget ?? authSummaryQuery.data?.teamTarget
+  const hasDelayBreakdown =
+    delayBreakdown?.available !== false &&
+    Boolean(
+      delayBreakdown?.clientSide ||
+      delayBreakdown?.ourSide ||
+      delayBreakdown?.techOtherDepartment,
+    )
 
   return (
     <motion.div
@@ -466,9 +468,10 @@ function HeadDashboard() {
               summaryQuery.data?.statusBreakdown?.delayed?.percentage
             }
           />
-          <MostActiveDay days={activeDays} />
+          <MostActiveDay days={activeDays ?? []} />
           <DelayWhoseSide
             totalDelayed={totalDelayed}
+            available={hasDelayBreakdown}
             clientCount={delayBreakdown?.clientSide?.count}
             clientPercent={delayBreakdown?.clientSide?.percentage}
             ourSideCount={delayBreakdown?.ourSide?.count}
