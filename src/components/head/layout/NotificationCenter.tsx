@@ -90,19 +90,35 @@ export function NotificationCenter({
             </div>
           ) : (
             items.map((item) => (
-              <article key={item.id} className={`hnotify-item${item.unread ? ' is-unread' : ''}`}>
+              <button
+                key={item.id}
+                type="button"
+                className={`hnotify-item${item.unread ? ' is-unread' : ''} ${notificationTone(item.text)}`}
+                onClick={() => {
+                  if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer')
+                }}
+                disabled={!item.link}
+                aria-label={item.link ? `Open notification: ${item.text}` : item.text}
+              >
                 <span className="hnotify-item__icon"><Icon name="bell" size={15} /></span>
                 <div>
                   <p>{item.text}</p>
                   <time>{item.timeLabel}</time>
                 </div>
-              </article>
+              </button>
             ))
           )}
         </div>
       </aside>
     </NotificationCenterContext.Provider>
   )
+}
+
+function notificationTone(text: string): 'is-completed' | 'is-pending' {
+  const normalized = text.toLowerCase()
+  return /completed|complete|approved|success|acknowledged|generated/.test(normalized)
+    ? 'is-completed'
+    : 'is-pending'
 }
 
 export function useNotificationCenter() {

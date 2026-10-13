@@ -1,9 +1,11 @@
 import { Icon } from '../shared/Icon'
 import { useNotificationCenter } from './NotificationCenter'
+import { getSession } from '../../../app/auth/session'
 
 /** Bell button with unread badge and a dropdown list. */
 export function NotificationsMenu() {
   const notifications = useNotificationCenter()
+  if (getSession()?.user.role === 'USER') return null
 
   return (
     <div className="hbell">
