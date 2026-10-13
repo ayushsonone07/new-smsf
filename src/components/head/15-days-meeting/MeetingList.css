@@ -181,15 +181,88 @@
   color: var(--head-text);
 }
 
-/* Responsive adjustments */
-@media (max-width: 900px) {
+/* Mobile card layout: each meeting is self-contained and never requires
+   horizontal scrolling. */
+@media (max-width: 768px) {
   .meeting-list__wrapper {
+    overflow-x: hidden;
+    border: 0;
     border-radius: 0;
-    border-left: 0;
-    border-right: 0;
+    background: transparent;
   }
-  
+
   .meeting-list__table {
-    min-width: 1000px;
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .meeting-list__table thead {
+    display: none;
+  }
+
+  .meeting-list__table tbody {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .meeting-list__row {
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    border: 1px solid var(--head-border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+  }
+
+  .meeting-list__td {
+    display: grid;
+    grid-template-columns: minmax(88px, 30%) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border-bottom: 1px solid #eef2f7;
+    overflow-wrap: anywhere;
+  }
+
+  .meeting-list__td::before {
+    content: attr(data-label);
+    padding-top: 2px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .meeting-list__td:last-child {
+    border-bottom: 0;
+  }
+
+  .meeting-list__customer-cell,
+  .meeting-list__department-pills {
+    min-width: 0;
+  }
+
+  .meeting-list__customer-contact {
+    overflow-wrap: anywhere;
+  }
+
+  .meeting-list__department-pills,
+  .meeting-list__actions {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 420px) {
+  .meeting-list__td {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }

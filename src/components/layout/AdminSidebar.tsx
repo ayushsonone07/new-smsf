@@ -10,7 +10,6 @@ import { ProfileMenu } from '../common/ProfileMenu'
 type NavPath =
   | '/admin'
   | '/admin/services'
-  | '/admin/tokens'
   | '/head'
   | '/users'
 
@@ -40,14 +39,6 @@ const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) =>
       pathname.startsWith('/admin/services') ||
       pathname === '/services',
-  },
-  {
-    to: '/admin/tokens',
-    label: 'Access Tokens',
-    icon: '⚿',
-    roles: ['ADMIN'],
-    isActive: (pathname) =>
-      pathname.startsWith('/admin/tokens'),
   },
   {
     to: '/head',
@@ -101,10 +92,10 @@ export function AdminSidebar({
     <>
       <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">S</div>
+        <img className="brand-mark" src="/mbg-card-logo.svg" alt="MBG Card" />
 
         <div>
-          <strong>SMSF</strong>
+          <strong>MBG Card</strong>
           <span>Admin Portal</span>
         </div>
 

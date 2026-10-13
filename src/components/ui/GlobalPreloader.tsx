@@ -22,7 +22,7 @@ export function GlobalPreloader() {
   return (
     <div className="global-preloader" role="status" aria-live="polite" aria-label="Loading data">
       <div className="global-preloader__card">
-        <div className="global-preloader__brand" aria-hidden="true">MBG</div>
+        <img className="global-preloader__brand" src="/mbg-card-logo.svg" alt="" />
         <span className="global-preloader__spinner" aria-hidden="true" />
         <strong>Loading data...</strong>
       </div>

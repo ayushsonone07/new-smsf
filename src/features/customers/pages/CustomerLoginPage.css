@@ -25,13 +25,9 @@
 }
 
 .cust-auth-brand-icon {
-  display: grid;
-  place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 12px;
-  background: #1d4ed8;
-  color: #fff;
+  object-fit: contain;
 }
 
 .cust-auth-brand strong {

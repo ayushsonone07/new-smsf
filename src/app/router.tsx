@@ -10,7 +10,7 @@ import {
   requireRoleDashboard,
   redirectAuthenticatedUser,
 } from './middleware/auth.middleware'
-import { clearSession, getSession } from './auth/session'
+import { getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
@@ -21,7 +21,6 @@ import { DepartmentHelpCenterPage } from '../features/departments/pages/Departme
 import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
 import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
 import { FinanceFeaturesPage } from '../features/departments/pages/FinanceFeaturesPage'
-import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
 import { FetchRoutesColumnsPage } from '../features/permissions/pages/FetchRoutesColumnsPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
@@ -98,30 +97,7 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginPage,
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { token?: string } => ({
-    token:
-      typeof search.token === 'string'
-        ? search.token
-        : undefined,
-  }),
-  beforeLoad: ({ search }) => {
-    const session = getSession()
-
-    if (!session) return
-
-    // A magic link always wins over whoever is signed in
-    // right now — otherwise opening the generated link in
-    // the admin's own browser silently bounces back to
-    // /admin instead of signing the head/user in.
-    if (typeof search.token === 'string' && search.token) {
-      clearSession()
-      return
-    }
-
-    redirectAuthenticatedUser()
-  },
+  beforeLoad: redirectAuthenticatedUser,
 })
 
 const authedLayoutRoute = createRoute({
@@ -167,13 +143,6 @@ const departmentFinanceRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/departments/$departmentId/finance',
   component: FinanceFeaturesPage,
-  beforeLoad: requireRole('ADMIN'),
-})
-
-const accessTokensRoute = createRoute({
-  getParentRoute: () => authedLayoutRoute,
-  path: '/admin/tokens',
-  component: AccessTokensPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -725,7 +694,6 @@ const routeTree = rootRoute.addChildren([
     servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
-    accessTokensRoute,
     fetchRcRoute,
     forbiddenRoute,
   ]),

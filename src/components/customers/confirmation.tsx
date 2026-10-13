@@ -102,12 +102,7 @@ const LoadingCard: React.FC<LoadingCardProps> = ({
       
       {/* MBG Logo Section */}
       <div className="flex items-center gap-3 mb-10">
-        {/* Logo Icon */}
-        <div className="flex items-center justify-center w-10 h-10 bg-[#2563eb] rounded-xl shadow-inner relative overflow-hidden">
-          <span className="text-white text-[10px] font-bold tracking-wider z-10">MBG</span>
-          {/* Orange arc at bottom of logo */}
-          <div className="absolute -bottom-2 w-8 h-4 border-[3px] border-[#f59e0b] rounded-[50%]" />
-        </div>
+        <img className="h-10 w-14 object-contain" src="/mbg-card-logo.svg" alt="MBG Card" />
         {/* Logo Text */}
         <span className="text-[22px] font-semibold text-gray-900 tracking-tight">
           MBG Card

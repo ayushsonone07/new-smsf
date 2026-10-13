@@ -91,14 +91,10 @@
 }
 
 .hbrand__mark {
-  display: grid;
-  place-items: center;
   flex: none;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
-  background: var(--c-blue);
-  box-shadow: inset 0 -3px 0 var(--c-yellow);
+  object-fit: contain;
 }
 
 .hbrand__mark span {
@@ -845,12 +841,10 @@
 .hbrand__mark {
   width: 52px;
   height: 52px;
-  border: 3px solid var(--head-yellow);
-  border-radius: 12px;
-  background: var(--head-blue);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  object-fit: contain;
 }
 
 .hbrand__text strong {
@@ -1829,5 +1823,120 @@
   .head-toolbar {
     flex-wrap: wrap;
     gap: 8px;
+  }
+}
+
+/* Department Users mobile card layout. Keep this after the shared responsive
+   table rules so the list remains contained within the viewport. */
+@media (max-width: 768px) {
+  .users-table.table-wrapper {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .users-table table,
+  .users-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .users-table thead {
+    display: none;
+  }
+
+  .users-table tbody {
+    padding: 8px;
+    background: #f4f7fb;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row) {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    margin-bottom: 10px;
+    border: 1px solid var(--head-border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row) > td {
+    display: grid;
+    grid-template-columns: minmax(82px, 28%) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eef2f7;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row) > td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row) > td:last-child {
+    border-bottom: 0;
+  }
+
+  .users-table .user-cell {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .users-table .user-cell__text {
+    flex: 1;
+  }
+
+  .users-table .user-cell__text strong,
+  .users-table__mono,
+  .users-table__email,
+  .role-pill {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .users-table .is-right,
+  .users-table .is-center {
+    text-align: left;
+  }
+
+  .users-table__actions {
+    flex-wrap: wrap;
+  }
+
+  .users-table__expanded-row {
+    display: block;
+    width: 100%;
+    margin: -10px 0 10px;
+  }
+
+  .users-table__expanded-row td {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .users-table tr[style*="height: 1"] {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .users-table tbody > tr:not(.users-table__expanded-row) > td {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }
