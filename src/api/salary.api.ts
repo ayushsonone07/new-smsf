@@ -19,7 +19,7 @@ export interface UserSalaryResponse {
   incentiveAmount: number
   currentSalary: number
   lastMonthSalary: number
-  createdAt: string | null
+  createdAt: string | number[] | null
   lastUpdatedAt: string | null
   isAbsent: boolean
 }
@@ -106,4 +106,3 @@ export async function markUserStatus(
   )
   return res?.message ?? 'Done'
 }
-

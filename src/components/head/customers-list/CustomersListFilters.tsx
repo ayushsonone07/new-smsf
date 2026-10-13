@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
+import './CustomersList.css'
 
 export type CustomerTab = 'all' | 'pending' | 'in-progress' | 'completed'
 
@@ -171,7 +172,7 @@ function CalendarMonth({
   )
 }
 
-function DateRangePicker({
+export function DateRangePicker({
   label,
   from,
   to,
