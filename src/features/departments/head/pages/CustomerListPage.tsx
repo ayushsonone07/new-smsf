@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -20,6 +21,8 @@ import { ServiceTagsModal } from '../../../../components/head/customers-list/Ser
 import {
   updateDepartmentServiceStatus,
   extractServiceTags,
+  getDepartmentConfig,
+  getServiceFlows,
 } from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
 import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
@@ -32,6 +35,7 @@ import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
   useDepartmentCustomerRows,
+  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
@@ -42,7 +46,6 @@ import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
-import { Icon } from '../../../../components/head/shared/Icon'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
@@ -101,7 +104,7 @@ export function CustomerListPage() {
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
 
   // 1. Department Config: GET /api/dept-config/{departmentType}

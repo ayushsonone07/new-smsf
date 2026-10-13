@@ -296,6 +296,128 @@ export function AdminServiceListCard({
 
   return (
     <>
+      {/* 2-Step Dynamic Department Creation Journey Banner */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '0.85rem',
+          marginBottom: '1rem',
+          padding: '1rem 1.25rem',
+          borderRadius: '12px',
+          background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
+          border: '1px solid #bfdbfe',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.85rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: '10px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #93c5fd',
+            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+          }}
+        >
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              flexShrink: 0,
+            }}
+          >
+            1
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: '#1e3a8a',
+              }}
+            >
+              Step 1: Create New Service
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+              Add your Service & Department Type in Service List below.
+            </div>
+          </div>
+          <Button
+            onClick={() => {
+              setEditingService(null)
+              setShowAddModal(true)
+            }}
+          >
+            ＋ Add Service
+          </Button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.85rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: '10px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+          }}
+        >
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              backgroundColor: '#0f766e',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              flexShrink: 0,
+            }}
+          >
+            2
+          </div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: '#0f766e',
+              }}
+            >
+              Step 2: Create Department Login
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+              Opens automatically after Step 1 (with Head role selected).
+            </div>
+          </div>
+          {onCreateDepartmentForService ? (
+            <Button
+              variant="secondary"
+              onClick={() =>
+                onCreateDepartmentForService(services[0] ?? (null as never))
+              }
+            >
+              Step 2: Create Login ➔
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
       <Card>
         <div className="table-toolbar">
           <div>
@@ -307,7 +429,7 @@ export function AdminServiceListCard({
             <p>
               {showPlans
                 ? 'View and manage plans, department types, and associated subservices.'
-                : 'View and manage your available services (Step 1: Create Service -> Step 2: Create Department).'}
+                : 'Create a new Service here — once created, "Step 2: Create Department Login" will open automatically.'}
             </p>
           </div>
 
@@ -326,9 +448,26 @@ export function AdminServiceListCard({
                 >
                   💳 Plans
                 </Button>
-                <Button onClick={() => setShowAddModal(true)}>
-                  <span>＋</span> Add Service
+                <Button
+                  onClick={() => {
+                    setEditingService(null)
+                    setShowAddModal(true)
+                  }}
+                >
+                  <span>＋</span> Add Service (Step 1)
                 </Button>
+                {onCreateDepartmentForService ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      onCreateDepartmentForService(
+                        services[0] ?? (null as never),
+                      )
+                    }
+                  >
+                    <span>🏢</span> Step 2: Create Department Login
+                  </Button>
+                ) : null}
                 <Button variant="secondary" onClick={handleExportCsv}>
                   ⬇ Export
                 </Button>
@@ -817,6 +956,14 @@ export function AdminServiceListCard({
         onClose={() => {
           setShowAddModal(false)
           setEditingService(null)
+        }}
+        onCreated={(createdService) => {
+          const wasEditing = Boolean(editingService)
+          setShowAddModal(false)
+          setEditingService(null)
+          if (!wasEditing && onCreateDepartmentForService) {
+            onCreateDepartmentForService(createdService)
+          }
         }}
       />
 
