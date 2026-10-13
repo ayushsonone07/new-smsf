@@ -109,7 +109,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const routesQuery = useDynamicRoutes(departmentType)
   const columnsQuery = useDynamicColumns(departmentType)
   const rowsQuery = useDepartmentCustomerRows(
-    { page: 0, size: 100, compatible: true },
+    { page: 0, size: 2000, compatible: true },
     { enabled: Boolean(session && feature.slug) },
   )
   const hasBillingActions = useMemo(() => {
@@ -130,6 +130,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const [error, setError] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [invoice, setInvoice] = useState({ invoiceNo: '', date: '', amount: '', status: 'PENDING', billingLink: '' })
+  const [rowSearch, setRowSearch] = useState('')
 
   const closeUploadModal = () => {
     if (busy || closingModal) return
@@ -303,6 +304,14 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     return displayValue(valueForColumn(row, columnName))
   }
 
+  const filteredRows = useMemo(() => {
+    const search = rowSearch.trim().toLowerCase()
+    return (rowsQuery.data?.customers ?? []).filter((row) => {
+      if (!search) return true
+      return routeColumns.some((column) => displayValue(valueForColumn(row, column.columnName)).toLowerCase().includes(search))
+    })
+  }, [rowsQuery.data?.customers, rowSearch, routeColumns])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div
@@ -364,12 +373,16 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
             padding: '1.25rem 1.5rem',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+          <div className="dynamic-route-toolbar">
             <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Route Data</h3>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              {rowsQuery.data?.totalElements ?? 0} row{rowsQuery.data?.totalElements === 1 ? '' : 's'}
+            <span className="dynamic-route-count">
+              {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
             </span>
           </div>
+          <label className="dynamic-search-field dynamic-search-field--full">
+            <span aria-hidden="true">⌕</span>
+            <input value={rowSearch} onChange={(event) => setRowSearch(event.target.value)} placeholder="Search by name, number or email" aria-label="Search customers" />
+          </label>
 
           {rowsQuery.isPending ? (
             <div className="loading-state">Loading rows...</div>
@@ -388,8 +401,8 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(rowsQuery.data?.customers ?? []).length > 0 ? (
-                    rowsQuery.data?.customers.map((row, index) => (
+                  {filteredRows.length > 0 ? (
+                    filteredRows.map((row, index) => (
                       <tr key={String(row.customerId ?? row.id ?? index)}>
                         {routeColumns.map((col) => (
                           <td key={col.columnId}>{renderCell(row, col.columnName)}</td>
@@ -399,7 +412,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
                   ) : (
                     <tr>
                       <td colSpan={routeColumns.length} className="table-empty-cell">
-                        No rows found for this department.
+                        No rows match your search or status filter.
                       </td>
                     </tr>
                   )}
