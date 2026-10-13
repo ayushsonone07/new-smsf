@@ -2,6 +2,7 @@ import type {
   AuthSession,
   UserRole,
 } from '../../features/auth/types/auth.types'
+import { normalizeDepartmentSlug } from '../../api/dynamic-permission.api'
 
 const SESSION_KEY = 'smsf.auth.session'
 /** Admin's own session, parked while they are "logged in as" a department. */
@@ -283,6 +284,7 @@ export type HomeRoute =
   | '/onboarding-user'
   | '/google-head'
   | '/google-user'
+  | (string & {})
 
 export function homeForRole(
   role: UserRole,
@@ -305,6 +307,14 @@ export function homeForRole(
       return '/google-user'
     }
     return '/google-head'
+  }
+
+  if (dept) {
+    const slug = normalizeDepartmentSlug(dept)
+    if (slug && slug !== 'head' && slug !== 'users' && slug !== 'department') {
+      const roleSegment = role === 'USER' ? 'user' : 'head'
+      return `/${slug}/${roleSegment}/dashboard` as HomeRoute
+    }
   }
 
   if (role === 'HEAD') {

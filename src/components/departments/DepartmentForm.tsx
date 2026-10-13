@@ -31,11 +31,13 @@ export function DepartmentForm({
         label="Department Name (Username)"
         required
         value={values.username}
+        minLength={3}
+        maxLength={20}
         onChange={(event) => {
           onChange('username', event.target.value)
           onChange('name', event.target.value)
         }}
-        placeholder="Enter department name / username"
+        placeholder="Enter department name / username (3-20 characters)"
       />
 
       <FormField
@@ -58,12 +60,13 @@ export function DepartmentForm({
             required={!isEdit}
             type={showPassword ? 'text' : 'password'}
             minLength={6}
+            maxLength={12}
             value={values.password}
             onChange={(event) => onChange('password', event.target.value)}
             placeholder={
               isEdit
                 ? 'Leave blank to keep current password'
-                : 'Enter password (min 6 characters)'
+                : 'Enter password (6-12 characters)'
             }
             style={{ width: '100%', paddingRight: '2.75rem' }}
           />

@@ -33,6 +33,16 @@ export function normalizeDepartmentTypeName(raw: string): string {
   return cleaned.endsWith('_DEPARTMENT') ? cleaned : `${cleaned}_DEPARTMENT`
 }
 
+export function normalizeDepartmentSlug(raw: string): string {
+  if (!raw) return 'department'
+  const trimmed = raw.trim().toLowerCase()
+  return (
+    trimmed
+      .replace(/[^a-z0-9_-]+/g, '_')
+      .replace(/^[_-]+|[_-]+$/g, '') || 'department'
+  )
+}
+
 export interface CreateDynamicRoutePayload {
   departmentType: string
   routeName: string
@@ -393,3 +403,99 @@ export async function getUserDynamicPermissions(params?: {
     return null
   }
 }
+
+export interface RouteColumnsSummaryResponse {
+  routeId: string
+  routeName: string
+  departmentType?: string
+  maxColumnsCount: number
+  columns: DynamicColumnResponse[]
+}
+
+export interface CreateRouteColumnsPayload {
+  departmentType: string
+  routeId?: string
+  routeName?: string
+  columnNames: string[]
+  readWriteAccess?: '1' | '2' | '12'
+}
+
+/**
+ * Get all columns configured for a particular route
+ */
+export async function getColumnsByRoute(
+  routeId: string,
+  departmentType?: string,
+): Promise<DynamicColumnResponse[]> {
+  try {
+    const url = departmentType
+      ? `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}/columns?departmentType=${encodeURIComponent(departmentType)}`
+      : `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}/columns`
+    const res = await authedApiRequest<any>(url)
+    if (Array.isArray(res)) return res
+    if (res && Array.isArray(res.data)) return res.data
+    return []
+  } catch (err) {
+    console.error('Failed to fetch columns by route:', err)
+    return []
+  }
+}
+
+/**
+ * Get maximum columns and count for a particular route
+ */
+export async function getMaxColumnsForRoute(
+  routeId: string,
+  departmentType?: string,
+): Promise<RouteColumnsSummaryResponse | null> {
+  try {
+    const url = departmentType
+      ? `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}/max-columns?departmentType=${encodeURIComponent(departmentType)}`
+      : `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}/max-columns`
+    const res = await authedApiRequest<any>(url)
+    if (res && res.data) return res.data
+    return res as RouteColumnsSummaryResponse
+  } catch (err) {
+    console.error('Failed to fetch max columns for route:', err)
+    return null
+  }
+}
+
+/**
+ * Get maximum columns summary for all routes
+ */
+export async function getRoutesColumnsSummary(
+  departmentType?: string,
+): Promise<RouteColumnsSummaryResponse[]> {
+  try {
+    const url = departmentType && departmentType !== 'ALL'
+      ? `/api/dynamic-permission/routes-columns-summary?departmentType=${encodeURIComponent(departmentType)}`
+      : '/api/dynamic-permission/routes-columns-summary'
+    const res = await authedApiRequest<any>(url)
+    if (Array.isArray(res)) return res
+    if (res && Array.isArray(res.data)) return res.data
+    return []
+  } catch (err) {
+    console.error('Failed to fetch routes columns summary:', err)
+    return []
+  }
+}
+
+/**
+ * Bulk create / associate columns for a particular route
+ */
+export async function createColumnsForRoute(
+  payload: CreateRouteColumnsPayload,
+): Promise<RouteColumnsSummaryResponse | null> {
+  const targetId = payload.routeId || payload.routeName || 'default'
+  const res = await authedApiRequest<any>(
+    `/api/dynamic-permission/routes/${encodeURIComponent(targetId)}/columns`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+  if (res && res.data) return res.data
+  return res as RouteColumnsSummaryResponse
+}
+

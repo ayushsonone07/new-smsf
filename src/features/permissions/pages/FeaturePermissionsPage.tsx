@@ -24,22 +24,7 @@ import {
   useUpdateColumnStatus,
   useUpdateRouteStatus,
 } from '../hooks/useDynamicPermissions'
-
-function normalize(value?: string): string {
-  return (value ?? '').trim().replace(/^\/+|\/+$/g, '').toLowerCase()
-}
-
-function belongsToRoute(
-  column: DynamicColumnResponse,
-  route: DynamicRouteResponse,
-): boolean {
-  if (column.routeId === route.routeId || column.routesType === route.routeId) {
-    return true
-  }
-
-  const columnRouteName = normalize(column.routeName)
-  return Boolean(columnRouteName && columnRouteName === normalize(route.routeName))
-}
+import { isColumnBelongingToRoute } from '../hooks/useDepartmentRoutePermissions'
 
 export function FeaturePermissionsPage() {
   const { departmentId } = useParams({
@@ -70,7 +55,7 @@ export function FeaturePermissionsPage() {
     for (const route of routesQuery.data ?? []) {
       result.set(
         route.routeId,
-        (columnsQuery.data ?? []).filter((column) => belongsToRoute(column, route)),
+        (columnsQuery.data ?? []).filter((column) => isColumnBelongingToRoute(column, route)),
       )
     }
     return result

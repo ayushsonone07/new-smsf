@@ -1,8 +1,10 @@
-import { Navigate } from '@tanstack/react-router'
+import { Navigate, useLocation } from '@tanstack/react-router'
+import { getSession } from '../../../../app/auth/session'
 import { useHeadNav } from '../hooks/useHeadNav'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
+import { buildDepartmentRoute, resolveDeptFromPath } from '../utils/routeUtils'
 import type { HeadRole } from '../types/head.types'
 
 interface HeadIndexPageProps {
@@ -11,8 +13,12 @@ interface HeadIndexPageProps {
 
 /** /head → first enabled menu item. */
 export function HeadIndexPage({ portalRole = 'HEAD' }: HeadIndexPageProps) {
+  const location = useLocation()
   const departmentId = useHeadDepartmentId()
-  const nav = useHeadNav(departmentId)
+  const deptFromUrl = resolveDeptFromPath(location.pathname) || undefined
+  const session = getSession()
+  const effectiveDeptType = session?.user.departmentType || deptFromUrl
+  const nav = useHeadNav(departmentId, effectiveDeptType)
 
   if (nav.isPending) return <LoadingState message="Loading..." />
 
@@ -25,6 +31,11 @@ export function HeadIndexPage({ portalRole = 'HEAD' }: HeadIndexPageProps) {
         message="The admin has not enabled any feature for this department yet."
       />
     )
+  }
+
+  if (effectiveDeptType) {
+    const target = buildDepartmentRoute(first.slug, effectiveDeptType, portalRole)
+    return <Navigate to={target as never} replace />
   }
 
   if (portalRole === 'USER') {

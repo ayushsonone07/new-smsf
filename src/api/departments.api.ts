@@ -1,9 +1,11 @@
 import { authedApiRequest } from './client'
 import { getSession } from '../app/auth/session'
 import {
+  createColumnsForRoute,
   createDynamicDepartmentType,
   createDynamicRoute,
   getDynamicRoutes,
+  normalizeDepartmentSlug,
   normalizeDepartmentTypeName,
 } from './dynamic-permission.api'
 import { isRouteMatch } from '../features/permissions/hooks/useDepartmentRoutePermissions'
@@ -12,6 +14,7 @@ import type {
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
 } from '../features/departments/types/department.types'
+import { DEFAULT_ROUTE_COLUMNS } from '../components/departments/DepartmentFormModal'
 
 interface BackendDepartmentUserDTO {
   id?: string | number
@@ -133,11 +136,25 @@ export async function createDepartment(
   await createDynamicDepartmentType(departmentType)
 
   // 2. Register the Department Head user via POST /api/auth/department/register (matching SMSF)
+  // Backend DTO limits: username 3-20, password 6-12. Fail fast with a clear
+  // message instead of a bare 400 + transaction rollback.
+  const username = (data.username || data.name).trim()
+  const email = data.email.trim()
+  if (username.length < 3 || username.length > 20) {
+    throw new Error('Username must be between 3 and 20 characters.')
+  }
+  if (!data.password || data.password.length < 6 || data.password.length > 12) {
+    throw new Error('Password must be 6 to 12 characters long.')
+  }
+  const contact = (data.contact || '9999999999').trim()
+  if (contact.length < 10 || contact.length > 15) {
+    throw new Error('Contact must be 10 to 15 characters long.')
+  }
   const payload = {
-    username: (data.username || data.name).trim(),
-    email: data.email.trim(),
+    username,
+    email,
     password: data.password,
-    contact: (data.contact || '9999999999').trim(),
+    contact,
     departmentType,
     role: 'DEPARTMENT_HEAD',
     isHead: true,
@@ -156,21 +173,45 @@ export async function createDepartment(
     throw new Error(response.message || 'Failed to create department')
   }
 
-  // 3. Provision initial environment routes idempotently (never overwrite existing routes)
+  // 3. Provision ONLY the selected initial environment routes in http://localhost:5173/{department_name}/{role}/{route} format
   if (Array.isArray(data.initialRoutes) && data.initialRoutes.length > 0) {
     try {
       const existingRoutes = await getDynamicRoutes(departmentType)
+      const deptSlug = normalizeDepartmentSlug(data.name || departmentType)
       for (const routeSlug of data.initialRoutes) {
         const trimmed = routeSlug.trim()
         if (!trimmed) continue
-        const alreadyExists = existingRoutes.some((r) =>
-          isRouteMatch(r, trimmed),
+        const formattedRouteName = `${deptSlug}/head/${trimmed}`
+        let targetRoute = existingRoutes.find((r) =>
+          isRouteMatch(r, formattedRouteName) ||
+          isRouteMatch(r, trimmed) ||
+          isRouteMatch(r, `${deptSlug}/${trimmed}`),
         )
-        if (!alreadyExists) {
-          await createDynamicRoute({
+        if (!targetRoute) {
+          targetRoute = await createDynamicRoute({
             departmentType,
-            routeName: trimmed,
+            routeName: formattedRouteName,
           })
+        }
+
+        // Provision columns for this particular route (from routeColumnsMap or defaults)
+        const customCols =
+          data.routeColumnsMap?.[trimmed] ||
+          data.routeColumnsMap?.[formattedRouteName] ||
+          DEFAULT_ROUTE_COLUMNS[trimmed] ||
+          []
+
+        if (targetRoute && customCols && customCols.length > 0) {
+          try {
+            await createColumnsForRoute({
+              departmentType,
+              routeId: targetRoute.routeId,
+              routeName: targetRoute.routeName,
+              columnNames: customCols,
+            })
+          } catch (colErr) {
+            console.warn('Non-fatal warning auto-provisioning route columns:', colErr)
+          }
         }
       }
     } catch (err) {

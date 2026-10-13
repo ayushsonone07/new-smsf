@@ -32,6 +32,7 @@ export interface CreateDepartmentRequest {
   password: string
   contact?: string
   initialRoutes?: string[]
+  routeColumnsMap?: Record<string, string[]>
 }
 
 export interface UpdateDepartmentRequest {

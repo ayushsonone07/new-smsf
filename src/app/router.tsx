@@ -648,6 +648,46 @@ const googleUserDynamicScreenRoute = createRoute({
   component: HeadScreenPage,
 })
 
+/**
+ * Dynamic Department Portal Routes:
+ * Matches URLs like http://localhost:5173/{department_name}/{routes}
+ * e.g., /seo/dashboard, /seo/customers, /seo/users, /sales/dashboard, etc.
+ */
+const dynamicDepartmentLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_dynamic_dept',
+  component: () => {
+    const session = getSession()
+    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    return <HeadConsoleLayout portalRole={portalRole} />
+  },
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+})
+
+const dynamicDepartmentRoleScreenRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$role/$screen',
+  component: HeadScreenPage,
+})
+
+const dynamicDepartmentRoleIndexRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$role',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const dynamicDepartmentIndexRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const dynamicDepartmentScreenRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$screen',
+  component: HeadScreenPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -740,6 +780,12 @@ const routeTree = rootRoute.addChildren([
   departmentCustomersRoute,
   departmentHelpCenterRoute,
   departmentServicesRoute,
+  dynamicDepartmentLayoutRoute.addChildren([
+    dynamicDepartmentRoleScreenRoute,
+    dynamicDepartmentRoleIndexRoute,
+    dynamicDepartmentIndexRoute,
+    dynamicDepartmentScreenRoute,
+  ]),
 ])
 
 export const router = createRouter({

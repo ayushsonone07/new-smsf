@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { AdminServiceItem } from '../../api/admin-services.api'
-import { normalizeDepartmentTypeName } from '../../api/dynamic-permission.api'
+import {
+  normalizeDepartmentSlug,
+  normalizeDepartmentTypeName,
+} from '../../api/dynamic-permission.api'
 import { useAdminServices } from '../../features/departments/hooks/useAdminServices'
 import type {
   CreateDepartmentRequest,
@@ -21,19 +24,104 @@ const ENVIRONMENT_FEATURE_OPTIONS: Array<{
   slug: string
   label: string
   defaultChecked: boolean
+  isUniversal?: boolean
 }> = [
-  { slug: 'dashboard', label: 'Dashboard', defaultChecked: true },
-  { slug: 'users', label: 'Department Users', defaultChecked: true },
-  { slug: 'customers', label: 'Customer List', defaultChecked: true },
-  { slug: 'attendance', label: 'Attendance', defaultChecked: true },
-  { slug: 'history', label: 'Task History', defaultChecked: true },
-  { slug: 'analytics', label: 'Analytics', defaultChecked: true },
-  { slug: 'service-flow', label: 'Service Flow', defaultChecked: false },
-  { slug: 'member-flow', label: 'Member Flow', defaultChecked: false },
+  { slug: 'dashboard', label: 'Dashboard', defaultChecked: true, isUniversal: true },
+  { slug: 'department-user', label: 'Department Users', defaultChecked: true, isUniversal: true },
+  { slug: 'customer-list', label: 'Customer List', defaultChecked: true, isUniversal: true },
+  { slug: 'history', label: 'Task History', defaultChecked: true, isUniversal: true },
+  { slug: 'service-flow', label: 'Service Flow', defaultChecked: true, isUniversal: true },
+  { slug: 'member-performance', label: 'Member Performance', defaultChecked: true, isUniversal: true },
+  { slug: 'attendance', label: 'Attendance', defaultChecked: false },
   { slug: 'meeting', label: '15 Days Meeting', defaultChecked: false },
   { slug: 'sop', label: 'SOP', defaultChecked: false },
-  { slug: 'help-support', label: 'Help & Support', defaultChecked: true },
+  { slug: 'help-support', label: 'Help & Support', defaultChecked: false },
 ]
+
+export const DEFAULT_ROUTE_COLUMNS: Record<string, string[]> = {
+  dashboard: [
+    'Metric Name',
+    'Target',
+    'Current',
+    'Achievement %',
+    'Status',
+    'Last Updated',
+  ],
+  'department-user': [
+    'Name',
+    'Number',
+    'Email',
+    'Role',
+    'Target',
+    'Achieved',
+    'P/A days',
+    'Action',
+  ],
+  users: [
+    'Name',
+    'Number',
+    'Email',
+    'Role',
+    'Target',
+    'Achieved',
+    'P/A days',
+    'Action',
+  ],
+  'customer-list': [
+    'Business',
+    'Contact',
+    'Status',
+    'Assign To',
+    'Internal Remark',
+  ],
+  customers: [
+    'Business',
+    'Contact',
+    'Status',
+    'Assign To',
+    'Internal Remark',
+  ],
+  history: [
+    'Customer',
+    'Assigned To',
+    'Phase',
+    'Service status',
+    'Status',
+    'Timeline',
+    'Remarks',
+    'Record',
+  ],
+  'service-flow': [
+    'Step ID',
+    'Process Name',
+    'Assigned Dept',
+    'Status',
+    'TAT',
+    'Priority',
+  ],
+  'member-performance': [
+    'Member',
+    'Pending',
+    'In Progress',
+    'Completed',
+    'Follow Up',
+    'Total',
+    'Completion',
+  ],
+  'member-flow': [
+    'Member',
+    'Pending',
+    'In Progress',
+    'Completed',
+    'Follow Up',
+    'Total',
+    'Completion',
+  ],
+  attendance: ['User Name', 'Date', 'Check In', 'Check Out', 'Total Hours', 'Status'],
+  meeting: ['Customer Name', 'Meeting Date', 'Status', 'Agenda', 'Assignee'],
+  sop: ['Title', 'Category', 'Version', 'Last Updated', 'Status'],
+  'help-support': ['Ticket ID', 'Customer Name', 'Issue Subject', 'Priority', 'Status', 'Assigned Agent'],
+}
 
 const DEFAULT_INITIAL_ROUTES = ENVIRONMENT_FEATURE_OPTIONS.filter(
   (item) => item.defaultChecked,
@@ -91,6 +179,13 @@ export function DepartmentFormModal({
   const [initialRoutes, setInitialRoutes] = useState<string[]>(
     DEFAULT_INITIAL_ROUTES,
   )
+  const [routeColumnsMap, setRouteColumnsMap] = useState<Record<string, string[]>>(
+    DEFAULT_ROUTE_COLUMNS,
+  )
+  const [selectedRouteForColumns, setSelectedRouteForColumns] = useState<string | null>(
+    'customer-list',
+  )
+  const [newColumnName, setNewColumnName] = useState('')
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
   const [lastInitialServiceId, setLastInitialServiceId] = useState<
@@ -168,8 +263,10 @@ export function DepartmentFormModal({
       setEmail(department?.email ?? '')
       setContact(department?.contact ?? '')
       setPassword('')
-      setIsHead(true)
       setInitialRoutes(DEFAULT_INITIAL_ROUTES)
+      setRouteColumnsMap(DEFAULT_ROUTE_COLUMNS)
+      setSelectedRouteForColumns('customer-list')
+      setNewColumnName('')
 
       if (department?.type) {
         setSelectedDepartmentType(department.type)
@@ -206,6 +303,38 @@ export function DepartmentFormModal({
     () => normalizeDepartmentTypeName(selectedDepartmentType),
     [selectedDepartmentType],
   )
+
+  const deptSlug = useMemo(
+    () =>
+      normalizeDepartmentSlug(
+        username || name || resolvedDepartmentType || 'department',
+      ),
+    [username, name, resolvedDepartmentType],
+  )
+
+  function handleAddColumn(routeSlug: string) {
+    if (!newColumnName.trim()) return
+    const colTrimmed = newColumnName.trim()
+    setRouteColumnsMap((prev) => {
+      const current = prev[routeSlug] || []
+      if (current.includes(colTrimmed)) return prev
+      return {
+        ...prev,
+        [routeSlug]: [...current, colTrimmed],
+      }
+    })
+    setNewColumnName('')
+  }
+
+  function handleRemoveColumn(routeSlug: string, colIndex: number) {
+    setRouteColumnsMap((prev) => {
+      const current = prev[routeSlug] || []
+      return {
+        ...prev,
+        [routeSlug]: current.filter((_, idx) => idx !== colIndex),
+      }
+    })
+  }
 
   // Check if this departmentType already has an active DEPARTMENT_HEAD
   const existingHeadForType = useMemo(() => {
@@ -245,11 +374,27 @@ export function DepartmentFormModal({
   }
 
   function toggleRoute(slug: string) {
-    setInitialRoutes((prev) =>
-      prev.includes(slug)
-        ? prev.filter((item) => item !== slug)
-        : [...prev, slug],
-    )
+    setInitialRoutes((prev) => {
+      const isChecking = !prev.includes(slug)
+      if (isChecking) {
+        setRouteColumnsMap((curr) => {
+          if (!curr[slug] || curr[slug].length === 0) {
+            const defaults =
+              DEFAULT_ROUTE_COLUMNS[slug] ||
+              DEFAULT_ROUTE_COLUMNS['customers'] ||
+              []
+            return {
+              ...curr,
+              [slug]: [...defaults],
+            }
+          }
+          return curr
+        })
+        return [...prev, slug]
+      } else {
+        return prev.filter((item) => item !== slug)
+      }
+    })
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -281,6 +426,7 @@ export function DepartmentFormModal({
       type: resolvedDepartmentType,
       departmentType: resolvedDepartmentType,
       initialRoutes,
+      routeColumnsMap,
     })
   }
 
@@ -536,7 +682,7 @@ export function DepartmentFormModal({
             </label>
           </div>
 
-          {/* 6. Initial Department Environment (Sidebar Routes) */}
+          {/* 6. Initial Department Environment (Sidebar Routes & Dynamic URLs) */}
           {!isEdit && !existingHeadForType && (
             <div
               style={{
@@ -564,11 +710,10 @@ export function DepartmentFormModal({
                       display: 'block',
                     }}
                   >
-                    Initial Department Environment (Sidebar Routes)
+                    Dynamic Department Routes & Columns Setup
                   </span>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Selected screens will be provisioned in{' '}
-                    <code>access_routes</code> for this department.
+                    Routes created as <code>http://localhost:5173/{deptSlug}/head/[route]</code> with maximum columns per route.
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -610,41 +755,251 @@ export function DepartmentFormModal({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: '0.45rem',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                  gap: '0.55rem',
                   marginTop: '0.5rem',
                 }}
               >
                 {ENVIRONMENT_FEATURE_OPTIONS.map((option) => {
                   const checked = initialRoutes.includes(option.slug)
+                  const cols = routeColumnsMap[option.slug] || []
+                  const isSelectedForCols = selectedRouteForColumns === option.slug
+
                   return (
-                    <label
+                    <div
                       key={option.slug}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
+                        flexDirection: 'column',
+                        gap: '0.3rem',
                         fontSize: '0.8125rem',
-                        color: '#334155',
-                        padding: '0.35rem 0.5rem',
-                        borderRadius: '6px',
+                        padding: '0.45rem 0.6rem',
+                        borderRadius: '8px',
                         backgroundColor: checked ? '#eff6ff' : '#ffffff',
-                        border: checked
-                          ? '1px solid #93c5fd'
-                          : '1px solid #e2e8f0',
-                        cursor: 'pointer',
+                        border: isSelectedForCols
+                          ? '2px solid #2563eb'
+                          : checked
+                            ? '1px solid #93c5fd'
+                            : '1px solid #e2e8f0',
+                        transition: 'all 0.15s ease-in-out',
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleRoute(option.slug)}
-                      />
-                      <span>{option.label}</span>
-                    </label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleRoute(option.slug)}
+                          />
+                          <span>{option.label}</span>
+                          {option.isUniversal && (
+                            <span
+                              style={{
+                                fontSize: '0.62rem',
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '4px',
+                                backgroundColor: '#dbeafe',
+                                color: '#1e40af',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em',
+                              }}
+                            >
+                              Universal
+                            </span>
+                          )}
+                        </label>
+
+                        {cols.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRouteForColumns(option.slug)}
+                            style={{
+                              fontSize: '0.68rem',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              backgroundColor: isSelectedForCols ? '#1d4ed8' : '#e0e7ff',
+                              color: isSelectedForCols ? '#ffffff' : '#3730a3',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {cols.length} cols
+                          </button>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '0.7rem',
+                          color: '#475569',
+                          fontFamily: 'monospace',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={`http://localhost:5173/${deptSlug}/head/${option.slug}`}
+                      >
+                        /{deptSlug}/head/{option.slug}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.15rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          Max Columns: <strong>{cols.length}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRouteForColumns(option.slug)}
+                          style={{
+                            fontSize: '0.68rem',
+                            background: 'none',
+                            border: 'none',
+                            color: '#2563eb',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          {isSelectedForCols ? 'Editing' : 'Manage'}
+                        </button>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
+
+              {/* Column manager for selected route */}
+              {selectedRouteForColumns && (
+                <div
+                  style={{
+                    marginTop: '0.85rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b' }}>
+                      Columns for Route: <code>http://localhost:5173/{deptSlug}/{selectedRouteForColumns}</code>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: '#1d4ed8',
+                        backgroundColor: '#dbeafe',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '999px',
+                      }}
+                    >
+                      Max Columns: {(routeColumnsMap[selectedRouteForColumns] || []).length}
+                    </span>
+                  </div>
+
+                  {/* List of active columns */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.35rem',
+                      marginBottom: '0.5rem',
+                      maxHeight: '120px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {(routeColumnsMap[selectedRouteForColumns] || []).map((col, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          fontSize: '0.75rem',
+                          backgroundColor: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          color: '#334155',
+                          padding: '0.2rem 0.45rem',
+                          borderRadius: '5px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                        }}
+                      >
+                        {col}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveColumn(selectedRouteForColumns, idx)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            padding: '0 0.1rem',
+                            lineHeight: 1,
+                          }}
+                          title="Remove column"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                    {(routeColumnsMap[selectedRouteForColumns] || []).length === 0 && (
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                        No columns configured yet for this route. Add below.
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Add column input */}
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="text"
+                      placeholder={`Add column to ${selectedRouteForColumns}...`}
+                      value={newColumnName}
+                      onChange={(e) => setNewColumnName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddColumn(selectedRouteForColumns)
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.78rem',
+                        padding: '0.35rem 0.6rem',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddColumn(selectedRouteForColumns)}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: '#2563eb',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      + Add Column
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

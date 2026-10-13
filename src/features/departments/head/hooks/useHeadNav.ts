@@ -9,10 +9,12 @@ import type { FeaturePermission, HeadScreenKey } from '../../../permissions/type
 import type { IconName } from '../../../../components/head/shared/iconPaths'
 import { getSession } from '../../../../app/auth/session'
 import {
+  buildDepartmentRoute,
   buildGoogleRoute,
   buildOnboardingRoute,
   isUserGoogle,
   isUserOnboarding,
+  resolveDeptFromPath,
 } from '../utils/routeUtils'
 
 const DEPARTMENT_USER_SCREENS: Array<{
@@ -68,23 +70,26 @@ const DYNAMIC_DEPARTMENT_HEAD_SCREENS: Array<{
   screen: HeadScreenKey
 }> = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
-  { key: 'users', label: 'Department User', icon: 'users', slug: 'users', screen: 'users' },
-  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customers', screen: 'customers' },
-  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+  { key: 'users', label: 'Department User', icon: 'users', slug: 'department-user', screen: 'department-user' },
+  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customer-list', screen: 'customer-list' },
   { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
-  { key: 'analytics', label: 'Analytics', icon: 'bar', slug: 'analytics', screen: 'analytics' },
   { key: 'service-flow', label: 'Service Flow', icon: 'flow', slug: 'service-flow', screen: 'service-flow' },
-  { key: 'member-flow', label: 'Member Flow', icon: 'perf', slug: 'member-flow', screen: 'member-flow' },
+  { key: 'member-flow', label: 'Member Performance', icon: 'perf', slug: 'member-performance', screen: 'member-performance' },
+  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+  { key: 'analytics', label: 'Analytics', icon: 'bar', slug: 'analytics', screen: 'analytics' },
   { key: 'meeting', label: '15 Days Meeting', icon: 'calendar', slug: 'meeting', screen: 'meeting' },
   { key: 'sop', label: 'SOP', icon: 'book', slug: 'sop', screen: 'sop' },
   { key: 'help-support', label: 'Help & Support', icon: 'help', slug: 'help-support', screen: 'help-support' },
 ]
 
 function extractCleanSlug(routeName: string): string {
-  const cleaned = routeName
+  const trimmed = routeName
     .trim()
     .replace(/^(\/|#)+/, '')
     .replace(/\/+$/, '')
+  const parts = trimmed.split('/')
+  const last = parts[parts.length - 1]
+  const cleaned = last
     .replace(/^(head|users|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)[-/]/i, '')
     .toLowerCase()
     .replace(/[\s_]+/g, '-')
@@ -109,16 +114,18 @@ function formatRouteLabel(slugOrName: string): string {
  * - For Dynamic / Other Departments: standard department screens + custom DB routes in `access_routes`
  * Filtered by live DB route visibility (if visibility is 0, item is not displayed).
  */
-export function useHeadNav(departmentId: string) {
+export function useHeadNav(departmentId: string, departmentType?: string) {
   const query = useDepartmentFeatures(departmentId)
   const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const effectiveDeptType = departmentType || session?.user.departmentType || deptFromUrl || undefined
   const role = session?.user.role
   const isUser = role === 'USER'
-  const isGoogle = isUserGoogle(session?.user.departmentType)
-  const isOnboarding = isUserOnboarding(session?.user.departmentType)
+  const isGoogle = isUserGoogle(effectiveDeptType)
+  const isOnboarding = isUserOnboarding(effectiveDeptType)
   const basePath = isUser ? '/users' : '/head'
 
-  const routePerms = useDepartmentRoutePermissions(session?.user.departmentType)
+  const routePerms = useDepartmentRoutePermissions(effectiveDeptType)
 
   const features = useMemo<FeaturePermission[]>(() => {
     if (isGoogle) {
@@ -222,8 +229,7 @@ export function useHeadNav(departmentId: string) {
             // Default environment when no DB routes exist yet
             return item.slug !== 'meeting' && item.slug !== 'sop'
           }
-          // Always keep dashboard available unless explicitly disabled, plus any DB-matched route
-          if (item.slug === 'dashboard') return true
+          // Strictly show only routes configured in DB for this department
           return routePerms.routes.some((r) => isRouteMatch(r, item.slug))
         })
         .map((item, index) => ({
@@ -320,9 +326,9 @@ export function useHeadNav(departmentId: string) {
         icon: feature.icon,
         to: isOnboarding
           ? buildOnboardingRoute(feature.slug, role)
-          : `${basePath}/${feature.slug}`,
+          : buildDepartmentRoute(feature.slug, effectiveDeptType, role),
       }))
-  }, [isGoogle, isUser, features, basePath, isOnboarding, role, routePerms])
+  }, [isGoogle, isUser, features, basePath, isOnboarding, role, routePerms, effectiveDeptType])
 
   const PROFILE_MENU_SCREENS: Record<
     string,
@@ -378,9 +384,40 @@ export function useHeadNav(departmentId: string) {
         feature.slug === s ||
         feature.screen === s ||
         (s === 'customers' && feature.slug === 'customer-list') ||
-        (s === 'customer-list' && feature.slug === 'customers'),
+        (s === 'customer-list' && feature.slug === 'customers') ||
+        (s === 'department-user' && (feature.slug === 'users' || feature.slug === 'department-user')) ||
+        (s === 'users' && (feature.slug === 'department-user' || feature.slug === 'users')) ||
+        (s === 'member-performance' && (feature.slug === 'member-flow' || feature.slug === 'member-performance')) ||
+        (s === 'member-flow' && (feature.slug === 'member-performance' || feature.slug === 'member-flow')),
     )
     if (found) return found
+
+    if (!isGoogle && !isOnboarding && routePerms.routes.length > 0) {
+      const matchedDbRoute = routePerms.routes.find(
+        (r) => extractCleanSlug(r.routeName) === s || isRouteMatch(r, s),
+      )
+      if (!matchedDbRoute) {
+        return undefined
+      }
+      const matchedStd = DYNAMIC_DEPARTMENT_HEAD_SCREENS.find(
+        (item) => item.slug === s || item.screen === s || isRouteMatch(matchedDbRoute, item.slug),
+      )
+      return {
+        id: `dyn-feat-${s}`,
+        departmentId,
+        name: matchedStd?.label ?? formatRouteLabel(matchedDbRoute.routeName || s),
+        description: matchedStd?.label ?? `Dynamic route (${matchedDbRoute.routeName})`,
+        screen: matchedStd?.screen ?? 'custom',
+        slug: matchedStd?.slug ?? s,
+        icon: matchedStd?.icon ?? 'brief',
+        enabled: true,
+        kind: 'screen',
+        order: 99,
+        roleAPermission: 'CAN_EDIT',
+        roleBPermission: 'CAN_READ',
+        category: 'screens',
+      }
+    }
 
     const dynamicFallback = DYNAMIC_DEPARTMENT_HEAD_SCREENS.find(
       (item) => item.slug === s || item.screen === s,

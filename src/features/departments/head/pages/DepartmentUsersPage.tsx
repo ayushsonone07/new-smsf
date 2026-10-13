@@ -36,6 +36,7 @@ import {
   resolveUserColumnKey,
   USER_TABLE_COLUMN_KEYS,
 } from '../utils/userColumnMatch'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
 import type {
@@ -67,7 +68,8 @@ export function DepartmentUsersPage() {
   const columnFeatures = useColumnFeatures(departmentId, 'users')
   const canManageUsers = columnFeatures.canEdit('actions')
   const session = getSession()
-  const dynamicColumnsQuery = useDynamicColumns(session?.user.departmentType)
+  const deptType = session?.user.departmentType || resolveDeptFromPath() || undefined
+  const dynamicColumnsQuery = useDynamicColumns(deptType)
   const isUser = session?.user.role === 'USER'
 
   // Map the API columns onto the table's fixed columns: a fixed column is
