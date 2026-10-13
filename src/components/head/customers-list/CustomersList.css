@@ -800,16 +800,35 @@
 
 .cl-toast--success {
   border-color: #86efac;
+  background: #f0fdf4;
   color: #15803d;
 }
 
 .cl-toast--error {
   border-color: #fecaca;
+  background: #fef2f2;
   color: #b91c1c;
 }
 
 .cl-toast > span {
   flex: 1;
+}
+
+.cl-toast-title,
+.cl-toast-message {
+  display: block;
+}
+
+.cl-toast-title {
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.cl-toast-message {
+  color: currentColor;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 .cl-toast > button {

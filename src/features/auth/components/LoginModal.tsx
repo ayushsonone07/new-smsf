@@ -76,7 +76,7 @@ export function LoginModal({ open, onClose, onRegister }: LoginModalProps) {
         <aside className="hidden flex-col justify-between bg-[#0b1d3f] p-14 text-white lg:flex">
           <div className="flex items-center gap-3.5">
             <img
-              src="https://www.mbgcard.in/mbg_logo.png"
+              src="/mbg-card-logo.svg"
               alt="MBG logo"
               className="h-11 w-11 flex-shrink-0 rounded-lg"
             />
@@ -123,7 +123,7 @@ export function LoginModal({ open, onClose, onRegister }: LoginModalProps) {
           <div className="w-full max-w-md">
             <div className="mb-6 flex items-center gap-3 lg:hidden">
               <img
-                src="https://www.mbgcard.in/mbg_logo.png"
+                src="/mbg-card-logo.svg"
                 alt="MBG logo"
                 className="h-10 w-10 rounded-lg"
               />

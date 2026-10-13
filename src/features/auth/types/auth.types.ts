@@ -24,11 +24,3 @@ export interface AuthSession {
   user: AuthUser
   issuedAt: string
 }
-
-export interface IssuedLoginToken {
-  token: string
-  user: AuthUser
-  issuedBy: string
-  createdAt: string
-  revoked: boolean
-}

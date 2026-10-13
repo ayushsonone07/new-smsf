@@ -61,15 +61,9 @@
 }
 
 .cdb-brand-logo {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 8px;
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 800;
+  object-fit: contain;
   flex-shrink: 0;
 }
 

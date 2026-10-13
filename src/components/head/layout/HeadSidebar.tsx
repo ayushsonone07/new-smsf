@@ -71,11 +71,7 @@ export function HeadSidebar({
       <div className="hbrand">
         {open ? (
           <>
-            <div className="hbrand__mark">
-              <span>
-                M<b>B</b>G
-              </span>
-            </div>
+            <img className="hbrand__mark" src="/mbg-card-logo.svg" alt="MBG Card" />
 
             <div className="hbrand__text">
               <strong>MBG Card</strong>
