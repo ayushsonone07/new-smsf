@@ -14,11 +14,37 @@ import type {
   CustomerDashboardData,
 } from './types/customer-dashboard.types'
 
+function formatBillDate(value?: string) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatBillAmount(value?: string) {
+  if (!value) return '—'
+  const amount = Number(value.replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(amount)
+    ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+    : value
+}
+
+function formatStatus(value?: string) {
+  const normalized = (value || 'PENDING').replace(/_/g, ' ').toLowerCase()
+  return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function statusClass(value?: string) {
+  const normalized = (value || '').toUpperCase()
+  if (normalized === 'GENERATED' || normalized === 'COMPLETED') return 'complete'
+  if (normalized.includes('PROGRESS')) return 'progress'
+  return 'pending'
+}
+
 export function CustomerDashboardView() {
   const [data, setData] = useState<CustomerDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [billOptionsOpen, setBillOptionsOpen] = useState(false)
   const [isDownloadingBill, setIsDownloadingBill] = useState(false)
 
   useEffect(() => {
@@ -75,7 +101,6 @@ export function CustomerDashboardView() {
       window.open(data.billUrl, '_blank', 'noopener,noreferrer')
     } finally {
       setIsDownloadingBill(false)
-      setBillOptionsOpen(false)
     }
   }
 
@@ -118,38 +143,36 @@ export function CustomerDashboardView() {
       {/* 1. Welcome Banner (Blue Gradient) */}
       <CustomerWelcomeBanner profile={data.profile} />
 
-      <div className="cdb-bill-action">
-        <button
-          type="button"
-          className="cdb-bill-action__trigger"
-          aria-expanded={billOptionsOpen}
-          onClick={() => setBillOptionsOpen((open) => !open)}
-        >
-          <Icon name="download" size={17} />
-          <span>My Bill</span>
-          <Icon name="chevronDown" size={15} />
-        </button>
-
-        {billOptionsOpen ? (
-          <div className="cdb-bill-action__menu">
-            <button
-              type="button"
-              className="cdb-bill-action__download"
-              disabled={!data.billUrl || isDownloadingBill}
-              onClick={handleDownloadBill}
-            >
-              <Icon name="download" size={17} />
-              <span>
-                {isDownloadingBill
-                  ? 'Downloading bill...'
-                  : data.billUrl
-                    ? 'Download bill'
-                    : 'Bill not available yet'}
-              </span>
-            </button>
+      <section className="cdb-invoice-card" aria-labelledby="customer-invoice-title">
+        <div className="cdb-invoice-card__heading">
+          <span className="cdb-invoice-card__icon"><Icon name="eye" size={18} d="M6 2h9l5 5v15H6V2Zm9 0v6h5M9 13h8M9 17h8" /></span>
+          <div>
+            <h2 id="customer-invoice-title">Invoices</h2>
+            <p>Your latest bill and payment details</p>
           </div>
-        ) : null}
-      </div>
+        </div>
+        <div className="cdb-invoice-card__table">
+          <div className="cdb-invoice-card__labels" aria-hidden="true">
+            <span>Invoice</span><span>Date</span><span>Description</span><span>Amount</span><span>Status</span><span>Actions</span>
+          </div>
+          <div className="cdb-invoice-card__row">
+            <strong>{data.bill?.invoiceNo || 'Your invoice'}</strong>
+            <span>{formatBillDate(data.bill?.date)}</span>
+            <span>Billing invoice</span>
+            <strong>{formatBillAmount(data.bill?.amount)}</strong>
+            <span><span className={`cdb-invoice-status cdb-invoice-status--${statusClass(data.bill?.status)}`}>{formatStatus(data.bill?.status)}</span></span>
+            <div className="cdb-invoice-actions">
+              <a className={`cdb-invoice-icon-button${data.billUrl ? '' : ' is-disabled'}`} href={data.billUrl || undefined} target="_blank" rel="noopener noreferrer" aria-label="View bill" title={data.billUrl ? 'View bill' : 'Bill not available'} onClick={(event) => { if (!data.billUrl) event.preventDefault() }}>
+                <Icon name="eye" size={17} />
+              </a>
+              <button className="cdb-invoice-icon-button" type="button" disabled={!data.billUrl || isDownloadingBill} aria-label="Download bill" title={data.billUrl ? 'Download bill' : 'Bill not available'} onClick={handleDownloadBill}>
+                <Icon name="download" size={17} />
+              </button>
+            </div>
+          </div>
+        </div>
+        {!data.billUrl ? <p className="cdb-invoice-card__empty">Your bill has not been uploaded yet.</p> : null}
+      </section>
 
       {/* 2. Upcoming Meeting Banner */}
       {data.meeting ? <UpcomingMeetingBanner meeting={data.meeting} /> : null}

@@ -1,5 +1,13 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Check, CheckCircle, Clock, CreditCard, ExternalLink, Eye, FileText, IndianRupee, Receipt, Upload, User, Wallet, X } from 'lucide-react'
 import { getSession } from '../../../../app/auth/session'
+import {
+  getBillingCustomers,
+  updateBillingInvoice,
+  uploadCustomerBill,
+  type BillingCustomer,
+} from '../../../../api/billing.api'
 import {
   useDynamicColumns,
   useDynamicRoutes,
@@ -9,6 +17,7 @@ import type { FeaturePermission } from '../../../permissions/types/permission.ty
 import { useDepartmentCustomerRows } from '../../hooks/useDepartmentUsersList'
 import type { DepartmentCustomerRowItem } from '../../../../api/department-users.api'
 import { applyDynamicColumnOrder, readDynamicColumnOrder } from '../../../../utils/dynamicColumnOrder'
+import './CustomFeaturePage.css'
 
 function normalizedKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -48,6 +57,46 @@ function valueForColumn(row: DepartmentCustomerRowItem, columnName: string): unk
   return '—'
 }
 
+function billingObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') return value as Record<string, unknown>
+  if (typeof value !== 'string' || !value.trim()) return {}
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function billUrl(customer: BillingCustomer | null | undefined): string {
+  if (!customer) return ''
+  const raw = customer.generatedBillInfo
+  if (typeof raw === 'string' && /^https?:\/\//i.test(raw.trim())) return raw.trim()
+  const info = billingObject(raw)
+  for (const key of ['generatedBillInfo', 'billingLink', 'billUrl']) {
+    const value = info[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function billText(customer: BillingCustomer, keys: string[]): string {
+  const info = billingObject(customer.generatedBillInfo)
+  for (const key of keys) {
+    const value = info[key]
+    if (value !== undefined && value !== null && String(value).trim()) return String(value)
+  }
+  return ''
+}
+
+function currency(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '—'
+  const number = Number(String(value).replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(number)
+    ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(number)
+    : String(value)
+}
+
 /**
  * Dynamic screen for admin-created custom routes.
  * Displays any dynamic columns / components linked to this route in `access_customer_columns`.
@@ -63,6 +112,132 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     { page: 0, size: 100, compatible: true },
     { enabled: Boolean(session && feature.slug) },
   )
+  const hasBillingActions = useMemo(() => {
+    const names = (columnsQuery.data ?? []).map((column) => normalizedKey(column.columnName))
+    return names.some((name) => name === 'billupload' || name === 'view')
+  }, [columnsQuery.data])
+  const billingQuery = useQuery({
+    queryKey: ['billing-customers', departmentType],
+    queryFn: () => getBillingCustomers(100),
+    enabled: Boolean(session && hasBillingActions),
+    staleTime: 15_000,
+  })
+  const [uploadCustomer, setUploadCustomer] = useState<BillingCustomer | null>(null)
+  const [detailsCustomer, setDetailsCustomer] = useState<BillingCustomer | null>(null)
+  const [closingModal, setClosingModal] = useState<'upload' | 'details' | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [invoice, setInvoice] = useState({ invoiceNo: '', date: '', amount: '', status: 'PENDING', billingLink: '' })
+
+  const closeUploadModal = () => {
+    if (busy || closingModal) return
+    setClosingModal('upload')
+    window.setTimeout(() => {
+      setUploadCustomer(null)
+      setUploadFile(null)
+      setClosingModal(null)
+    }, 180)
+  }
+
+  const closeDetailsModal = () => {
+    if (busy || closingModal) return
+    setClosingModal('details')
+    window.setTimeout(() => {
+      setDetailsCustomer(null)
+      setClosingModal(null)
+    }, 180)
+  }
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 3500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const billingById = useMemo(() => new Map(
+    (billingQuery.data ?? []).map((customer) => [String(customer.id), customer]),
+  ), [billingQuery.data])
+
+  const customerForRow = (row: DepartmentCustomerRowItem): BillingCustomer => {
+    const rowId = row.customerId ?? row.id
+    const found = rowId !== undefined ? billingById.get(String(rowId)) : undefined
+    if (found) return found
+    const details = row.customerDetails ?? {}
+    return {
+      ...row,
+      ...details,
+      id: Number(rowId),
+      ownerName: details.ownerName ?? row.ownerName,
+      businessName: details.businessName ?? row.businessName,
+      phoneNumber: details.phoneNumber ?? row.phoneNumber,
+      email: details.email ?? row.email,
+    } as BillingCustomer
+  }
+
+  const openDetails = (customer: BillingCustomer) => {
+    const date = billText(customer, ['invoiceDate', 'date', 'generatedAt']) || customer.lastUpdated || customer.createdAt || ''
+    setDetailsCustomer(customer)
+    setInvoice({
+      invoiceNo: billText(customer, ['invoiceNo', 'invoiceNumber', 'billId', 'id']) || `INV-${customer.id}`,
+      date: date.slice(0, 10),
+      amount: billText(customer, ['invoiceAmount', 'amount']) || String(customer.amountPending ?? customer.amountPaid ?? ''),
+      status: customer.billStatus || 'PENDING',
+      billingLink: billUrl(customer),
+    })
+    setError('')
+  }
+
+  const refreshBilling = async () => {
+    const refreshed = await billingQuery.refetch()
+    await rowsQuery.refetch()
+    return refreshed.data ?? []
+  }
+
+  const saveInvoice = async () => {
+    if (!detailsCustomer || !Number.isFinite(detailsCustomer.id)) return
+    setBusy(true)
+    setError('')
+    try {
+      const updated = await updateBillingInvoice(detailsCustomer.id, {
+        invoiceNo: invoice.invoiceNo,
+        invoiceDate: invoice.date,
+        invoiceAmount: invoice.amount,
+        status: invoice.status,
+        billingLink: invoice.billingLink,
+      })
+      const customers = await refreshBilling()
+      setDetailsCustomer(updated ?? customers.find((item) => item.id === detailsCustomer.id) ?? detailsCustomer)
+      setToast({ type: 'success', message: 'Bill details saved successfully' })
+    } catch (saveError) {
+      setError((saveError as Error).message)
+      setToast({ type: 'error', message: 'Failed to save bill details' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const uploadBill = async () => {
+    if (!uploadCustomer || !uploadFile) {
+      setError('Select a bill file to upload.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await uploadCustomerBill(uploadCustomer.id, uploadFile)
+      await refreshBilling()
+      setUploadCustomer(null)
+      setUploadFile(null)
+      setToast({ type: 'success', message: 'Bill uploaded successfully' })
+    } catch (uploadError) {
+      setError((uploadError as Error).message)
+      setToast({ type: 'error', message: 'Bill upload failed' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const matchedRoute = useMemo(() => {
     return (routesQuery.data ?? []).find((r) => isRouteMatch(r, feature.slug))
@@ -96,6 +271,37 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
       readDynamicColumnOrder(departmentType, matchedRoute.routeId),
     )
   }, [columnsQuery.data, matchedRoute, isHead, departmentType])
+
+  const renderCell = (row: DepartmentCustomerRowItem, columnName: string) => {
+    const key = normalizedKey(columnName)
+    const customer = customerForRow(row)
+    if (key === 'customer' || key === 'customername') {
+      return (
+        <div className="dynamic-customer-cell">
+          <span>{displayValue(valueForColumn(row, columnName))}</span>
+          <button className="dynamic-eye-button" type="button" title="Open billing details" aria-label={`Open billing details for ${customer.ownerName || 'customer'}`} onClick={() => openDetails(customer)}>
+            <Eye size={16} />
+          </button>
+        </div>
+      )
+    }
+    if (key === 'billupload') {
+      return (
+        <button className="dynamic-action-button" type="button" onClick={() => { setUploadCustomer(customer); setUploadFile(null); setError('') }} disabled={!Number.isFinite(customer.id)}>
+          <Upload size={15} /> Upload
+        </button>
+      )
+    }
+    if (key === 'view') {
+      const url = billUrl(customer)
+      return url ? (
+        <button className="dynamic-action-button dynamic-view-button" type="button" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>
+          <FileText size={15} /> View <ExternalLink size={12} />
+        </button>
+      ) : <span style={{ color: '#94a3b8' }}>No bill</span>
+    }
+    return displayValue(valueForColumn(row, columnName))
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -186,7 +392,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
                     rowsQuery.data?.customers.map((row, index) => (
                       <tr key={String(row.customerId ?? row.id ?? index)}>
                         {routeColumns.map((col) => (
-                          <td key={col.columnId}>{displayValue(valueForColumn(row, col.columnName))}</td>
+                          <td key={col.columnId}>{renderCell(row, col.columnName)}</td>
                         ))}
                       </tr>
                     ))
@@ -255,6 +461,109 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
           </p>
         </div>
       )}
+
+      {uploadCustomer ? (
+        <div className={`modal-backdrop billing-modal-backdrop${closingModal === 'upload' ? ' is-closing' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeUploadModal() }}>
+          <div className={`modal billing-modal${closingModal === 'upload' ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-labelledby="upload-bill-title">
+            <div className="billing-modal__header">
+              <div>
+                <h2 className="billing-modal__title" id="upload-bill-title"><Upload size={20} color="#0284c7" /> Upload Bill</h2>
+                <p className="billing-modal__subtitle">{uploadCustomer.ownerName || 'Customer'}{uploadCustomer.businessName ? ` · ${uploadCustomer.businessName}` : ''}</p>
+              </div>
+              <button className="close-button" type="button" aria-label="Close" disabled={busy} onClick={closeUploadModal}><X size={18} /></button>
+            </div>
+            <div className="billing-modal__body">
+              <label className="billing-upload-drop">
+                <Upload size={30} />
+                <strong>{uploadFile ? 'Bill file selected' : 'Choose bill file'}</strong>
+                <span>PDF, image, or document file</span>
+                <input type="file" accept="application/pdf,image/*,.doc,.docx" onChange={(event) => { setUploadFile(event.target.files?.[0] ?? null); setError('') }} />
+              </label>
+              {uploadFile ? <p className="billing-upload-file">{uploadFile.name}</p> : null}
+              {error ? <p className="billing-error" role="alert">{error}</p> : null}
+              <div className="modal-actions">
+                <button className="secondary-button" type="button" disabled={busy} onClick={closeUploadModal}>Cancel</button>
+                <button className="primary-button" type="button" disabled={busy || !uploadFile} onClick={uploadBill}><Upload size={15} /> {busy ? 'Uploading...' : 'Upload Bill'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {detailsCustomer ? (
+        <div className={`modal-backdrop billing-modal-backdrop${closingModal === 'details' ? ' is-closing' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDetailsModal() }}>
+          <div className={`modal billing-modal billing-modal--details${closingModal === 'details' ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-labelledby="billing-details-title">
+            <div className="billing-modal__header">
+              <div>
+                <h2 className="billing-modal__title" id="billing-details-title"><Receipt size={20} color="#2563eb" /> Billing &amp; Bills</h2>
+                <p className="billing-modal__subtitle">{detailsCustomer.ownerName || 'Customer'}{detailsCustomer.businessName ? ` · ${detailsCustomer.businessName}` : ''} billing summary and payment information</p>
+              </div>
+              <button className="close-button" type="button" aria-label="Close" disabled={busy} onClick={closeDetailsModal}><X size={18} /></button>
+            </div>
+            <div className="billing-modal__body">
+              <div className="billing-summary-grid">
+                <div className="billing-summary-card"><i className="billing-summary-card__icon is-green"><CheckCircle size={18} /></i><span>Total Paid</span><strong>{currency(detailsCustomer.amountPaid)}</strong><small>Lifetime, incl. GST</small></div>
+                <div className="billing-summary-card"><i className="billing-summary-card__icon is-amber"><Clock size={18} /></i><span>Outstanding</span><strong>{currency(detailsCustomer.amountPending)}</strong><small>Awaiting bill generation</small></div>
+                <div className="billing-summary-card"><i className="billing-summary-card__icon is-blue"><CreditCard size={18} /></i><span>Active Subscriptions</span><strong>{detailsCustomer.status ? '1' : '—'}</strong><small>{detailsCustomer.status || '—'}</small></div>
+                <div className="billing-summary-card billing-summary-card--due"><i className="billing-summary-card__icon is-due"><IndianRupee size={18} /></i><span>Payment Due</span><strong>{currency(detailsCustomer.amountPending)}</strong><small>{detailsCustomer.lastUpdated ? `Last updated ${new Date(detailsCustomer.lastUpdated).toLocaleDateString('en-IN')}` : '—'}</small></div>
+              </div>
+              <div className="billing-info-grid">
+                <section className="billing-info-card">
+                  <h3><User size={15} /> Customer Information</h3>
+                  <div className="billing-detail-grid">
+                    <div><span>Customer Name</span><strong>{detailsCustomer.ownerName || '—'}</strong></div>
+                    <div><span>Business Name</span><strong>{detailsCustomer.businessName || '—'}</strong></div>
+                    <div><span>Phone</span><strong>{detailsCustomer.phoneNumber || '—'}</strong></div>
+                    <div><span>Email</span><strong>{detailsCustomer.email || '—'}</strong></div>
+                    <div><span>Address</span><strong>{detailsCustomer.address || '—'}</strong></div>
+                  </div>
+                </section>
+                <section className="billing-info-card">
+                  <h3><Wallet size={15} /> Payment &amp; GST</h3>
+                  <div className="billing-detail-grid">
+                    <div><span>Billing Address</span><strong>{detailsCustomer.billingAddress || '—'}</strong></div>
+                    <div><span>GST Number</span><strong>{detailsCustomer.gstNumber || '—'}</strong></div>
+                    <div><span>Information Status</span><strong>{detailsCustomer.informationStatus || '—'}</strong></div>
+                    <div><span>Uploaded Bill</span><strong>{billUrl(detailsCustomer) ? 'Available' : 'Not uploaded'}</strong></div>
+                  </div>
+                </section>
+              </div>
+              <div className="billing-bottom-grid">
+              <section className="billing-info-card billing-invoice">
+                <h3><FileText size={15} /> Invoices</h3>
+                <div className="billing-invoice-head"><span>Invoice</span><span>Date</span><span>Amount</span><span>Status</span></div>
+                <div className="billing-invoice-grid">
+                  <div className="billing-field"><label htmlFor="invoice-number">Invoice No</label><input id="invoice-number" value={invoice.invoiceNo} onChange={(event) => setInvoice((value) => ({ ...value, invoiceNo: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-date">Date</label><input id="invoice-date" type="date" value={invoice.date} onChange={(event) => setInvoice((value) => ({ ...value, date: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-amount">Amount</label><input id="invoice-amount" value={invoice.amount} onChange={(event) => setInvoice((value) => ({ ...value, amount: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-status">Status</label><select id="invoice-status" value={invoice.status} onChange={(event) => setInvoice((value) => ({ ...value, status: event.target.value }))}><option value="PENDING">Pending</option><option value="IN_PROGRESS">In Progress</option><option value="GENERATED">Generated</option></select></div>
+                </div>
+                <div className="billing-link-row">
+                  <div className="billing-field"><label htmlFor="invoice-link">Invoice / Bill Link</label><input id="invoice-link" value={invoice.billingLink} placeholder="https://..." onChange={(event) => setInvoice((value) => ({ ...value, billingLink: event.target.value }))} /></div>
+                  <button className="primary-button" type="button" disabled={busy} onClick={saveInvoice}><Check size={15} /> {busy ? 'Saving...' : 'Save Invoice'}</button>
+                </div>
+                {error ? <p className="billing-error" role="alert">{error}</p> : null}
+              </section>
+              <aside className="billing-side-stack">
+                <section className="billing-info-card billing-purchase-card">
+                  <h3><Receipt size={15} /> What You Purchased</h3>
+                  <p>No purchase history available</p>
+                </section>
+                <section className="billing-info-card">
+                  <h3><CreditCard size={15} /> Payment &amp; GST</h3>
+                  <div className="billing-side-row"><span>GST Number</span><strong>{detailsCustomer.gstNumber || '—'}</strong></div>
+                  <div className="billing-side-row"><span>Total Paid</span><strong>{currency(detailsCustomer.amountPaid)}</strong></div>
+                  <div className="billing-side-row"><span>Outstanding</span><strong>{currency(detailsCustomer.amountPending)}</strong></div>
+                </section>
+              </aside>
+              </div>
+              <div className="modal-actions"><button className="secondary-button" type="button" onClick={closeDetailsModal}>Close</button></div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? <div className={`billing-toast billing-toast--${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}>{toast.message}</div> : null}
     </div>
   )
 }

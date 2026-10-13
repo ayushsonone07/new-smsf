@@ -106,6 +106,34 @@ function getBillUrl(value: ApiCustomer['generatedBillInfo']): string | undefined
   }
 }
 
+function getBillDetails(value: ApiCustomer['generatedBillInfo']) {
+  let info: Record<string, unknown> = {}
+  if (value && typeof value === 'object') info = value
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (parsed && typeof parsed === 'object') info = parsed as Record<string, unknown>
+    } catch {
+      // A plain URL has no additional invoice metadata.
+    }
+  }
+  const text = (...keys: string[]) => {
+    for (const key of keys) {
+      const candidate = info[key]
+      if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
+        return String(candidate)
+      }
+    }
+    return undefined
+  }
+  return {
+    invoiceNo: text('invoiceNo', 'invoiceNumber', 'billId') || 'Your invoice',
+    date: text('invoiceDate', 'date', 'generatedAt'),
+    amount: text('invoiceAmount', 'amount'),
+    status: text('status', 'billStatus') || 'GENERATED',
+  }
+}
+
 function toNotificationTimestamp(timestamp?: string | number[]): string | undefined {
   if (!timestamp) return undefined
   const date = Array.isArray(timestamp)
@@ -216,6 +244,7 @@ export async function fetchCustomerDashboardData(): Promise<CustomerDashboardDat
 
   return {
     billUrl: getBillUrl(customer.generatedBillInfo),
+    bill: getBillDetails(customer.generatedBillInfo),
     profile: {
       id: session.customerId,
       clientName,
