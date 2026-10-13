@@ -105,6 +105,7 @@ export function DepartmentManagementPage() {
       onSuccess: () => {
         setShowCreateModal(false)
         setPreselectedService(null)
+        setActiveTab('departments')
       },
     })
   }
