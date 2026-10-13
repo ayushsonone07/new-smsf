@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, CheckCircle, Clock, CreditCard, ExternalLink, Eye, FileText, IndianRupee, Receipt, Upload, User, Wallet, X } from 'lucide-react'
+import { Check, CheckCircle, ChevronDown, Clock, CreditCard, ExternalLink, Eye, FileText, IndianRupee, Receipt, Search, Upload, User, Wallet, X } from 'lucide-react'
 import { getSession } from '../../../../app/auth/session'
 import {
   getBillingCustomers,
@@ -132,6 +132,9 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const [invoice, setInvoice] = useState({ invoiceNo: '', date: '', amount: '', status: 'PENDING', billingLink: '' })
   const [rowSearch, setRowSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10
 
   const closeUploadModal = () => {
     if (busy || closingModal) return
@@ -281,17 +284,19 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
       return (
         <div className="dynamic-customer-cell">
           <span>{displayValue(valueForColumn(row, columnName))}</span>
-          <button className="dynamic-eye-button" type="button" title="Open billing details" aria-label={`Open billing details for ${customer.ownerName || 'customer'}`} onClick={() => openDetails(customer)}>
-            <Eye size={16} />
-          </button>
         </div>
       )
     }
     if (key === 'billupload') {
       return (
-        <button className="dynamic-action-button" type="button" onClick={() => { setUploadCustomer(customer); setUploadFile(null); setError('') }} disabled={!Number.isFinite(customer.id)}>
-          <Upload size={15} /> Upload
-        </button>
+        <div className="dynamic-bill-actions">
+          <button className="dynamic-action-button" type="button" onClick={() => { setUploadCustomer(customer); setUploadFile(null); setError('') }} disabled={!Number.isFinite(customer.id)}>
+            <Upload size={15} /> Upload
+          </button>
+          <button className="dynamic-eye-button dynamic-bill-eye" type="button" title="View billing details" aria-label={`View billing details for ${customer.ownerName || 'customer'}`} onClick={() => openDetails(customer)} disabled={!Number.isFinite(customer.id)}>
+            <Eye size={16} />
+          </button>
+        </div>
       )
     }
     if (key === 'view') {
@@ -305,23 +310,20 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     return displayValue(valueForColumn(row, columnName))
   }
 
-  const statusOptions = useMemo(() => {
-    const values = new Set<string>()
-    for (const row of rowsQuery.data?.customers ?? []) {
-      const status = displayValue(valueForColumn(row, 'status'))
-      if (status !== '—') values.add(status)
-    }
-    return Array.from(values).sort()
-  }, [rowsQuery.data?.customers])
-
   const filteredRows = useMemo(() => {
     const search = rowSearch.trim().toLowerCase()
     return (rowsQuery.data?.customers ?? []).filter((row) => {
-      if (statusFilter !== 'ALL' && displayValue(valueForColumn(row, 'status')) !== statusFilter) return false
+      const status = displayValue(valueForColumn(row, 'Status')).toUpperCase()
+      if (statusFilter !== 'ALL' && status !== statusFilter) return false
       if (!search) return true
       return routeColumns.some((column) => displayValue(valueForColumn(row, column.columnName)).toLowerCase().includes(search))
     })
   }, [rowsQuery.data?.customers, rowSearch, statusFilter, routeColumns])
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const pagedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages))
+  }, [totalPages])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -340,20 +342,36 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
               {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
             </span>
           </div>
-          <div className="dynamic-route-filters">
-            <label className="dynamic-search-field">
+          {/* <div className="dynamic-customer-filters">
+            <label className="dynamic-search-field dynamic-search-field--full">
               <span aria-hidden="true">⌕</span>
-              <input value={rowSearch} onChange={(event) => setRowSearch(event.target.value)} placeholder="Search by name, number or email" aria-label="Search customers" />
+              <input value={rowSearch} onChange={(event) => setRowSearch(event.target.value)} placeholder="Search customers..." aria-label="Search customers" />
             </label>
-            <label className="dynamic-status-field">
-              <span>Status</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
-                <option value="ALL">All</option>
-                {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-            </label>
-          </div>
+            <label className="dynamic-filter-select"><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter status"><option value="ALL">Status</option><option value="PENDING">Pending</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option><option value="GENERATED">Generated</option></select><span>⌄</span></label>
+          </div> */}
 
+          <div className="dynamic-customer-filters">
+  <label className="dynamic-search-field dynamic-search-field--full">
+    <Search size={18} aria-hidden="true" />
+    <input
+      value={rowSearch}
+      onChange={(event) => setRowSearch(event.target.value)}
+      placeholder="Search customers..."
+      aria-label="Search customers"
+    />
+  </label>
+  <div className="dynamic-status-menu">
+    <button type="button" className={`dynamic-status-menu__trigger${statusMenuOpen ? ' is-open' : ''}`} aria-expanded={statusMenuOpen} onClick={() => setStatusMenuOpen((open) => !open)}>
+      <span>{statusFilter === 'ALL' ? 'Status' : statusFilter.replace('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
+      <ChevronDown size={18} />
+    </button>
+    {statusMenuOpen ? <div className="dynamic-status-menu__panel" role="menu">
+      {[['ALL', 'All statuses'], ['PENDING', 'Pending'], ['IN_PROGRESS', 'In progress'], ['COMPLETED', 'Completed'], ['GENERATED', 'Generated']].map(([value, label]) => (
+        <button key={value} type="button" className={statusFilter === value ? 'is-selected' : ''} onClick={() => { setStatusFilter(value); setStatusMenuOpen(false); setCurrentPage(1) }} role="menuitem">{label}{statusFilter === value ? <Check size={16} /> : null}</button>
+      ))}
+    </div> : null}
+  </div>
+          </div>
           {rowsQuery.isPending ? (
             <div className="loading-state">Loading rows...</div>
           ) : rowsQuery.isError ? (
@@ -371,8 +389,8 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.length > 0 ? (
-                    filteredRows.map((row, index) => (
+                  {pagedRows.length > 0 ? (
+                    pagedRows.map((row, index) => (
                       <tr key={String(row.customerId ?? row.id ?? index)}>
                         {routeColumns.map((col) => (
                           <td key={col.columnId}>{renderCell(row, col.columnName)}</td>
@@ -390,6 +408,16 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
               </table>
             </div>
           )}
+          {!rowsQuery.isPending && !rowsQuery.isError && filteredRows.length > 0 ? (
+            <div className="dynamic-pagination">
+              <span>Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredRows.length)} of {filteredRows.length}</span>
+              <div>
+                <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)}>Previous</button>
+                <strong>Page {currentPage} of {totalPages}</strong>
+                <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => page + 1)}>Next</button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="hpage-coming-soon" role="status">
