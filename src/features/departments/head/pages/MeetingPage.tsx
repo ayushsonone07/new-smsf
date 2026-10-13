@@ -3,6 +3,7 @@ import { motion, type Variants } from 'framer-motion'
 import { MeetingSearchBar } from '../../../../components/head/15-days-meeting/MeetingSearchBar'
 import { MeetingFilters, type MeetingStatus } from '../../../../components/head/15-days-meeting/MeetingFilters'
 import { MeetingList, type Meeting, type MeetingCustomer, type MeetingDepartment } from '../../../../components/head/15-days-meeting/MeetingList'
+import { DepartmentFlowModal } from '../../../../components/head/15-days-meeting/DepartmentFlowModal'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { Button } from '../../../../components/ui/Button'
@@ -147,6 +148,10 @@ function toMeeting(item: CustomerFollowUpItem, isDone: boolean): Meeting {
  * - GET /api/customer/follow-up/meeting/due?page=0&size=10 (and size=1 for counts)
  */
 export function MeetingPage() {
+  const [selectedDepartmentFlow, setSelectedDepartmentFlow] = useState<{
+    meeting: Meeting
+    department: MeetingDepartment
+  } | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<MeetingStatus>('all')
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false)
@@ -452,9 +457,16 @@ export function MeetingPage() {
         statusFilter={statusFilter}
         searchQuery={search}
         onMarkDone={handleMarkDone}
+        onDepartmentClick={(meeting, department) =>
+          setSelectedDepartmentFlow({ meeting, department })
+        }
         onPhoneClick={handlePhoneClick}
         onMessageClick={handleMessageClick}
         onHistoryClick={handleHistoryClick}
+      />
+      <DepartmentFlowModal
+        selection={selectedDepartmentFlow}
+        onClose={() => setSelectedDepartmentFlow(null)}
       />
     </>
   )
