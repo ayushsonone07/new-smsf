@@ -979,7 +979,7 @@ export function CustomersListModal({
                           <FormRow
                             key={key}
                             label={formatFieldLabel(key)}
-                            value={formatValue(value)}
+                            value={formatProfileValue(key, value)}
                           />
                         ))}
                       </div>
@@ -1503,6 +1503,54 @@ function formatFieldLabel(key: string): string {
         .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
+function formatProfileValue(
+  key: keyof CustomerProfileDetails,
+  value: CustomerProfileDetails[keyof CustomerProfileDetails] | unknown,
+): string {
+  if (key !== 'generatedBillInfo') return formatValue(value)
+
+  let details: Record<string, unknown> = {}
+  if (value && typeof value === 'object') {
+    details = value as Record<string, unknown>
+  } else if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (parsed && typeof parsed === 'object') details = parsed as Record<string, unknown>
+    } catch {
+      return value
+    }
+  }
+
+  const labels: Record<string, string> = {
+    status: 'Status',
+    generatedBillInfo: 'Bill link',
+    billingLink: 'Bill link',
+    billUrl: 'Bill link',
+    invoiceNo: 'Invoice no',
+    invoiceDate: 'Invoice date',
+    invoiceAmount: 'Invoice amount',
+    updatedAt: 'Updated',
+  }
+  const entries = Object.entries(details).filter(([, item]) => item !== null && item !== undefined && String(item).trim())
+  if (entries.length === 0) return 'No billing details available'
+  return entries
+    .map(([entryKey, item]) => {
+      const formatted = entryKey === 'updatedAt' ? formatDateOnly(String(item)) : formatValue(item)
+      return `${labels[entryKey] || formatFieldLabel(entryKey)}: ${formatted}`
+    })
+    .join(' · ')
+}
+
+function formatDateOnly(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.split('T')[0] || value
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 function getProfileSections(profile: CustomerProfileDetails) {
       type ProfileEntry = [
         keyof CustomerProfileDetails,
@@ -1521,7 +1569,7 @@ function getProfileSections(profile: CustomerProfileDetails) {
             group.keys.includes(key) &&
             value !== undefined &&
             value !== null &&
-            formatValue(value).trim() !== '',
+            formatProfileValue(key, value).trim() !== '',
         )
         for (const [key] of groupEntries) seen.add(key)
         if (groupEntries.length > 0) {
@@ -1534,7 +1582,7 @@ function getProfileSections(profile: CustomerProfileDetails) {
           !seen.has(key) &&
           value !== undefined &&
           value !== null &&
-          formatValue(value).trim() !== '',
+          formatProfileValue(key, value).trim() !== '',
       )
       if (otherEntries.length > 0) {
         sections.push({ title: 'Other details', entries: otherEntries })
@@ -1612,7 +1660,7 @@ function DetailGrid({
           {title && <h5>{title}</h5>}
           <div>
             {entries.map(([key, value]) => (
-              <FormRow key={key} label={formatFieldLabel(key)} value={formatValue(value)} />
+              <FormRow key={key} label={formatFieldLabel(key)} value={formatProfileValue(key as keyof CustomerProfileDetails, value)} />
             ))}
           </div>
         </section>

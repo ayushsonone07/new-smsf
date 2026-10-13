@@ -523,12 +523,26 @@
 .hnotify-item {
   display: flex;
   gap: 11px;
+  width: 100%;
   padding: 13px 12px;
+  border: 0;
   border-bottom: 1px solid #edf1f7;
   border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
+.hnotify-item:hover:not(:disabled) { background: #eaf2ff; }
+.hnotify-item:disabled { cursor: default; }
+
 .hnotify-item.is-unread { background: #f3f7ff; }
+.hnotify-item.is-completed { background: #ecfdf3; border-color: #d1fae5; }
+.hnotify-item.is-completed .hnotify-item__icon { background: #d9fbe8; color: #16803c; }
+.hnotify-item.is-pending { background: #fff8e7; border-color: #fde7b0; }
+.hnotify-item.is-pending .hnotify-item__icon { background: #ffefc2; color: #b45309; }
 .hnotify-item__icon {
   display: grid;
   width: 34px;
