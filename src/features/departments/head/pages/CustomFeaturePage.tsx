@@ -6,6 +6,47 @@ import {
 } from '../../../permissions/hooks/useDynamicPermissions'
 import { isRouteMatch } from '../../../permissions/hooks/useDepartmentRoutePermissions'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
+import { useDepartmentCustomerRows } from '../../hooks/useDepartmentUsersList'
+import type { DepartmentCustomerRowItem } from '../../../../api/department-users.api'
+import { applyDynamicColumnOrder, readDynamicColumnOrder } from '../../../../utils/dynamicColumnOrder'
+
+function normalizedKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function valueForColumn(row: DepartmentCustomerRowItem, columnName: string): unknown {
+  const nested = row.customerDetails && typeof row.customerDetails === 'object'
+    ? row.customerDetails
+    : {}
+  const values = { ...nested, ...row } as Record<string, unknown>
+  const target = normalizedKey(columnName)
+  const directKey = Object.keys(values).find((key) => normalizedKey(key) === target)
+  if (directKey) return values[directKey]
+
+  const aliases: Record<string, string[]> = {
+    customer: ['ownerName', 'customerName', 'name'],
+    customername: ['ownerName', 'customerName', 'name'],
+    business: ['businessName', 'brandName'],
+    phone: ['phoneNumber', 'phone', 'contact'],
+    number: ['phoneNumber', 'phone', 'contact'],
+    email: ['email'],
+    status: ['status', 'onboardingStatus'],
+    billupload: ['generatedBillInfo', 'billUrl', 'billingLink', 'paymentLinkSS'],
+  }
+  for (const alias of aliases[target] ?? []) {
+    if (values[alias] !== null && values[alias] !== undefined && values[alias] !== '') {
+      return values[alias]
+    }
+  }
+  return '—'
+}
 
 /**
  * Dynamic screen for admin-created custom routes.
@@ -18,6 +59,10 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
 
   const routesQuery = useDynamicRoutes(departmentType)
   const columnsQuery = useDynamicColumns(departmentType)
+  const rowsQuery = useDepartmentCustomerRows(
+    { page: 0, size: 100, compatible: true },
+    { enabled: Boolean(session && feature.slug) },
+  )
 
   const matchedRoute = useMemo(() => {
     return (routesQuery.data ?? []).find((r) => isRouteMatch(r, feature.slug))
@@ -26,7 +71,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const routeColumns = useMemo(() => {
     const allCols = columnsQuery.data ?? []
     if (!matchedRoute) return []
-    return allCols.filter((col) => {
+    const visibleColumns = allCols.filter((col) => {
       if (col.visibility === false || (col.visibility as unknown) === 0) {
         return false
       }
@@ -46,7 +91,11 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
       const targetRoute = (matchedRoute.routeName || '').trim().toLowerCase()
       return Boolean(colRoute && colRoute === targetRoute)
     })
-  }, [columnsQuery.data, matchedRoute, isHead])
+    return applyDynamicColumnOrder(
+      visibleColumns,
+      readDynamicColumnOrder(departmentType, matchedRoute.routeId),
+    )
+  }, [columnsQuery.data, matchedRoute, isHead, departmentType])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -109,64 +158,49 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
             padding: '1.25rem 1.5rem',
           }}
         >
-          <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#1e293b' }}>
-            Configured Route Columns &amp; Fields
-          </h3>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '0.75rem',
-            }}
-          >
-            {routeColumns.map((col) => {
-              const perm = isHead ? col.roleAPermission : col.roleBPermission
-              const canEdit =
-                perm === 'CAN_EDIT' || col.readWriteAccess === '12' || col.readWriteAccess === '2'
-              return (
-                <div
-                  key={col.columnId}
-                  style={{
-                    padding: '0.875rem 1rem',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f8fafc',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.35rem',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
-                      {col.columnName}
-                    </strong>
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '999px',
-                        backgroundColor: canEdit ? '#dcfce7' : '#f1f5f9',
-                        color: canEdit ? '#166534' : '#475569',
-                      }}
-                    >
-                      {canEdit ? 'Read & Edit' : 'Read Only'}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Column ID: <code>{col.columnId}</code>
-                  </span>
-                </div>
-              )
-            })}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Route Data</h3>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              {rowsQuery.data?.totalElements ?? 0} row{rowsQuery.data?.totalElements === 1 ? '' : 's'}
+            </span>
           </div>
+
+          {rowsQuery.isPending ? (
+            <div className="loading-state">Loading rows...</div>
+          ) : rowsQuery.isError ? (
+            <div className="error-state">
+              <strong>Unable to load route rows</strong>
+              <p>{rowsQuery.error.message}</p>
+              <button className="primary-button" onClick={() => rowsQuery.refetch()}>Try Again</button>
+            </div>
+          ) : (
+            <div className="table-wrapper" style={{ width: '100%', overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    {routeColumns.map((col) => <th key={col.columnId}>{col.columnName}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(rowsQuery.data?.customers ?? []).length > 0 ? (
+                    rowsQuery.data?.customers.map((row, index) => (
+                      <tr key={String(row.customerId ?? row.id ?? index)}>
+                        {routeColumns.map((col) => (
+                          <td key={col.columnId}>{displayValue(valueForColumn(row, col.columnName))}</td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={routeColumns.length} className="table-empty-cell">
+                        No rows found for this department.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : (
         <div className="hpage-coming-soon" role="status">

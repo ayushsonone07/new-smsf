@@ -612,6 +612,45 @@
   box-shadow: 0 3px 10px rgb(79 70 229 / 6%);
 }
 
+.department-column-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.department-column-order button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #2563eb;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.department-column-order button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.department-column-order button:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.department-column-order span {
+  min-width: 18px;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+}
+
 .department-column-identity {
   display: flex;
   align-items: center;

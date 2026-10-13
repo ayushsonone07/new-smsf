@@ -12,6 +12,11 @@ import {
   useUpdateColumnStatus,
   useUpdateRouteStatus,
 } from '../../permissions/hooks/useDynamicPermissions'
+import {
+  applyDynamicColumnOrder,
+  readDynamicColumnOrder,
+  saveDynamicColumnOrder,
+} from '../../../utils/dynamicColumnOrder'
 
 interface DepartmentRoutesDropdownProps {
   departmentType: string
@@ -50,6 +55,7 @@ export function DepartmentRoutesDropdown({
 }: DepartmentRoutesDropdownProps) {
   const [selectedRouteId, setSelectedRouteId] = useState('')
   const [routeUpdateError, setRouteUpdateError] = useState('')
+  const [orderRevision, setOrderRevision] = useState(0)
   const routesQuery = useDynamicRoutes(departmentType)
   const columnsQuery = useDynamicColumns(departmentType)
   const updateColumnStatusMutation = useUpdateColumnStatus()
@@ -61,10 +67,24 @@ export function DepartmentRoutesDropdown({
   const routeColumns = useMemo(
     () =>
       selectedRoute
-        ? (columnsQuery.data ?? []).filter((column) => belongsToRoute(column, selectedRoute))
+        ? applyDynamicColumnOrder(
+            (columnsQuery.data ?? []).filter((column) => belongsToRoute(column, selectedRoute)),
+            readDynamicColumnOrder(departmentType, selectedRoute.routeId),
+          )
         : [],
-    [columnsQuery.data, selectedRoute],
+    [columnsQuery.data, selectedRoute, departmentType, orderRevision],
   )
+
+  function moveColumn(columnId: string, direction: -1 | 1) {
+    if (!selectedRoute) return
+    const currentIndex = routeColumns.findIndex((column) => column.columnId === columnId)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= routeColumns.length) return
+    const next = routeColumns.map((column) => column.columnId)
+    ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
+    saveDynamicColumnOrder(departmentType, selectedRoute.routeId, next)
+    setOrderRevision((revision) => revision + 1)
+  }
 
   function updateColumnEnabled(
     column: DynamicColumnResponse,
@@ -268,7 +288,7 @@ export function DepartmentRoutesDropdown({
             <p className="department-route-state">No columns are linked to this route.</p>
           ) : (
             <ul className="department-column-list">
-              {routeColumns.map((column) => (
+              {routeColumns.map((column, index) => (
                 <li key={column.columnId} className="department-column-item">
                   <div className="department-column-identity">
                     <span className="department-column-icon" aria-hidden="true">▤</span>
@@ -276,6 +296,28 @@ export function DepartmentRoutesDropdown({
                       <strong>{column.columnName}</strong>
                       <span>{column.columnId}</span>
                     </div>
+                  </div>
+
+                  <div className="department-column-order" aria-label={`Reorder ${column.columnName}`}>
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      title="Move column up"
+                      aria-label={`Move ${column.columnName} up`}
+                      onClick={() => moveColumn(column.columnId, -1)}
+                    >
+                      ↑
+                    </button>
+                    <span>{index + 1}</span>
+                    <button
+                      type="button"
+                      disabled={index === routeColumns.length - 1}
+                      title="Move column down"
+                      aria-label={`Move ${column.columnName} down`}
+                      onClick={() => moveColumn(column.columnId, 1)}
+                    >
+                      ↓
+                    </button>
                   </div>
 
                   <div className="department-column-permissions">
