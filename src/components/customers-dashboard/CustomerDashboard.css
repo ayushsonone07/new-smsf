@@ -395,7 +395,7 @@
 .cdb-invoice-card__heading h2 { margin: 0; color: #0f172a; font-size: 16px; }
 .cdb-invoice-card__heading p { margin: 2px 0 0; color: #8492aa; font-size: 11px; }
 .cdb-invoice-card__icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: #eff6ff; color: #2563eb; }
-.cdb-invoice-card__labels, .cdb-invoice-card__row { display: grid; grid-template-columns: 1.3fr .82fr 1fr .55fr .8fr auto; align-items: center; gap: 16px; padding: 12px 18px; }
+.cdb-invoice-card__labels, .cdb-invoice-card__row { display: grid; grid-template-columns: 1.3fr 1.4fr .8fr auto; align-items: center; gap: 16px; padding: 12px 18px; }
 .cdb-invoice-card__labels { background: #fbfcfe; color: #8190aa; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .cdb-invoice-card__row { min-height: 66px; color: #334155; font-size: 13px; }
 .cdb-invoice-card__row > strong { color: #0f172a; font-weight: 600; }
@@ -1175,7 +1175,7 @@
 @media (max-width: 768px) {
   .cdb-invoice-card__labels { display: none; }
   .cdb-invoice-card__row { grid-template-columns: 1fr auto; gap: 8px 14px; }
-  .cdb-invoice-card__row > :nth-child(2), .cdb-invoice-card__row > :nth-child(3), .cdb-invoice-card__row > :nth-child(4), .cdb-invoice-card__row > :nth-child(5) { font-size: 11px; }
+  .cdb-invoice-card__row > :nth-child(2), .cdb-invoice-card__row > :nth-child(3) { font-size: 11px; }
   .cdb-invoice-actions { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
   .cdb-topbar-menu {
     display: grid;

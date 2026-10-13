@@ -14,21 +14,6 @@ import type {
   CustomerDashboardData,
 } from './types/customer-dashboard.types'
 
-function formatBillDate(value?: string) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function formatBillAmount(value?: string) {
-  if (!value) return '—'
-  const amount = Number(value.replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(amount)
-    ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
-    : value
-}
-
 function formatStatus(value?: string) {
   const normalized = (value || 'PENDING').replace(/_/g, ' ').toLowerCase()
   return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase())
@@ -153,13 +138,11 @@ export function CustomerDashboardView() {
         </div>
         <div className="cdb-invoice-card__table">
           <div className="cdb-invoice-card__labels" aria-hidden="true">
-            <span>Invoice</span><span>Date</span><span>Description</span><span>Amount</span><span>Status</span><span>Actions</span>
+            <span>Invoice</span><span>Description</span><span>Status</span><span>Actions</span>
           </div>
           <div className="cdb-invoice-card__row">
             <strong>{data.bill?.invoiceNo || 'Your invoice'}</strong>
-            <span>{formatBillDate(data.bill?.date)}</span>
             <span>Billing invoice</span>
-            <strong>{formatBillAmount(data.bill?.amount)}</strong>
             <span><span className={`cdb-invoice-status cdb-invoice-status--${statusClass(data.bill?.status)}`}>{formatStatus(data.bill?.status)}</span></span>
             <div className="cdb-invoice-actions">
               <a className={`cdb-invoice-icon-button${data.billUrl ? '' : ' is-disabled'}`} href={data.billUrl || undefined} target="_blank" rel="noopener noreferrer" aria-label="View bill" title={data.billUrl ? 'View bill' : 'Bill not available'} onClick={(event) => { if (!data.billUrl) event.preventDefault() }}>
