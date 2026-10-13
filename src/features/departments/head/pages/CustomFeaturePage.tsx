@@ -131,6 +131,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [invoice, setInvoice] = useState({ invoiceNo: '', date: '', amount: '', status: 'PENDING', billingLink: '' })
   const [rowSearch, setRowSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   const closeUploadModal = () => {
     if (busy || closingModal) return
@@ -304,66 +305,26 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     return displayValue(valueForColumn(row, columnName))
   }
 
+  const statusOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const row of rowsQuery.data?.customers ?? []) {
+      const status = displayValue(valueForColumn(row, 'status'))
+      if (status !== '—') values.add(status)
+    }
+    return Array.from(values).sort()
+  }, [rowsQuery.data?.customers])
+
   const filteredRows = useMemo(() => {
     const search = rowSearch.trim().toLowerCase()
     return (rowsQuery.data?.customers ?? []).filter((row) => {
+      if (statusFilter !== 'ALL' && displayValue(valueForColumn(row, 'status')) !== statusFilter) return false
       if (!search) return true
       return routeColumns.some((column) => displayValue(valueForColumn(row, column.columnName)).toLowerCase().includes(search))
     })
-  }, [rowsQuery.data?.customers, rowSearch, routeColumns])
+  }, [rowsQuery.data?.customers, rowSearch, statusFilter, routeColumns])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0',
-          padding: '1.25rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}
-      >
-        <div>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: '#2563eb',
-            }}
-          >
-            {departmentType} • Dynamic Workspace
-          </span>
-          <h2 style={{ margin: '0.25rem 0', fontSize: '1.25rem', color: '#0f172a' }}>
-            {feature.name}
-          </h2>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748b' }}>
-            {matchedRoute
-              ? `Connected to dynamic route "${matchedRoute.routeName}" (ID: ${matchedRoute.routeId})`
-              : feature.description}
-          </p>
-        </div>
-
-        <div
-          style={{
-            padding: '0.45rem 0.85rem',
-            borderRadius: '999px',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            color: '#1d4ed8',
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-          }}
-        >
-          {routeColumns.length} Active Dynamic Column{routeColumns.length === 1 ? '' : 's'}
-        </div>
-      </div>
-
       {routeColumns.length > 0 ? (
         <div
           style={{
@@ -379,10 +340,19 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
               {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
             </span>
           </div>
-          <label className="dynamic-search-field dynamic-search-field--full">
-            <span aria-hidden="true">⌕</span>
-            <input value={rowSearch} onChange={(event) => setRowSearch(event.target.value)} placeholder="Search by name, number or email" aria-label="Search customers" />
-          </label>
+          <div className="dynamic-route-filters">
+            <label className="dynamic-search-field">
+              <span aria-hidden="true">⌕</span>
+              <input value={rowSearch} onChange={(event) => setRowSearch(event.target.value)} placeholder="Search by name, number or email" aria-label="Search customers" />
+            </label>
+            <label className="dynamic-status-field">
+              <span>Status</span>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
+                <option value="ALL">All</option>
+                {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+          </div>
 
           {rowsQuery.isPending ? (
             <div className="loading-state">Loading rows...</div>
