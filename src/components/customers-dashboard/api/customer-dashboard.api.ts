@@ -36,6 +36,7 @@ interface ApiCustomer {
   email?: string | null
   phone?: string | null
   serviceExpiration?: string | null
+  generatedBillInfo?: string | Record<string, unknown> | null
 }
 
 interface ApiNotification {
@@ -85,6 +86,24 @@ function toExpirationText(date?: string | null): string {
     month: 'short',
     year: 'numeric',
   })}`
+}
+
+function getBillUrl(value: ApiCustomer['generatedBillInfo']): string | undefined {
+  if (!value) return undefined
+  if (typeof value === 'object') {
+    const url = value.generatedBillInfo || value.billingLink || value.billUrl
+    return typeof url === 'string' && url.trim() ? url.trim() : undefined
+  }
+
+  const raw = value.trim()
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const url = parsed.generatedBillInfo || parsed.billingLink || parsed.billUrl
+    return typeof url === 'string' && url.trim() ? url.trim() : undefined
+  } catch {
+    return raw
+  }
 }
 
 function toNotificationTimestamp(timestamp?: string | number[]): string | undefined {
@@ -196,6 +215,7 @@ export async function fetchCustomerDashboardData(): Promise<CustomerDashboardDat
   const executiveName = assignedExecutive?.username || 'Not assigned'
 
   return {
+    billUrl: getBillUrl(customer.generatedBillInfo),
     profile: {
       id: session.customerId,
       clientName,

@@ -75,6 +75,7 @@ export interface CreateTicketInput {
 
 export interface CustomerDashboardData {
   profile: CustomerProfile
+  billUrl?: string
   meeting?: UpcomingMeeting
   services: CustomerServiceItem[]
   updates: RecentUpdate[]

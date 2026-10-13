@@ -390,6 +390,60 @@
   margin-bottom: 2px;
 }
 
+.cdb-bill-action {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cdb-bill-action__trigger,
+.cdb-bill-action__download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  background: #fff;
+  color: #1d4ed8;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cdb-bill-action__trigger {
+  padding: 9px 13px;
+}
+
+.cdb-bill-action__menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 20;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid #dbe4f0;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 14%);
+}
+
+.cdb-bill-action__download {
+  width: 100%;
+  padding: 10px 11px;
+  border-color: transparent;
+  text-align: left;
+}
+
+.cdb-bill-action__trigger:hover,
+.cdb-bill-action__download:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.cdb-bill-action__download:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .cdb-preview-icon {
   display: grid;
   place-items: center;

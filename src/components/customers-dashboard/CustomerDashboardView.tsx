@@ -18,6 +18,8 @@ export function CustomerDashboardView() {
   const [data, setData] = useState<CustomerDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [billOptionsOpen, setBillOptionsOpen] = useState(false)
+  const [isDownloadingBill, setIsDownloadingBill] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -55,6 +57,36 @@ export function CustomerDashboardView() {
     })
   }
 
+  async function handleDownloadBill() {
+    if (!data?.billUrl || isDownloadingBill) return
+    setIsDownloadingBill(true)
+    try {
+      const response = await fetch(data.billUrl)
+      if (!response.ok) throw new Error('Unable to download bill')
+      const blobUrl = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = getBillFileName(data.billUrl)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(data.billUrl, '_blank', 'noopener,noreferrer')
+    } finally {
+      setIsDownloadingBill(false)
+      setBillOptionsOpen(false)
+    }
+  }
+
+  function getBillFileName(url: string) {
+    try {
+      return decodeURIComponent(new URL(url).pathname.split('/').pop() || 'MBG-Card-Bill.pdf')
+    } catch {
+      return 'MBG-Card-Bill.pdf'
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="cdb-body" style={{ opacity: 0.7, padding: '40px 0', textAlign: 'center' }}>
@@ -85,6 +117,39 @@ export function CustomerDashboardView() {
 
       {/* 1. Welcome Banner (Blue Gradient) */}
       <CustomerWelcomeBanner profile={data.profile} />
+
+      <div className="cdb-bill-action">
+        <button
+          type="button"
+          className="cdb-bill-action__trigger"
+          aria-expanded={billOptionsOpen}
+          onClick={() => setBillOptionsOpen((open) => !open)}
+        >
+          <Icon name="download" size={17} />
+          <span>My Bill</span>
+          <Icon name="chevronDown" size={15} />
+        </button>
+
+        {billOptionsOpen ? (
+          <div className="cdb-bill-action__menu">
+            <button
+              type="button"
+              className="cdb-bill-action__download"
+              disabled={!data.billUrl || isDownloadingBill}
+              onClick={handleDownloadBill}
+            >
+              <Icon name="download" size={17} />
+              <span>
+                {isDownloadingBill
+                  ? 'Downloading bill...'
+                  : data.billUrl
+                    ? 'Download bill'
+                    : 'Bill not available yet'}
+              </span>
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       {/* 2. Upcoming Meeting Banner */}
       {data.meeting ? <UpcomingMeetingBanner meeting={data.meeting} /> : null}
