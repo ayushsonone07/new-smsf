@@ -36,6 +36,7 @@ interface ApiCustomer {
   email?: string | null
   phone?: string | null
   serviceExpiration?: string | null
+  generatedBillInfo?: string | Record<string, unknown> | null
 }
 
 interface ApiNotification {
@@ -85,6 +86,52 @@ function toExpirationText(date?: string | null): string {
     month: 'short',
     year: 'numeric',
   })}`
+}
+
+function getBillUrl(value: ApiCustomer['generatedBillInfo']): string | undefined {
+  if (!value) return undefined
+  if (typeof value === 'object') {
+    const url = value.generatedBillInfo || value.billingLink || value.billUrl
+    return typeof url === 'string' && url.trim() ? url.trim() : undefined
+  }
+
+  const raw = value.trim()
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const url = parsed.generatedBillInfo || parsed.billingLink || parsed.billUrl
+    return typeof url === 'string' && url.trim() ? url.trim() : undefined
+  } catch {
+    return raw
+  }
+}
+
+function getBillDetails(value: ApiCustomer['generatedBillInfo']) {
+  let info: Record<string, unknown> = {}
+  if (value && typeof value === 'object') info = value
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (parsed && typeof parsed === 'object') info = parsed as Record<string, unknown>
+    } catch {
+      // A plain URL has no additional invoice metadata.
+    }
+  }
+  const text = (...keys: string[]) => {
+    for (const key of keys) {
+      const candidate = info[key]
+      if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
+        return String(candidate)
+      }
+    }
+    return undefined
+  }
+  return {
+    invoiceNo: text('invoiceNo', 'invoiceNumber', 'billId') || 'Your invoice',
+    date: text('invoiceDate', 'date', 'generatedAt'),
+    amount: text('invoiceAmount', 'amount'),
+    status: text('status', 'billStatus') || 'GENERATED',
+  }
 }
 
 function toNotificationTimestamp(timestamp?: string | number[]): string | undefined {
@@ -196,6 +243,8 @@ export async function fetchCustomerDashboardData(): Promise<CustomerDashboardDat
   const executiveName = assignedExecutive?.username || 'Not assigned'
 
   return {
+    billUrl: getBillUrl(customer.generatedBillInfo),
+    bill: getBillDetails(customer.generatedBillInfo),
     profile: {
       id: session.customerId,
       clientName,

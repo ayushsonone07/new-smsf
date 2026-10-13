@@ -884,7 +884,7 @@ export function RegisterBusinessPage() {
           </button>
           <div className="flex min-w-0 items-center gap-2">
             <img
-              src="https://www.mbgcard.in/mbg_logo.png"
+              src="/mbg-card-logo.svg"
               alt="MBG logo"
               className="h-7 w-7 flex-shrink-0 rounded-lg"
             />
@@ -1986,4 +1986,4 @@ function ChoiceCard({
       <span className="truncate text-sm font-medium">{label}</span>
     </label>
   )
-} 
+}

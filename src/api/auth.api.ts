@@ -3,15 +3,12 @@ import { getSession } from '../app/auth/session'
 import { delay } from './mock/db'
 import {
   generateToken,
-  issuedTokens,
-  persistIssuedTokens,
   storedUsers,
   toAuthUser,
 } from './mock/auth.db'
 import type {
   AuthSession,
   AuthUser,
-  IssuedLoginToken,
   UserRole,
 } from '../features/auth/types/auth.types'
 import type { StoredUser } from './mock/auth.db'
@@ -29,7 +26,6 @@ interface BackendLoginData {
   contact?: string
   isHead?: boolean
 }
-
 interface BackendLoginEnvelope {
   success?: boolean
   message?: string
@@ -313,74 +309,4 @@ export async function generateDepartmentSession(
         ? claims.departmentType
         : undefined),
   })
-}
-
-export async function loginWithToken(
-  token: string,
-): Promise<AuthSession> {
-  await delay(400)
-
-  const issued = issuedTokens.find(
-    (item) => item.token === token.trim() && !item.revoked,
-  )
-
-  if (!issued) {
-    throw new Error('Invalid or revoked access token')
-  }
-
-  const user = storedUsers.find((item) => item.id === issued.user.id)
-
-  if (!user) {
-    throw new Error('Account no longer exists')
-  }
-
-  return createSession(user)
-}
-
-export async function issueLoginToken(
-  targetUserId: string,
-  issuedBy: string,
-): Promise<IssuedLoginToken> {
-  await delay(300)
-
-  const user = storedUsers.find((item) => item.id === targetUserId)
-
-  if (!user) {
-    throw new Error('User not found')
-  }
-
-  const record: IssuedLoginToken = {
-    token: generateToken({
-      sub: user.id,
-      role: user.role,
-      type: 'login',
-    }),
-    user: toAuthUser(user),
-    issuedBy,
-    createdAt: new Date().toISOString(),
-    revoked: false,
-  }
-
-  issuedTokens.unshift(record)
-  persistIssuedTokens()
-
-  return record
-}
-
-export async function getIssuedTokens(): Promise<IssuedLoginToken[]> {
-  await delay()
-  return structuredClone(issuedTokens)
-}
-
-export async function revokeLoginToken(token: string): Promise<void> {
-  await delay(250)
-
-  const record = issuedTokens.find((item) => item.token === token)
-
-  if (!record) {
-    throw new Error('Token not found')
-  }
-
-  record.revoked = true
-  persistIssuedTokens()
 }

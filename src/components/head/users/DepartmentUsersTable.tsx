@@ -356,7 +356,7 @@ function UserRow({
         className={expanded ? 'is-expanded' : undefined}
       >
         {onToggle ? (
-          <td className="users-table__chevron">
+          <td className="users-table__chevron" data-label="Details">
             <button
               type="button"
               className={`chevron-button${
@@ -374,7 +374,7 @@ function UserRow({
         ) : null}
 
         {visible('name') ? (
-          <td>
+          <td data-label="User">
             <div className="user-cell">
               <Avatar name={user.name} src={user.avatarSrc} />
 
@@ -401,35 +401,35 @@ function UserRow({
         ) : null}
 
         {visible('phone') ? (
-          <td className="users-table__mono">{user.phone}</td>
+          <td className="users-table__mono" data-label="Number">{user.phone}</td>
         ) : null}
 
         {visible('email') ? (
-          <td className="users-table__email" title={user.email}>
+          <td className="users-table__email" data-label="Email" title={user.email}>
             {user.email}
           </td>
         ) : null}
 
         {visible('role') ? (
-          <td>
+          <td data-label="Role">
             <RolePill role={user.role} />
           </td>
         ) : null}
 
         {visible('target') ? (
-          <td className="is-right users-table__target">
+          <td className="is-right users-table__target" data-label="Target">
             {user.target}
           </td>
         ) : null}
 
         {visible('achieved') ? (
-          <td className="is-center">
+          <td className="is-center" data-label="Achieved">
             <AchievedPill percent={user.achievedPercent} />
           </td>
         ) : null}
 
         {visible('attendance') ? (
-          <td className="is-center">
+          <td className="is-center" data-label="P / A days">
             <AttendancePills
               present={user.presentDays}
               absent={user.absentDays}
@@ -446,11 +446,11 @@ function UserRow({
                 ? JSON.stringify(value)
                 : String(value)
 
-          return <td key={column.key}>{displayValue}</td>
+          return <td key={column.key} data-label={column.label}>{displayValue}</td>
         })}
 
         {showActions ? (
-          <td className="is-right">
+          <td className="is-right" data-label="Actions">
             <div className="users-table__actions">
               {onView ? (
                 <button

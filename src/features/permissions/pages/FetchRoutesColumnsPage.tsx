@@ -408,7 +408,7 @@ export function FetchRoutesColumnsPage() {
       <PageHeader
         breadcrumb={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>SMSF</span>
+            <img src="/mbg-card-logo.svg" alt="MBG Card" style={{ width: '34px', height: '26px', objectFit: 'contain' }} />
             <span style={{ fontSize: '14px', color: '#64748b' }}>Admin Portal</span>
           </div>
         }

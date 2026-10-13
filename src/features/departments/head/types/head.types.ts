@@ -24,6 +24,7 @@ export interface HeadNotification {
   text: string
   timeLabel: string
   unread?: boolean
+  link?: string
 }
 
 /* ---------- department users ---------- */

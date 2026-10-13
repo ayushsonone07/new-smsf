@@ -1,5 +1,6 @@
 import { Icon } from '../head/shared/Icon'
 import { useNotificationCenter } from '../head/layout/NotificationCenter'
+import { getCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 
 interface CustomerDashboardTopbarProps {
   notificationCount?: number
@@ -11,6 +12,7 @@ export function CustomerDashboardTopbar({
   onToggleSidebar,
 }: CustomerDashboardTopbarProps) {
   const notificationCenter = useNotificationCenter()
+  const isCustomerAuthenticated = Boolean(getCustomerSession())
   const count = notificationCenter?.unreadCount ?? notificationCount
   return (
     <header className="cdb-topbar">
@@ -33,6 +35,7 @@ export function CustomerDashboardTopbar({
       </div>
 
       <div className="cdb-topbar-right">
+        {isCustomerAuthenticated ? (
         <button
           type="button"
           className="cdb-topbar-notif"
@@ -44,6 +47,7 @@ export function CustomerDashboardTopbar({
             <span className="cdb-topbar-badge">{count}</span>
           ) : null}
         </button>
+        ) : null}
       </div>
     </header>
   )

@@ -75,6 +75,13 @@ export interface CreateTicketInput {
 
 export interface CustomerDashboardData {
   profile: CustomerProfile
+  billUrl?: string
+  bill?: {
+    invoiceNo: string
+    date?: string
+    amount?: string
+    status: string
+  }
   meeting?: UpcomingMeeting
   services: CustomerServiceItem[]
   updates: RecentUpdate[]

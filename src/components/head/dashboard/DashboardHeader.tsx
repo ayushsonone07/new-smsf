@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../shared/Icon'
 import { useNotificationCenter } from '../layout/NotificationCenter'
+import { getSession } from '../../../app/auth/session'
 import { useHeadShell } from '../layout/HeadShellContext'
 
 export interface DashboardHeaderProps {
@@ -37,6 +38,7 @@ export function DashboardHeader({
   subtitle,
 }: DashboardHeaderProps) {
   const notificationCenter = useNotificationCenter()
+  const canAccessNotifications = getSession()?.user.role !== 'USER'
   const shell = useHeadShell()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -140,7 +142,7 @@ export function DashboardHeader({
         </button>
 
         {/* Bell Button */}
-        <div className="hdb-banner__bell-wrap">
+        {canAccessNotifications ? <div className="hdb-banner__bell-wrap">
           <button
             type="button"
             className="hdb-banner__btn"
@@ -155,7 +157,7 @@ export function DashboardHeader({
               {notificationCenter?.unreadCount ?? unreadNotifications}
             </span>
           )}
-        </div>
+        </div> : null}
       </div>
     </div>
   )

@@ -80,11 +80,7 @@ export function CustomerDashboardSidebar({
         {/* Brand Header */}
         <div className="cdb-brand">
           <div className="cdb-brand-left">
-            <div className="cdb-brand-logo">
-              <span>
-                M<b>B</b>G
-              </span>
-            </div>
+            <img className="cdb-brand-logo" src="/mbg-card-logo.svg" alt="MBG Card" />
             {!collapsed ? (
               <div className="cdb-brand-text">
                 <span className="cdb-brand-title">MBG Card</span>
