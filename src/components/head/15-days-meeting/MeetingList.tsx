@@ -136,13 +136,13 @@ export function MeetingList({
               className="meeting-list__row"
               variants={rowVariants}
             >
-              <td className="meeting-list__td meeting-list__td--created">
+              <td className="meeting-list__td meeting-list__td--created" data-label="Created">
                 <div className="meeting-list__date-row">
                   <span className="meeting-list__date-label">{formatDate(meeting.createdAt)}</span>
                   <span className="meeting-list__time-label">{formatTime(meeting.createdAt)}</span>
                 </div>
               </td>
-              <td className="meeting-list__td meeting-list__td--customer">
+              <td className="meeting-list__td meeting-list__td--customer" data-label="Customer">
                 <div className="meeting-list__customer-cell">
                   <div className="meeting-list__customer-name">{meeting.customer.name}</div>
                   <div className="meeting-list__customer-company">{meeting.customer.company}</div>
@@ -151,20 +151,20 @@ export function MeetingList({
                   </div>
                 </div>
               </td>
-              <td className="meeting-list__td meeting-list__td--department">
+              <td className="meeting-list__td meeting-list__td--department" data-label="Department">
                 <div className="meeting-list__department-pills">
                   {meeting.departments.map(dept => (
                     <DepartmentPill key={dept.id} department={dept} />
                   ))}
                 </div>
               </td>
-              <td className="meeting-list__td meeting-list__td--date">
+              <td className="meeting-list__td meeting-list__td--date" data-label="Meeting date">
                 <div className="meeting-list__date-row">
                   <span className="meeting-list__date-label">{formatDate(meeting.meetingDate)}</span>
                   <span className="meeting-list__time-label">{formatTime(meeting.meetingDate)}</span>
                 </div>
               </td>
-              <td className="meeting-list__td meeting-list__td--actions">
+              <td className="meeting-list__td meeting-list__td--actions" data-label="Actions">
                 <div className="meeting-list__actions">
                   <Button
                     variant="primary"
