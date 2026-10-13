@@ -233,6 +233,9 @@ export function CustomersListModal({
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
   const [isAddingRemark, setIsAddingRemark] = useState(false)
+  const [editingRemark, setEditingRemark] = useState<string | null>(null)
+  const [editingRemarkText, setEditingRemarkText] = useState('')
+  const [isSavingRemark, setIsSavingRemark] = useState(false)
   const queryClient = useQueryClient()
 
   const current = activeCustomer ?? customer
@@ -247,11 +250,28 @@ export function CustomersListModal({
   }
 
   useEffect(() => {
-    setActiveCustomer(customer)
-  }, [customer])
+    setActiveCustomer((previous) => {
+      if (previous?.id === customer?.id) return previous
+      return customer
+    })
+  }, [customer?.id])
 
   function startClose() {
     setClosing(true)
+  }
+
+  async function saveRemarkEdit() {
+    if (!current?.id || !editingRemarkText.trim() || isSavingRemark) return
+    setIsSavingRemark(true)
+    try {
+      await updateCustomer(current.id, { remark: editingRemarkText.trim() })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+      setEditingRemark(null)
+    } catch (error) {
+      console.error('Failed to update remark', error)
+    } finally {
+      setIsSavingRemark(false)
+    }
   }
 
   // Close on Escape key
@@ -922,6 +942,14 @@ export function CustomersListModal({
                       serviceRow?.internalRemark
                     }
                     internal
+                    editable
+                    editingRemark={editingRemark}
+                    editingRemarkText={editingRemarkText}
+                    onEdit={(remark) => { setEditingRemark(remark.timestamp || remark.remark || 'remark'); setEditingRemarkText(remark.remark || '') }}
+                    onEditTextChange={setEditingRemarkText}
+                    onCancelEdit={() => setEditingRemark(null)}
+                    onSaveEdit={saveRemarkEdit}
+                    isSavingRemark={isSavingRemark}
                   />
                 </div>
 
@@ -1684,6 +1712,14 @@ function RemarkGroup({
   fallback,
   internal = false,
   badge,
+  editable = false,
+  editingRemark,
+  editingRemarkText = '',
+  onEdit,
+  onEditTextChange,
+  onCancelEdit,
+  onSaveEdit,
+  isSavingRemark = false,
 }: {
   title: string
   emptyMessage: string
@@ -1691,6 +1727,14 @@ function RemarkGroup({
   fallback?: string
   internal?: boolean
   badge?: string
+  editable?: boolean
+  editingRemark?: string | null
+  editingRemarkText?: string
+  onEdit?: (remark: CustomerRemark) => void
+  onEditTextChange?: (value: string) => void
+  onCancelEdit?: () => void
+  onSaveEdit?: () => void
+  isSavingRemark?: boolean
 }) {
   return (
     <section className="cl-drawer__remark-group">
@@ -1709,7 +1753,13 @@ function RemarkGroup({
         <ul className="cl-drawer__remark-list">
           {entries.map(({ remark }, index) => (
             <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
-              <p>{remark.remark || '—'}</p>
+              {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
+                <div className="cl-remark-edit">
+                  <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
+                  <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
+                </div>
+              ) : <p>{remark.remark || '—'}</p>}
+              {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
               <span>
                 {[remark.staffName, remark.type, remark.timestamp]
                   .filter(Boolean)

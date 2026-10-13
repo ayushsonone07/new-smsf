@@ -555,6 +555,12 @@
 }
 .hnotify-item p { color: var(--c-text); font-size: 13px; line-height: 1.45; }
 .hnotify-item time { color: var(--c-faint); font-size: 11px; }
+.cl-remark-edit { display: grid; gap: 7px; }
+.cl-remark-edit textarea { width: 100%; min-height: 64px; padding: 8px; border: 1px solid #bfdbfe; border-radius: 7px; resize: vertical; font: inherit; }
+.cl-remark-edit div { display: flex; justify-content: flex-end; gap: 6px; }
+.cl-remark-edit button, .cl-remark-edit-trigger { padding: 4px 9px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #2459e0; cursor: pointer; font-size: 11px; }
+.cl-remark-edit button:last-child { border-color: #2459e0; background: #2459e0; color: #fff; }
+.cl-remark-edit-trigger { float: right; margin-top: -4px; }
 
 .hnotify-drawer__empty {
   display: flex;
