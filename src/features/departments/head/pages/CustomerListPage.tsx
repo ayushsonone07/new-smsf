@@ -30,6 +30,7 @@ import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useOnboardingCustomersList,
@@ -69,7 +70,8 @@ const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
   const session = getSession()
-  const rawDepartment = session?.user.departmentType || ''
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && (
@@ -104,8 +106,18 @@ export function CustomerListPage() {
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
-  const [, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error'
+    title?: string
+    message: string
+  } | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   // 1. Department Config: GET /api/dept-config/{departmentType}
   useQuery({
@@ -615,11 +627,12 @@ export function CustomerListPage() {
       }
       setToast({
         type: 'success',
-        message: `Call initiated to ${customer.contactName || customer.phone}. Please pick up when your phone rings.`,
+        title: 'Call initiated',
+        message: `Connecting you to ${customer.contactName || customer.phone}. Please pick up when your phone rings.`,
       })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unable to initiate call'
-      setToast({ type: 'error', message })
+      setToast({ type: 'error', title: 'Call failed', message })
     } finally {
       setCallingCustomerId(null)
     }
@@ -890,6 +903,22 @@ export function CustomerListPage() {
         onClose={() => setRoundRobinDialogOpen(false)}
         onConfirm={handleConfirmRoundRobin}
       />
+
+      {toast ? (
+        <div
+          className={`cl-toast cl-toast--${toast.type}`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>
+            <strong className="cl-toast-title">{toast.title || (toast.type === 'success' ? 'Success' : 'Error')}</strong>
+            <small className="cl-toast-message">{toast.message}</small>
+          </span>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setToast(null)}>
+            ×
+          </button>
+        </div>
+      ) : null}
     </>
   )
 }

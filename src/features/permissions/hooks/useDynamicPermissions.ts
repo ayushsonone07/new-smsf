@@ -3,6 +3,10 @@ import {
   createDynamicColumn,
   createDynamicDepartmentType,
   createDynamicRoute,
+  createColumnsForRoute,
+  getColumnsByRoute,
+  getMaxColumnsForRoute,
+  getRoutesColumnsSummary,
   getDepartmentDetails,
   getDepartmentTypes,
   getDynamicColumns,
@@ -13,15 +17,17 @@ import {
   updateRouteStatus,
   type CreateDynamicColumnPayload,
   type CreateDynamicRoutePayload,
+  type CreateRouteColumnsPayload,
   type UpdateColumnPermissionPayload,
   type UpdateColumnStatusPayload,
   type UpdateRouteStatusPayload,
 } from '../../../api/dynamic-permission.api'
 
-export function useDepartmentTypes() {
+export function useDepartmentTypes(enabled = true) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'departments'],
     queryFn: getDepartmentTypes,
+    enabled,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -39,11 +45,11 @@ export function useCreateDynamicDepartmentType() {
   })
 }
 
-export function useDynamicRoutes(departmentType?: string) {
+export function useDynamicRoutes(departmentType?: string, enabled = true) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
-    enabled: Boolean(departmentType),
+    enabled: enabled && Boolean(departmentType),
     staleTime: 0,
     refetchOnMount: 'always',
   })
@@ -142,5 +148,57 @@ export function useUpdateRouteStatus() {
     },
   })
 }
+
+export function useColumnsByRoute(routeId?: string, departmentType?: string) {
+  return useQuery({
+    queryKey: ['dynamic-permissions', 'route-columns', routeId, departmentType],
+    queryFn: () => getColumnsByRoute(routeId!, departmentType),
+    enabled: Boolean(routeId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+}
+
+export function useMaxColumnsForRoute(routeId?: string, departmentType?: string) {
+  return useQuery({
+    queryKey: ['dynamic-permissions', 'route-max-columns', routeId, departmentType],
+    queryFn: () => getMaxColumnsForRoute(routeId!, departmentType),
+    enabled: Boolean(routeId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+}
+
+export function useRoutesColumnsSummary(departmentType?: string) {
+  return useQuery({
+    queryKey: ['dynamic-permissions', 'routes-columns-summary', departmentType],
+    queryFn: () => getRoutesColumnsSummary(departmentType),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+}
+
+export function useCreateColumnsForRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: CreateRouteColumnsPayload) =>
+      createColumnsForRoute(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-max-columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes-columns-summary'],
+      })
+    },
+  })
+}
+
 
 

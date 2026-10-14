@@ -49,11 +49,9 @@ export function CustomerLoginPage() {
     <main className="cust-auth-page">
       <div className="cust-auth-card">
         <div className="cust-auth-brand">
-          <div className="cust-auth-brand-icon">
-            <Icon name="users" size={24} strokeWidth={2} />
-          </div>
+          <img className="cust-auth-brand-icon" src="/mbg-card-logo.svg" alt="MBG Card" />
           <div>
-            <strong>SMSF</strong>
+            <strong>MBG Card</strong>
             <span>Customer Portal</span>
           </div>
         </div>

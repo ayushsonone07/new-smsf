@@ -1,7 +1,30 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import {
+  BadgeCheck,
+  BriefcaseBusiness,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  Filter,
+  IndianRupee,
+  LockKeyhole,
+  Pencil,
+  RefreshCw,
+  Search,
+  Target,
+  UserRound,
+  UserRoundCheck,
+  X,
+} from 'lucide-react'
 import { getSession } from '../../../../app/auth/session'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import { isUserGoogle } from '../utils/routeUtils'
+import { ApiError } from '../../../../api/client'
+import { DateRangePicker } from '../../../../components/head/customers-list/CustomersListFilters'
 import {
   fetchSalaryHead,
   fetchDepartmentSalaries,
@@ -22,17 +45,63 @@ const DEPARTMENT_OPTIONS = [
   { value: 'CUSTOMER_CARE_DEPARTMENT', label: 'Customer Care' },
 ]
 
+const EMPTY_SALARIES: UserSalaryResponse[] = []
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+const formatCurrency = (amount: number | null | undefined) =>
+  amount == null
+    ? '—'
+    : new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+      }).format(amount)
+
+const parseApiDate = (value?: string | number[] | null) => {
+  if (!value) return null
+  const date = Array.isArray(value)
+    ? value.length >= 3
+      ? new Date(
+          value[0],
+          value[1] - 1,
+          value[2],
+          value[3] ?? 0,
+          value[4] ?? 0,
+          value[5] ?? 0,
+          Math.floor((value[6] ?? 0) / 1_000_000),
+        )
+      : new Date(Number.NaN)
+    : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const getDateKey = (value?: string | number[] | null) => {
+  const date = parseApiDate(value)
+  if (!date) return null
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const formatDate = (value?: string | number[] | null) => {
+  const date = parseApiDate(value)
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
 
 const toApiDate = (date?: Date) => {
   if (!date) return undefined
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
+
+const departmentLabel = (departmentType: string) =>
+  DEPARTMENT_OPTIONS.find((department) => department.value === departmentType)?.label ??
+  departmentType.replace(/_DEPARTMENT$/i, '').replace(/_/g, ' ')
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -41,27 +110,28 @@ interface Props {
 }
 
 export function SalaryManagementPage({ feature: _feature }: Props) {
+  void _feature
   const session = getSession()
   const user = session?.user
   const isAdmin = user?.role === 'ADMIN'
   const isHead = user?.role === 'HEAD' || isAdmin
-  const defaultDepartment = isUserGoogle(user?.departmentType)
+  const userDepartment = isUserGoogle(user?.departmentType)
     ? 'GOOGLE_DEPARTMENT'
-    : user?.departmentType || 'ONBOARDING_DEPARTMENT'
-  const [selectedDept, setSelectedDept] = useState(defaultDepartment)
-  const departmentType = isAdmin ? selectedDept : defaultDepartment
-
-  // Data
-  const [deptHead, setDeptHead] = useState<UserSalaryResponse | null>(null)
-  const [teamSalaries, setTeamSalaries] = useState<UserSalaryResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+    : user?.departmentType?.trim() || null
+  const [selectedDept, setSelectedDept] = useState(
+    userDepartment ?? 'ONBOARDING_DEPARTMENT',
+  )
+  const departmentType = isAdmin ? selectedDept : userDepartment
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'absent'>('all')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [startDate, setStartDate] = useState<Date | undefined>()
   const [endDate, setEndDate] = useState<Date | undefined>()
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Pagination (client-side for search results)
   const [page, setPage] = useState(0)
@@ -92,43 +162,75 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
     return () => clearTimeout(t)
   }, [searchTerm])
 
-  // Fetch data
-  const loadData = useCallback(async () => {
-    if (!departmentType) return
-    setLoading(true)
-    setError(null)
-    try {
+  const salaryQuery = useQuery({
+    queryKey: ['salary-management', departmentType, startDate, endDate],
+    enabled: Boolean(departmentType),
+    queryFn: async () => {
+      if (!departmentType) {
+        throw new Error('Your account is not linked to a department.')
+      }
       const params = {
         departmentType,
         startDate: toApiDate(startDate),
         endDate: toApiDate(endDate),
       }
       const [head, team] = await Promise.all([
-        fetchSalaryHead(params).catch(() => null),
+        fetchSalaryHead(params).catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 404) return null
+          throw e
+        }),
         fetchDepartmentSalaries(params),
       ])
-      setDeptHead(head)
-      setTeamSalaries(team)
-    } catch (e: unknown) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [departmentType, startDate, endDate])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+      return { head, team }
+    },
+  })
+  const {
+    data: salaryData,
+    isPending: salaryPending,
+    isError: salaryHasError,
+    error: salaryError,
+    refetch: refetchSalaries,
+  } = salaryQuery
+  const deptHead = salaryData?.head ?? null
+  const teamSalaries = salaryData?.team ?? EMPTY_SALARIES
+  const loading = Boolean(departmentType) && salaryPending
+  const error = !departmentType
+    ? 'Your account is not linked to a department.'
+    : salaryHasError
+      ? salaryError instanceof Error
+        ? salaryError.message
+        : 'Unable to load department salary data.'
+      : null
+  const loadData = useCallback(async () => {
+    await refetchSalaries()
+  }, [refetchSalaries])
 
   const filteredSalaries = useMemo(() => {
+    const allDepartmentSalaries = [
+      ...(deptHead ? [deptHead] : []),
+      ...teamSalaries,
+    ]
     const q = debouncedSearch.trim().toLowerCase()
-    if (!q) return teamSalaries
-    return teamSalaries.filter(
-      (s) =>
-        (s.username ?? '').toLowerCase().includes(q) ||
-        (s.email ?? '').toLowerCase().includes(q),
-    )
-  }, [teamSalaries, debouncedSearch])
+    return allDepartmentSalaries.filter((s) => {
+      const joinedDate = getDateKey(s.createdAt)
+      return (
+        (!q ||
+          (s.username ?? '').toLowerCase().includes(q) ||
+          (s.email ?? '').toLowerCase().includes(q)) &&
+        (statusFilter === 'all' ||
+          (statusFilter === 'absent' ? s.isAbsent : !s.isAbsent)) &&
+        (!createdFrom || Boolean(joinedDate && joinedDate >= createdFrom)) &&
+        (!createdTo || Boolean(joinedDate && joinedDate <= createdTo))
+      )
+    })
+  }, [
+    deptHead,
+    teamSalaries,
+    debouncedSearch,
+    statusFilter,
+    createdFrom,
+    createdTo,
+  ])
 
   // Paginated salaries
   const paginatedSalaries = filteredSalaries.slice(page * pageSize, (page + 1) * pageSize)
@@ -200,16 +302,133 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5 p-4 mt-4">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-semibold text-slate-800">Salary Management</h2>
-        <p className="text-sm text-slate-500">
-          {isHead
-            ? 'View and manage salary information for your department'
-            : 'Your salary details'}
-        </p>
+    <div className="mx-auto mt-3 w-full max-w-[1600px] space-y-5 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <label className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search users by name or email..."
+            aria-label="Search users by name or email"
+            className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </label>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <select
+              aria-label="Select department"
+              value={selectedDept}
+              onChange={(e) => {
+                setSelectedDept(e.target.value)
+                setPage(0)
+              }}
+              className="h-12 min-w-44 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+            >
+              {DEPARTMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            className={`inline-flex h-12 items-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition ${
+              filtersOpen
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50'
+            }`}
+          >
+            <Filter size={17} />
+            Filter
+          </button>
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            disabled={loading || !departmentType}
+            aria-label="Refresh salary data"
+            title="Refresh"
+            className="grid h-12 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
+
+      {filtersOpen && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+          <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+            Status:
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as typeof statusFilter)
+                setPage(0)
+              }}
+              className="h-11 min-w-48 rounded-xl border border-slate-300 bg-white px-4 font-normal text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="all">All Status</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+            </select>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold text-slate-700">Created Date:</span>
+            <DateRangePicker
+              label="Created Date"
+              from={createdFrom}
+              to={createdTo}
+              onChange={(from, to) => {
+                setCreatedFrom(from)
+                setCreatedTo(to)
+                setPage(0)
+              }}
+              onReset={() => {
+                setCreatedFrom('')
+                setCreatedTo('')
+                setPage(0)
+              }}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-semibold text-slate-700">Completion Date:</span>
+            <DateRangePicker
+              label="Completion Date"
+              from={startDate ? toApiDate(startDate) ?? '' : ''}
+              to={endDate ? toApiDate(endDate) ?? '' : ''}
+              onChange={(from, to) => {
+                setStartDate(from ? new Date(`${from}T00:00:00`) : undefined)
+                setEndDate(to ? new Date(`${to}T00:00:00`) : undefined)
+                setPage(0)
+              }}
+              onReset={() => {
+                setStartDate(undefined)
+                setEndDate(undefined)
+                setPage(0)
+              }}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter('all')
+              setCreatedFrom('')
+              setCreatedTo('')
+              setStartDate(undefined)
+              setEndDate(undefined)
+              setPage(0)
+            }}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+          >
+            <X size={16} />
+            Reset Filter
+          </button>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
@@ -221,107 +440,6 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
           }`}
         >
           {toast.type === 'ok' ? '✅' : '❌'} {toast.msg}
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap gap-3 items-end">
-          {isAdmin && (
-            <div className="min-w-[200px]">
-              <label className="text-xs font-medium text-slate-600">Department</label>
-              <select
-                value={selectedDept}
-                onChange={(e) => {
-                  setSelectedDept(e.target.value)
-                  setPage(0)
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                {DEPARTMENT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-medium text-slate-600">Search by name or email</label>
-            <div className="relative mt-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search users..."
-                className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              />
-            </div>
-          </div>
-
-          <div className="min-w-[140px]">
-            <label className="text-xs font-medium text-slate-600">From Date</label>
-            <input
-              type="date"
-              value={startDate ? toApiDate(startDate) : ''}
-              onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : undefined)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            />
-          </div>
-
-          <div className="min-w-[140px]">
-            <label className="text-xs font-medium text-slate-600">To Date</label>
-            <input
-              type="date"
-              value={endDate ? toApiDate(endDate) : ''}
-              onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : undefined)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            />
-          </div>
-
-          <button
-            onClick={() => {
-              setSearchTerm('')
-              setStartDate(undefined)
-              setEndDate(undefined)
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
-          >
-            ↺ Reset
-          </button>
-        </div>
-      </div>
-
-      {/* Department Head Card */}
-      {deptHead && !debouncedSearch && (
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="h-10 w-10 rounded-full bg-indigo-200 flex items-center justify-center text-lg">
-                  👤
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800">{deptHead.username}</p>
-                  <p className="text-xs text-slate-500">{deptHead.email}</p>
-                </div>
-                <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">
-                  Department Head
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-6 flex-wrap text-sm">
-              <SalaryField label="Current Salary" value={formatCurrency(deptHead.currentSalary)} />
-              <SalaryField label="Target" value={String(deptHead.target)} />
-              <SalaryField label="Achieved" value={String(deptHead.achievedCount)} />
-              <SalaryField label="Incentive" value={formatCurrency(deptHead.incentiveAmount)} />
-              <SalaryField
-                label="Status"
-                value={deptHead.isAbsent ? '🔴 Absent' : '🟢 Present'}
-              />
-            </div>
-          </div>
         </div>
       )}
 
@@ -337,136 +455,157 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
           ⚠ {error}
         </div>
       ) : filteredSalaries.length > 0 ? (
-        <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-slate-50/70 text-slate-600">
-                  <th className="px-4 py-3 text-left font-semibold">User</th>
-                  <th className="px-4 py-3 text-left font-semibold">Current Salary</th>
-                  <th className="px-4 py-3 text-left font-semibold">Target</th>
-                  <th className="px-4 py-3 text-left font-semibold">Achieved</th>
-                  <th className="px-4 py-3 text-left font-semibold">Incentive</th>
-                  <th className="px-4 py-3 text-left font-semibold">Target Met</th>
-                  <th className="px-4 py-3 text-left font-semibold">Status</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-600 text-white">
+                <BriefcaseBusiness size={19} />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Department Salary Summary</h2>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                  {departmentLabel(departmentType ?? '')} · {filteredSalaries.length} {filteredSalaries.length === 1 ? 'member' : 'members'}
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-h-[58vh] overflow-auto">
+            <table className="w-full min-w-[1120px] border-collapse text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 shadow-[0_1px_0_#e2e8f0]">
+                <tr>
+                  <SalaryHeading icon={<UserRound size={14} />} label="User" />
+                  <SalaryHeading icon={<BriefcaseBusiness size={14} />} label="Role" />
+                  <SalaryHeading icon={<UserRoundCheck size={14} />} label="Attendance" />
+                  <SalaryHeading icon={<IndianRupee size={14} />} label="Current Salary" />
+                  <SalaryHeading icon={<Clock3 size={14} />} label="Incentives" />
+                  <SalaryHeading icon={<Target size={14} />} label="Target" />
+                  <SalaryHeading icon={<BadgeCheck size={14} />} label="Achieved" />
+                  <SalaryHeading icon={<CalendarDays size={14} />} label="Joined" />
+                  <th className="whitespace-nowrap px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {paginatedSalaries.map((salary) => (
-                  <tr key={salary.userId} className="border-b hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{salary.username}</div>
-                      <div className="text-xs text-slate-400">{salary.email}</div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-700">
-                      {formatCurrency(salary.currentSalary)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{salary.target}</td>
-                    <td className="px-4 py-3 text-slate-600">{salary.achievedCount}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {formatCurrency(salary.incentiveAmount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          salary.targetAchieved
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {salary.targetAchieved ? '✅ Yes' : '⏳ No'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+              <tbody className="divide-y divide-slate-100">
+                {paginatedSalaries.map((salary) => {
+                  const isDepartmentHead = deptHead?.userId === salary.userId
+                  return (
+                    <tr key={salary.userId} className="transition-colors hover:bg-blue-50/40">
+                      <td className="px-5 py-4">
+                        <div className="font-semibold text-slate-800">{salary.username}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{salary.email}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${
+                          isDepartmentHead
+                            ? 'border-blue-200 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-slate-100 text-slate-600'
+                        }`}>
+                          {isDepartmentHead ? 'HEAD' : 'USER'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
                           salary.isAbsent
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {salary.isAbsent ? '🔴 Absent' : '🟢 Present'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => openDetailModal(salary)}
-                          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 text-xs"
-                          title="View details"
-                        >
-                          👁
-                        </button>
-                        <button
-                          onClick={() => handleMarkStatus(salary)}
-                          className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                        >
-                          {salary.isAbsent ? 'Mark Present' : 'Mark Absent'}
-                        </button>
-                        <button
-                          onClick={() => openEditModal(salary, 'target')}
-                          className="rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-600 hover:bg-blue-100"
-                          title="Edit target"
-                        >
-                          ✏️
-                        </button>
-                        {isHead && (
-                          <button
-                            onClick={() => openEditModal(salary, 'full')}
-                            className="rounded-md border border-rose-200 bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-100"
-                            title="Full edit"
-                          >
-                            🔒
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            ? 'border-rose-200 bg-rose-50 text-rose-700'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${salary.isAbsent ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                          {salary.isAbsent ? 'Absent' : 'Present'}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-slate-800">
+                        {formatCurrency(salary.currentSalary)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 font-semibold text-emerald-600">
+                        {formatCurrency(salary.incentiveAmount)}
+                      </td>
+                      <td className="px-4 py-4 text-slate-700">{salary.target ?? '—'}</td>
+                      <td className="px-4 py-4">
+                        <span className="inline-flex min-w-12 justify-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                          {salary.achievedCount ?? 0}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 text-slate-600">
+                        {formatDate(salary.createdAt)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <SalaryAction label="View salary details" onClick={() => openDetailModal(salary)} tone="slate">
+                            <Eye size={17} />
+                          </SalaryAction>
+                          {!isDepartmentHead && (
+                            <SalaryAction
+                              label={salary.isAbsent ? 'Mark present' : 'Mark absent'}
+                              onClick={() => void handleMarkStatus(salary)}
+                              tone={salary.isAbsent ? 'emerald' : 'slate'}
+                            >
+                              <UserRoundCheck size={17} />
+                            </SalaryAction>
+                          )}
+                          <SalaryAction label="Edit target and incentive" onClick={() => openEditModal(salary, 'target')} tone="blue">
+                            <Pencil size={17} />
+                          </SalaryAction>
+                          {isHead && (
+                            <SalaryAction label="Edit salary" onClick={() => openEditModal(salary, 'full')} tone="rose">
+                              <LockKeyhole size={16} />
+                            </SalaryAction>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Pagination */}
           {filteredSalaries.length > pageSize && (
-            <div className="border-t px-4 py-3 flex items-center justify-between text-sm text-slate-600">
-              <span>
-                Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filteredSalaries.length)} of{' '}
-                {filteredSalaries.length}
-              </span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-3 text-sm text-slate-600">
+              <label className="flex items-center gap-2">
+                Rows per page
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
-                  className="rounded border border-slate-200 px-2 py-1 text-xs"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
-                  {[10, 20, 50].map((s) => <option key={s} value={s}>{s} / page</option>)}
+                  {[10, 20, 50].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
+              </label>
+              <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="rounded border border-slate-200 px-3 py-1 disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="Previous page"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
                 >
-                  ←
+                  <ChevronLeft size={18} />
                 </button>
-                <span className="text-xs text-slate-500">
-                  Page {page + 1} of {Math.ceil(filteredSalaries.length / pageSize)}
+                <span className="grid h-10 min-w-10 place-items-center rounded-xl bg-blue-600 px-3 font-semibold text-white">
+                  {page + 1}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setPage((p) => p + 1)}
                   disabled={(page + 1) * pageSize >= filteredSalaries.length}
-                  className="rounded border border-slate-200 px-3 py-1 disabled:opacity-40 hover:bg-slate-50"
+                  aria-label="Next page"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-50"
                 >
-                  →
+                  <ChevronRight size={18} />
                 </button>
               </div>
+              <span className="text-slate-500">
+                Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, filteredSalaries.length)} of {filteredSalaries.length} results
+              </span>
             </div>
           )}
-        </div>
+        </section>
       ) : departmentType && !loading ? (
         <div className="rounded-xl border border-slate-100 bg-white p-12 text-center shadow-sm">
-          <div className="text-5xl mb-4">🏦</div>
+          <div className="mb-4 flex justify-center text-blue-500"><BriefcaseBusiness size={38} /></div>
           <h3 className="text-lg font-semibold text-slate-800 mb-2">No salary data found</h3>
           <p className="text-slate-500 text-sm">
             {debouncedSearch
@@ -564,6 +703,7 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
             <div className="space-y-3">
               <DetailRow label="Username" value={selectedUser.username} />
               <DetailRow label="Email" value={selectedUser.email} />
+              <DetailRow label="Role" value={deptHead?.userId === selectedUser.userId ? 'HEAD' : 'USER'} />
               <DetailRow label="Current Salary" value={formatCurrency(selectedUser.currentSalary)} />
               <DetailRow label="Last Month Salary" value={formatCurrency(selectedUser.lastMonthSalary)} />
               <DetailRow label="Target" value={String(selectedUser.target)} />
@@ -594,12 +734,49 @@ export function SalaryManagementPage({ feature: _feature }: Props) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const SalaryField = ({ label, value }: { label: string; value: string }) => (
-  <div>
-    <p className="text-xs text-slate-500">{label}</p>
-    <p className="font-medium text-slate-800">{value}</p>
-  </div>
-)
+function SalaryHeading({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <th className="whitespace-nowrap border-r border-slate-200/70 px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0">
+      <span className="inline-flex items-center gap-2">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-blue-100 text-blue-600">
+          {icon}
+        </span>
+        {label}
+      </span>
+    </th>
+  )
+}
+
+function SalaryAction({
+  children,
+  label,
+  onClick,
+  tone,
+}: {
+  children: ReactNode
+  label: string
+  onClick: () => void
+  tone: 'slate' | 'blue' | 'emerald' | 'rose'
+}) {
+  const toneClass = {
+    slate: 'text-slate-500 hover:bg-slate-100',
+    blue: 'text-blue-600 hover:bg-blue-50',
+    emerald: 'text-emerald-600 hover:bg-emerald-50',
+    rose: 'text-rose-600 hover:bg-rose-50',
+  }[tone]
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`grid h-9 w-9 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${toneClass}`}
+    >
+      {children}
+    </button>
+  )
+}
 
 const DetailRow = ({ label, value }: { label: string; value: string }) => (
   <div className="flex justify-between border-b border-slate-50 pb-2 text-sm">
@@ -627,4 +804,3 @@ const EditField = ({
     />
   </div>
 )
-

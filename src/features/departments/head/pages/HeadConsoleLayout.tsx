@@ -15,7 +15,7 @@ import { sampleNotifications } from '../../../../api/mock/head.db'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import type { HeadNotification, HeadRole } from '../types/head.types'
 
-import { resolveSlugFromPath } from '../utils/routeUtils'
+import { resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 
 interface HeadConsoleLayoutProps {
   portalRole: HeadRole
@@ -47,8 +47,9 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
   const navigate = useNavigate()
   const session = getSession()
   const departmentId = useHeadDepartmentId()
+  const deptFromUrl = resolveDeptFromPath(location.pathname) || undefined
 
-  const nav = useHeadNav(departmentId)
+  const nav = useHeadNav(departmentId, deptFromUrl)
 
   const slug = resolveSlugFromPath(location.pathname, portalRole)
   const feature = nav.bySlug(slug)

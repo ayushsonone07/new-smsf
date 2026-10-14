@@ -1,8 +1,46 @@
 import type { HeadRole } from '../types/head.types'
+import { normalizeDepartmentSlug } from '../../../../api/dynamic-permission.api'
+
+const STATIC_TOP_LEVEL_PATHS = new Set([
+  'admin',
+  'head',
+  'users',
+  'customers',
+  'login',
+  'forbidden',
+  'services',
+  'onboarding',
+  'profile-update',
+  'customer-details',
+  'departments',
+  'google-head',
+  'google-user',
+  'google',
+])
+
+export function resolveDeptFromPath(pathname?: string): string | null {
+  if (typeof window === 'undefined' && !pathname) return null
+  const p = (pathname || window.location.pathname).replace(/\/+$/, '')
+  const first = p.replace(/^\/+/, '').split('/')[0]
+  if (!first) return null
+  const lower = first.toLowerCase()
+  if (STATIC_TOP_LEVEL_PATHS.has(lower) || lower.startsWith('onboarding-')) {
+    return null
+  }
+  return first
+}
 
 export function isUserOnboarding(departmentType?: string | null): boolean {
-  if (!departmentType) return true
-  return departmentType.toUpperCase().includes('ONBOARDING')
+  if (departmentType && departmentType.toUpperCase().includes('ONBOARDING')) {
+    return true
+  }
+  if (typeof window !== 'undefined') {
+    const p = window.location.pathname.toLowerCase()
+    if (p.startsWith('/onboarding') || p.startsWith('/onboarding-')) {
+      return true
+    }
+  }
+  return false
 }
 
 export function buildOnboardingRoute(slug: string, role?: string): string {
@@ -56,9 +94,16 @@ export function buildDepartmentRoute(
   if (isUserOnboarding(departmentType)) {
     return buildOnboardingRoute(slug, role)
   }
+  const roleSegment = role?.toUpperCase() === 'USER' ? 'user' : 'head'
+  const resolvedDept = departmentType || resolveDeptFromPath()
+  if (resolvedDept) {
+    const deptSlug = normalizeDepartmentSlug(resolvedDept)
+    if (deptSlug && deptSlug !== 'head' && deptSlug !== 'users' && deptSlug !== 'department') {
+      return `/${deptSlug}/${roleSegment}/${slug}`
+    }
+  }
   const basePath = role === 'USER' ? '/users' : '/head'
-  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
-  return `${basePath}/${normalizedSlug}`
+  return `${basePath}/${slug}`
 }
 
 export function resolveSlugFromPath(
@@ -122,6 +167,20 @@ export function resolveSlugFromPath(
   if (p.startsWith('/onboarding/')) {
     const s = p.replace('/onboarding/', '')
     return s === 'customer-list' ? 'customers' : s
+  }
+
+  const segments = p.replace(/^\/+|\/+$/g, '').split('/')
+  if (segments.length >= 3) {
+    const last = segments[segments.length - 1]
+    return last === 'customer-list' ? 'customers' : last
+  } else if (segments.length === 2) {
+    const second = segments[1]
+    if (second === 'head' || second === 'user') {
+      return 'dashboard'
+    }
+    return second === 'customer-list' ? 'customers' : second
+  } else if (segments.length === 1 && segments[0] && segments[0] !== 'head' && segments[0] !== 'users') {
+    return 'dashboard'
   }
 
   const basePath = portalRole === 'USER' ? '/users' : '/head'

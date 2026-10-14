@@ -19,6 +19,7 @@ import {
   useUpdateColumnStatus,
   useUpdateRouteStatus,
 } from '../hooks/useDynamicPermissions'
+import { isColumnBelongingToRoute } from '../hooks/useDepartmentRoutePermissions'
 import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
 import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 import type {
@@ -64,6 +65,7 @@ export function FetchRoutesColumnsPage() {
     }
   })
   const [activeTab, setActiveTab] = useState<ActiveTab>('routes')
+  const [selectedRouteFilter, setSelectedRouteFilter] = useState<string>('ALL')
   const [search, setSearch] = useState('')
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -93,6 +95,7 @@ export function FetchRoutesColumnsPage() {
     try {
       localStorage.setItem('smsf_selected_dept', dept)
     } catch {}
+    setSelectedRouteFilter('ALL')
     setRoutesUiState({})
     setColumnsUiState({})
     setRoutesOrder([])
@@ -185,14 +188,22 @@ export function FetchRoutesColumnsPage() {
   }, [orderedRoutes, search])
 
   const filteredColumns = useMemo(() => {
+    let list = orderedColumns
+    if (selectedRouteFilter !== 'ALL') {
+      const targetRoute = rawRoutes.find((r) => r.routeId === selectedRouteFilter)
+      if (targetRoute) {
+        list = list.filter((c) => isColumnBelongingToRoute(c, targetRoute))
+      }
+    }
     const term = search.trim().toLowerCase()
-    if (!term) return orderedColumns
-    return orderedColumns.filter(
+    if (!term) return list
+    return list.filter(
       (c) =>
         c.columnName.toLowerCase().includes(term) ||
-        c.columnId.toLowerCase().includes(term),
+        c.columnId.toLowerCase().includes(term) ||
+        (c.routeName && c.routeName.toLowerCase().includes(term)),
     )
-  }, [orderedColumns, search])
+  }, [orderedColumns, selectedRouteFilter, rawRoutes, search])
 
   // Real backend enable/disable update for Routes into access_summary table
   const handleToggleRoute = (
@@ -397,7 +408,7 @@ export function FetchRoutesColumnsPage() {
       <PageHeader
         breadcrumb={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>SMSF</span>
+            <img src="/mbg-card-logo.svg" alt="MBG Card" style={{ width: '34px', height: '26px', objectFit: 'contain' }} />
             <span style={{ fontSize: '14px', color: '#64748b' }}>Admin Portal</span>
           </div>
         }
@@ -686,36 +697,65 @@ export function FetchRoutesColumnsPage() {
             </button>
           </div>
 
-          {/* Right: Search Input */}
-          <div style={{ position: 'relative', width: '280px' }}>
-            <span
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#94a3b8',
-                fontSize: '13px',
-                pointerEvents: 'none',
-              }}
-            >
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder={activeTab === 'routes' ? 'Search routes, UUID or URL...' : 'Search columns, UUID or Name...'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 34px',
-                fontSize: '13px',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-              }}
-            />
+          {/* Right: Route filter (on columns tab) + Search Input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {activeTab === 'columns' && rawRoutes.length > 0 && (
+              <select
+                value={selectedRouteFilter}
+                onChange={(e) => setSelectedRouteFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  maxWidth: '220px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ALL">All Routes ({rawColumns.length} cols)</option>
+                {rawRoutes.map((r) => {
+                  const count = rawColumns.filter((c) => isColumnBelongingToRoute(c, r)).length
+                  return (
+                    <option key={r.routeId} value={r.routeId}>
+                      {r.routeName} ({count} cols)
+                    </option>
+                  )
+                })}
+              </select>
+            )}
+
+            <div style={{ position: 'relative', width: '260px' }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8',
+                  fontSize: '13px',
+                  pointerEvents: 'none',
+                }}
+              >
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder={activeTab === 'routes' ? 'Search routes, UUID or URL...' : 'Search columns, UUID or Name...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 34px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -826,6 +866,31 @@ export function FetchRoutesColumnsPage() {
                         </div>
                         <div style={{ fontSize: '12px', color: '#6366f1', fontFamily: 'monospace' }}>
                           {route.routeName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#059669', fontFamily: 'monospace' }}>
+                          http://localhost:5173/{route.routeName?.startsWith('/') ? route.routeName.slice(1) : route.routeName}
+                        </div>
+                        <div style={{ marginTop: '2px' }}>
+                          <span
+                            onClick={() => {
+                              setSelectedRouteFilter(route.routeId)
+                              setActiveTab('columns')
+                            }}
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#1d4ed8',
+                              backgroundColor: '#dbeafe',
+                              border: '1px solid #bfdbfe',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              display: 'inline-block',
+                              cursor: 'pointer',
+                            }}
+                            title="Click to view columns for this route"
+                          >
+                            Max Columns: {rawColumns.filter((c) => isColumnBelongingToRoute(c, route)).length}
+                          </span>
                         </div>
                       </div>
                     </td>

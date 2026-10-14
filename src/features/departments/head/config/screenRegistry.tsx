@@ -1,23 +1,34 @@
-import type { ComponentType } from 'react'
+import { lazy, type ComponentType } from 'react'
 import type {
   FeaturePermission,
   HeadScreenKey,
 } from '../../../permissions/types/permission.types'
-import { DashboardPage } from '../pages/DashboardPage'
-import { DepartmentUsersPage } from '../pages/DepartmentUsersPage'
-import { CustomerListPage } from '../pages/CustomerListPage'
-import { AttendancePage } from '../pages/AttendancePage'
-import { MeetingPage } from '../pages/MeetingPage'
-import { SopPage } from '../pages/SopPage'
-import { HelpCenterPage } from '../pages/HelpCenterPage'
-import { HistoryPage } from '../pages/HistoryPage'
-import { AnalyticsPage } from '../pages/AnalyticsPage'
-import { ServiceFlowPage } from '../pages/ServiceFlowPage'
-import { MemberFlowPage } from '../pages/MemberFlowPage'
-import { CustomFeaturePage } from '../pages/CustomFeaturePage'
-import { MyAirtelCallsPage } from '../pages/MyAirtelCallsPage'
-import { ManageServicesPage } from '../pages/ManageServicesPage'
-import { SalaryManagementPage } from '../pages/SalaryManagementPage'
+
+function lazyScreen<T extends Record<string, ComponentType<{ feature: FeaturePermission }>>>(
+  loader: () => Promise<T>,
+  exportName: keyof T,
+) {
+  return lazy(async () => {
+    const module = await loader()
+    return { default: module[exportName] }
+  })
+}
+
+const DashboardPage = lazyScreen(() => import('../pages/DashboardPage'), 'DashboardPage')
+const DepartmentUsersPage = lazyScreen(() => import('../pages/DepartmentUsersPage'), 'DepartmentUsersPage')
+const CustomerListPage = lazyScreen(() => import('../pages/CustomerListPage'), 'CustomerListPage')
+const AttendancePage = lazyScreen(() => import('../pages/AttendancePage'), 'AttendancePage')
+const MeetingPage = lazyScreen(() => import('../pages/MeetingPage'), 'MeetingPage')
+const SopPage = lazyScreen(() => import('../pages/SopPage'), 'SopPage')
+const HelpCenterPage = lazyScreen(() => import('../pages/HelpCenterPage'), 'HelpCenterPage')
+const HistoryPage = lazyScreen(() => import('../pages/HistoryPage'), 'HistoryPage')
+const AnalyticsPage = lazyScreen(() => import('../pages/AnalyticsPage'), 'AnalyticsPage')
+const ServiceFlowPage = lazyScreen(() => import('../pages/ServiceFlowPage'), 'ServiceFlowPage')
+const MemberFlowPage = lazyScreen(() => import('../pages/MemberFlowPage'), 'MemberFlowPage')
+const CustomFeaturePage = lazyScreen(() => import('../pages/CustomFeaturePage'), 'CustomFeaturePage')
+const MyAirtelCallsPage = lazyScreen(() => import('../pages/MyAirtelCallsPage'), 'MyAirtelCallsPage')
+const ManageServicesPage = lazyScreen(() => import('../pages/ManageServicesPage'), 'ManageServicesPage')
+const SalaryManagementPage = lazyScreen(() => import('../pages/SalaryManagementPage'), 'SalaryManagementPage')
 
 interface ScreenEntry {
   component: ComponentType<{ feature: FeaturePermission }>
@@ -33,6 +44,8 @@ interface ScreenEntry {
 export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   dashboard: { component: DashboardPage, title: 'Dashboard' },
   users: { component: DepartmentUsersPage, title: 'Department Management' },
+  'department-user': { component: DepartmentUsersPage, title: 'Department Users' },
+  'department-users': { component: DepartmentUsersPage, title: 'Department Users' },
   customers: { component: CustomerListPage, title: 'Customer List' },
   'customer-list': { component: CustomerListPage, title: 'Customer List' },
   attendance: { component: AttendancePage, title: 'Attendance' },
@@ -43,6 +56,7 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   analytics: { component: AnalyticsPage as ComponentType<{ feature: FeaturePermission }>, title: 'Analytics' },
   'service-flow': { component: ServiceFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Service Flow' },
   'member-flow': { component: MemberFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Member Flow' },
+  'member-performance': { component: MemberFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Member Performance' },
   'help-support': { component: HelpCenterPage, title: 'Help & Support' },
   'airtel-calls': { component: MyAirtelCallsPage as ComponentType<{ feature: FeaturePermission }>, title: 'My Airtel Calls' },
   'manage-services': { component: ManageServicesPage as ComponentType<{ feature: FeaturePermission }>, title: 'Manage Services' },

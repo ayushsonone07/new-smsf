@@ -32,6 +32,7 @@ import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
 import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
+import './DepartmentManagementPage.css'
 
 export function DepartmentManagementPage() {
   const navigate = useNavigate()
@@ -204,205 +205,195 @@ export function DepartmentManagementPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        breadcrumb="Administration / Departments & Services"
-        title="Department & Service Management"
-        description="Step 1: Create a Service in Service List -> Step 2: Create Department Head Login."
-        actions={
-          <>
-            <Button
-              variant="icon"
-              aria-label="Notifications"
-            >
-              ♢
-            </Button>
+      <div className="department-management-page">
+        <PageHeader
+          breadcrumb="Administration / Departments & Services"
+          title="Department & Service Management"
+          description="Step 1: Create a Service in Service List -> Step 2: Create Department Head Login."
+          actions={
+            <>
+              <Button
+                variant="icon"
+                aria-label="Notifications"
+              >
+                ♢
+              </Button>
 
-            <ProfileChip />
-          </>
-        }
-      />
-
-      <DepartmentStats departments={departments} />
-
-      {/* Top Navigation Tabs: Department Accounts vs Service List (Superadmin -> ServiceList) */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '1rem',
-          borderBottom: '1px solid #e2e8f0',
-          paddingBottom: '0.5rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setActiveTab('departments')}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            border:
-              activeTab === 'departments'
-                ? '1px solid #2563eb'
-                : '1px solid transparent',
-            backgroundColor:
-              activeTab === 'departments' ? '#eff6ff' : 'transparent',
-            color: activeTab === 'departments' ? '#1d4ed8' : '#475569',
-            cursor: 'pointer',
-          }}
-        >
-          🏢 Department Accounts ({departments.length})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('services')}
-          style={{
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            border:
-              activeTab === 'services'
-                ? '1px solid #2563eb'
-                : '1px solid transparent',
-            backgroundColor:
-              activeTab === 'services' ? '#eff6ff' : 'transparent',
-            color: activeTab === 'services' ? '#1d4ed8' : '#475569',
-            cursor: 'pointer',
-          }}
-        >
-          ➕ Create Department
-        </button>
-      </div>
-
-      {loginAsMutation.isError ? (
-        <p className="auth-error" role="alert">
-          Could not log in as department:{' '}
-          {loginAsMutation.error.message}
-        </p>
-      ) : null}
-
-      {activeTab === 'services' ? (
-        <AdminServiceListCard
-          onCreateDepartmentForService={(service) => {
-            setPreselectedService(service ?? null)
-            setShowCreateModal(true)
-          }}
+              <ProfileChip />
+            </>
+          }
         />
-      ) : (
-        <Card>
-          <div className="table-toolbar">
-            <div>
-              <h2>Department Accounts</h2>
 
-              <p>
-                Manage login credentials and access
-                for each department.
-              </p>
-            </div>
+        <DepartmentStats departments={departments} />
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <Button
-                variant="secondary"
-                onClick={() => setShowRouteModal(true)}
-              >
-                <span>＋</span> Add Dynamic Route
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setShowColumnModal(true)}
-              >
-                <span>＋</span> Add Dynamic Column
-              </Button>
-              <Button
-                onClick={() => setActiveTab('services')}
-              >
-                <span>➕</span> Create Department
-              </Button>
-            </div>
-          </div>
+        <div className="department-management-tabs" role="tablist" aria-label="Department management sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'departments'}
+            className={`department-management-tab${activeTab === 'departments' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('departments')}
+          >
+            <span aria-hidden="true">🏢</span>
+            Department Accounts
+            <span className="department-management-tab-count">{departments.length}</span>
+          </button>
 
-          <DepartmentFilters
-            search={search}
-            onSearchChange={setSearch}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'services'}
+            className={`department-management-tab${activeTab === 'services' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('services')}
+          >
+            <span aria-hidden="true">🛠</span>
+            Service List
+            <span className="department-management-tab-hint">Step 1: Create Service</span>
+          </button>
+        </div>
+
+        {loginAsMutation.isError ? (
+          <p className="auth-error" role="alert">
+            Could not log in as department:{' '}
+            {loginAsMutation.error.message}
+          </p>
+        ) : null}
+
+        {activeTab === 'services' ? (
+          <AdminServiceListCard
+            onCreateDepartmentForService={(service) => {
+              setPreselectedService(service)
+              setShowCreateModal(true)
+            }}
           />
+        ) : (
+          <Card className="department-management-card">
+            <div className="table-toolbar">
+              <div>
+                <h2>Department Accounts</h2>
 
-          <DepartmentTable
-            departments={filteredDepartments}
-            onEdit={setEditingDepartment}
-            onDelete={setDepartmentToDelete}
+                <p>
+                  Manage login credentials and access
+                  for each department.
+                </p>
+              </div>
+
+              <div className="department-management-actions">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRouteModal(true)}
+                >
+                  <span>＋</span> Add Dynamic Route
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowColumnModal(true)}
+                >
+                  <span>＋</span> Add Dynamic Column
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowAddServiceModal(true)}
+                >
+                  <span>＋</span> Step 1: Create Service
+                </Button>
+                <Button
+                  onClick={() => {
+                    setPreselectedService(null)
+                    setShowCreateModal(true)
+                  }}
+                >
+                  <span>＋</span> Step 2: Create Department Login
+                </Button>
+              </div>
+            </div>
+
+            <DepartmentFilters
+              search={search}
+              onSearchChange={setSearch}
+            />
+
+            <DepartmentTable
+              departments={filteredDepartments}
+              onEdit={setEditingDepartment}
+              onDelete={setDepartmentToDelete}
+              onViewFeatures={handleViewFeatures}
+              onViewDashboard={handleLoginAsDepartment}
+              loggingInId={
+                loginAsMutation.isPending
+                  ? (departments.find(
+                      (item) =>
+                        item.email === loginAsMutation.variables,
+                    )?.id ?? '')
+                  : null
+              }
+            />
+          </Card>
+        )}
+
+        {showAddServiceModal ? (
+          <AddAdminServiceModal
+            open
+            onClose={() => setShowAddServiceModal(false)}
+            onCreated={(createdService) => {
+              setPreselectedService(createdService)
+              setShowCreateModal(true)
+            }}
+          />
+        ) : null}
+
+        {showCreateModal || editingDepartment ? (
+          <DepartmentFormModal
+            open
+            department={editingDepartment}
+            initialService={preselectedService}
+            existingDepartments={departments}
+            isSubmitting={
+              createMutation.isPending ||
+              updateMutation.isPending
+            }
+            error={mutationError?.message}
+            onClose={() => {
+              setShowCreateModal(false)
+              setEditingDepartment(null)
+              setPreselectedService(null)
+              createMutation.reset()
+              updateMutation.reset()
+            }}
+            onCreate={handleCreate}
+            onUpdate={handleUpdate}
             onViewFeatures={handleViewFeatures}
             onViewDashboard={handleLoginAsDepartment}
-            loggingInId={
-              loginAsMutation.isPending
-                ? (departments.find(
-                    (item) =>
-                      item.email === loginAsMutation.variables,
-                  )?.id ?? '')
-                : null
-            }
           />
-        </Card>
-      )}
+        ) : null}
 
-      <AddAdminServiceModal
-        open={showAddServiceModal}
-        onClose={() => setShowAddServiceModal(false)}
-        onCreated={(createdService) => {
-          setPreselectedService(createdService)
-          setShowCreateModal(true)
-        }}
-      />
+        {departmentToDelete ? (
+          <DeleteDepartmentDialog
+            department={departmentToDelete}
+            isDeleting={deleteMutation.isPending}
+            error={deleteMutation.error?.message}
+            onClose={() => {
+              setDepartmentToDelete(null)
+              deleteMutation.reset()
+            }}
+            onConfirm={handleDelete}
+          />
+        ) : null}
 
-      <DepartmentFormModal
-        open={
-          showCreateModal ||
-          Boolean(editingDepartment)
-        }
-        department={editingDepartment}
-        initialService={preselectedService}
-        existingDepartments={departments}
-        isSubmitting={
-          createMutation.isPending ||
-          updateMutation.isPending
-        }
-        error={mutationError?.message}
-        onClose={() => {
-          setShowCreateModal(false)
-          setEditingDepartment(null)
-          setPreselectedService(null)
-          createMutation.reset()
-          updateMutation.reset()
-        }}
-        onCreate={handleCreate}
-        onUpdate={handleUpdate}
-        onViewFeatures={handleViewFeatures}
-        onViewDashboard={handleLoginAsDepartment}
-      />
+        {showRouteModal ? (
+          <CreateRouteModal
+            open
+            onClose={() => setShowRouteModal(false)}
+          />
+        ) : null}
 
-      <DeleteDepartmentDialog
-        department={departmentToDelete}
-        isDeleting={deleteMutation.isPending}
-        error={deleteMutation.error?.message}
-        onClose={() => {
-          setDepartmentToDelete(null)
-          deleteMutation.reset()
-        }}
-        onConfirm={handleDelete}
-      />
-
-      <CreateRouteModal
-        open={showRouteModal}
-        onClose={() => setShowRouteModal(false)}
-      />
-
-      <CreateColumnModal
-        open={showColumnModal}
-        onClose={() => setShowColumnModal(false)}
-      />
+        {showColumnModal ? (
+          <CreateColumnModal
+            open
+            onClose={() => setShowColumnModal(false)}
+          />
+        ) : null}
+      </div>
     </PageLayout>
   )
 }

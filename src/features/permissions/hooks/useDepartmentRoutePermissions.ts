@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
 import { getSession } from '../../../app/auth/session'
 import { useDynamicRoutes } from './useDynamicPermissions'
-import type { DynamicRouteResponse } from '../../../api/dynamic-permission.api'
+import type { DynamicColumnResponse, DynamicRouteResponse } from '../../../api/dynamic-permission.api'
+import { resolveDeptFromPath } from '../../departments/head/utils/routeUtils'
 
 export interface DepartmentRoutePermissionsResult {
   routes: DynamicRouteResponse[]
@@ -23,6 +24,49 @@ function normalizeRouteSegment(str: string): string {
     .replace(/\/+$/, '')
 }
 
+function extractScreenSlug(str: string): string {
+  if (!str) return ''
+  const trimmed = str
+    .toLowerCase()
+    .trim()
+    .replace(/^(\/|#)+/, '')
+    .replace(/\/+$/, '')
+  const parts = trimmed.split('/')
+  const last = parts[parts.length - 1] || ''
+  return last
+    .replace(/^(head|users|user|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)[-/]/i, '')
+    .replace(/[\s_]+/g, '-')
+}
+
+export function areSlugsEquivalent(a: string, b: string): boolean {
+  const normA = extractScreenSlug(a)
+  const normB = extractScreenSlug(b)
+  if (!normA || !normB) return false
+  if (normA === normB) return true
+
+  const isUsersA = normA === 'users' || normA === 'department-user' || normA === 'department-users'
+  const isUsersB = normB === 'users' || normB === 'department-user' || normB === 'department-users'
+  if (isUsersA && isUsersB) return true
+
+  const isCustA = normA === 'customers' || normA === 'customer-list'
+  const isCustB = normB === 'customers' || normB === 'customer-list'
+  if (isCustA && isCustB) return true
+
+  const isPerfA = normA === 'member-flow' || normA === 'member-performance' || normA === 'members-performance'
+  const isPerfB = normB === 'member-flow' || normB === 'member-performance' || normB === 'members-performance'
+  if (isPerfA && isPerfB) return true
+
+  const isHelpA = normA === 'help' || normA === 'help-center' || normA === 'help-support'
+  const isHelpB = normB === 'help' || normB === 'help-center' || normB === 'help-support'
+  if (isHelpA && isHelpB) return true
+
+  const isHistA = normA === 'history' || normA === 'task-history' || normA === 'my-analytics' || normA === 'analytics'
+  const isHistB = normB === 'history' || normB === 'task-history' || normB === 'my-analytics' || normB === 'analytics'
+  if (isHistA && isHistB) return true
+
+  return false
+}
+
 /**
  * Checks whether a given DB route matches a target name, slug, or path.
  */
@@ -37,80 +81,72 @@ export function isRouteMatch(route: DynamicRouteResponse, target: string): boole
   // 1. Direct exact equality
   if (tNorm === nameNorm || tNorm === idNorm) return true
 
-  // 1b. Dashboard routes mapping: /onboarding-user is the user dashboard, /google-head is Google dashboard
-  if (
-    tNorm === 'onboarding-user' ||
-    tNorm === 'onboarding-dashboard-head-departmentuser' ||
-    tNorm === 'onboarding-dashboard-head' ||
-    tNorm === 'onboarding' ||
-    tNorm === 'google-head' ||
-    tNorm === 'google-head/dashboard' ||
-    tNorm === 'google-head-dashboard'
-  ) {
-    return nameNorm === 'dashboard' || idNorm === 'dashboard'
-  }
-
-  // 1c. History route mapping
-  if (
-    tNorm === 'history' ||
-    tNorm === 'task-history' ||
-    tNorm === 'onboarding-dashboard-head-departmentuser-history' ||
-    tNorm === 'onboarding-dashboard-head-history' ||
-    tNorm === 'google-head/history'
-  ) {
-    if (
-      nameNorm === 'history' ||
-      nameNorm === 'task-history' ||
-      nameNorm === 'my-analytics' ||
-      nameNorm === 'analytics' ||
-      idNorm === 'history'
-    ) {
-      return true
-    }
-  }
-
-  // 2. Slug aliases
-  if (
-    ((tNorm === 'customer-list' || tNorm === 'google-head/customer-list' || tNorm === 'google-head/customers') &&
-      (nameNorm === 'customers' || nameNorm === 'customer-list')) ||
-    ((tNorm === 'customers' || tNorm === 'customer-list') &&
-      (nameNorm === 'customers' || nameNorm === 'customer-list')) ||
-    (tNorm === 'department-user' && (nameNorm === 'users' || nameNorm === 'department-users')) ||
-    (tNorm === 'users' && (nameNorm === 'department-user' || nameNorm === 'department-users')) ||
-    (tNorm === 'member-flow' && (nameNorm === 'member-performance' || nameNorm === 'members-performance')) ||
-    (tNorm === 'help-support' && (nameNorm === 'help-center' || nameNorm === 'help')) ||
-    (tNorm === 'help-center' && (nameNorm === 'help-support' || nameNorm === 'help'))
-  ) {
-    return true
-  }
-
-  const tAlias =
-    tNorm === 'customer-list' ? 'customers' : tNorm === 'customers' ? 'customer-list' : tNorm
-  if (tAlias === nameNorm) return true
+  // 2. Slug equivalence (handles users <-> department-user, customers <-> customer-list, etc.)
+  if (areSlugsEquivalent(target, route.routeName || '')) return true
+  if (route.routeId && areSlugsEquivalent(target, route.routeId)) return true
 
   // 3. Suffix / subpath matching:
-  // e.g. target="/onboarding-dashboard-head-meeting", routeName="meeting" or "/head/meeting"
   if (nameNorm && (tNorm.endsWith(`-${nameNorm}`) || tNorm.endsWith(`/${nameNorm}`))) return true
   if (tNorm && (nameNorm.endsWith(`-${tNorm}`) || nameNorm.endsWith(`/${tNorm}`))) return true
 
-  // 4. Last segment matching:
-  // e.g. target="onboarding-dashboard-head-meeting", last segment="meeting"
-  // name="head/meeting", last segment="meeting"
-  const targetLast = tNorm.split(/[-/]/).pop() || ''
-  const nameLast = nameNorm.split(/[-/]/).pop() || ''
-  if (targetLast && nameLast && targetLast === nameLast) {
+  // 4. Last path segment matching
+  const targetLast = tNorm.split('/').pop() || ''
+  const nameLast = nameNorm.split('/').pop() || ''
+  if (targetLast && nameLast && (targetLast === nameLast || areSlugsEquivalent(targetLast, nameLast))) {
     return true
   }
 
-  // Handle customer list last segment alias
-  const targetLastAlias =
-    targetLast === 'customer-list'
-      ? 'customers'
-      : targetLast === 'customers'
-        ? 'customer-list'
-        : targetLast
-  if (targetLastAlias && nameLast && targetLastAlias === nameLast) {
-    return true
+  return false
+}
+
+/**
+ * Determines whether a column belongs to a given route.
+ * Supports:
+ * - Direct routeId match (handles exact UUID match and comma-separated routesType)
+ * - Exact routeName match or suffix match
+ * - Slug equivalence (e.g. users <-> department-user, customers <-> customer-list)
+ */
+export function isColumnBelongingToRoute(
+  column: DynamicColumnResponse,
+  route: DynamicRouteResponse,
+): boolean {
+  if (!column || !route) return false
+
+  const targetRouteId = (route.routeId || '').trim().toLowerCase()
+  const targetRouteName = (route.routeName || '').trim().toLowerCase()
+
+  // 1. Direct routeId match (highest priority, avoids ambiguity)
+  if (targetRouteId) {
+    if (column.routeId && column.routeId.trim().toLowerCase() === targetRouteId) {
+      return true
+    }
+    if (column.routesType) {
+      const ids = column.routesType.split(',').map((s) => s.trim().toLowerCase())
+      if (ids.includes(targetRouteId)) {
+        return true
+      }
+    }
+  }
+
+  // 2. Route name / slug match
+  if (targetRouteName) {
+    if (column.routeName) {
+      const colRouteNames = column.routeName.split(',').map((s) => s.trim().toLowerCase())
+      for (const crn of colRouteNames) {
+        if (crn === targetRouteName) return true
+        if (areSlugsEquivalent(crn, targetRouteName)) return true
+        if (crn.endsWith(`/${targetRouteName}`) || targetRouteName.endsWith(`/${crn}`)) return true
+      }
+    }
+
+    if (column.routesType) {
+      const parts = column.routesType.split(',').map((s) => s.trim().toLowerCase())
+      for (const part of parts) {
+        if (part === targetRouteName || areSlugsEquivalent(part, targetRouteName)) {
+          return true
+        }
+      }
+    }
   }
 
   return false
@@ -126,7 +162,8 @@ export function useDepartmentRoutePermissions(
   departmentType?: string,
 ): DepartmentRoutePermissionsResult {
   const session = getSession()
-  const dept = departmentType || session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const dept = departmentType || session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT'
   const isHead = session?.user.role !== 'USER'
 
   const query = useDynamicRoutes(dept)

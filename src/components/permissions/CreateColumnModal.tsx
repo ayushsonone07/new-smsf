@@ -22,13 +22,13 @@ export function CreateColumnModal({
   initialRouteId,
 }: CreateColumnModalProps) {
   const { data: departmentTypes = [], isLoading: isLoadingDepts } =
-    useDepartmentTypes()
+    useDepartmentTypes(open)
   const createColumnMutation = useCreateDynamicColumn()
 
   const [selectedDept, setSelectedDept] = useState<string>(
     initialDepartmentType || 'ONBOARDING_DEPARTMENT',
   )
-  const routesQuery = useDynamicRoutes(selectedDept)
+  const routesQuery = useDynamicRoutes(selectedDept, open)
   const routes = routesQuery.data ?? []
 
   const [selectedRouteId, setSelectedRouteId] = useState<string>(initialRouteId || '')

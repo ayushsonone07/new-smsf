@@ -1,11 +1,12 @@
-import { Navigate, useLocation, useParams } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
+import { useLocation, useNavigate, useParams } from '@tanstack/react-router'
 import { getSession } from '../../../../app/auth/session'
 import { useHeadNav } from '../hooks/useHeadNav'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
-import { resolveSlugFromPath } from '../utils/routeUtils'
+import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -16,10 +17,46 @@ interface HeadScreenPageProps {
  * and renders that screen's component.
  */
 export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
-  const { screen } = useParams({ strict: false }) as { screen?: string }
+  const { departmentName, role, screen } = useParams({ strict: false }) as {
+    departmentName?: string
+    role?: string
+    screen?: string
+  }
   const location = useLocation()
   const departmentId = useHeadDepartmentId()
-  const nav = useHeadNav(departmentId)
+  const deptFromUrl = departmentName || resolveDeptFromPath(location.pathname) || undefined
+  const nav = useHeadNav(departmentId, deptFromUrl)
+  const navigate = useNavigate()
+  const didRedirect = useRef(false)
+
+  const ready = !nav.isPending && !nav.isError
+  const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
+  const feature = ready && targetSlug ? nav.bySlug(targetSlug) : undefined
+  const Screen = feature ? SCREEN_REGISTRY[feature.screen]?.component : undefined
+
+  // Fall back to the first enabled feature when the requested slug is unknown.
+  // Redirect imperatively, once, instead of <Navigate> (see HeadIndexPage).
+  let target: string | null = null
+  if (ready && !feature) {
+    const firstEnabledFeature = nav.features[0]
+    if (firstEnabledFeature) {
+      const session = getSession()
+      const isUser = (role?.toUpperCase() === 'USER') || (session?.user.role === 'USER')
+      const deptType = deptFromUrl || session?.user.departmentType
+      const candidate = buildDepartmentRoute(
+        firstEnabledFeature.slug,
+        deptType,
+        isUser ? 'USER' : 'HEAD',
+      )
+      if (candidate !== location.pathname) target = candidate
+    }
+  }
+
+  useEffect(() => {
+    if (!target || didRedirect.current) return
+    didRedirect.current = true
+    navigate({ to: target as never, replace: true })
+  }, [navigate, target])
 
   if (nav.isPending) {
     return <LoadingState message="Loading..." />
@@ -35,35 +72,8 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
     )
   }
 
-  const targetSlug = screenOverride || screen || resolveSlugFromPath(location.pathname)
-
-  const feature = targetSlug ? nav.bySlug(targetSlug) : undefined
-
-  const Screen = feature
-    ? SCREEN_REGISTRY[feature.screen]?.component
-    : undefined
-
   if (!feature) {
-    const firstEnabledFeature = nav.features[0]
-
-    if (firstEnabledFeature) {
-      const isUser = getSession()?.user.role === 'USER'
-
-      return isUser ? (
-        <Navigate
-          to="/users/$screen"
-          params={{ screen: firstEnabledFeature.slug }}
-          replace
-        />
-      ) : (
-        <Navigate
-          to="/head/$screen"
-          params={{ screen: firstEnabledFeature.slug }}
-          replace
-        />
-      )
-    }
-
+    if (target) return <LoadingState message="Redirecting..." />
     return (
       <ErrorState
         title="No pages enabled"

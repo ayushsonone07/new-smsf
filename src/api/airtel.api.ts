@@ -1,5 +1,11 @@
 import { authedApiRequest } from './client'
-import { getSession } from '../app/auth/session'
+import {
+  getCurrentPhoneNumber,
+  updateSessionPhoneNumber,
+} from '../app/auth/session'
+import { fetchCurrentUserProfileMeta } from './department-users.api'
+
+const AIRTEL_API_BASE = '/api/v1/airtel'
 
 export interface AirtelClickToCallResponse {
   status?: string
@@ -91,14 +97,14 @@ function queryString(query: AirtelCallsQuery): string {
 
 export async function getMyAirtelCalls(query: AirtelCallsQuery): Promise<AirtelCallsPage> {
   const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
-    `/v1/airtel/my-calls?${queryString(query)}`,
+    `${AIRTEL_API_BASE}/my-calls?${queryString(query)}`,
   )
   return 'pageNumber' in response ? response : response.data
 }
 
 export async function getMyAirtelAnalytics(query: AirtelCallsQuery): Promise<AirtelAnalytics> {
   const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
-    `/v1/airtel/my-calls/analytics?${queryString(query)}`,
+    `${AIRTEL_API_BASE}/my-calls/analytics?${queryString(query)}`,
   )
   return 'data' in response ? response.data : response
 }
@@ -109,7 +115,7 @@ export async function getDepartmentAirtelCalls(
 ): Promise<AirtelCallsPage> {
   const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
   const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
-    `/v1/airtel/department/calls?${search}`,
+    `${AIRTEL_API_BASE}/department/calls?${search}`,
   )
   return 'pageNumber' in response ? response : response.data
 }
@@ -120,14 +126,14 @@ export async function getDepartmentAirtelAnalytics(
 ): Promise<AirtelAnalytics> {
   const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
   const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
-    `/v1/airtel/department/calls/analytics?${search}`,
+    `${AIRTEL_API_BASE}/department/calls/analytics?${search}`,
   )
   return 'data' in response ? response.data : response
 }
 
 export async function getAirtelCallDetail(id: number): Promise<AirtelCallDetail> {
   const response = await authedApiRequest<AirtelCallDetail | { data: AirtelCallDetail }>(
-    `/v1/airtel/calls/${id}`,
+    `${AIRTEL_API_BASE}/calls/${id}`,
   )
   return 'id' in response ? response : response.data
 }
@@ -146,18 +152,22 @@ export async function initiateAirtelClickToCall(
   const toNumber = sanitizePhone(customerPhone)
   if (!toNumber) throw new Error('Invalid customer phone number')
 
-  const session = getSession()
-  const fromNumber = sanitizePhone(
-    session?.user.phoneNumber ||
-      session?.user.contact ||
-      sessionStorage.getItem('phoneNumber'),
-  )
+  let fromNumber = sanitizePhone(getCurrentPhoneNumber())
+
+  // Some older login responses do not include the agent's phone number. In
+  // that case resolve it from the same department profile endpoint used by
+  // the profile menu, then cache it for subsequent calls.
+  if (!fromNumber) {
+    const profile = await fetchCurrentUserProfileMeta()
+    fromNumber = sanitizePhone(profile.phoneNumber)
+    if (fromNumber) updateSessionPhoneNumber(fromNumber)
+  }
 
   if (!fromNumber) {
     throw new Error('Your agent phone number is not on file. Please contact your admin.')
   }
 
-  return authedApiRequest<AirtelClickToCallResponse>('/v1/airtel/click-to-call', {
+  return authedApiRequest<AirtelClickToCallResponse>(`${AIRTEL_API_BASE}/click-to-call`, {
     method: 'POST',
     body: JSON.stringify({ fromNumber, toNumber }),
   })

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { getSession } from '../../../app/auth/session'
 import { useDynamicColumns } from './useDynamicPermissions'
 import type { DynamicColumnResponse } from '../../../api/dynamic-permission.api'
+import { resolveDeptFromPath } from '../../departments/head/utils/routeUtils'
 
 export interface DepartmentColumnPermissionsResult {
   columns: DynamicColumnResponse[]
@@ -81,7 +82,8 @@ export function useDepartmentColumnPermissions(
   departmentType?: string,
 ): DepartmentColumnPermissionsResult {
   const session = getSession()
-  const dept = departmentType || session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const dept = departmentType || session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT'
   const isHead = session?.user.role !== 'USER'
 
   const query = useDynamicColumns(dept)

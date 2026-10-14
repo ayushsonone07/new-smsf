@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import {
@@ -26,6 +26,7 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
@@ -159,7 +160,8 @@ export function DashboardPage() {
 
 function HeadDashboard() {
   const session = getSession()
-  const rawDepartment = session?.user.departmentType || ''
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && (
@@ -216,8 +218,19 @@ function HeadDashboard() {
   )
 
   const infiniteMembersQuery = useInfiniteOnboardingDashboardMembers(membersParams)
+  const {
+    hasNextPage: membersHasNextPage,
+    isFetchingNextPage: membersIsFetchingNextPage,
+    fetchNextPage: fetchMoreMembers,
+  } = infiniteMembersQuery
   const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+
+  const handleLoadMoreMembers = useCallback(() => {
+    if (membersHasNextPage && !membersIsFetchingNextPage) {
+      void fetchMoreMembers()
+    }
+  }, [membersHasNextPage, membersIsFetchingNextPage, fetchMoreMembers])
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1)
@@ -494,11 +507,7 @@ function HeadDashboard() {
           onRefresh={handleRefresh}
           hasNextPage={Boolean(infiniteMembersQuery.hasNextPage)}
           isFetchingNextPage={Boolean(infiniteMembersQuery.isFetchingNextPage)}
-          onLoadMore={() => {
-            if (infiniteMembersQuery.hasNextPage && !infiniteMembersQuery.isFetchingNextPage) {
-              void infiniteMembersQuery.fetchNextPage()
-            }
-          }}
+          onLoadMore={handleLoadMoreMembers}
           totalMembers={totalMembers}
         />
       </motion.div>

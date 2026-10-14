@@ -59,7 +59,8 @@ export function AdminLayout({
           </button>
 
           <span className="shell-brand">
-            SMSF <span>Admin Portal</span>
+            <img src="/mbg-card-logo.svg" alt="MBG Card" />
+            <span>Admin Portal</span>
           </span>
         </header>
 

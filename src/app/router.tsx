@@ -1,39 +1,77 @@
+/* eslint-disable react-refresh/only-export-components -- route configuration intentionally owns lazy component bindings */
 import {
   createRootRoute,
   createRoute,
   createRouter,
   Outlet,
 } from '@tanstack/react-router'
+import { lazy } from 'react'
 import {
   requireAuth,
   requireRole,
   requireRoleDashboard,
   redirectAuthenticatedUser,
 } from './middleware/auth.middleware'
-import { clearSession, getSession } from './auth/session'
+import { getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
-import { ServicesListPage } from '../features/departments/pages/ServicesListPage'
-import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
-import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
-import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
-import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
-import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
-import { FinanceFeaturesPage } from '../features/departments/pages/FinanceFeaturesPage'
-import { AccessTokensPage } from '../features/auth/pages/AccessTokensPage'
-import { FetchRoutesColumnsPage } from '../features/permissions/pages/FetchRoutesColumnsPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
-import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
-import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
-import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
-import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage'
-import { RegisterBusinessPage } from '../features/customers/pages/RegisterBusinessPage'
-import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
-import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
-import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
 import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
+
+// Route screens are deliberately split from the startup bundle. Several of the
+// head/customer screens include large tables, charts and modal workflows; eager
+// imports made Chrome parse and evaluate all of them before the small admin
+// landing page could respond to input.
+const ServicesListPage = lazy(() =>
+  import('../features/departments/pages/ServicesListPage').then((module) => ({ default: module.ServicesListPage })),
+)
+const DepartmentDashboardPage = lazy(() =>
+  import('../features/departments/pages/DepartmentDashboardPage').then((module) => ({ default: module.DepartmentDashboardPage })),
+)
+const DepartmentCustomersPage = lazy(() =>
+  import('../features/departments/pages/DepartmentCustomersPage').then((module) => ({ default: module.DepartmentCustomersPage })),
+)
+const DepartmentHelpCenterPage = lazy(() =>
+  import('../features/departments/pages/DepartmentHelpCenterPage').then((module) => ({ default: module.DepartmentHelpCenterPage })),
+)
+const DepartmentServicesPage = lazy(() =>
+  import('../features/departments/pages/DepartmentServicesPage').then((module) => ({ default: module.DepartmentServicesPage })),
+)
+const FeaturePermissionsPage = lazy(() =>
+  import('../features/permissions/pages/FeaturePermissionsPage').then((module) => ({ default: module.FeaturePermissionsPage })),
+)
+const FinanceFeaturesPage = lazy(() =>
+  import('../features/departments/pages/FinanceFeaturesPage').then((module) => ({ default: module.FinanceFeaturesPage })),
+)
+const FetchRoutesColumnsPage = lazy(() =>
+  import('../features/permissions/pages/FetchRoutesColumnsPage').then((module) => ({ default: module.FetchRoutesColumnsPage })),
+)
+const ForbiddenPage = lazy(() =>
+  import('../features/auth/pages/ForbiddenPage').then((module) => ({ default: module.ForbiddenPage })),
+)
+const HeadIndexPage = lazy(() =>
+  import('../features/departments/head/pages/HeadIndexPage').then((module) => ({ default: module.HeadIndexPage })),
+)
+const HeadScreenPage = lazy(() =>
+  import('../features/departments/head/pages/HeadScreenPage').then((module) => ({ default: module.HeadScreenPage })),
+)
+const CustomerLoginPage = lazy(() =>
+  import('../features/customers/pages/CustomerLoginPage').then((module) => ({ default: module.CustomerLoginPage })),
+)
+const RegisterBusinessPage = lazy(() =>
+  import('../features/customers/pages/RegisterBusinessPage').then((module) => ({ default: module.RegisterBusinessPage })),
+)
+const CustomerDashboardPage = lazy(() =>
+  import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
+)
+const CustomerDetailsPage = lazy(() =>
+  import('../components/customers-dashboard/CustomerDetailsPage').then((module) => ({ default: module.CustomerDetailsPage })),
+)
+const ProfileUpdatePage = lazy(() =>
+  import('../features/profile/pages/ProfileUpdatePage').then((module) => ({ default: module.ProfileUpdatePage })),
+)
 
 function NotFoundPage() {
   const session = getSession()
@@ -98,30 +136,7 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginPage,
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { token?: string } => ({
-    token:
-      typeof search.token === 'string'
-        ? search.token
-        : undefined,
-  }),
-  beforeLoad: ({ search }) => {
-    const session = getSession()
-
-    if (!session) return
-
-    // A magic link always wins over whoever is signed in
-    // right now — otherwise opening the generated link in
-    // the admin's own browser silently bounces back to
-    // /admin instead of signing the head/user in.
-    if (typeof search.token === 'string' && search.token) {
-      clearSession()
-      return
-    }
-
-    redirectAuthenticatedUser()
-  },
+  beforeLoad: redirectAuthenticatedUser,
 })
 
 const authedLayoutRoute = createRoute({
@@ -167,13 +182,6 @@ const departmentFinanceRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/departments/$departmentId/finance',
   component: FinanceFeaturesPage,
-  beforeLoad: requireRole('ADMIN'),
-})
-
-const accessTokensRoute = createRoute({
-  getParentRoute: () => authedLayoutRoute,
-  path: '/admin/tokens',
-  component: AccessTokensPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -648,6 +656,46 @@ const googleUserDynamicScreenRoute = createRoute({
   component: HeadScreenPage,
 })
 
+/**
+ * Dynamic Department Portal Routes:
+ * Matches URLs like http://localhost:5173/{department_name}/{routes}
+ * e.g., /seo/dashboard, /seo/customers, /seo/users, /sales/dashboard, etc.
+ */
+const dynamicDepartmentLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: '_dynamic_dept',
+  component: () => {
+    const session = getSession()
+    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    return <HeadConsoleLayout portalRole={portalRole} />
+  },
+  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+})
+
+const dynamicDepartmentRoleScreenRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$role/$screen',
+  component: HeadScreenPage,
+})
+
+const dynamicDepartmentRoleIndexRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$role',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const dynamicDepartmentIndexRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName',
+  component: () => <HeadScreenPage screenOverride="dashboard" />,
+})
+
+const dynamicDepartmentScreenRoute = createRoute({
+  getParentRoute: () => dynamicDepartmentLayoutRoute,
+  path: '/$departmentName/$screen',
+  component: HeadScreenPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -725,7 +773,6 @@ const routeTree = rootRoute.addChildren([
     servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
-    accessTokensRoute,
     fetchRcRoute,
     forbiddenRoute,
   ]),
@@ -740,6 +787,12 @@ const routeTree = rootRoute.addChildren([
   departmentCustomersRoute,
   departmentHelpCenterRoute,
   departmentServicesRoute,
+  dynamicDepartmentLayoutRoute.addChildren([
+    dynamicDepartmentRoleScreenRoute,
+    dynamicDepartmentRoleIndexRoute,
+    dynamicDepartmentIndexRoute,
+    dynamicDepartmentScreenRoute,
+  ]),
 ])
 
 export const router = createRouter({

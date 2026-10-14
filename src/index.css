@@ -55,16 +55,9 @@ body {
 }
 
 .global-preloader__brand {
-  display: grid;
-  place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: #2459e0;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  box-shadow: inset 0 -3px 0 #ffc629;
+  object-fit: contain;
 }
 
 .global-preloader__spinner {
@@ -177,13 +170,21 @@ a {
 }
 
 .shell-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 700;
   color: #0f172a;
 }
 
+.shell-brand > img {
+  width: 32px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .shell-brand span {
-  margin-left: 4px;
   color: #64748b;
   font-size: 12px;
   font-weight: 500;
@@ -209,14 +210,9 @@ a {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  background: #4f46e5;
-  color: #fff;
-  font-weight: 700;
+  object-fit: contain;
 }
 
 .brand strong {
@@ -1554,73 +1550,9 @@ tr.is-selected-row td {
   color: #b91c1c;
 }
 
-/* ---------------------------------------------------------------
-   Access tokens page
-   --------------------------------------------------------------- */
-
-.issue-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-  padding: 14px 16px;
-  border: 1px solid #c7d2fe;
-  border-radius: 12px;
-  background: #eef2ff;
-}
-
-.issue-banner > div {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.issue-banner strong {
-  font-size: 13px;
-  color: #312e81;
-}
-
-.token-code {
-  display: inline-block;
-  max-width: 220px;
-  padding: 4px 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 7px;
-  background: #f8fafc;
-  color: #334155;
-  font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
-
-.token-code.wide {
-  max-width: 100%;
-  background: #fff;
-}
-
-.token-issue-button {
-  padding: 7px 12px;
-  font-size: 12px;
-}
-
 @media (max-width: 640px) {
   .auth-card {
     padding: 24px 20px;
-  }
-
-  .issue-banner {
-    flex-direction: column;
-    align-items: stretch;
   }
 }
 

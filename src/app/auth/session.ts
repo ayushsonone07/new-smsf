@@ -4,6 +4,18 @@ import type {
 } from '../../features/auth/types/auth.types'
 
 const SESSION_KEY = 'smsf.auth.session'
+
+// Keep session routing independent from the API layer. Importing the API helper
+// here created a client -> session -> dynamic API -> client cycle and also pulled
+// the dynamic-permission module into the initial bundle.
+function normalizeDepartmentSlug(raw: string): string {
+  const trimmed = raw.trim().toLowerCase()
+  return (
+    trimmed
+      .replace(/[^a-z0-9_-]+/g, '_')
+      .replace(/^[_-]+|[_-]+$/g, '') || 'department'
+  )
+}
 /** Admin's own session, parked while they are "logged in as" a department. */
 const ADMIN_BACKUP_KEY = 'smsf.auth.admin-backup'
 
@@ -283,6 +295,7 @@ export type HomeRoute =
   | '/onboarding-user'
   | '/google-head'
   | '/google-user'
+  | (string & {})
 
 export function homeForRole(
   role: UserRole,
@@ -305,6 +318,14 @@ export function homeForRole(
       return '/google-user'
     }
     return '/google-head'
+  }
+
+  if (dept) {
+    const slug = normalizeDepartmentSlug(dept)
+    if (slug && slug !== 'head' && slug !== 'users' && slug !== 'department') {
+      const roleSegment = role === 'USER' ? 'user' : 'head'
+      return `/${slug}/${roleSegment}/dashboard` as HomeRoute
+    }
   }
 
   if (role === 'HEAD') {
