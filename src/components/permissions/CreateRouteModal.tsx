@@ -19,7 +19,7 @@ export function CreateRouteModal({
   initialDepartmentType,
 }: CreateRouteModalProps) {
   const { data: departmentTypes = [], isLoading: isLoadingDepts } =
-    useDepartmentTypes()
+    useDepartmentTypes(open)
   const createRouteMutation = useCreateDynamicRoute()
 
   const [selectedDept, setSelectedDept] = useState<string>(

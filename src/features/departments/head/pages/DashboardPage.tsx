@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import {
@@ -218,8 +218,19 @@ function HeadDashboard() {
   )
 
   const infiniteMembersQuery = useInfiniteOnboardingDashboardMembers(membersParams)
+  const {
+    hasNextPage: membersHasNextPage,
+    isFetchingNextPage: membersIsFetchingNextPage,
+    fetchNextPage: fetchMoreMembers,
+  } = infiniteMembersQuery
   const { refetch: refetchPermissions } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+
+  const handleLoadMoreMembers = useCallback(() => {
+    if (membersHasNextPage && !membersIsFetchingNextPage) {
+      void fetchMoreMembers()
+    }
+  }, [membersHasNextPage, membersIsFetchingNextPage, fetchMoreMembers])
 
   function handleRefresh() {
     setRefreshKey((k) => k + 1)
@@ -496,11 +507,7 @@ function HeadDashboard() {
           onRefresh={handleRefresh}
           hasNextPage={Boolean(infiniteMembersQuery.hasNextPage)}
           isFetchingNextPage={Boolean(infiniteMembersQuery.isFetchingNextPage)}
-          onLoadMore={() => {
-            if (infiniteMembersQuery.hasNextPage && !infiniteMembersQuery.isFetchingNextPage) {
-              void infiniteMembersQuery.fetchNextPage()
-            }
-          }}
+          onLoadMore={handleLoadMoreMembers}
           totalMembers={totalMembers}
         />
       </motion.div>

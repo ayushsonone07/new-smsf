@@ -163,8 +163,8 @@ export function DepartmentFormModal({
   onViewDashboard,
 }: DepartmentFormModalProps) {
   const { data: adminServices = [], isLoading: isLoadingServices } =
-    useAdminServices()
-  const { data: departmentTypes = [] } = useDepartmentTypes()
+    useAdminServices(open)
+  const { data: departmentTypes = [] } = useDepartmentTypes(open)
 
   const [selectedDepartmentType, setSelectedDepartmentType] = useState<string>(
     'WEBSITE_DEPARTMENT',
