@@ -10,10 +10,11 @@ import {
 
 export const ADMIN_SERVICES_QUERY_KEY = ['admin-services'] as const
 
-export function useAdminServices() {
+export function useAdminServices(enabled = true) {
   return useQuery({
     queryKey: ADMIN_SERVICES_QUERY_KEY,
     queryFn: getAdminServices,
+    enabled,
     staleTime: 60 * 1000,
   })
 }

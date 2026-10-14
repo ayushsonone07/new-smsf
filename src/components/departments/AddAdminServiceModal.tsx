@@ -26,7 +26,7 @@ export function AddAdminServiceModal({
   onClose,
   onCreated,
 }: AddAdminServiceModalProps) {
-  const { data: departmentTypes = [] } = useDepartmentTypes()
+  const { data: departmentTypes = [] } = useDepartmentTypes(open)
   const addMutation = useAddAdminService()
   const manageMutation = useManageAdminService()
 

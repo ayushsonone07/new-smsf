@@ -23,10 +23,11 @@ import {
   type UpdateRouteStatusPayload,
 } from '../../../api/dynamic-permission.api'
 
-export function useDepartmentTypes() {
+export function useDepartmentTypes(enabled = true) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'departments'],
     queryFn: getDepartmentTypes,
+    enabled,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -44,11 +45,11 @@ export function useCreateDynamicDepartmentType() {
   })
 }
 
-export function useDynamicRoutes(departmentType?: string) {
+export function useDynamicRoutes(departmentType?: string, enabled = true) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
-    enabled: Boolean(departmentType),
+    enabled: enabled && Boolean(departmentType),
     staleTime: 0,
     refetchOnMount: 'always',
   })

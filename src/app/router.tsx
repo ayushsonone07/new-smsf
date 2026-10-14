@@ -1,9 +1,11 @@
+/* eslint-disable react-refresh/only-export-components -- route configuration intentionally owns lazy component bindings */
 import {
   createRootRoute,
   createRoute,
   createRouter,
   Outlet,
 } from '@tanstack/react-router'
+import { lazy } from 'react'
 import {
   requireAuth,
   requireRole,
@@ -14,25 +16,62 @@ import { getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
-import { ServicesListPage } from '../features/departments/pages/ServicesListPage'
-import { DepartmentDashboardPage } from '../features/departments/pages/DepartmentDashboardPage'
-import { DepartmentCustomersPage } from '../features/departments/pages/DepartmentCustomersPage'
-import { DepartmentHelpCenterPage } from '../features/departments/pages/DepartmentHelpCenterPage'
-import { DepartmentServicesPage } from '../features/departments/pages/DepartmentServicesPage'
-import { FeaturePermissionsPage } from '../features/permissions/pages/FeaturePermissionsPage'
-import { FinanceFeaturesPage } from '../features/departments/pages/FinanceFeaturesPage'
-import { FetchRoutesColumnsPage } from '../features/permissions/pages/FetchRoutesColumnsPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
-import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
-import { HeadIndexPage } from '../features/departments/head/pages/HeadIndexPage'
-import { HeadScreenPage } from '../features/departments/head/pages/HeadScreenPage'
-import { CustomerLoginPage } from '../features/customers/pages/CustomerLoginPage'
-import { RegisterBusinessPage } from '../features/customers/pages/RegisterBusinessPage'
-import { CustomerDashboardPage } from '../features/customers/pages/CustomerDashboardPage'
-import { CustomerDetailsPage } from '../components/customers-dashboard/CustomerDetailsPage'
-import { ProfileUpdatePage } from '../features/profile/pages/ProfileUpdatePage'
 import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
+
+// Route screens are deliberately split from the startup bundle. Several of the
+// head/customer screens include large tables, charts and modal workflows; eager
+// imports made Chrome parse and evaluate all of them before the small admin
+// landing page could respond to input.
+const ServicesListPage = lazy(() =>
+  import('../features/departments/pages/ServicesListPage').then((module) => ({ default: module.ServicesListPage })),
+)
+const DepartmentDashboardPage = lazy(() =>
+  import('../features/departments/pages/DepartmentDashboardPage').then((module) => ({ default: module.DepartmentDashboardPage })),
+)
+const DepartmentCustomersPage = lazy(() =>
+  import('../features/departments/pages/DepartmentCustomersPage').then((module) => ({ default: module.DepartmentCustomersPage })),
+)
+const DepartmentHelpCenterPage = lazy(() =>
+  import('../features/departments/pages/DepartmentHelpCenterPage').then((module) => ({ default: module.DepartmentHelpCenterPage })),
+)
+const DepartmentServicesPage = lazy(() =>
+  import('../features/departments/pages/DepartmentServicesPage').then((module) => ({ default: module.DepartmentServicesPage })),
+)
+const FeaturePermissionsPage = lazy(() =>
+  import('../features/permissions/pages/FeaturePermissionsPage').then((module) => ({ default: module.FeaturePermissionsPage })),
+)
+const FinanceFeaturesPage = lazy(() =>
+  import('../features/departments/pages/FinanceFeaturesPage').then((module) => ({ default: module.FinanceFeaturesPage })),
+)
+const FetchRoutesColumnsPage = lazy(() =>
+  import('../features/permissions/pages/FetchRoutesColumnsPage').then((module) => ({ default: module.FetchRoutesColumnsPage })),
+)
+const ForbiddenPage = lazy(() =>
+  import('../features/auth/pages/ForbiddenPage').then((module) => ({ default: module.ForbiddenPage })),
+)
+const HeadIndexPage = lazy(() =>
+  import('../features/departments/head/pages/HeadIndexPage').then((module) => ({ default: module.HeadIndexPage })),
+)
+const HeadScreenPage = lazy(() =>
+  import('../features/departments/head/pages/HeadScreenPage').then((module) => ({ default: module.HeadScreenPage })),
+)
+const CustomerLoginPage = lazy(() =>
+  import('../features/customers/pages/CustomerLoginPage').then((module) => ({ default: module.CustomerLoginPage })),
+)
+const RegisterBusinessPage = lazy(() =>
+  import('../features/customers/pages/RegisterBusinessPage').then((module) => ({ default: module.RegisterBusinessPage })),
+)
+const CustomerDashboardPage = lazy(() =>
+  import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
+)
+const CustomerDetailsPage = lazy(() =>
+  import('../components/customers-dashboard/CustomerDetailsPage').then((module) => ({ default: module.CustomerDetailsPage })),
+)
+const ProfileUpdatePage = lazy(() =>
+  import('../features/profile/pages/ProfileUpdatePage').then((module) => ({ default: module.ProfileUpdatePage })),
+)
 
 function NotFoundPage() {
   const session = getSession()

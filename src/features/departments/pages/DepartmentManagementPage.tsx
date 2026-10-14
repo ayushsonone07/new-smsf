@@ -331,61 +331,68 @@ export function DepartmentManagementPage() {
           </Card>
         )}
 
-        <AddAdminServiceModal
-          open={showAddServiceModal}
-          onClose={() => setShowAddServiceModal(false)}
-          onCreated={(createdService) => {
-            setPreselectedService(createdService)
-            setShowCreateModal(true)
-          }}
-        />
+        {showAddServiceModal ? (
+          <AddAdminServiceModal
+            open
+            onClose={() => setShowAddServiceModal(false)}
+            onCreated={(createdService) => {
+              setPreselectedService(createdService)
+              setShowCreateModal(true)
+            }}
+          />
+        ) : null}
 
-        <DepartmentFormModal
-          open={
-            showCreateModal ||
-            Boolean(editingDepartment)
-          }
-          department={editingDepartment}
-          initialService={preselectedService}
-          existingDepartments={departments}
-          isSubmitting={
-            createMutation.isPending ||
-            updateMutation.isPending
-          }
-          error={mutationError?.message}
-          onClose={() => {
-            setShowCreateModal(false)
-            setEditingDepartment(null)
-            setPreselectedService(null)
-            createMutation.reset()
-            updateMutation.reset()
-          }}
-          onCreate={handleCreate}
-          onUpdate={handleUpdate}
-          onViewFeatures={handleViewFeatures}
-          onViewDashboard={handleLoginAsDepartment}
-        />
+        {showCreateModal || editingDepartment ? (
+          <DepartmentFormModal
+            open
+            department={editingDepartment}
+            initialService={preselectedService}
+            existingDepartments={departments}
+            isSubmitting={
+              createMutation.isPending ||
+              updateMutation.isPending
+            }
+            error={mutationError?.message}
+            onClose={() => {
+              setShowCreateModal(false)
+              setEditingDepartment(null)
+              setPreselectedService(null)
+              createMutation.reset()
+              updateMutation.reset()
+            }}
+            onCreate={handleCreate}
+            onUpdate={handleUpdate}
+            onViewFeatures={handleViewFeatures}
+            onViewDashboard={handleLoginAsDepartment}
+          />
+        ) : null}
 
-        <DeleteDepartmentDialog
-          department={departmentToDelete}
-          isDeleting={deleteMutation.isPending}
-          error={deleteMutation.error?.message}
-          onClose={() => {
-            setDepartmentToDelete(null)
-            deleteMutation.reset()
-          }}
-          onConfirm={handleDelete}
-        />
+        {departmentToDelete ? (
+          <DeleteDepartmentDialog
+            department={departmentToDelete}
+            isDeleting={deleteMutation.isPending}
+            error={deleteMutation.error?.message}
+            onClose={() => {
+              setDepartmentToDelete(null)
+              deleteMutation.reset()
+            }}
+            onConfirm={handleDelete}
+          />
+        ) : null}
 
-        <CreateRouteModal
-          open={showRouteModal}
-          onClose={() => setShowRouteModal(false)}
-        />
+        {showRouteModal ? (
+          <CreateRouteModal
+            open
+            onClose={() => setShowRouteModal(false)}
+          />
+        ) : null}
 
-        <CreateColumnModal
-          open={showColumnModal}
-          onClose={() => setShowColumnModal(false)}
-        />
+        {showColumnModal ? (
+          <CreateColumnModal
+            open
+            onClose={() => setShowColumnModal(false)}
+          />
+        ) : null}
       </div>
     </PageLayout>
   )

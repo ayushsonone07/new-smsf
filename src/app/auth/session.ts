@@ -2,9 +2,20 @@ import type {
   AuthSession,
   UserRole,
 } from '../../features/auth/types/auth.types'
-import { normalizeDepartmentSlug } from '../../api/dynamic-permission.api'
 
 const SESSION_KEY = 'smsf.auth.session'
+
+// Keep session routing independent from the API layer. Importing the API helper
+// here created a client -> session -> dynamic API -> client cycle and also pulled
+// the dynamic-permission module into the initial bundle.
+function normalizeDepartmentSlug(raw: string): string {
+  const trimmed = raw.trim().toLowerCase()
+  return (
+    trimmed
+      .replace(/[^a-z0-9_-]+/g, '_')
+      .replace(/^[_-]+|[_-]+$/g, '') || 'department'
+  )
+}
 /** Admin's own session, parked while they are "logged in as" a department. */
 const ADMIN_BACKUP_KEY = 'smsf.auth.admin-backup'
 

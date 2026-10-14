@@ -88,15 +88,30 @@ export function DepartmentUsersTable({
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLTableRowElement>(null)
 
+  // Latest state/callback for the observer so it isn't re-created on every
+  // render (which re-fired "load more" for an already-visible sentinel).
+  const onLoadMoreRef = useRef(onLoadMore)
+  const hasNextPageRef = useRef(hasNextPage)
+  const isFetchingNextPageRef = useRef(isFetchingNextPage)
+
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore
+    hasNextPageRef.current = hasNextPage
+    isFetchingNextPageRef.current = isFetchingNextPage
+  })
+
   // Use a single load trigger so the same next page is not requested twice.
   useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
+    if (!hasNextPage) return
+
+    const el = sentinelRef.current
+    if (!el) return
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onLoadMore()
-        }
+        if (!entries[0]?.isIntersecting) return
+        if (!hasNextPageRef.current || isFetchingNextPageRef.current) return
+        onLoadMoreRef.current?.()
       },
       {
         root: containerRef.current,
@@ -105,14 +120,12 @@ export function DepartmentUsersTable({
       },
     )
 
-    const el = sentinelRef.current
-    if (el) observer.observe(el)
+    observer.observe(el)
 
     return () => {
-      if (el) observer.unobserve(el)
       observer.disconnect()
     }
-  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+  }, [hasNextPage])
 
   const visible = (key: DepartmentUserColumnKey) =>
     !hiddenColumns?.includes(key)

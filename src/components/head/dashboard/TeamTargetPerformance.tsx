@@ -45,6 +45,20 @@ export function TeamTargetPerformance({
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLTableRowElement>(null)
 
+  // Latest callbacks/state for the observer so it is not re-created on every
+  // render. Re-creating it meant a sentinel that was already on screen fired a
+  // fresh "load more" on each render, cascading into unbounded auto-pagination
+  // (and an out-of-memory crash) for departments with many members.
+  const onLoadMoreRef = useRef(onLoadMore)
+  const hasNextPageRef = useRef(hasNextPage)
+  const isFetchingNextPageRef = useRef(isFetchingNextPage)
+
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore
+    hasNextPageRef.current = hasNextPage
+    isFetchingNextPageRef.current = isFetchingNextPage
+  })
+
   const presentCount = members.filter((m) => m.attendance === 'Present').length
   const absentCount = members.filter((m) => m.attendance === 'Absent').length
 
@@ -59,15 +73,20 @@ export function TeamTargetPerformance({
     )
   }, [members, search])
 
-  // 1. IntersectionObserver on sentinel row at table bottom
+  // 1. IntersectionObserver on sentinel row at table bottom.
+  //    Created once per pagination state so an already-visible sentinel only
+  //    triggers a single load instead of one per render.
   useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
+    if (!hasNextPage) return
+
+    const el = sentinelRef.current
+    if (!el) return
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onLoadMore()
-        }
+        if (!entries[0]?.isIntersecting) return
+        if (!hasNextPageRef.current || isFetchingNextPageRef.current) return
+        onLoadMoreRef.current?.()
       },
       {
         root: null,
@@ -76,16 +95,12 @@ export function TeamTargetPerformance({
       },
     )
 
-    const el = sentinelRef.current
-    if (el) {
-      observer.observe(el)
-    }
+    observer.observe(el)
 
     return () => {
-      if (el) observer.unobserve(el)
       observer.disconnect()
     }
-  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+  }, [hasNextPage])
 
   // 2. Container scroll listener on .hdb-team-table-wrap
   const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -99,19 +114,21 @@ export function TeamTargetPerformance({
 
   // 3. Window scroll listener when scrolling down the dashboard page
   useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return
+    if (!hasNextPage) return
 
     const handleWindowScroll = () => {
       if (!sentinelRef.current) return
       const rect = sentinelRef.current.getBoundingClientRect()
       if (rect.top <= window.innerHeight + 250) {
-        onLoadMore()
+        if (!isFetchingNextPageRef.current) {
+          onLoadMoreRef.current?.()
+        }
       }
     }
 
     window.addEventListener('scroll', handleWindowScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleWindowScroll)
-  }, [hasNextPage, isFetchingNextPage, onLoadMore])
+  }, [hasNextPage])
 
   return (
     <div className="hdb-team-table-card">
