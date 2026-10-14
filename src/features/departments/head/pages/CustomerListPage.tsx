@@ -30,6 +30,7 @@ import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useOnboardingCustomersList,
@@ -69,7 +70,8 @@ const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
 export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
   const session = getSession()
-  const rawDepartment = session?.user.departmentType || ''
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && (

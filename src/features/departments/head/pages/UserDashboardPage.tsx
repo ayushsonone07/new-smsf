@@ -17,6 +17,7 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryKpis } from '../../types/onboarding-dashboard.types'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import '../../../../components/head/dashboard/Dashboard.css'
 
 const containerVariants: Variants = {
@@ -128,7 +129,8 @@ export function UserDashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const session = getSession()
   const name = session?.user.name ?? 'there'
-  const rawDepartment = session?.user.departmentType || ''
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' &&

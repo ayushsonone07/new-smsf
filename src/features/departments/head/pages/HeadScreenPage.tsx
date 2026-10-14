@@ -5,7 +5,7 @@ import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
-import { resolveSlugFromPath } from '../utils/routeUtils'
+import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -16,10 +16,15 @@ interface HeadScreenPageProps {
  * and renders that screen's component.
  */
 export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
-  const { screen } = useParams({ strict: false }) as { screen?: string }
+  const { departmentName, role, screen } = useParams({ strict: false }) as {
+    departmentName?: string
+    role?: string
+    screen?: string
+  }
   const location = useLocation()
   const departmentId = useHeadDepartmentId()
-  const nav = useHeadNav(departmentId)
+  const deptFromUrl = departmentName || resolveDeptFromPath(location.pathname) || undefined
+  const nav = useHeadNav(departmentId, deptFromUrl)
 
   if (nav.isPending) {
     return <LoadingState message="Loading..." />
@@ -47,21 +52,16 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
     const firstEnabledFeature = nav.features[0]
 
     if (firstEnabledFeature) {
-      const isUser = getSession()?.user.role === 'USER'
-
-      return isUser ? (
-        <Navigate
-          to="/users/$screen"
-          params={{ screen: firstEnabledFeature.slug }}
-          replace
-        />
-      ) : (
-        <Navigate
-          to="/head/$screen"
-          params={{ screen: firstEnabledFeature.slug }}
-          replace
-        />
+      const session = getSession()
+      const isUser = (role?.toUpperCase() === 'USER') || (session?.user.role === 'USER')
+      const deptType = deptFromUrl || session?.user.departmentType
+      const targetPath = buildDepartmentRoute(
+        firstEnabledFeature.slug,
+        deptType,
+        isUser ? 'USER' : 'HEAD',
       )
+
+      return <Navigate to={targetPath as never} replace />
     }
 
     return (

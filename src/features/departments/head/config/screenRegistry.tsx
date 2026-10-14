@@ -33,6 +33,8 @@ interface ScreenEntry {
 export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   dashboard: { component: DashboardPage, title: 'Dashboard' },
   users: { component: DepartmentUsersPage, title: 'Department Management' },
+  'department-user': { component: DepartmentUsersPage, title: 'Department Users' },
+  'department-users': { component: DepartmentUsersPage, title: 'Department Users' },
   customers: { component: CustomerListPage, title: 'Customer List' },
   'customer-list': { component: CustomerListPage, title: 'Customer List' },
   attendance: { component: AttendancePage, title: 'Attendance' },
@@ -43,6 +45,7 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   analytics: { component: AnalyticsPage as ComponentType<{ feature: FeaturePermission }>, title: 'Analytics' },
   'service-flow': { component: ServiceFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Service Flow' },
   'member-flow': { component: MemberFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Member Flow' },
+  'member-performance': { component: MemberFlowPage as ComponentType<{ feature: FeaturePermission }>, title: 'Member Performance' },
   'help-support': { component: HelpCenterPage, title: 'Help & Support' },
   'airtel-calls': { component: MyAirtelCallsPage as ComponentType<{ feature: FeaturePermission }>, title: 'My Airtel Calls' },
   'manage-services': { component: ManageServicesPage as ComponentType<{ feature: FeaturePermission }>, title: 'Manage Services' },

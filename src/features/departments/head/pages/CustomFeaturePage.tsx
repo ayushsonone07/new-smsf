@@ -12,7 +12,8 @@ import {
   useDynamicColumns,
   useDynamicRoutes,
 } from '../../../permissions/hooks/useDynamicPermissions'
-import { isRouteMatch } from '../../../permissions/hooks/useDepartmentRoutePermissions'
+import { isColumnBelongingToRoute, isRouteMatch } from '../../../permissions/hooks/useDepartmentRoutePermissions'
+import { resolveDeptFromPath } from '../utils/routeUtils'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import { useDepartmentCustomerRows } from '../../hooks/useDepartmentUsersList'
 import type { DepartmentCustomerRowItem } from '../../../../api/department-users.api'
@@ -103,7 +104,8 @@ function currency(value: unknown): string {
  */
 export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const session = getSession()
-  const departmentType = session?.user.departmentType || 'ONBOARDING_DEPARTMENT'
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const departmentType = session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT'
   const isHead = session?.user.role !== 'USER'
 
   const routesQuery = useDynamicRoutes(departmentType)
@@ -261,15 +263,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
       if (!isHead && (col.enableUser === false || (col.enableUser as unknown) === 0)) {
         return false
       }
-      if (
-        col.routeId === matchedRoute.routeId ||
-        col.routesType === matchedRoute.routeId
-      ) {
-        return true
-      }
-      const colRoute = (col.routeName || '').trim().toLowerCase()
-      const targetRoute = (matchedRoute.routeName || '').trim().toLowerCase()
-      return Boolean(colRoute && colRoute === targetRoute)
+      return isColumnBelongingToRoute(col, matchedRoute)
     })
     return applyDynamicColumnOrder(
       visibleColumns,
