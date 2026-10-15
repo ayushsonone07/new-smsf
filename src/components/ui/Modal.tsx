@@ -68,9 +68,10 @@ export function Modal({
   }
 
   const classes = [
-    className ?? 'modal',
+    'modal',
     SIZE_CLASSES[size],
     flush ? 'modal--flush' : null,
+    className,
   ]
     .filter(Boolean)
     .join(' ')

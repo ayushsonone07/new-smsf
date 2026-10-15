@@ -159,11 +159,18 @@ export function AddAdminServiceModal({
               type="text"
               required
               value={serviceType}
-              onChange={(e) =>
-                setServiceType(
-                  e.target.value.toUpperCase().replace(/\s+/g, '_'),
-                )
-              }
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase().replace(/\s+/g, '_')
+                setServiceType(val)
+                if (
+                  deptMode === 'custom' &&
+                  (!customDeptType ||
+                    customDeptType === serviceType ||
+                    customDeptType === `${serviceType}_DEPARTMENT`)
+                ) {
+                  setCustomDeptType(val)
+                }
+              }}
               placeholder="e.g. AI_AUTOMATION or SEO_OPTIMIZATION"
               disabled={isSubmitting}
               style={{

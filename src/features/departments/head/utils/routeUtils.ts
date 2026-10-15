@@ -95,7 +95,7 @@ export function buildDepartmentRoute(
     return buildOnboardingRoute(slug, role)
   }
   const roleSegment = role?.toUpperCase() === 'USER' ? 'user' : 'head'
-  const resolvedDept = departmentType || resolveDeptFromPath()
+  const resolvedDept = resolveDeptFromPath() || departmentType
   if (resolvedDept) {
     const deptSlug = normalizeDepartmentSlug(resolvedDept)
     if (deptSlug && deptSlug !== 'head' && deptSlug !== 'users' && deptSlug !== 'department') {

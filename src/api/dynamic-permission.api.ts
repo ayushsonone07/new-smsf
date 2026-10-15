@@ -172,8 +172,12 @@ export async function getDynamicRoutes(
   departmentType?: string,
 ): Promise<DynamicRouteResponse[]> {
   try {
-    const url = departmentType && departmentType !== 'ALL'
-      ? `/api/dynamic-permission/routes?departmentType=${encodeURIComponent(departmentType)}`
+    const resolvedType =
+      departmentType && departmentType !== 'ALL'
+        ? normalizeDepartmentTypeName(departmentType)
+        : undefined
+    const url = resolvedType
+      ? `/api/dynamic-permission/routes?departmentType=${encodeURIComponent(resolvedType)}`
       : '/api/dynamic-permission/routes'
     const res = await authedApiRequest<any>(url)
     if (Array.isArray(res)) return res
@@ -211,8 +215,12 @@ export async function getDynamicColumns(
   departmentType?: string,
 ): Promise<DynamicColumnResponse[]> {
   try {
-    const url = departmentType && departmentType !== 'ALL'
-      ? `/api/dynamic-permission/columns?departmentType=${encodeURIComponent(departmentType)}`
+    const resolvedType =
+      departmentType && departmentType !== 'ALL'
+        ? normalizeDepartmentTypeName(departmentType)
+        : undefined
+    const url = resolvedType
+      ? `/api/dynamic-permission/columns?departmentType=${encodeURIComponent(resolvedType)}`
       : '/api/dynamic-permission/columns'
     const res = await authedApiRequest<any>(url)
     if (Array.isArray(res)) return res

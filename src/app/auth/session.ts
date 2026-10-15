@@ -9,6 +9,7 @@ const SESSION_KEY = 'smsf.auth.session'
 // here created a client -> session -> dynamic API -> client cycle and also pulled
 // the dynamic-permission module into the initial bundle.
 function normalizeDepartmentSlug(raw: string): string {
+  if (!raw) return 'department'
   const trimmed = raw.trim().toLowerCase()
   return (
     trimmed

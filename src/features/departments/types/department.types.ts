@@ -27,6 +27,7 @@ export interface CreateDepartmentRequest {
   name: string
   type?: DepartmentType
   departmentType?: string
+  serviceType?: string
   username: string
   email: string
   password: string

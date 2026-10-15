@@ -753,21 +753,51 @@ tr.is-selected-row td {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 16px;
   background: rgb(15 23 42 / 55%);
   z-index: 50;
+  overflow-y: auto;
 }
 
 .modal,
 .delete-modal {
   width: 100%;
   max-width: 420px;
-  padding: 14px;
-  border-radius: 10px;
+  max-height: min(90vh, calc(100vh - 40px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 18px;
+  border-radius: 12px;
   background: #fff;
   box-shadow: 0 16px 40px rgb(15 23 42 / 20%);
+  margin: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.modal::-webkit-scrollbar,
+.delete-modal::-webkit-scrollbar {
+  width: 7px;
+}
+
+.modal::-webkit-scrollbar-track,
+.delete-modal::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.modal::-webkit-scrollbar-thumb,
+.delete-modal::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.modal::-webkit-scrollbar-thumb:hover,
+.delete-modal::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .delete-modal {
@@ -1581,6 +1611,44 @@ tr.is-selected-row td {
 .modal--flush .modal-header {
   padding: 22px 22px 0;
 }
+
+/* ---------------------------------------------------------------
+   Department Form Modal (Step 2: Create Department Login)
+   --------------------------------------------------------------- */
+
+.department-form-modal {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 20%);
+  max-height: min(90vh, calc(100vh - 36px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 22px;
+}
+
+.department-form-modal .modal-header {
+  position: sticky;
+  top: -20px;
+  background: #ffffff;
+  z-index: 20;
+  padding-top: 20px;
+  margin-top: -20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.department-form-modal .modal-actions {
+  position: sticky;
+  bottom: -20px;
+  background: #ffffff;
+  z-index: 20;
+  padding-top: 14px;
+  padding-bottom: 20px;
+  margin-bottom: -20px;
+  border-top: 1px solid #f1f5f9;
+}
+
 
 /* ---------------------------------------------------------------
    Pill
