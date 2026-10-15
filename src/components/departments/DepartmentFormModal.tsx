@@ -443,6 +443,7 @@ export function DepartmentFormModal({
       <Modal
         open={open}
         onClose={onClose}
+        className="modal department-form-modal"
         size="lg"
         title={
           isEdit

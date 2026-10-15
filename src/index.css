@@ -1572,6 +1572,13 @@ tr.is-selected-row td {
   max-width: 1180px;
 }
 
+.department-form-modal {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .modal--flush {
   padding: 0;
   overflow: hidden;
