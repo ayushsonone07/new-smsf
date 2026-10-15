@@ -438,13 +438,16 @@ export function DepartmentFormModal({
     if (!resolvedDepartmentType) return
     if (!isEdit && existingHeadForType) return
 
+    const normalizedContact = contact.replace(/\D/g, '')
+    if ((!isEdit || normalizedContact) && normalizedContact.length !== 10) return
+
     if (isEdit) {
       onUpdate({
         name: username || name,
         username: username || name,
         oldEmail: department?.email,
         email,
-        contact: contact || undefined,
+        contact: normalizedContact || undefined,
         password: password || undefined,
         type: resolvedDepartmentType,
         departmentType: resolvedDepartmentType,
@@ -456,7 +459,7 @@ export function DepartmentFormModal({
       name: username || name || resolvedDepartmentType,
       username: username || name || resolvedDepartmentType,
       email,
-      contact: contact || '9999999999',
+      contact: normalizedContact,
       password,
       type: resolvedDepartmentType,
       departmentType: resolvedDepartmentType,
@@ -478,9 +481,13 @@ export function DepartmentFormModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={() => {
+          if (!isSubmitting) onClose()
+        }}
+        className="modal department-form-modal"
         size="lg"
-        className="department-form-modal"
+        showCloseButton={!isSubmitting}
+        closeOnEscape={!isSubmitting}
         title={
           isEdit
             ? 'Edit Department Login'
@@ -492,6 +499,31 @@ export function DepartmentFormModal({
             : 'Enter Department Name, Email, Password, select a Service from the dropdown, and create the Department with Head role.'
         }
       >
+        {!isEdit && isSubmitting ? (
+          <div
+            className="department-creation-loading"
+            data-suppress-global-preloader
+            role="status"
+            aria-live="polite"
+            aria-label="Creating department"
+          >
+            <div className="department-creation-loading__card">
+              <div className="department-creation-loading__icon" aria-hidden="true">
+                <span />
+              </div>
+              <strong>Creating department...</strong>
+              <p>Please wait while the department account and routes are set up.</p>
+              <div
+                className="department-creation-loading__track"
+                role="progressbar"
+                aria-label="Department creation in progress"
+              >
+                <span className="department-creation-loading__bar" />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit}>
           {/* 1. Department Name (Username), 2. Email, 3. Password */}
           <DepartmentForm

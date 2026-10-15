@@ -17,7 +17,12 @@ export function GlobalPreloader() {
     return () => window.clearTimeout(timer)
   }, [activeRequests])
 
-  if (!visible) return null
+  if (
+    !visible ||
+    document.querySelector('[data-suppress-global-preloader]')
+  ) {
+    return null
+  }
 
   return (
     <div className="global-preloader" role="status" aria-live="polite" aria-label="Loading data">
