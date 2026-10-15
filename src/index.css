@@ -1651,13 +1651,13 @@ tr.is-selected-row td {
 
 .department-creation-loading__card strong {
   display: block;
-  color: #172554;
-  font-size: 17px;
+  color: #0f172a;
+  font-size: 1.125rem;
 }
 
 .department-creation-loading__card p {
   margin: 7px 0 18px;
-  color: #64748b;
+  color: #eab308;
   font-size: 12.5px;
 }
 

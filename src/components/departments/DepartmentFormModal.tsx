@@ -511,8 +511,8 @@ export function DepartmentFormModal({
               <div className="department-creation-loading__icon" aria-hidden="true">
                 <span />
               </div>
-              <strong>Creating department...</strong>
-              <p>Please wait while the department account and routes are set up.</p>
+              <strong className='text-black'>Creating department...</strong>
+              <p className='text-yellow-500 text-md font-bold'>Creating a new department Please Wait for a while, It may take some time.</p>
               <div
                 className="department-creation-loading__track"
                 role="progressbar"
