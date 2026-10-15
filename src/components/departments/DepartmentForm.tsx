@@ -50,6 +50,24 @@ export function DepartmentForm({
         placeholder="Enter email address"
       />
 
+      <FormField
+        id="department-contact"
+        label="Phone Number"
+        required={!isEdit}
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel"
+        pattern="[0-9]{10}"
+        minLength={10}
+        maxLength={10}
+        value={values.contact}
+        onChange={(event) =>
+          onChange('contact', event.target.value.replace(/\D/g, '').slice(0, 10))
+        }
+        placeholder="Enter 10-digit phone number"
+        title="Phone number must contain exactly 10 digits"
+      />
+
       <div className="form-field">
         <label htmlFor="department-password">
           {isEdit ? 'New Password (optional)' : 'Password'}
