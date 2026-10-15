@@ -272,11 +272,14 @@ export function DepartmentFormModal({
         setSelectedDepartmentType(department.type)
         const matchingOption = serviceDropdownOptions.find(
           (opt) =>
+            opt.serviceType.toUpperCase() === department.type!.toUpperCase() ||
             opt.departmentType.toUpperCase() === department.type!.toUpperCase(),
         )
         setSelectedServiceKey(matchingOption?.key ?? `dept:${department.type}`)
       } else if (initialService) {
-        setSelectedDepartmentType(initialService.departmentType)
+        setSelectedDepartmentType(
+          initialService.serviceType || initialService.departmentType,
+        )
         setSelectedServiceKey(
           `srv:${initialService.id}:${initialService.serviceType}:${initialService.departmentType}`,
         )
@@ -288,9 +291,12 @@ export function DepartmentFormModal({
         )
         const firstAvailable =
           serviceDropdownOptions.find(
-            (opt) => !takenSet.has(opt.departmentType.toUpperCase()),
+            (opt) =>
+              !takenSet.has((opt.serviceType || opt.departmentType).toUpperCase()),
           ) || serviceDropdownOptions[0]
-        setSelectedDepartmentType(firstAvailable.departmentType)
+        setSelectedDepartmentType(
+          firstAvailable.serviceType || firstAvailable.departmentType,
+        )
         setSelectedServiceKey(firstAvailable.key)
       } else {
         setSelectedDepartmentType('WEBSITE_DEPARTMENT')
@@ -304,12 +310,41 @@ export function DepartmentFormModal({
     [selectedDepartmentType],
   )
 
+  const selectedServiceOption = useMemo(() => {
+    return serviceDropdownOptions.find(
+      (o) =>
+        o.key === selectedServiceKey ||
+        (o.serviceType &&
+          resolvedDepartmentType &&
+          normalizeDepartmentTypeName(o.serviceType).toUpperCase() ===
+            resolvedDepartmentType.toUpperCase()) ||
+        (o.departmentType &&
+          resolvedDepartmentType &&
+          normalizeDepartmentTypeName(o.departmentType).toUpperCase() ===
+            resolvedDepartmentType.toUpperCase()),
+    )
+  }, [serviceDropdownOptions, selectedServiceKey, resolvedDepartmentType])
+
+  const serviceTypeName = useMemo(() => {
+    if (selectedServiceOption?.serviceType) {
+      return selectedServiceOption.serviceType
+    }
+    return resolvedDepartmentType
+      ? resolvedDepartmentType.replace(/_DEPARTMENT$/i, '')
+      : ''
+  }, [selectedServiceOption, resolvedDepartmentType])
+
   const deptSlug = useMemo(
     () =>
       normalizeDepartmentSlug(
-        username || name || resolvedDepartmentType || 'department',
+        selectedServiceOption?.serviceType ||
+        resolvedDepartmentType ||
+        selectedDepartmentType ||
+        name ||
+        username ||
+        'department',
       ),
-    [username, name, resolvedDepartmentType],
+    [selectedServiceOption, resolvedDepartmentType, selectedDepartmentType, name, username],
   )
 
   function handleAddColumn(routeSlug: string) {
@@ -365,7 +400,7 @@ export function DepartmentFormModal({
     setSelectedServiceKey(optionKey)
     const found = serviceDropdownOptions.find((o) => o.key === optionKey)
     if (found) {
-      setSelectedDepartmentType(found.departmentType)
+      setSelectedDepartmentType(found.serviceType || found.departmentType)
     } else if (optionKey.startsWith('dept:')) {
       setSelectedDepartmentType(optionKey.slice(5))
     } else {
@@ -425,6 +460,7 @@ export function DepartmentFormModal({
       password,
       type: resolvedDepartmentType,
       departmentType: resolvedDepartmentType,
+      serviceType: serviceTypeName,
       initialRoutes,
       routeColumnsMap,
     })
@@ -445,6 +481,7 @@ export function DepartmentFormModal({
         onClose={onClose}
         className="modal department-form-modal"
         size="lg"
+        className="department-form-modal"
         title={
           isEdit
             ? 'Edit Department Login'
