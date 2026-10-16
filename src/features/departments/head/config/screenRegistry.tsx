@@ -29,6 +29,7 @@ const CustomFeaturePage = lazyScreen(() => import('../pages/CustomFeaturePage'),
 const MyAirtelCallsPage = lazyScreen(() => import('../pages/MyAirtelCallsPage'), 'MyAirtelCallsPage')
 const ManageServicesPage = lazyScreen(() => import('../pages/ManageServicesPage'), 'ManageServicesPage')
 const SalaryManagementPage = lazyScreen(() => import('../pages/SalaryManagementPage'), 'SalaryManagementPage')
+const AutowebisionCustomersPage = lazyScreen(() => import('../pages/AutowebisionCustomersPage'), 'AutowebisionCustomersPage')
 
 interface ScreenEntry {
   component: ComponentType<{ feature: FeaturePermission }>
@@ -61,5 +62,6 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   'airtel-calls': { component: MyAirtelCallsPage as ComponentType<{ feature: FeaturePermission }>, title: 'My Airtel Calls' },
   'manage-services': { component: ManageServicesPage as ComponentType<{ feature: FeaturePermission }>, title: 'Manage Services' },
   'salary-management': { component: SalaryManagementPage as ComponentType<{ feature: FeaturePermission }>, title: 'Salary Management' },
+  'autowebision-customers': { component: AutowebisionCustomersPage, title: 'Autowebsion Customers' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>

@@ -3644,231 +3644,53 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-/* ── Bill upload tab (billing department) ─────────────────── */
-.cl-drawer__bill-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.cl-drawer__bill-status--generated {
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
-}
-
-.cl-drawer__bill-status--in_progress {
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.cl-drawer__bill-status--pending {
-  border: 1px solid #fde68a;
-  background: #fefce8;
-  color: #92400e;
-}
-
-.cl-drawer__bill-upload {
+/* ── Autowebsion Sub-Service Switcher ────────────────────────── */
+.autowebsion-dept-tabs-container {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.cl-drawer__bill-drop {
-  position: relative;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 20px 16px;
-  border: 1px dashed #c7d2fe;
+  margin-bottom: 16px;
+  background: #f8fafc;
+  padding: 6px;
   border-radius: 12px;
-  background: #f8faff;
-  color: #64748b;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  border: 1px solid #e2e8f0;
 }
 
-.cl-drawer__bill-drop:hover {
-  border-color: #2459e0;
-  background: #eef2ff;
-}
-
-.cl-drawer__bill-drop strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
-  word-break: break-all;
-}
-
-.cl-drawer__bill-drop span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.cl-drawer__bill-drop input[type='file'] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.cl-drawer__bill-drop input[type='file']:disabled {
-  cursor: not-allowed;
-}
-
-.cl-drawer__bill-progress {
+.autowebsion-dept-tabs {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
 }
 
-.cl-drawer__bill-progress-track {
-  position: relative;
+.autowebsion-dept-tab {
   flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  overflow: hidden;
-}
-
-.cl-drawer__bill-progress-track > span {
-  position: absolute;
-  top: 0;
-  left: -40%;
-  width: 40%;
-  height: 100%;
-  border-radius: 999px;
-  background: #2459e0;
-  animation: cl-bill-progress 1s ease-in-out infinite;
-}
-
-@keyframes cl-bill-progress {
-  from {
-    left: -40%;
-  }
-  to {
-    left: 100%;
-  }
-}
-
-.cl-drawer__bill-notice {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-.cl-drawer__bill-notice strong {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
   font-size: 13px;
-}
-
-.cl-drawer__bill-notice--success {
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
-}
-
-.cl-drawer__bill-notice--error {
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.cl-drawer__bill-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.cl-drawer__bill-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-/* ── Bill upload: card title with icon ─────────────────────── */
-.cl-drawer__card-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.cl-drawer__card-title svg {
-  color: #2563eb;
-}
-
-/* ── Bill upload: editable invoice form ────────────────────── */
-.cl-drawer__bill-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.cl-drawer__bill-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.cl-drawer__bill-field--full {
-  grid-column: 1 / -1;
-}
-
-.cl-drawer__bill-field > span {
-  font-size: 12px;
   font-weight: 600;
-  color: #475569;
-}
-
-.cl-drawer__bill-field input,
-.cl-drawer__bill-field select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.autowebsion-dept-tab:hover {
   color: #1e293b;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: #ffffff;
+  border-color: #e2e8f0;
 }
 
-.cl-drawer__bill-field input:focus,
-.cl-drawer__bill-field select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+.autowebsion-dept-tab.active {
+  color: #2563eb;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.cl-drawer__bill-form + .cl-drawer__bill-notice {
-  margin-top: 12px;
-}
-
-.cl-drawer__bill-form + .cl-drawer__bill-actions {
-  margin-top: 12px;
-}
-
-@media (max-width: 560px) {
-  .cl-drawer__bill-form {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.autowebsion-dept-tab-icon {
+  font-size: 15px;
 }
