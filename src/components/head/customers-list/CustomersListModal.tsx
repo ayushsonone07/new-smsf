@@ -18,6 +18,11 @@ import type {
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
+import {
+  CUSTOMER_ACTIVITY_EVENT,
+  getCustomerActivities,
+  type CustomerActivityEvent,
+} from '../../../utils/customerActivity'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -249,6 +254,16 @@ export function CustomersListModal({
     departmentType,
     requestUsername,
   })
+  const [localActivities, setLocalActivities] = useState<CustomerActivityEvent[]>([])
+
+  useEffect(() => {
+    const refreshActivities = () => {
+      setLocalActivities(getCustomerActivities(current?.id, current?.phone))
+    }
+    refreshActivities()
+    window.addEventListener(CUSTOMER_ACTIVITY_EVENT, refreshActivities)
+    return () => window.removeEventListener(CUSTOMER_ACTIVITY_EVENT, refreshActivities)
+  }, [current?.id, current?.phone])
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
@@ -347,9 +362,13 @@ export function CustomersListModal({
   const assignee =
     assignees.find((a) => a.id === current?.assigneeId) ?? null
 
-  const serviceRow = apiDetails.serviceRows.find(
+  const customerServiceRows = apiDetails.serviceRows.filter(
     (row) => String(row.customerId) === String(current?.id),
   )
+  const relevantServiceRows = customerServiceRows.length > 0
+    ? customerServiceRows
+    : apiDetails.serviceRows
+  const serviceRow = relevantServiceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
   const hasDepartmentServiceSummary = serviceRow?.departmentStatuses != null
@@ -455,6 +474,19 @@ export function CustomersListModal({
       detail: remark.remark || '',
       timestamp: remark.timestamp || '',
     })),
+    ...buildServiceStatusUpdates(relevantServiceRows),
+    ...localActivities.map((activity) => {
+      const department = formatServiceName(
+        activity.departmentType.replace(/_DEPARTMENT$/i, ''),
+      )
+      return {
+        title: activity.kind === 'call-initiated'
+          ? `${department} call initiated`
+          : `${department} email sent`,
+        detail: activity.detail,
+        timestamp: activity.timestamp,
+      }
+    }),
   ].sort(
     (a, b) =>
       (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0),
@@ -1198,10 +1230,10 @@ export function CustomersListModal({
                   {updates.map((update, index) => (
                     <li
                       key={`${update.title}-${update.timestamp}-${index}`}
-                      className="cl-drawer__timeline-item"
+                      className={`cl-drawer__timeline-item ${updateToneClass(update)}`}
                     >
                       <span className="cl-drawer__timeline-icon">
-                        <Icon name="clock" size={16} strokeWidth={1.8} />
+                        <Icon name={updateIcon(update)} size={16} strokeWidth={1.8} />
                       </span>
                       <div>
                         <strong>{update.title}</strong>
@@ -1453,6 +1485,101 @@ const DEPARTMENT_SERVICE_LABELS: Record<string, string> = {
   ONBOARDING_DEPARTMENT: 'Onboarding',
   GOOGLE_DEPARTMENT: 'Google',
   AUTOWEBSION_DEPARTMENT: 'Website & Automation',
+}
+
+interface DrawerUpdate {
+  title: string
+  detail: string
+  timestamp: string
+  tone?: 'completed'
+}
+
+function isCompletedUpdate(update: { title: string; tone?: 'completed' }) {
+  return update.tone === 'completed' || /\bcompleted\b/i.test(update.title)
+}
+
+function updateIcon(update: { title: string; tone?: 'completed' }) {
+  if (isCompletedUpdate(update)) return 'done' as const
+  if (/\bcall\b/i.test(update.title)) return 'phone' as const
+  if (/\b(email|mail|acknowledgement)\b/i.test(update.title)) {
+    return 'messageSquare' as const
+  }
+  return 'clock' as const
+}
+
+function updateToneClass(update: { title: string; tone?: 'completed' }) {
+  if (isCompletedUpdate(update)) return 'is-completed'
+  if (/\bcall\b/i.test(update.title)) return 'is-call'
+  if (/\b(email|mail|acknowledgement)\b/i.test(update.title)) return 'is-email'
+  return ''
+}
+
+function buildServiceStatusUpdates(rows: CustomerServiceRow[]): DrawerUpdate[] {
+  const updates: DrawerUpdate[] = []
+  const seen = new Set<string>()
+
+  const add = (key: string, update: DrawerUpdate) => {
+    if (seen.has(key)) return
+    seen.add(key)
+    updates.push(update)
+  }
+
+  rows.forEach((row) => {
+    const rowDepartment = formatServiceName(
+      row.serviceType || row.callStatus?.departmentType || 'Department',
+    )
+    const rowTimestamp = row.updatedAt || row.createdAt || ''
+
+    Object.entries(row.departmentStatuses ?? {}).forEach(([department, details]) => {
+      const departmentName =
+        DEPARTMENT_SERVICE_LABELS[department.toUpperCase()] ??
+        formatServiceName(department.replace(/_DEPARTMENT$/i, ''))
+      const rawStatus = details?.status || (details?.onboarded ? 'COMPLETED' : 'PENDING')
+      const status = formatServiceName(rawStatus)
+      add(`status:${department}:${rawStatus}`, {
+        title: `${departmentName} ${status.toLowerCase()}`,
+        detail: `${departmentName} service status changed to ${status}.`,
+        timestamp:
+          details?.completedAt || details?.updatedAt || details?.timestamp || rowTimestamp,
+        tone: rawStatus.toUpperCase() === 'COMPLETED' || details?.onboarded
+          ? 'completed'
+          : undefined,
+      })
+    })
+
+    const rawCallStatus = row.callStatus as
+      | CustomerServiceRow['callStatus']
+      | string
+      | undefined
+    if (rawCallStatus) {
+      const call = typeof rawCallStatus === 'string'
+        ? { status: rawCallStatus }
+        : rawCallStatus
+      const callLabel = call.status || (call.connected === true ? 'Connected' : call.connected === false ? 'Not answered' : 'Updated')
+      add(`call:${rowDepartment}:${callLabel}:${call.lastCallDate || ''}`, {
+        title: `${rowDepartment} call ${formatServiceName(callLabel).toLowerCase()}`,
+        detail: call.callNotes || `Call status: ${formatServiceName(callLabel)}.`,
+        timestamp: call.lastCallDate || call.updatedAt || rowTimestamp,
+      })
+    }
+
+    if (row.isMailSent) {
+      add(`mail:${rowDepartment}:draft`, {
+        title: `${rowDepartment} email sent`,
+        detail: 'The department email was sent to the customer.',
+        timestamp: rowTimestamp,
+      })
+    }
+    if (row.serviceDeliverySent) {
+      add(`mail:${rowDepartment}:delivery`, {
+        title: `${rowDepartment} acknowledgement sent`,
+        detail: 'The service delivery acknowledgement was sent to the customer.',
+        timestamp: rowTimestamp,
+      })
+    }
+  })
+
+  return updates
 }
 
 function getDepartmentServices(

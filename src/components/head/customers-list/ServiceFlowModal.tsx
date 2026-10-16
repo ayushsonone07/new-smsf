@@ -11,6 +11,7 @@ import { normalizeDepartmentTypeName } from '../../../api/dynamic-permission.api
 import { resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
 import { getSession } from '../../../app/auth/session'
 import type { OnboardingCustomer } from './CustomersList'
+import { recordCustomerActivity } from '../../../utils/customerActivity'
 import './ServiceFlowModal.css'
 
 export interface Phase1Step {
@@ -520,6 +521,14 @@ export function ServiceFlowModal({
         customerId: customer.id,
         subServiceName,
         departmentType: effectiveDept,
+      })
+
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: customer.phone,
+        departmentType,
+        kind: 'email-sent',
+        detail: `Acknowledgement email sent for ${subServiceName}.`,
       })
 
       // After acknowledgement is sent, update sub-service status
