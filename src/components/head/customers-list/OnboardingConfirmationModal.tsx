@@ -13,6 +13,8 @@ import { Modal } from '../../ui/Modal'
 import { Button } from '../../ui/Button'
 import { sendOnboardingConfirmationMail } from '../../../api/department-users.api'
 import type { OnboardingCustomer } from './CustomersList'
+import { getSession } from '../../../app/auth/session'
+import { recordCustomerActivity } from '../../../utils/customerActivity'
 
 interface OnboardingConfirmationModalProps {
   open: boolean
@@ -72,6 +74,14 @@ export function OnboardingConfirmationModal({
         isDuplicate: Boolean(customer.hasDuplicateCustomer),
         domainConnect,
         themeSelection,
+      })
+
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: contact.trim(),
+        departmentType: getSession()?.user.departmentType || 'ONBOARDING_DEPARTMENT',
+        kind: 'email-sent',
+        detail: `Acknowledgement email sent to ${email.trim()}.`,
       })
 
       onSuccess?.()
