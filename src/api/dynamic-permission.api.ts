@@ -30,6 +30,9 @@ export function normalizeDepartmentTypeName(raw: string): string {
     .replace(/[^A-Z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '')
   if (!cleaned) return ''
+  if (cleaned === 'ADS' || cleaned === 'ADS_DEPARTMENT' || cleaned === 'ADVERTISEMENT') {
+    return 'ADVERTISEMENT_DEPARTMENT'
+  }
   return cleaned.endsWith('_DEPARTMENT') ? cleaned : `${cleaned}_DEPARTMENT`
 }
 

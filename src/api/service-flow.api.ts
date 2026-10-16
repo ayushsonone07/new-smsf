@@ -1,5 +1,7 @@
 import { authedApiRequest } from './client'
 import { getSession } from '../app/auth/session'
+import { normalizeDepartmentTypeName } from './dynamic-permission.api'
+import { resolveDeptFromPath } from '../features/departments/head/utils/routeUtils'
 
 export interface ServiceFlowStepData {
   order: number
@@ -50,8 +52,22 @@ export async function getServiceFlows(params: {
   search.set('page', String(params.page ?? 0))
   search.set('size', String(params.size ?? 10))
   if (params.serviceName) search.set('serviceName', params.serviceName)
-  if (params.departmentType && params.departmentType !== 'ALL') {
-    search.set('departmentType', params.departmentType)
+
+  let dept = params.departmentType
+  if (!dept && typeof window !== 'undefined') {
+    const fromPath = resolveDeptFromPath(window.location.pathname)
+    if (fromPath) {
+      dept = normalizeDepartmentTypeName(fromPath)
+    } else {
+      const session = getSession()
+      if (session?.user.departmentType) {
+        dept = normalizeDepartmentTypeName(session.user.departmentType)
+      }
+    }
+  }
+
+  if (dept && dept !== 'ALL') {
+    search.set('departmentType', dept)
   }
 
   const res = await authedApiRequest<{

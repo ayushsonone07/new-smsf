@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Building2, Check, Clock3, Hourglass, ListChecks } from 'lucide-react'
 import { getCustomerServiceFlow } from '../../../api/service-flow.api'
+import { matchesDepartmentKey } from '../customers-list/ServiceFlowModal'
 import type { Meeting, MeetingDepartment } from './MeetingList'
 import './DepartmentFlowModal.css'
 
@@ -38,7 +39,7 @@ function getSections(response: unknown, departmentType: string): FlowSection[] {
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
     .map((item) => {
       const match = Object.entries(item).find(
-        ([key]) => normalizeKey(key) === normalizeKey(departmentType),
+        ([key]) => matchesDepartmentKey(key, departmentType),
       )
       return match?.[1]
     })
