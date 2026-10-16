@@ -1,9 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { getSession } from '../../../app/auth/session'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateCustomer } from '../../../api/customers.api'
+import {
+  extractBillingCustomers,
+  fetchBillingCustomers,
+  getBillingInformation,
+  uploadCustomerBill,
+  type BillingCustomer,
+} from '../../../api/billing.api'
 import { Button } from '../../ui/Button'
 import { Icon } from '../shared/Icon'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
@@ -44,6 +51,7 @@ type DrawerTab =
   | 'duplicates'
   | 'deliverables'
   | 'business-form'
+  | 'bill-upload'
   | 'remarks'
   | 'activity'
 
@@ -182,6 +190,10 @@ const EXTERNAL_ICON =
 const HOURGLASS_ICON =
   'M6 2h12M6 22h12M7 2v4a5 5 0 0 0 2 4l3 2-3 2a5 5 0 0 0-2 4v4m10-20v4a5 5 0 0 1-2 4l-3 2 3 2a5 5 0 0 1 2 4v4'
 
+/** Department that is allowed to upload generated bills. */
+const BILL_UPLOAD_DEPARTMENT = 'BILLING_DEPARTMENT'
+const BILL_FILE_ACCEPT = '.pdf,.doc,.docx,image/*,video/*'
+
 const overlayVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.2 } },
@@ -239,14 +251,25 @@ export function CustomersListModal({
   profileOnly = false,
   requestUsername,
 }: CustomersListModalProps) {
-  const [activeTab, setActiveTab] = useState<DrawerTab>(initialTab ?? 'overview')
+  // Billing department opens straight to the Bill Upload tab.
+  const defaultDrawerTab: DrawerTab =
+    initialTab ??
+    (departmentType === BILL_UPLOAD_DEPARTMENT ? 'bill-upload' : 'overview')
+  const [activeTab, setActiveTab] = useState<DrawerTab>(defaultDrawerTab)
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
   const [isAddingRemark, setIsAddingRemark] = useState(false)
   const [editingRemark, setEditingRemark] = useState<string | null>(null)
   const [editingRemarkText, setEditingRemarkText] = useState('')
   const [isSavingRemark, setIsSavingRemark] = useState(false)
+  const [billFile, setBillFile] = useState<File | null>(null)
+  const [billUploading, setBillUploading] = useState(false)
+  const [billError, setBillError] = useState('')
+  const [billSuccess, setBillSuccess] = useState('')
+  const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+
+  const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
   const current = activeCustomer ?? customer
   const apiDetails = useCustomerDrawerDetails(current, {
@@ -269,9 +292,18 @@ export function CustomersListModal({
   if (customer?.id !== prevCustomerId) {
     setPrevCustomerId(customer?.id)
     setActiveCustomer(customer)
-    setActiveTab(initialTab ?? 'overview')
+    setActiveTab(defaultDrawerTab)
     setClosing(false)
+    setBillFile(null)
+    setBillError('')
+    setBillSuccess('')
   }
+
+  // Clear the native file input whenever the drawer switches customers,
+  // since its value is uncontrolled and cannot be reset during render.
+  useEffect(() => {
+    if (billInputRef.current) billInputRef.current.value = ''
+  }, [customer?.id])
 
   useEffect(() => {
     setActiveCustomer((previous) => {
@@ -326,6 +358,106 @@ export function CustomersListModal({
     if (fromApi.length > 0) return fromApi
     return customer?.duplicateCustomers ?? []
   }, [duplicatesQuery.data, customer?.duplicateCustomers])
+
+  // Billing lookup key — the backend searches billing customers by owner name,
+  // business name, phone number or email.
+  const billingSearch = useMemo(() => {
+    const phone = (apiDetails.profile?.phone || current?.phone || '').trim()
+    const email = (apiDetails.profile?.email || current?.email || '').trim()
+    return phone || email
+  }, [
+    apiDetails.profile?.phone,
+    apiDetails.profile?.email,
+    current?.phone,
+    current?.email,
+  ])
+
+  // Billing data is only fetched once the Bill Upload tab is opened.
+  const billingQuery = useQuery({
+    queryKey: ['customer-drawer-billing', billingSearch],
+    queryFn: () =>
+      fetchBillingCustomers({ page: 0, size: 10, searchParam: billingSearch }),
+    enabled:
+      showBillUploadTab && activeTab === 'bill-upload' && billingSearch.length > 0,
+    staleTime: 15_000,
+  })
+
+  // Match the returned billing record to the opened customer by id, phone or email.
+  const billingCustomer = useMemo<BillingCustomer | null>(() => {
+    const list = extractBillingCustomers(billingQuery.data)
+    if (list.length === 0) return null
+
+    const targetId = String(current?.id ?? '')
+    const byId = list.find((item) => String(item.id) === targetId)
+    if (byId) return byId
+
+    const digits = (value?: string | null) => (value || '').replace(/\D/g, '')
+    const targetPhone = digits(apiDetails.profile?.phone || current?.phone)
+    const targetEmail = (apiDetails.profile?.email || current?.email || '')
+      .trim()
+      .toLowerCase()
+
+    return (
+      list.find((item) => {
+        const phone = digits(item.phoneNumber) || digits(item.phone as string)
+        const email = String(item.email ?? '').trim().toLowerCase()
+        return (
+          (targetPhone.length > 0 && phone === targetPhone) ||
+          (targetEmail.length > 0 && email === targetEmail)
+        )
+      }) ?? null
+    )
+  }, [
+    billingQuery.data,
+    current?.id,
+    current?.phone,
+    current?.email,
+    apiDetails.profile?.phone,
+    apiDetails.profile?.email,
+  ])
+
+  const billingInfo = useMemo(
+    () => getBillingInformation(billingCustomer),
+    [billingCustomer],
+  )
+
+  const billingErrorMessage =
+    billingQuery.error instanceof Error
+      ? billingQuery.error.message
+      : 'Something went wrong while loading billing details.'
+
+  function handleBillFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setBillFile(event.target.files?.[0] ?? null)
+    setBillError('')
+    setBillSuccess('')
+  }
+
+  async function handleBillUpload() {
+    if (!billingCustomer || billUploading) return
+    if (!billFile) {
+      setBillError('Select a bill file to upload.')
+      return
+    }
+
+    setBillUploading(true)
+    setBillError('')
+    setBillSuccess('')
+    try {
+      await uploadCustomerBill(billingCustomer.id, billFile)
+      await billingQuery.refetch()
+      setBillFile(null)
+      if (billInputRef.current) billInputRef.current.value = ''
+      setBillSuccess('Bill uploaded successfully. The bill status is now Generated.')
+    } catch (error) {
+      setBillError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to upload bill. Please try again.',
+      )
+    } finally {
+      setBillUploading(false)
+    }
+  }
 
   const allBusinesses = useMemo(() => {
     if (!customer) return []
@@ -505,6 +637,9 @@ export function CustomersListModal({
     .toUpperCase()
 
   const allTabs: { id: DrawerTab; label: string; count?: number }[] = [
+    ...(showBillUploadTab
+      ? [{ id: 'bill-upload' as DrawerTab, label: 'Bill Upload' }]
+      : []),
     { id: 'overview', label: 'Overview' },
     ...(duplicateItems.length > 0
       ? [
@@ -534,8 +669,10 @@ export function CustomersListModal({
   useEffect(() => {
     if (profileOnly && activeTab !== 'overview' && activeTab !== 'business-form') {
       setActiveTab('overview')
+    } else if (activeTab === 'bill-upload' && !showBillUploadTab) {
+      setActiveTab('overview')
     }
-  }, [activeTab, profileOnly])
+  }, [activeTab, profileOnly, showBillUploadTab])
 
   if (!customer || !current) return null
 
@@ -1083,6 +1220,189 @@ export function CustomersListModal({
                   Open original form
                 </button>
               )}
+            </motion.div>
+          )}
+
+          {/* Bill upload (Billing department only) */}
+          {activeTab === 'bill-upload' && showBillUploadTab && (
+            <motion.div
+              className="cl-drawer__stack"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__card">
+                <div className="cl-drawer__card-head">
+                  <div>
+                    <h3>Bill upload</h3>
+                    <p className="cl-drawer__card-meta">
+                      Upload the generated bill for {contactName || 'this customer'}.
+                    </p>
+                  </div>
+                  {billingCustomer && (
+                    <span
+                      className={`cl-drawer__bill-status cl-drawer__bill-status--${billingInfo.billStatus.toLowerCase()}`}
+                    >
+                      <Icon
+                        name={billingInfo.isGenerated ? 'done' : 'hourglass'}
+                        size={13}
+                        strokeWidth={2}
+                      />
+                      {billingInfo.billStatusLabel}
+                    </span>
+                  )}
+                </div>
+
+                {billingQuery.isLoading ? (
+                  <p className="cl-drawer__empty">Loading billing details…</p>
+                ) : billingQuery.isError ? (
+                  <div
+                    className="cl-drawer__bill-notice cl-drawer__bill-notice--error"
+                    role="alert"
+                  >
+                    <strong>Unable to load billing details</strong>
+                    <span>{billingErrorMessage}</span>
+                    <button
+                      type="button"
+                      className="cl-drawer__outline-btn"
+                      onClick={() => billingQuery.refetch()}
+                    >
+                      <Icon name="refresh" size={13} strokeWidth={2} />
+                      Try again
+                    </button>
+                  </div>
+                ) : !billingSearch ? (
+                  <p className="cl-drawer__empty">
+                    This customer has no phone number or email, so billing details
+                    could not be requested.
+                  </p>
+                ) : !billingCustomer ? (
+                  <div className="cl-drawer__bill-empty">
+                    <p className="cl-drawer__empty">
+                      No billing record was found for this customer.
+                    </p>
+                    <button
+                      type="button"
+                      className="cl-drawer__outline-btn"
+                      disabled={billingQuery.isFetching}
+                      onClick={() => billingQuery.refetch()}
+                    >
+                      <Icon name="refresh" size={13} strokeWidth={2} />
+                      {billingQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="cl-drawer__fields">
+                      <Field
+                        label="Customer name"
+                        value={billingCustomer.ownerName}
+                      />
+                      <Field
+                        label="Business name"
+                        value={billingCustomer.businessName}
+                      />
+                      <Field
+                        label="Customer email"
+                        value={billingCustomer.email}
+                        full
+                      />
+                      <Field
+                        label="Information status"
+                        value={billingInfo.informationStatusLabel}
+                      />
+                      <Field
+                        label="Bill status"
+                        value={billingInfo.billStatusLabel}
+                      />
+                    </div>
+
+                    <div className="cl-drawer__bill-upload">
+                      <label className="cl-drawer__bill-drop">
+                        <Icon name="upload" size={22} strokeWidth={1.8} />
+                        <strong>
+                          {billFile
+                            ? billFile.name
+                            : billingInfo.billUrl
+                              ? 'Choose a replacement bill file'
+                              : 'Choose a bill file'}
+                        </strong>
+                        <span>PDF, DOC, DOCX, image or video</span>
+                        <input
+                          ref={billInputRef}
+                          type="file"
+                          accept={BILL_FILE_ACCEPT}
+                          disabled={billUploading}
+                          onChange={handleBillFileChange}
+                        />
+                      </label>
+
+                      {billUploading && (
+                        <div className="cl-drawer__bill-progress" role="status">
+                          <span className="cl-drawer__bill-progress-track">
+                            <span />
+                          </span>
+                          <span className="cl-drawer__card-meta">
+                            Uploading bill…
+                          </span>
+                        </div>
+                      )}
+
+                      {billError && (
+                        <p
+                          className="cl-drawer__bill-notice cl-drawer__bill-notice--error"
+                          role="alert"
+                        >
+                          {billError}
+                        </p>
+                      )}
+                      {billSuccess && (
+                        <p
+                          className="cl-drawer__bill-notice cl-drawer__bill-notice--success"
+                          role="status"
+                        >
+                          {billSuccess}
+                        </p>
+                      )}
+
+                      <div className="cl-drawer__bill-actions">
+                        <Button
+                          disabled={!billFile || billUploading}
+                          onClick={handleBillUpload}
+                        >
+                          <Icon name="upload" size={14} strokeWidth={2} />
+                          {billUploading
+                            ? 'Uploading…'
+                            : billingInfo.billUrl
+                              ? 'Re-upload Bill'
+                              : 'Upload Bill'}
+                        </Button>
+                        {billingInfo.billUrl && (
+                          <button
+                            type="button"
+                            className="cl-drawer__outline-btn"
+                            onClick={() =>
+                              window.open(
+                                billingInfo.billUrl,
+                                '_blank',
+                                'noopener,noreferrer',
+                              )
+                            }
+                          >
+                            <Icon
+                              name="eye"
+                              d={EXTERNAL_ICON}
+                              size={13}
+                              strokeWidth={2}
+                            />
+                            View Bill
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </motion.div>
           )}
 
