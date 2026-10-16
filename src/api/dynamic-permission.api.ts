@@ -33,6 +33,15 @@ export function normalizeDepartmentTypeName(raw: string): string {
   if (cleaned === 'ADS' || cleaned === 'ADS_DEPARTMENT' || cleaned === 'ADVERTISEMENT') {
     return 'ADVERTISEMENT_DEPARTMENT'
   }
+  if (
+    cleaned === 'AUTOWEB' ||
+    cleaned === 'AUTOWEBSION' ||
+    cleaned === 'AUTOWEBISION' ||
+    cleaned === 'AUTOWEBSION_DEPARTMENT' ||
+    cleaned === 'AUTOWEBISION_DEPARTMENT'
+  ) {
+    return 'AUTOWEBSION_DEPARTMENT'
+  }
   return cleaned.endsWith('_DEPARTMENT') ? cleaned : `${cleaned}_DEPARTMENT`
 }
 
