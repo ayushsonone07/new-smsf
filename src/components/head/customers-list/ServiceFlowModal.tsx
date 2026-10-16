@@ -8,6 +8,7 @@ import {
   sendSubServiceConfirmationMail,
 } from '../../../api/service-flow.api'
 import type { OnboardingCustomer } from './CustomersList'
+import { recordCustomerActivity } from '../../../utils/customerActivity'
 import './ServiceFlowModal.css'
 
 export interface Phase1Step {
@@ -269,6 +270,14 @@ export function ServiceFlowModal({
         customerId: customer.id,
         subServiceName,
         departmentType,
+      })
+
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: customer.phone,
+        departmentType,
+        kind: 'email-sent',
+        detail: `Acknowledgement email sent for ${subServiceName}.`,
       })
 
       // After acknowledgement is sent, update sub-service status

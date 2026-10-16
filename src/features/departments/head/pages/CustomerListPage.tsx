@@ -48,6 +48,7 @@ import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
+import { recordCustomerActivity } from '../../../../utils/customerActivity'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
   (user) => ({
@@ -625,6 +626,13 @@ export function CustomerListPage() {
       if (result?.success === false) {
         throw new Error(result.message || 'Unable to initiate call')
       }
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: customer.phone,
+        departmentType: currentDepartment,
+        kind: 'call-initiated',
+        detail: `Call initiated to ${customer.contactName || customer.phone}.`,
+      })
       setToast({
         type: 'success',
         title: 'Call initiated',
