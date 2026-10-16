@@ -69,8 +69,14 @@ const CustomerDashboardPage = lazy(() =>
 const CustomerDetailsPage = lazy(() =>
   import('../components/customers-dashboard/CustomerDetailsPage').then((module) => ({ default: module.CustomerDetailsPage })),
 )
+const AdminCustomersPage = lazy(() =>
+  import('../features/customers/pages/AdminCustomersPage').then((module) => ({ default: module.AdminCustomersPage })),
+)
 const ProfileUpdatePage = lazy(() =>
   import('../features/profile/pages/ProfileUpdatePage').then((module) => ({ default: module.ProfileUpdatePage })),
+)
+const OnboardingConfirmationPage = lazy(() =>
+  import('../features/customers/pages/OnboardingConfirmationPage').then((module) => ({ default: module.OnboardingConfirmationPage })),
 )
 
 function NotFoundPage() {
@@ -139,6 +145,18 @@ const loginRoute = createRoute({
   beforeLoad: redirectAuthenticatedUser,
 })
 
+const onboardingConfirmationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/confirmation/onboarding',
+  component: OnboardingConfirmationPage,
+})
+
+const departmentConfirmationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/confirmation/department',
+  component: OnboardingConfirmationPage,
+})
+
 const authedLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_authed',
@@ -161,6 +179,13 @@ const adminServicesRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/services',
   component: ServicesListPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminCustomersRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/customers',
+  component: AdminCustomersPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -769,6 +794,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   authedLayoutRoute.addChildren([
     adminRoute,
+    adminCustomersRoute,
     adminServicesRoute,
     servicesAliasRoute,
     departmentFeaturesRoute,
@@ -782,6 +808,8 @@ const routeTree = rootRoute.addChildren([
     customerDetailsRoute,
   ]),
   directCustomerDetailsRoute,
+  onboardingConfirmationRoute,
+  departmentConfirmationRoute,
   profileUpdateRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,

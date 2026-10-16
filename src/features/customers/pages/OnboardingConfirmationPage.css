@@ -1,0 +1,18 @@
+.onboarding-confirmation { min-height: 100vh; padding: 24px; background: #f5f7fc; }
+.onboarding-confirmation__backdrop { min-height: calc(100vh - 48px); display: grid; place-items: center; border: 1px solid #e1e7f0; border-radius: 24px; background: linear-gradient(135deg, #eaf0ff 0%, #f8fafc 55%, #fff3c4 100%); }
+.onboarding-confirmation__card { width: min(100% - 32px, 646px); padding: 38px 36px; border-radius: 30px; background: #fff; box-shadow: 0 24px 60px rgb(15 23 42 / 10%); text-align: center; }
+.onboarding-confirmation__brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 22px; font-size: 22px; }
+.onboarding-confirmation__brand span { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 13px; background: #2459e0; box-shadow: inset 0 -5px #ffc629; color: #fff; font-size: 13px; font-weight: 800; }
+.onboarding-confirmation__icon { display: grid; width: 114px; height: 114px; margin: 0 auto 22px; place-items: center; border-radius: 32px; background: #e8efff; color: #2459e0; }
+.onboarding-confirmation__card.is-success .onboarding-confirmation__icon { background: #dcfce7; color: #16a34a; }
+.onboarding-confirmation__card.is-failure .onboarding-confirmation__icon { background: #fff4d6; color: #b7791f; }
+.onboarding-confirmation__card.is-error .onboarding-confirmation__icon { background: #ffe4e6; color: #e11d48; }
+.onboarding-confirmation__card h1 { margin: 0 0 14px; color: #101a33; font-size: clamp(27px, 4vw, 34px); }
+.onboarding-confirmation__card > p { max-width: 520px; margin: 0 auto; color: #52617b; font-size: 18px; line-height: 1.55; }
+.onboarding-confirmation__summary { display: grid; grid-template-columns: auto 1fr; gap: 8px 24px; margin-top: 26px; padding: 17px 20px; border: 1px solid #a7efc0; border-radius: 16px; background: #effdf4; text-align: left; }
+.onboarding-confirmation__summary span { color: #64748b; }
+.onboarding-confirmation__summary strong { color: #0f172a; }
+.onboarding-confirmation__card button { margin-top: 24px; padding: 12px 28px; border: 0; border-radius: 12px; background: #2459e0; color: #fff; font-weight: 600; cursor: pointer; }
+.onboarding-confirmation__card .onboarding-confirmation__back { display: block; margin: 20px auto 0; border: 1px solid #dbe2ec; background: #fff; color: #52617b; }
+.onboarding-confirmation__card .onboarding-confirmation__back:hover { border-color: #9aabc2; color: #1e293b; }
+@media (max-width: 600px) { .onboarding-confirmation { padding: 0; } .onboarding-confirmation__backdrop { min-height: 100vh; border: 0; border-radius: 0; } .onboarding-confirmation__card { padding: 30px 22px; border-radius: 24px; } .onboarding-confirmation__summary { grid-template-columns: 1fr; } }

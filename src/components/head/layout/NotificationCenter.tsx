@@ -93,9 +93,9 @@ export function NotificationCenter({
               <button
                 key={item.id}
                 type="button"
-                className={`hnotify-item${item.unread ? ' is-unread' : ''} ${notificationTone(item.text)}`}
+                className={`hnotify-item${item.unread ? ' is-unread' : ''} ${notificationTone(item.text, item.link)}`}
                 onClick={() => {
-                  if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer')
+                  if (item.link) openNotificationLink(item.link)
                 }}
                 disabled={!item.link}
                 aria-label={item.link ? `Open notification: ${item.text}` : item.text}
@@ -114,11 +114,54 @@ export function NotificationCenter({
   )
 }
 
-function notificationTone(text: string): 'is-completed' | 'is-pending' {
+function notificationTone(text: string, link?: string): 'is-completed' | 'is-pending' {
+  if (link && isConfirmationLinkCompleted(link)) return 'is-completed'
   const normalized = text.toLowerCase()
-  return /completed|complete|approved|success|acknowledged|generated/.test(normalized)
+  // Calls to action such as "Complete your onboarding" are still pending.
+  if (/complete your onboarding|finish your onboarding|onboarding pending|incomplete|review and acknowledge|awaiting acknowledgement/.test(normalized)) {
+    return 'is-pending'
+  }
+
+  return /completed|approved|successful|successfully|acknowledged|generated/.test(normalized)
     ? 'is-completed'
     : 'is-pending'
+}
+
+function openNotificationLink(link: string) {
+  try {
+    const target = new URL(link, window.location.origin)
+    if (target.pathname.startsWith('/confirmation/')) {
+      sessionStorage.setItem(
+        'smsf.active-confirmation-link',
+        `${target.pathname}${target.search}`,
+      )
+    }
+    if (
+      target.origin === window.location.origin ||
+      target.pathname.startsWith('/confirmation/')
+    ) {
+      // Keep the current tab and its sessionStorage so authenticated onboarding
+      // routes do not send the customer back to the login screen.
+      window.location.assign(`${target.pathname}${target.search}${target.hash}`)
+      return
+    }
+    window.open(target.toString(), '_blank', 'noopener,noreferrer')
+  } catch {
+    window.location.assign(link)
+  }
+}
+
+function isConfirmationLinkCompleted(link: string) {
+  try {
+    const target = new URL(link, window.location.origin)
+    const key = `${target.pathname}${target.search}`
+    const stored = JSON.parse(
+      localStorage.getItem('smsf.completed-confirmation-links') || '[]',
+    ) as unknown
+    return Array.isArray(stored) && stored.includes(key)
+  } catch {
+    return false
+  }
 }
 
 export function useNotificationCenter() {

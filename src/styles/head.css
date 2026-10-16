@@ -455,7 +455,7 @@
   bottom: 0;
   z-index: 1200;
   display: flex;
-  width: min(410px, 100vw);
+  width: 50vw;
   flex-direction: column;
   border-left: 1px solid var(--c-border);
   background: #fff;
@@ -575,6 +575,10 @@
 
 .hnotify-drawer__empty strong { color: var(--c-text); }
 .hnotify-drawer__empty span { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .hnotify-drawer { width: 100vw; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .hnotify-backdrop,
