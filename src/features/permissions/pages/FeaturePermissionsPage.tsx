@@ -9,8 +9,11 @@ import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { EditRouteModal } from '../../../components/permissions/EditRouteModal'
+import { EditColumnModal } from '../../../components/permissions/EditColumnModal'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import { Modal } from '../../../components/ui/Modal'
@@ -23,6 +26,8 @@ import {
   useUpdateColumnPermission,
   useUpdateColumnStatus,
   useUpdateRouteStatus,
+  useDeleteDynamicRoute,
+  useDeleteDynamicColumn,
 } from '../hooks/useDynamicPermissions'
 import { isColumnBelongingToRoute } from '../hooks/useDepartmentRoutePermissions'
 
@@ -39,11 +44,20 @@ export function FeaturePermissionsPage() {
   const updateRouteStatusMutation = useUpdateRouteStatus()
   const updateColumnStatusMutation = useUpdateColumnStatus()
   const updateColumnPermissionMutation = useUpdateColumnPermission()
+  const deleteRouteMutation = useDeleteDynamicRoute()
+  const deleteColumnMutation = useDeleteDynamicColumn()
 
   const [showRouteModal, setShowRouteModal] = useState(false)
   const [showColumnModal, setShowColumnModal] = useState(false)
   const [columnModalRouteId, setColumnModalRouteId] = useState('')
   const [selectedRouteId, setSelectedRouteId] = useState('')
+
+  const [editingRoute, setEditingRoute] = useState<DynamicRouteResponse | null>(null)
+  const [deletingRoute, setDeletingRoute] = useState<DynamicRouteResponse | null>(null)
+  const [deleteRouteError, setDeleteRouteError] = useState('')
+  const [editingColumn, setEditingColumn] = useState<DynamicColumnResponse | null>(null)
+  const [deletingColumn, setDeletingColumn] = useState<DynamicColumnResponse | null>(null)
+  const [deleteColumnError, setDeleteColumnError] = useState('')
 
   function openColumnModal(routeId = '') {
     setColumnModalRouteId(routeId)
@@ -176,6 +190,11 @@ export function FeaturePermissionsPage() {
             routes={routesQuery.data ?? []}
             selectedRouteId={selectedRouteId}
             onSelectRoute={(route) => setSelectedRouteId(route.routeId)}
+            onEditRoute={(route) => setEditingRoute(route)}
+            onDeleteRoute={(route) => {
+              setDeleteRouteError('')
+              setDeletingRoute(route)
+            }}
             updatingRouteId={
               updateRouteStatusMutation.isPending
                 ? updateRouteStatusMutation.variables?.routeId
@@ -218,6 +237,11 @@ export function FeaturePermissionsPage() {
               setSelectedRouteId('')
               openColumnModal(routeId)
             }}
+            onEditColumn={(col) => setEditingColumn(col)}
+            onDeleteColumn={(col) => {
+              setDeleteColumnError('')
+              setDeletingColumn(col)
+            }}
             onToggleColumn={handleColumnToggle}
             onPermissionChange={handleColumnPermissionChange}
           />
@@ -236,6 +260,138 @@ export function FeaturePermissionsPage() {
         onClose={() => setShowColumnModal(false)}
         initialDepartmentType={departmentType}
         initialRouteId={columnModalRouteId}
+      />
+
+      <EditRouteModal
+        open={Boolean(editingRoute)}
+        onClose={() => setEditingRoute(null)}
+        route={editingRoute}
+        departmentType={departmentType}
+      />
+
+      <EditColumnModal
+        open={Boolean(editingColumn)}
+        onClose={() => setEditingColumn(null)}
+        column={editingColumn}
+        departmentType={departmentType}
+        routes={routesQuery.data ?? []}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingRoute)}
+        onClose={() => {
+          setDeletingRoute(null)
+          setDeleteRouteError('')
+        }}
+        onConfirm={async () => {
+          if (!deletingRoute) return
+          try {
+            setDeleteRouteError('')
+            await deleteRouteMutation.mutateAsync(deletingRoute.routeId)
+            if (selectedRouteId === deletingRoute.routeId) {
+              setSelectedRouteId('')
+            }
+            setDeletingRoute(null)
+          } catch (err) {
+            setDeleteRouteError(
+              err instanceof Error ? err.message : 'Failed to delete route',
+            )
+          }
+        }}
+        title="Delete Route"
+        confirmDisabled={Boolean(deletingRoute && (columnsByRoute.get(deletingRoute.routeId)?.length ?? 0) > 0)}
+        message={
+          deletingRoute ? (
+            <div>
+              <p style={{ margin: '0 0 0.5rem 0' }}>
+                Are you sure you want to delete route <strong>"{deletingRoute.routeName}"</strong>?
+              </p>
+              {(columnsByRoute.get(deletingRoute.routeId)?.length ?? 0) > 0 ? (
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#fff7ed',
+                    border: '1px solid #fed7aa',
+                    borderRadius: '8px',
+                    color: '#9a3412',
+                    fontSize: '0.85rem',
+                    textAlign: 'left',
+                    marginTop: '0.75rem',
+                    lineHeight: '1.45',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      color: '#c2410c',
+                    }}
+                  >
+                    ⚠️ You cannot delete this route
+                  </div>
+                  This route still has <strong>{columnsByRoute.get(deletingRoute.routeId)?.length} column(s)</strong> attached to it:{' '}
+                  <span style={{ fontWeight: 600, color: '#9a3412' }}>
+                    [{(columnsByRoute.get(deletingRoute.routeId) ?? []).map((c) => c.columnName).join(', ')}]
+                  </span>.
+                  <div style={{ marginTop: '0.4rem', color: '#7c2d12', fontWeight: 500 }}>
+                    First you have to delete or remove the columns before this route can be deleted.
+                  </div>
+                </div>
+              ) : (
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>
+                  This will remove the route from navigation and permissions.
+                </span>
+              )}
+            </div>
+          ) : ''
+        }
+        confirmLabel={
+          (deletingRoute && (columnsByRoute.get(deletingRoute.routeId)?.length ?? 0) > 0)
+            ? 'Delete Columns First'
+            : 'Delete Route'
+        }
+        confirmLoadingLabel="Deleting..."
+        isLoading={deleteRouteMutation.isPending}
+        error={deleteRouteError}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingColumn)}
+        onClose={() => {
+          setDeletingColumn(null)
+          setDeleteColumnError('')
+        }}
+        onConfirm={async () => {
+          if (!deletingColumn) return
+          try {
+            setDeleteColumnError('')
+            await deleteColumnMutation.mutateAsync(deletingColumn.columnId)
+            setDeletingColumn(null)
+          } catch (err) {
+            setDeleteColumnError(
+              err instanceof Error ? err.message : 'Failed to delete column',
+            )
+          }
+        }}
+        title="Delete Column"
+        message={
+          deletingColumn ? (
+            <>
+              Are you sure you want to delete column <strong>"{deletingColumn.columnName}"</strong>?
+              <br />
+              <span style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem', display: 'block' }}>
+                This will permanently delete this column and its permission mappings.
+              </span>
+            </>
+          ) : ''
+        }
+        confirmLabel="Delete Column"
+        confirmLoadingLabel="Deleting..."
+        isLoading={deleteColumnMutation.isPending}
+        error={deleteColumnError}
       />
     </PageLayout>
   )
