@@ -19,6 +19,7 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { FlowBuilderModal } from '../components/FlowBuilderModal'
+import { AddServiceFlowModal } from '../components/AddServiceFlowModal'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import './MeetingPage.css'
 
@@ -55,6 +56,7 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [editingFlow, setEditingFlow] = useState<ServiceFlowItem | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
   const [timelineModalFlow, setTimelineModalFlow] = useState<ServiceFlowItem | null>(null)
   const [newTimelineDays, setNewTimelineDays] = useState<number>(3)
   const [isSubmittingTimeline, setIsSubmittingTimeline] = useState(false)
@@ -179,9 +181,31 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
       )}
 
       {/* ── Toolbar: Search, Department Filter & Refresh ── */}
-      <motion.div className="history-toolbar" variants={sectionVariants}>
-        <div style={{ display: 'flex', gap: 12, flex: 1, flexWrap: 'wrap' }}>
-          <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 220 }}>
+      <motion.div
+        className="meeting-toolbar"
+        variants={sectionVariants}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flex: '1 1 320px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div
+            className="meeting-search-wrap"
+            style={{ flex: '1 1 260px', maxWidth: 440 }}
+          >
             <SearchBar
               value={search}
               onChange={(val) => {
@@ -194,8 +218,19 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
 
           {/* SuperAdmin Department Switcher */}
           {isSuperAdmin && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Department:</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}
+              >
+                Department:
+              </span>
               <select
                 value={selectedDept}
                 onChange={(e) => {
@@ -203,7 +238,8 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
                   setPage(0)
                 }}
                 style={{
-                  padding: '7px 12px',
+                  height: 38,
+                  padding: '0 12px',
                   borderRadius: 8,
                   border: '1px solid #cbd5e1',
                   background: '#ffffff',
@@ -212,6 +248,7 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
                   fontWeight: 500,
                   cursor: 'pointer',
                   minWidth: 180,
+                  outline: 'none',
                 }}
               >
                 <option value="ALL">All Departments</option>
@@ -225,6 +262,66 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
           )}
         </div>
 
+        <div
+          className="meeting-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            className="meeting-action-btn meeting-action-btn--primary"
+            onClick={() => setIsAddOpen(true)}
+            title="Create a new service with its workflow steps"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 38,
+              padding: '0 16px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              background: '#16a34a',
+              color: '#ffffff',
+              boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Icon name="plus" size={15} strokeWidth={2.5} />
+            <span>Add Service Flow</span>
+          </button>
+          <button
+            type="button"
+            className="meeting-action-btn"
+            onClick={handleRefresh}
+            title="Refresh service flows"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 38,
+              padding: '0 14px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Icon name="refresh" size={14} strokeWidth={2} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </motion.div>
 
       {/* ── Content ── */}
@@ -557,6 +654,16 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
         flow={editingFlow}
         departmentType={editingFlow?.departmentType || selectedDept}
         departmentConfig={configQuery.data}
+        onSuccess={handleRefresh}
+      />
+
+      {/* ── Add Service Flow Modal ── */}
+      <AddServiceFlowModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        defaultDepartmentType={selectedDept}
+        departmentTypes={deptTypesQuery.data ?? []}
+        isSuperAdmin={isSuperAdmin}
         onSuccess={handleRefresh}
       />
 
