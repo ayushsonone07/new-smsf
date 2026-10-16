@@ -8,6 +8,8 @@ import {
   extractBillingCustomers,
   fetchBillingCustomers,
   getBillingInformation,
+  getBillingInvoice,
+  updateBillingInvoice,
   uploadCustomerBill,
   type BillingCustomer,
 } from '../../../api/billing.api'
@@ -217,6 +219,18 @@ function show(value?: string) {
   return value && value.trim() ? value : '—'
 }
 
+/** Formats a number-ish value as Indian rupees, or returns "—" when empty. */
+function formatCurrency(value: unknown) {
+  if (value === undefined || value === null || value === '') return '—'
+  const amount = Number(String(value).replace(/[^0-9.-]/g, ''))
+  if (!Number.isFinite(amount)) return String(value)
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 function Field({
   label,
   value,
@@ -266,6 +280,17 @@ export function CustomersListModal({
   const [billUploading, setBillUploading] = useState(false)
   const [billError, setBillError] = useState('')
   const [billSuccess, setBillSuccess] = useState('')
+  const [invoice, setInvoice] = useState({
+    invoiceNo: '',
+    date: '',
+    amount: '',
+    status: 'PENDING' as string,
+    billingLink: '',
+  })
+  const [invoiceSaving, setInvoiceSaving] = useState(false)
+  const [invoiceError, setInvoiceError] = useState('')
+  const [invoiceSuccess, setInvoiceSuccess] = useState('')
+  const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
@@ -297,6 +322,9 @@ export function CustomersListModal({
     setBillFile(null)
     setBillError('')
     setBillSuccess('')
+    setInvoiceError('')
+    setInvoiceSuccess('')
+    setInvoiceDraftId(null)
   }
 
   // Clear the native file input whenever the drawer switches customers,
@@ -426,6 +454,22 @@ export function CustomersListModal({
       ? billingQuery.error.message
       : 'Something went wrong while loading billing details.'
 
+  // Seed the editable invoice draft once per billing record. Re-seeding is
+  // keyed on the billing id so background refetches never clobber user edits.
+  if (billingCustomer && invoiceDraftId !== billingCustomer.id) {
+    const details = getBillingInvoice(billingCustomer)
+    setInvoiceDraftId(billingCustomer.id)
+    setInvoice({
+      invoiceNo: details.invoiceNo || `INV-${billingCustomer.id}`,
+      date: details.invoiceDate.slice(0, 10),
+      amount: details.invoiceAmount,
+      status: details.status,
+      billingLink: details.billingLink,
+    })
+    setInvoiceError('')
+    setInvoiceSuccess('')
+  }
+
   function handleBillFileChange(event: ChangeEvent<HTMLInputElement>) {
     setBillFile(event.target.files?.[0] ?? null)
     setBillError('')
@@ -444,10 +488,20 @@ export function CustomersListModal({
     setBillSuccess('')
     try {
       await uploadCustomerBill(billingCustomer.id, billFile)
-      await billingQuery.refetch()
+      const refreshed = await billingQuery.refetch()
       setBillFile(null)
       if (billInputRef.current) billInputRef.current.value = ''
       setBillSuccess('Bill uploaded successfully. The bill status is now Generated.')
+      const refreshedCustomer =
+        extractBillingCustomers(refreshed.data).find(
+          (item) => String(item.id) === String(billingCustomer.id),
+        ) ?? billingCustomer
+      const details = getBillingInvoice(refreshedCustomer)
+      setInvoice((value) => ({
+        ...value,
+        status: details.status,
+        billingLink: details.billingLink || value.billingLink,
+      }))
     } catch (error) {
       setBillError(
         error instanceof Error && error.message
@@ -456,6 +510,42 @@ export function CustomersListModal({
       )
     } finally {
       setBillUploading(false)
+    }
+  }
+
+  async function handleSaveInvoice() {
+    if (!billingCustomer || invoiceSaving) return
+    const invoiceNo = invoice.invoiceNo.trim()
+    if (!invoiceNo) {
+      setInvoiceError('Invoice number is required.')
+      return
+    }
+    if (invoice.status === 'GENERATED' && !invoice.billingLink.trim()) {
+      setInvoiceError('Billing link is required when status is Generated.')
+      return
+    }
+
+    setInvoiceSaving(true)
+    setInvoiceError('')
+    setInvoiceSuccess('')
+    try {
+      await updateBillingInvoice(billingCustomer.id, {
+        invoiceNo,
+        invoiceDate: invoice.date,
+        invoiceAmount: invoice.amount,
+        status: invoice.status,
+        billingLink: invoice.billingLink.trim(),
+      })
+      await billingQuery.refetch()
+      setInvoiceSuccess("Invoice details saved in the customer's billing details.")
+    } catch (error) {
+      setInvoiceError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to save invoice details. Please try again.',
+      )
+    } finally {
+      setInvoiceSaving(false)
     }
   }
 
@@ -1403,6 +1493,159 @@ export function CustomersListModal({
                   </>
                 )}
               </div>
+
+              {billingCustomer && (
+                <>
+                  {/* Invoices — editable */}
+                  <div className="cl-drawer__card">
+                    <div className="cl-drawer__card-head">
+                      <div>
+                        <h3 className="cl-drawer__card-title">
+                          <Icon name="fileText" size={15} strokeWidth={2} />
+                          Invoices
+                        </h3>
+                        <p className="cl-drawer__card-meta">
+                          Invoice details are saved in the customer's billing
+                          details.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="cl-drawer__bill-form">
+                      <label className="cl-drawer__bill-field">
+                        <span>Invoice No</span>
+                        <input
+                          value={invoice.invoiceNo}
+                          onChange={(event) =>
+                            setInvoice((value) => ({
+                              ...value,
+                              invoiceNo: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="cl-drawer__bill-field">
+                        <span>Date</span>
+                        <input
+                          type="date"
+                          value={invoice.date}
+                          onChange={(event) =>
+                            setInvoice((value) => ({
+                              ...value,
+                              date: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="cl-drawer__bill-field">
+                        <span>Amount</span>
+                        <input
+                          value={invoice.amount}
+                          onChange={(event) =>
+                            setInvoice((value) => ({
+                              ...value,
+                              amount: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="cl-drawer__bill-field">
+                        <span>Status</span>
+                        <select
+                          value={invoice.status}
+                          onChange={(event) =>
+                            setInvoice((value) => ({
+                              ...value,
+                              status: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="PENDING">Pending</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="GENERATED">Generated</option>
+                        </select>
+                      </label>
+                      <label className="cl-drawer__bill-field cl-drawer__bill-field--full">
+                        <span>Invoice / Bill Link</span>
+                        <input
+                          value={invoice.billingLink}
+                          placeholder="https://..."
+                          onChange={(event) =>
+                            setInvoice((value) => ({
+                              ...value,
+                              billingLink: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+
+                    {invoiceError && (
+                      <p
+                        className="cl-drawer__bill-notice cl-drawer__bill-notice--error"
+                        role="alert"
+                      >
+                        {invoiceError}
+                      </p>
+                    )}
+                    {invoiceSuccess && (
+                      <p
+                        className="cl-drawer__bill-notice cl-drawer__bill-notice--success"
+                        role="status"
+                      >
+                        {invoiceSuccess}
+                      </p>
+                    )}
+
+                    <div className="cl-drawer__bill-actions">
+                      <Button
+                        disabled={invoiceSaving}
+                        onClick={handleSaveInvoice}
+                      >
+                        <Icon name="check" size={14} strokeWidth={2} />
+                        {invoiceSaving ? 'Saving…' : 'Save Invoice'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* What You Purchased */}
+                  <div className="cl-drawer__card">
+                    <div className="cl-drawer__card-head">
+                      <h3 className="cl-drawer__card-title">
+                        <Icon name="receipt" size={15} strokeWidth={2} />
+                        What You Purchased
+                      </h3>
+                    </div>
+                    <p className="cl-drawer__empty">
+                      No purchase history available
+                    </p>
+                  </div>
+
+                  {/* Payment & GST */}
+                  <div className="cl-drawer__card">
+                    <div className="cl-drawer__card-head">
+                      <h3 className="cl-drawer__card-title">
+                        <Icon name="wallet" size={15} strokeWidth={2} />
+                        Payment &amp; GST
+                      </h3>
+                    </div>
+                    <div className="cl-drawer__fields">
+                      <Field
+                        label="GST Number"
+                        value={billingCustomer.gstNumber ?? ''}
+                      />
+                      <Field
+                        label="Total Paid"
+                        value={formatCurrency(billingCustomer.amountPaid)}
+                      />
+                      <Field
+                        label="Outstanding"
+                        value={formatCurrency(billingCustomer.amountPending)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
 

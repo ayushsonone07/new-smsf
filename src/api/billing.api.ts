@@ -65,6 +65,15 @@ export interface BillingInformation {
   billUrl: string
 }
 
+/** Editable invoice fields stored inside the billing details JSON. */
+export interface BillingInvoiceDetails {
+  invoiceNo: string
+  invoiceDate: string
+  invoiceAmount: string
+  status: BillStatus
+  billingLink: string
+}
+
 const BILL_URL_KEYS = ['generatedBillInfo', 'billingLink', 'billUrl'] as const
 
 function buildBillingCustomersQuery(query: BillingCustomerQuery): string {
@@ -241,6 +250,51 @@ export interface BillingInvoiceUpdate {
   invoiceAmount?: string
   status: string
   billingLink?: string
+}
+
+function pickText(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key]
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value)
+    }
+  }
+  return ''
+}
+
+/**
+ * Reads the editable invoice fields out of the customer's serialized billing
+ * details (`generatedBillInfo`), falling back to top-level DTO fields.
+ */
+export function getBillingInvoice(
+  customer?: BillingCustomer | null,
+): BillingInvoiceDetails {
+  if (!customer) {
+    return {
+      invoiceNo: '',
+      invoiceDate: '',
+      invoiceAmount: '',
+      status: 'PENDING',
+      billingLink: '',
+    }
+  }
+
+  const details =
+    typeof customer.generatedBillInfo === 'string'
+      ? parseGeneratedBillInfo(customer.generatedBillInfo)
+      : asRecord(customer.generatedBillInfo)
+
+  const status = normalizeBillStatus(
+    (details.status as string | undefined) ?? customer.billStatus,
+  )
+
+  return {
+    invoiceNo: pickText(details, ['invoiceNo', 'invoiceNumber', 'billId']),
+    invoiceDate: pickText(details, ['invoiceDate', 'date', 'generatedAt']),
+    invoiceAmount: pickText(details, ['invoiceAmount', 'amount']),
+    status,
+    billingLink: getBillUrl(customer) || pickText(details, BILL_URL_KEYS.slice()),
+  }
 }
 
 export async function updateBillingInvoice(

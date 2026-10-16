@@ -3803,3 +3803,72 @@
   align-items: center;
   gap: 10px;
 }
+
+/* ── Bill upload: card title with icon ─────────────────────── */
+.cl-drawer__card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cl-drawer__card-title svg {
+  color: #2563eb;
+}
+
+/* ── Bill upload: editable invoice form ────────────────────── */
+.cl-drawer__bill-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cl-drawer__bill-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.cl-drawer__bill-field--full {
+  grid-column: 1 / -1;
+}
+
+.cl-drawer__bill-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.cl-drawer__bill-field input,
+.cl-drawer__bill-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cl-drawer__bill-field input:focus,
+.cl-drawer__bill-field select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.cl-drawer__bill-form + .cl-drawer__bill-notice {
+  margin-top: 12px;
+}
+
+.cl-drawer__bill-form + .cl-drawer__bill-actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .cl-drawer__bill-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
