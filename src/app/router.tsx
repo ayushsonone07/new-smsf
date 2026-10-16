@@ -27,6 +27,15 @@ import { AvailableSoonPage } from '../features/departments/head/pages/AvailableS
 const ServicesListPage = lazy(() =>
   import('../features/departments/pages/ServicesListPage').then((module) => ({ default: module.ServicesListPage })),
 )
+const AdminTimelinesPage = lazy(() =>
+  import('../features/departments/pages/AdminTimelinesPage').then((module) => ({ default: module.AdminTimelinesPage })),
+)
+const AdminApprovalsPage = lazy(() =>
+  import('../features/departments/pages/AdminApprovalsPage').then((module) => ({ default: module.AdminApprovalsPage })),
+)
+const CreateDepartmentPage = lazy(() =>
+  import('../features/departments/pages/CreateDepartmentPage').then((module) => ({ default: module.CreateDepartmentPage })),
+)
 const DepartmentDashboardPage = lazy(() =>
   import('../features/departments/pages/DepartmentDashboardPage').then((module) => ({ default: module.DepartmentDashboardPage })),
 )
@@ -175,10 +184,45 @@ const adminRoute = createRoute({
   beforeLoad: requireRole('ADMIN'),
 })
 
+const adminCreateDepartmentRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/create-department',
+  component: CreateDepartmentPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminCreateDepartmentNestedRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/departments/create',
+  component: CreateDepartmentPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
 const adminServicesRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/services',
   component: ServicesListPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminTimelinesRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/timelines',
+  component: AdminTimelinesPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminServiceFlowRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/service-flow',
+  component: AdminTimelinesPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminApprovalsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/approvals',
+  component: AdminApprovalsPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -794,8 +838,13 @@ const routeTree = rootRoute.addChildren([
   ]),
   authedLayoutRoute.addChildren([
     adminRoute,
+    adminCreateDepartmentRoute,
+    adminCreateDepartmentNestedRoute,
     adminCustomersRoute,
     adminServicesRoute,
+    adminTimelinesRoute,
+    adminServiceFlowRoute,
+    adminApprovalsRoute,
     servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
