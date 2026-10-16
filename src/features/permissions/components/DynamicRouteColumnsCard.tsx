@@ -2,6 +2,7 @@ import type {
   DynamicColumnResponse,
   DynamicRouteResponse,
 } from '../../../api/dynamic-permission.api'
+import { Pencil, Trash2 } from 'lucide-react'
 import { PermissionToggle } from '../../../components/permissions/PermissionToggle'
 import { Card } from '../../../components/ui/Card'
 import { Select } from '../../../components/ui/Select'
@@ -12,6 +13,8 @@ interface DynamicRouteColumnsCardProps {
   updatingColumnId?: string
   updatingPermissionColumnId?: string
   onAddColumn: () => void
+  onEditColumn?: (column: DynamicColumnResponse) => void
+  onDeleteColumn?: (column: DynamicColumnResponse) => void
   onToggleColumn: (
     column: DynamicColumnResponse,
     role: 'DEPARTMENT_HEAD' | 'DEPARTMENT_USER',
@@ -30,6 +33,8 @@ export function DynamicRouteColumnsCard({
   updatingColumnId,
   updatingPermissionColumnId,
   onAddColumn,
+  onEditColumn,
+  onDeleteColumn,
   onToggleColumn,
   onPermissionChange,
 }: DynamicRouteColumnsCardProps) {
@@ -65,6 +70,7 @@ export function DynamicRouteColumnsCard({
                 <th>ENABLE FOR USER</th>
                 <th>HEAD ACCESS</th>
                 <th>USER ACCESS</th>
+                {(onEditColumn || onDeleteColumn) && <th>ACTIONS</th>}
               </tr>
             </thead>
             <tbody>
@@ -148,6 +154,34 @@ export function DynamicRouteColumnsCard({
                         <option value="12">Read + Write</option>
                       </Select>
                     </td>
+                    {(onEditColumn || onDeleteColumn) && (
+                      <td>
+                        <div className="department-item-actions">
+                          {onEditColumn && (
+                            <button
+                              type="button"
+                              className="department-icon-action-btn is-edit"
+                              title={`Edit column ${column.columnName}`}
+                              aria-label={`Edit column ${column.columnName}`}
+                              onClick={() => onEditColumn(column)}
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          {onDeleteColumn && (
+                            <button
+                              type="button"
+                              className="department-icon-action-btn is-delete"
+                              title={`Delete column ${column.columnName}`}
+                              aria-label={`Delete column ${column.columnName}`}
+                              onClick={() => onDeleteColumn(column)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

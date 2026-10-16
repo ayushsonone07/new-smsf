@@ -1,4 +1,5 @@
 import type { DynamicRouteResponse } from '../../../api/dynamic-permission.api'
+import { Pencil, Trash2 } from 'lucide-react'
 import { PermissionToggle } from '../../../components/permissions/PermissionToggle'
 
 interface DynamicRoutesTableProps {
@@ -6,6 +7,8 @@ interface DynamicRoutesTableProps {
   updatingRouteId?: string
   selectedRouteId?: string
   onSelectRoute?: (route: DynamicRouteResponse) => void
+  onEditRoute?: (route: DynamicRouteResponse) => void
+  onDeleteRoute?: (route: DynamicRouteResponse) => void
   onToggle: (
     route: DynamicRouteResponse,
     role: 'DEPARTMENT_HEAD' | 'DEPARTMENT_USER',
@@ -18,6 +21,8 @@ export function DynamicRoutesTable({
   updatingRouteId,
   selectedRouteId,
   onSelectRoute,
+  onEditRoute,
+  onDeleteRoute,
   onToggle,
 }: DynamicRoutesTableProps) {
   if (routes.length === 0) {
@@ -38,6 +43,7 @@ export function DynamicRoutesTable({
             <th>ROUTE</th>
             <th>ENABLE FOR HEAD</th>
             <th>ENABLE FOR USER</th>
+            {(onEditRoute || onDeleteRoute) && <th>ACTIONS</th>}
           </tr>
         </thead>
 
@@ -87,6 +93,34 @@ export function DynamicRoutesTable({
                     }
                   />
                 </td>
+                {(onEditRoute || onDeleteRoute) && (
+                  <td>
+                    <div className="department-item-actions">
+                      {onEditRoute && (
+                        <button
+                          type="button"
+                          className="department-icon-action-btn is-edit"
+                          title={`Edit route ${route.routeName}`}
+                          aria-label={`Edit route ${route.routeName}`}
+                          onClick={() => onEditRoute(route)}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      {onDeleteRoute && (
+                        <button
+                          type="button"
+                          className="department-icon-action-btn is-delete"
+                          title={`Delete route ${route.routeName}`}
+                          aria-label={`Delete route ${route.routeName}`}
+                          onClick={() => onDeleteRoute(route)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             )
           })}

@@ -15,12 +15,18 @@ import {
   updateColumnPermission,
   updateColumnStatus,
   updateRouteStatus,
+  updateDynamicRoute,
+  deleteDynamicRoute,
+  updateDynamicColumn,
+  deleteDynamicColumn,
   type CreateDynamicColumnPayload,
   type CreateDynamicRoutePayload,
   type CreateRouteColumnsPayload,
   type UpdateColumnPermissionPayload,
   type UpdateColumnStatusPayload,
   type UpdateRouteStatusPayload,
+  type UpdateDynamicRoutePayload,
+  type UpdateDynamicColumnPayload,
 } from '../../../api/dynamic-permission.api'
 
 export function useDepartmentTypes(enabled = true) {
@@ -199,6 +205,97 @@ export function useCreateColumnsForRoute() {
     },
   })
 }
+
+export function useUpdateDynamicRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      routeId,
+      payload,
+    }: {
+      routeId: string
+      payload: UpdateDynamicRoutePayload
+    }) => updateDynamicRoute(routeId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes-columns-summary'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+    },
+  })
+}
+
+export function useDeleteDynamicRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (routeId: string) => deleteDynamicRoute(routeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes-columns-summary'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+    },
+  })
+}
+
+export function useUpdateDynamicColumn() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      columnId,
+      payload,
+    }: {
+      columnId: string
+      payload: UpdateDynamicColumnPayload
+    }) => updateDynamicColumn(columnId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes-columns-summary'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-max-columns'],
+      })
+    },
+  })
+}
+
+export function useDeleteDynamicColumn() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (columnId: string) => deleteDynamicColumn(columnId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'routes-columns-summary'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-max-columns'],
+      })
+    },
+  })
+}
+
 
 
 
