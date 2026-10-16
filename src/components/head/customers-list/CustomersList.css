@@ -3643,3 +3643,54 @@
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
+
+/* ── Autowebsion Sub-Service Switcher ────────────────────────── */
+.autowebsion-dept-tabs-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  background: #f8fafc;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.autowebsion-dept-tabs {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.autowebsion-dept-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.autowebsion-dept-tab:hover {
+  color: #1e293b;
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.autowebsion-dept-tab.active {
+  color: #2563eb;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.autowebsion-dept-tab-icon {
+  font-size: 15px;
+}
