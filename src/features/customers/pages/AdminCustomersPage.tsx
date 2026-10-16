@@ -4,7 +4,6 @@ import {
   getAdminCustomers,
   type AdminCustomer,
 } from '../../../api/admin-customers.api'
-import { ProfileChip } from '../../../components/common/ProfileChip'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { Button } from '../../../components/ui/Button'
@@ -182,16 +181,13 @@ export function AdminCustomersPage() {
           title="Customer Accounts"
           description="View all customer accounts registered across departments."
           actions={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => void customersQuery.refetch()}
-                disabled={customersQuery.isFetching}
-              >
-                {customersQuery.isFetching ? 'Refreshing…' : '↻ Refresh'}
-              </Button>
-              <ProfileChip />
-            </>
+            <Button
+              variant="secondary"
+              onClick={() => void customersQuery.refetch()}
+              disabled={customersQuery.isFetching}
+            >
+              {customersQuery.isFetching ? 'Refreshing…' : '↻ Refresh'}
+            </Button>
           }
         />
 

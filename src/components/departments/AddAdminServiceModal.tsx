@@ -18,6 +18,7 @@ interface AddAdminServiceModalProps {
   editingService?: AdminServiceItem | null
   onClose: () => void
   onCreated?: (service: AdminServiceItem) => void
+  embedded?: boolean
 }
 
 export function AddAdminServiceModal({
@@ -25,6 +26,7 @@ export function AddAdminServiceModal({
   editingService = null,
   onClose,
   onCreated,
+  embedded = false,
 }: AddAdminServiceModalProps) {
   const { data: departmentTypes = [] } = useDepartmentTypes(open)
   const addMutation = useAddAdminService()
@@ -120,19 +122,8 @@ export function AddAdminServiceModal({
     )
   }
 
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="md"
-      title={isEdit ? 'Edit Service' : 'Step 1: Add New Service'}
-      description={
-        isEdit
-          ? 'Update the service type, department type, or active status.'
-          : 'Create a Service and link it to a Department Type before creating the Department Head login.'
-      }
-    >
-      <form onSubmit={handleSubmit}>
+  const formElement = (
+    <form onSubmit={handleSubmit}>
         <div
           style={{
             display: 'flex',
@@ -416,6 +407,39 @@ export function AddAdminServiceModal({
           </div>
         </div>
       </form>
+  )
+
+  if (embedded) {
+    return (
+      <div className="add-admin-service-embedded">
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.35rem' }}>
+            {isEdit ? 'Edit Service' : 'Step 1: Add New Service'}
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+            {isEdit
+              ? 'Update the service type, department type, or active status.'
+              : 'Create a Service and link it to a Department Type before creating the Department Head login.'}
+          </p>
+        </div>
+        {formElement}
+      </div>
+    )
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="md"
+      title={isEdit ? 'Edit Service' : 'Step 1: Add New Service'}
+      description={
+        isEdit
+          ? 'Update the service type, department type, or active status.'
+          : 'Create a Service and link it to a Department Type before creating the Department Head login.'
+      }
+    >
+      {formElement}
     </Modal>
   )
 }
