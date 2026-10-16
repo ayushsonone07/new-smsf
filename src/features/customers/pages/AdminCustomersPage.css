@@ -1,0 +1,141 @@
+.admin-customers-page {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-customers-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-customers-card__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+}
+
+.admin-customers-card__heading h2,
+.admin-customers-card__heading p {
+  margin: 0;
+}
+
+.admin-customers-card__heading p {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.admin-customer-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-customer-identity > div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-customer-identity span:not(.admin-customer-avatar) {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-customer-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.admin-customer-status {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-customer-status--inactive,
+.admin-customer-status--disabled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.admin-customer-view-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.admin-customer-view-button:hover {
+  border-color: #94a3b8;
+  background: #fff;
+  color: #64748b;
+}
+
+.admin-customer-view-button:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 18%);
+  outline-offset: 2px;
+}
+
+.admin-customers-pagination {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.admin-customers-pagination label,
+.admin-customers-pagination__buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-customers-pagination > span:last-child {
+  text-align: right;
+}
+
+.admin-customers-pagination select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+@media (max-width: 800px) {
+  .admin-customers-pagination {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-customers-pagination__buttons {
+    justify-content: space-between;
+  }
+
+  .admin-customers-pagination > span:last-child {
+    text-align: left;
+  }
+
+}

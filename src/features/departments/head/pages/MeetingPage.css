@@ -31,6 +31,91 @@
   border-color: var(--head-border-2);
 }
 
+/* ===============================================================
+   Shared Toolbar & Action Buttons (ServiceFlow, History, MemberFlow, Analytics)
+   =============================================================== */
+.meeting-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.meeting-search-wrap {
+  flex: 1;
+  min-width: 240px;
+  max-width: 440px;
+}
+
+.meeting-search-wrap .head-search {
+  height: 38px;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.meeting-search-wrap .head-search:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.meeting-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meeting-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.meeting-action-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.meeting-action-btn:active {
+  transform: translateY(1px);
+}
+
+.meeting-action-btn--primary {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.25) !important;
+}
+
+.meeting-action-btn--primary:hover {
+  background: #15803d !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 5px rgba(22, 163, 74, 0.35) !important;
+}
+
+.meeting-action-btn--primary:active {
+  background: #166534 !important;
+}
+
 /* Filter dropdown */
 .filter-dropdown {
   position: relative;
@@ -215,6 +300,20 @@
    RESPONSIVE — MeetingPage
    ============================================================= */
 @media (max-width: 768px) {
+  .meeting-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .meeting-search-wrap {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .meeting-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
   .meeting-page__controls {
     flex-direction: column;
     align-items: stretch;

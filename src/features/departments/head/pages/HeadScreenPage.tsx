@@ -7,6 +7,8 @@ import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
+import { AutowebisionCustomersPage } from './AutowebisionCustomersPage'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -25,7 +27,9 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   const location = useLocation()
   const departmentId = useHeadDepartmentId()
   const deptFromUrl = departmentName || resolveDeptFromPath(location.pathname) || undefined
-  const nav = useHeadNav(departmentId, deptFromUrl)
+  const session = getSession()
+  const effectiveDepartmentType = session?.user.departmentType || deptFromUrl
+  const nav = useHeadNav(departmentId, effectiveDepartmentType)
   const navigate = useNavigate()
   const didRedirect = useRef(false)
 
@@ -40,9 +44,8 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   if (ready && !feature) {
     const firstEnabledFeature = nav.features[0]
     if (firstEnabledFeature) {
-      const session = getSession()
       const isUser = (role?.toUpperCase() === 'USER') || (session?.user.role === 'USER')
-      const deptType = deptFromUrl || session?.user.departmentType
+      const deptType = session?.user.departmentType || deptFromUrl
       const candidate = buildDepartmentRoute(
         firstEnabledFeature.slug,
         deptType,
@@ -91,5 +94,23 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
     )
   }
 
+  const isAutowebsion = Boolean(
+    effectiveDepartmentType && (
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'AUTOWEBSION_DEPARTMENT' ||
+      effectiveDepartmentType.toUpperCase().includes('AUTOWEB')
+    ),
+  )
+
+  if (
+    isAutowebsion &&
+    (feature.screen === 'customers' ||
+      feature.screen === 'customer-list' ||
+      targetSlug === 'customers' ||
+      targetSlug === 'customer-list')
+  ) {
+    return <AutowebisionCustomersPage />
+  }
+
   return <Screen feature={feature} />
 }
+

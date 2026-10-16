@@ -304,3 +304,67 @@ export async function decideTimelineRequest(params: {
   )
   return response.data
 }
+
+export interface AdminServiceFlowItem {
+  departmentServiceId: string
+  departmentServiceName: string
+  departmentType: string
+  serviceTimeline?: {
+    timeline?: {
+      time?: number
+      createdAt?: string
+      updatedAt?: string
+      updation?: {
+        timetobe?: number
+        approvedBy?: string | null
+        requestBy?: string
+        status?: string
+      }
+    }
+  }
+  serviceFlow?: Record<string, { order?: number }>
+}
+
+export async function fetchAdminServiceFlows(params?: {
+  departmentType?: string
+  serviceName?: string
+  page?: number
+  size?: number
+}): Promise<AdminServiceFlowItem[]> {
+  const query = new URLSearchParams({
+    page: String(params?.page ?? 0),
+    size: String(params?.size ?? 100),
+  })
+  if (params?.departmentType && params.departmentType !== 'ALL') {
+    const normalized = normalizeDepartmentTypeName(params.departmentType)
+    query.append('departmentType', normalized || params.departmentType)
+  }
+  if (params?.serviceName?.trim()) {
+    query.append('serviceName', params.serviceName.trim())
+  }
+  const response = await apiClient.get<{
+    data?: AdminServiceFlowItem[]
+  }>(`/api/service/flows?${query.toString()}`, {
+    headers: getAdminUsernameHeader(),
+  })
+  return Array.isArray(response.data?.data) ? response.data.data : []
+}
+
+/**
+ * SuperAdmin directly sets/updates a timeline for ANY department service.
+ * Applies immediately as APPROVED in database.
+ */
+export async function updateAdminServiceTimeline(params: {
+  serviceId: string
+  time: number
+}): Promise<unknown> {
+  const response = await apiClient.put(
+    `/api/service/${encodeURIComponent(params.serviceId)}/timeline?time=${encodeURIComponent(String(params.time))}`,
+    null,
+    {
+      headers: getAdminUsernameHeader(),
+    },
+  )
+  return response.data
+}
+

@@ -416,6 +416,20 @@
   margin-bottom: -4px;
 }
 
+.department-route-dropdown-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.department-route-dropdown-actions .secondary-button {
+  min-height: 34px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
 .department-route-dropdown-heading > div,
 .department-route-columns-heading > div {
   display: flex;
@@ -575,7 +589,53 @@
   transform: translateX(12px);
 }
 
+.department-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.department-icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.department-icon-action-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.department-icon-action-btn.is-edit:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+
+.department-icon-action-btn.is-delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.department-icon-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .department-route-columns {
+
   align-self: stretch;
 }
 

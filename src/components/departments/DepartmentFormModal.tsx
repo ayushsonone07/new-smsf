@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AdminServiceItem } from '../../api/admin-services.api'
 import {
   normalizeDepartmentSlug,
@@ -147,6 +147,7 @@ interface DepartmentFormModalProps {
   onUpdate: (data: UpdateDepartmentRequest) => void
   onViewFeatures?: (department: Department) => void
   onViewDashboard?: (department: Department) => void
+  embedded?: boolean
 }
 
 export function DepartmentFormModal({
@@ -161,6 +162,7 @@ export function DepartmentFormModal({
   onUpdate,
   onViewFeatures,
   onViewDashboard,
+  embedded = false,
 }: DepartmentFormModalProps) {
   const { data: adminServices = [], isLoading: isLoadingServices } =
     useAdminServices(open)
@@ -187,7 +189,7 @@ export function DepartmentFormModal({
   )
   const [newColumnName, setNewColumnName] = useState('')
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
-  const [wasOpen, setWasOpen] = useState(open)
+  const [wasOpen, setWasOpen] = useState(false)
   const [lastInitialServiceId, setLastInitialServiceId] = useState<
     number | string | null
   >(null)
@@ -249,6 +251,35 @@ export function DepartmentFormModal({
     return options
   }, [adminServices, departmentTypes, initialService])
 
+  // Automatically select the first available department without an existing head
+  useEffect(() => {
+    if (isEdit || initialService) return
+    if (serviceDropdownOptions.length === 0) return
+
+    const takenSet = new Set(
+      existingDepartments
+        .map((d) => (d.type || '').toUpperCase())
+        .filter(Boolean),
+    )
+
+    const currentTaken = selectedDepartmentType && takenSet.has(selectedDepartmentType.toUpperCase())
+
+    if (!selectedServiceKey || currentTaken) {
+      const firstAvailable =
+        serviceDropdownOptions.find(
+          (opt) =>
+            !takenSet.has((opt.serviceType || opt.departmentType).toUpperCase()),
+        ) || serviceDropdownOptions[0]
+
+      if (firstAvailable) {
+        setSelectedDepartmentType(
+          firstAvailable.serviceType || firstAvailable.departmentType,
+        )
+        setSelectedServiceKey(firstAvailable.key)
+      }
+    }
+  }, [serviceDropdownOptions, existingDepartments, isEdit, initialService, selectedServiceKey, selectedDepartmentType])
+
   const currentInitialKey = initialService
     ? `${initialService.id}:${initialService.serviceType}:${initialService.departmentType}`
     : null
@@ -272,11 +303,14 @@ export function DepartmentFormModal({
         setSelectedDepartmentType(department.type)
         const matchingOption = serviceDropdownOptions.find(
           (opt) =>
+            opt.serviceType.toUpperCase() === department.type!.toUpperCase() ||
             opt.departmentType.toUpperCase() === department.type!.toUpperCase(),
         )
         setSelectedServiceKey(matchingOption?.key ?? `dept:${department.type}`)
       } else if (initialService) {
-        setSelectedDepartmentType(initialService.departmentType)
+        setSelectedDepartmentType(
+          initialService.serviceType || initialService.departmentType,
+        )
         setSelectedServiceKey(
           `srv:${initialService.id}:${initialService.serviceType}:${initialService.departmentType}`,
         )
@@ -288,9 +322,12 @@ export function DepartmentFormModal({
         )
         const firstAvailable =
           serviceDropdownOptions.find(
-            (opt) => !takenSet.has(opt.departmentType.toUpperCase()),
+            (opt) =>
+              !takenSet.has((opt.serviceType || opt.departmentType).toUpperCase()),
           ) || serviceDropdownOptions[0]
-        setSelectedDepartmentType(firstAvailable.departmentType)
+        setSelectedDepartmentType(
+          firstAvailable.serviceType || firstAvailable.departmentType,
+        )
         setSelectedServiceKey(firstAvailable.key)
       } else {
         setSelectedDepartmentType('WEBSITE_DEPARTMENT')
@@ -304,12 +341,41 @@ export function DepartmentFormModal({
     [selectedDepartmentType],
   )
 
+  const selectedServiceOption = useMemo(() => {
+    return serviceDropdownOptions.find(
+      (o) =>
+        o.key === selectedServiceKey ||
+        (o.serviceType &&
+          resolvedDepartmentType &&
+          normalizeDepartmentTypeName(o.serviceType).toUpperCase() ===
+            resolvedDepartmentType.toUpperCase()) ||
+        (o.departmentType &&
+          resolvedDepartmentType &&
+          normalizeDepartmentTypeName(o.departmentType).toUpperCase() ===
+            resolvedDepartmentType.toUpperCase()),
+    )
+  }, [serviceDropdownOptions, selectedServiceKey, resolvedDepartmentType])
+
+  const serviceTypeName = useMemo(() => {
+    if (selectedServiceOption?.serviceType) {
+      return selectedServiceOption.serviceType
+    }
+    return resolvedDepartmentType
+      ? resolvedDepartmentType.replace(/_DEPARTMENT$/i, '')
+      : ''
+  }, [selectedServiceOption, resolvedDepartmentType])
+
   const deptSlug = useMemo(
     () =>
       normalizeDepartmentSlug(
-        username || name || resolvedDepartmentType || 'department',
+        selectedServiceOption?.serviceType ||
+        resolvedDepartmentType ||
+        selectedDepartmentType ||
+        name ||
+        username ||
+        'department',
       ),
-    [username, name, resolvedDepartmentType],
+    [selectedServiceOption, resolvedDepartmentType, selectedDepartmentType, name, username],
   )
 
   function handleAddColumn(routeSlug: string) {
@@ -365,7 +431,7 @@ export function DepartmentFormModal({
     setSelectedServiceKey(optionKey)
     const found = serviceDropdownOptions.find((o) => o.key === optionKey)
     if (found) {
-      setSelectedDepartmentType(found.departmentType)
+      setSelectedDepartmentType(found.serviceType || found.departmentType)
     } else if (optionKey.startsWith('dept:')) {
       setSelectedDepartmentType(optionKey.slice(5))
     } else {
@@ -401,7 +467,9 @@ export function DepartmentFormModal({
     event.preventDefault()
 
     if (!resolvedDepartmentType) return
-    if (!isEdit && existingHeadForType) return
+
+    const normalizedContact = contact.replace(/\D/g, '')
+    if ((!isEdit || normalizedContact) && normalizedContact.length !== 10) return
 
     if (isEdit) {
       onUpdate({
@@ -409,7 +477,7 @@ export function DepartmentFormModal({
         username: username || name,
         oldEmail: department?.email,
         email,
-        contact: contact || undefined,
+        contact: normalizedContact || undefined,
         password: password || undefined,
         type: resolvedDepartmentType,
         departmentType: resolvedDepartmentType,
@@ -421,10 +489,11 @@ export function DepartmentFormModal({
       name: username || name || resolvedDepartmentType,
       username: username || name || resolvedDepartmentType,
       email,
-      contact: contact || '9999999999',
+      contact: normalizedContact,
       password,
       type: resolvedDepartmentType,
       departmentType: resolvedDepartmentType,
+      serviceType: serviceTypeName,
       initialRoutes,
       routeColumnsMap,
     })
@@ -438,23 +507,33 @@ export function DepartmentFormModal({
     password,
   }
 
-  return (
+  const formBody = (
     <>
-      <Modal
-        open={open}
-        onClose={onClose}
-        size="lg"
-        title={
-          isEdit
-            ? 'Edit Department Login'
-            : 'Step 2: Create Department Login'
-        }
-        description={
-          isEdit
-            ? 'Update department head account details and service/department assignment.'
-            : 'Enter Department Name, Email, Password, select a Service from the dropdown, and create the Department with Head role.'
-        }
-      >
+      {!isEdit && isSubmitting ? (
+          <div
+            className="department-creation-loading"
+            data-suppress-global-preloader
+            role="status"
+            aria-live="polite"
+            aria-label="Creating department"
+          >
+            <div className="department-creation-loading__card">
+              <div className="department-creation-loading__icon" aria-hidden="true">
+                <span />
+              </div>
+              <strong className='text-black'>Creating department...</strong>
+              <p className='text-yellow-500 text-md font-bold'>Creating a new department Please Wait for a while, It may take some time.</p>
+              <div
+                className="department-creation-loading__track"
+                role="progressbar"
+                aria-label="Department creation in progress"
+              >
+                <span className="department-creation-loading__bar" />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit}>
           {/* 1. Department Name (Username), 2. Email, 3. Password */}
           <DepartmentForm
@@ -683,7 +762,7 @@ export function DepartmentFormModal({
           </div>
 
           {/* 6. Initial Department Environment (Sidebar Routes & Dynamic URLs) */}
-          {!isEdit && !existingHeadForType && (
+          {!isEdit && (
             <div
               style={{
                 marginTop: '0.5rem',
@@ -1018,8 +1097,7 @@ export function DepartmentFormModal({
               type="submit"
               disabled={
                 isSubmitting ||
-                !resolvedDepartmentType ||
-                (!isEdit && Boolean(existingHeadForType))
+                !resolvedDepartmentType
               }
             >
               {isSubmitting
@@ -1030,6 +1108,50 @@ export function DepartmentFormModal({
             </Button>
           </div>
         </form>
+      </>
+  )
+
+  if (embedded) {
+    return (
+      <div className="department-form-embedded">
+        {formBody}
+        <AddAdminServiceModal
+          open={showAddServiceModal}
+          onClose={() => setShowAddServiceModal(false)}
+          onCreated={(createdService) => {
+            setSelectedDepartmentType(createdService.departmentType)
+            setSelectedServiceKey(
+              `srv:${createdService.id}:${createdService.serviceType}:${createdService.departmentType}`,
+            )
+          }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Modal
+        open={open}
+        onClose={() => {
+          if (!isSubmitting) onClose()
+        }}
+        className="modal department-form-modal"
+        size="lg"
+        showCloseButton={!isSubmitting}
+        closeOnEscape={!isSubmitting}
+        title={
+          isEdit
+            ? 'Edit Department Login'
+            : 'Step 2: Create Department Login'
+        }
+        description={
+          isEdit
+            ? 'Update department head account details and service/department assignment.'
+            : 'Enter Department Name, Email, Password, select a Service from the dropdown, and create the Department with Head role.'
+        }
+      >
+        {formBody}
       </Modal>
 
       <AddAdminServiceModal

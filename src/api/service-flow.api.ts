@@ -1,5 +1,7 @@
 import { authedApiRequest } from './client'
 import { getSession } from '../app/auth/session'
+import { normalizeDepartmentTypeName } from './dynamic-permission.api'
+import { resolveDeptFromPath } from '../features/departments/head/utils/routeUtils'
 
 export interface ServiceFlowStepData {
   order: number
@@ -7,12 +9,29 @@ export interface ServiceFlowStepData {
   updatedAt?: string
 }
 
+export interface TimelineUpdation {
+  timetobe?: number
+  approvedBy?: string | null
+  requestBy?: string
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | string
+}
+
+export interface TimelineDetail {
+  time?: number
+  createdAt?: string
+  updatedAt?: string
+  updation?: TimelineUpdation
+}
+
 export interface ServiceFlowItem {
-  departmentServiceId: string | number
+  departmentServiceId: string
   departmentServiceName: string
   departmentType: string
   serviceFlow: Record<string, ServiceFlowStepData>
-  serviceTimeline?: Record<string, unknown>
+  serviceTimeline?: {
+    timeline?: TimelineDetail
+    [key: string]: unknown
+  }
 }
 
 export interface ServiceFlowPageResponse {
@@ -27,11 +46,29 @@ export async function getServiceFlows(params: {
   page?: number
   size?: number
   serviceName?: string
+  departmentType?: string
 } = {}): Promise<ServiceFlowPageResponse> {
   const search = new URLSearchParams()
   search.set('page', String(params.page ?? 0))
   search.set('size', String(params.size ?? 10))
   if (params.serviceName) search.set('serviceName', params.serviceName)
+
+  let dept = params.departmentType
+  if (!dept && typeof window !== 'undefined') {
+    const fromPath = resolveDeptFromPath(window.location.pathname)
+    if (fromPath) {
+      dept = normalizeDepartmentTypeName(fromPath)
+    } else {
+      const session = getSession()
+      if (session?.user.departmentType) {
+        dept = normalizeDepartmentTypeName(session.user.departmentType)
+      }
+    }
+  }
+
+  if (dept && dept !== 'ALL') {
+    search.set('departmentType', dept)
+  }
 
   const res = await authedApiRequest<{
     data?: ServiceFlowItem[]
@@ -48,6 +85,42 @@ export async function getServiceFlows(params: {
     totalElements: res.totalElements ?? (res.data?.length ?? 0),
     totalPage: res.totalPage ?? 1,
   }
+}
+
+/**
+ * Update service timeline.
+ * Department Head creates a PENDING request for approval.
+ * SuperAdmin directly updates and approves the timeline immediately.
+ */
+export async function updateServiceTimeline(
+  serviceId: string,
+  time: number,
+): Promise<TimelineDetail | null> {
+  const res = await authedApiRequest<any>(
+    `/api/service/${encodeURIComponent(serviceId)}/timeline?time=${encodeURIComponent(String(time))}`,
+    {
+      method: 'PUT',
+    },
+  )
+  if (res && res.data) return res.data
+  return res as TimelineDetail
+}
+
+/**
+ * SuperAdmin approves or rejects a pending timeline update request.
+ */
+export async function decideServiceTimeline(
+  serviceId: string,
+  action: 'APPROVE' | 'REJECT',
+): Promise<TimelineDetail | null> {
+  const res = await authedApiRequest<any>(
+    `/api/service/${encodeURIComponent(serviceId)}/timeline/decision?action=${encodeURIComponent(action)}`,
+    {
+      method: 'PUT',
+    },
+  )
+  if (res && res.data) return res.data
+  return res as TimelineDetail
 }
 
 export interface DepartmentConfigData {

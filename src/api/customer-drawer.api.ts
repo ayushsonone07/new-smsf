@@ -106,7 +106,13 @@ export interface CustomerServiceRow {
   }
   departmentStatuses?: Record<
     string,
-    { status?: string; onboarded?: boolean }
+    {
+      status?: string
+      onboarded?: boolean
+      updatedAt?: string
+      completedAt?: string
+      timestamp?: string
+    }
   >
   deliveryStatus?: {
     delivered?: boolean
@@ -115,8 +121,12 @@ export interface CustomerServiceRow {
     completionPercentage?: number
   }
   callStatus?: {
+    status?: string
+    connected?: boolean
     lastCallDate?: string
     callNotes?: string
+    departmentType?: string
+    updatedAt?: string
   }
   internalRemark?: string
 }
@@ -179,10 +189,22 @@ export async function getCustomerProfileDetails(
   contact: string,
 ): Promise<CustomerProfileDetails> {
   const search = new URLSearchParams({ contact })
-  const response = await authedApiRequest<ApiEnvelope<CustomerProfileDetails>>(
+  const response = await authedApiRequest<
+    ApiEnvelope<CustomerProfileDetails> & {
+      customerDetails?: CustomerProfileDetails
+      customer?: CustomerProfileDetails
+    }
+  >(
     `/api/common/customerDetails?${search.toString()}`,
   )
-  return requireData(response, 'Customer details')
+  const profile = response.data ?? response.customerDetails ?? response.customer
+  if (profile) return profile
+
+  // Some deployments return the customer object without an envelope.
+  if (response && typeof response === 'object' && ('email' in response || 'phone' in response)) {
+    return response as CustomerProfileDetails
+  }
+  throw new Error(response.message || 'Customer details returned no data')
 }
 
 export async function getCustomerReviewReplies(
@@ -203,6 +225,7 @@ export async function getCustomerReviewReplies(
 export async function getCustomerRemarks(
   customerId: number,
   departmentType: string,
+  username?: string,
 ): Promise<CustomerRemarks> {
   const search = new URLSearchParams({
     customerId: String(customerId),
@@ -210,6 +233,7 @@ export async function getCustomerRemarks(
   })
   const response = await authedApiRequest<ApiEnvelope<CustomerRemarks>>(
     `/api/auth/customer-service/remarks?${search.toString()}`,
+    username ? { headers: { username } } : undefined,
   )
   return requireData(response, 'Customer remarks')
 }
@@ -217,6 +241,7 @@ export async function getCustomerRemarks(
 export async function getCustomerInternalRemarks(
   customerId: number,
   departmentType: string,
+  username?: string,
 ): Promise<CustomerRemark[]> {
   const search = new URLSearchParams({
     customerId: String(customerId),
@@ -224,6 +249,7 @@ export async function getCustomerInternalRemarks(
   })
   const response = await authedApiRequest<ApiEnvelope<CustomerRemark[]> | { data?: CustomerRemark[] }>(
     `/api/auth/customer-service/internal-remarks?${search.toString()}`,
+    username ? { headers: { username } } : undefined,
   )
   const data = (response as ApiEnvelope<CustomerRemark[]>).data ?? (response as any)
   return Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])
@@ -231,6 +257,7 @@ export async function getCustomerInternalRemarks(
 
 export async function getCustomerServiceRows(
   contact: string,
+  username?: string,
 ): Promise<CustomerServiceRow[]> {
   const search = new URLSearchParams({
     page: '0',
@@ -239,6 +266,7 @@ export async function getCustomerServiceRows(
   })
   const response = await authedApiRequest<CustomerRowsResponse>(
     `/api/auth/department/customer/rows?${search.toString()}`,
+    username ? { headers: { username } } : undefined,
   )
   const rows = Array.isArray(response.data)
     ? response.data

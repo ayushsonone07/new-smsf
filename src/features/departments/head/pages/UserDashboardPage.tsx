@@ -121,7 +121,7 @@ function percent(part: number, total: number): string {
 /**
  * Personal dashboard of a logged-in department USER — the same
  * widgets as the head dashboard, but the counts come from
- * `GET /api/onboarding/dashboard/summary` which scopes every
+ * `GET /api/dashboard/summary` which scopes every
  * number to the requesting user.
  */
 export function UserDashboardPage() {

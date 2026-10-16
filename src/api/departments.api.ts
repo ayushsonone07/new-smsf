@@ -129,7 +129,11 @@ export async function createDepartment(
 ): Promise<Department> {
   const adminUsername = getAdminUsername()
   const rawDeptType =
-    data.departmentType || data.type || data.name || 'ONBOARDING_DEPARTMENT'
+    data.serviceType ||
+    data.departmentType ||
+    data.type ||
+    data.name ||
+    'ONBOARDING_DEPARTMENT'
   const departmentType = normalizeDepartmentTypeName(rawDeptType)
 
   // 1. Register the dynamic department type in SMSB (idempotent if it already exists)
@@ -177,16 +181,30 @@ export async function createDepartment(
   if (Array.isArray(data.initialRoutes) && data.initialRoutes.length > 0) {
     try {
       const existingRoutes = await getDynamicRoutes(departmentType)
-      const deptSlug = normalizeDepartmentSlug(data.name || departmentType)
+      const deptSlug = normalizeDepartmentSlug(
+        data.serviceType ||
+        departmentType ||
+        data.departmentType ||
+        data.name,
+      )
       for (const routeSlug of data.initialRoutes) {
         const trimmed = routeSlug.trim()
         if (!trimmed) continue
         const formattedRouteName = `${deptSlug}/head/${trimmed}`
-        let targetRoute = existingRoutes.find((r) =>
-          isRouteMatch(r, formattedRouteName) ||
-          isRouteMatch(r, trimmed) ||
-          isRouteMatch(r, `${deptSlug}/${trimmed}`),
+        let targetRoute = existingRoutes.find(
+          (r) =>
+            r.routeName === formattedRouteName ||
+            r.routeName === `${deptSlug}/${trimmed}` ||
+            r.routeName?.toLowerCase() === formattedRouteName.toLowerCase(),
         )
+        if (!targetRoute) {
+          targetRoute = existingRoutes.find(
+            (r) =>
+              isRouteMatch(r, formattedRouteName) ||
+              isRouteMatch(r, `${deptSlug}/${trimmed}`) ||
+              isRouteMatch(r, trimmed),
+          )
+        }
         if (!targetRoute) {
           targetRoute = await createDynamicRoute({
             departmentType,

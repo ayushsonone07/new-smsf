@@ -31,6 +31,7 @@ import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { resolveDeptFromPath } from '../utils/routeUtils'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useOnboardingCustomersList,
@@ -48,6 +49,7 @@ import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
+import { recordCustomerActivity } from '../../../../utils/customerActivity'
 
 const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
   (user) => ({
@@ -71,15 +73,17 @@ export function CustomerListPage() {
   const departmentId = useHeadDepartmentId()
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
-  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
+  const resolvedDept = deptFromUrl
+    ? normalizeDepartmentTypeName(deptFromUrl)
+    : (session?.user.departmentType ? normalizeDepartmentTypeName(session.user.departmentType) : '')
   const isGoogle =
-    rawDepartment.toUpperCase().includes('GOOGLE') ||
+    resolvedDept.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && (
       window.location.pathname.startsWith('/google-head') ||
       window.location.pathname.startsWith('/google-user') ||
       window.location.pathname.startsWith('/google')
     ))
-  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDepartment || 'ONBOARDING_DEPARTMENT')
+  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (resolvedDept || 'ONBOARDING_DEPARTMENT')
   const isOnboardingDept = currentDepartment === 'ONBOARDING_DEPARTMENT'
   // Any non-onboarding (incl. dynamically added) department drives its
   // customer table from the generic rows endpoint once columns are picked.
@@ -126,10 +130,15 @@ export function CustomerListPage() {
     enabled: useRowsEndpoint,
   })
 
-  // 2. Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100
+  // 2. Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100&departmentType=...
   const serviceFlowsQuery = useQuery({
     queryKey: ['serviceFlows', currentDepartment],
-    queryFn: () => getServiceFlows({ page: 0, size: 100 }),
+    queryFn: () =>
+      getServiceFlows({
+        page: 0,
+        size: 100,
+        departmentType: currentDepartment,
+      }),
     enabled: useRowsEndpoint,
   })
   const hasSubServiceFlow = (serviceFlowsQuery.data?.data.length ?? 0) > 0
@@ -625,6 +634,13 @@ export function CustomerListPage() {
       if (result?.success === false) {
         throw new Error(result.message || 'Unable to initiate call')
       }
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: customer.phone,
+        departmentType: currentDepartment,
+        kind: 'call-initiated',
+        detail: `Call initiated to ${customer.contactName || customer.phone}.`,
+      })
       setToast({
         type: 'success',
         title: 'Call initiated',

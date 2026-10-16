@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, type Variants } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
@@ -281,8 +282,14 @@ function AssigneeDropdown({
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(0)
+  const [menuPosition, setMenuPosition] = useState<{
+    left: number
+    top?: number
+    bottom?: number
+  } | null>(null)
 
   const wrapRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 5
@@ -328,7 +335,12 @@ function AssigneeDropdown({
     if (!isOpen) return
 
     function handleOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (
+        wrapRef.current &&
+        !wrapRef.current.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setIsOpen(false)
       }
     }
@@ -344,6 +356,43 @@ function AssigneeDropdown({
     return () => {
       document.removeEventListener('mousedown', handleOutside)
       document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMenuPosition(null)
+      return
+    }
+
+    function positionMenu() {
+      const trigger = wrapRef.current?.getBoundingClientRect()
+      if (!trigger) return
+
+      const menuWidth = 236
+      const estimatedMenuHeight = 330
+      const viewportPadding = 8
+      const left = Math.min(
+        Math.max(viewportPadding, trigger.left),
+        window.innerWidth - menuWidth - viewportPadding,
+      )
+
+      if (trigger.bottom + estimatedMenuHeight <= window.innerHeight) {
+        setMenuPosition({ left, top: trigger.bottom + 4 })
+      } else {
+        setMenuPosition({
+          left,
+          bottom: window.innerHeight - trigger.top + 4,
+        })
+      }
+    }
+
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
     }
   }, [isOpen])
 
@@ -392,10 +441,17 @@ function AssigneeDropdown({
         )}
       </button>
 
-      {isEditable && isOpen && (
+      {isEditable && isOpen && menuPosition && createPortal(
         <motion.div
+          ref={menuRef}
           className="cl-assign-menu"
           role="listbox"
+          style={{
+            position: 'fixed',
+            left: menuPosition.left,
+            top: menuPosition.top,
+            bottom: menuPosition.bottom,
+          }}
           variants={menuVariants}
           initial="hidden"
           animate="visible"
@@ -528,7 +584,8 @@ function AssigneeDropdown({
               </button>
             </div>
           )}
-        </motion.div>
+        </motion.div>,
+        document.body,
       )}
     </div>
   )
@@ -592,19 +649,27 @@ function CustomerRow({
   showUpdated = false,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
+  const [statusMenuPosition, setStatusMenuPosition] = useState<{
+    left: number
+    top?: number
+    bottom?: number
+  } | null>(null)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
 
   const statusRef = useRef<HTMLDivElement>(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
 
   /* Close menus on outside click */
   useEffect(() => {
     if (!statusOpen) return
 
     function handler(e: MouseEvent) {
+      const target = e.target as Node
       if (
         statusRef.current &&
-        !statusRef.current.contains(e.target as Node)
+        !statusRef.current.contains(target) &&
+        !statusMenuRef.current?.contains(target)
       ) {
         setStatusOpen(false)
       }
@@ -612,6 +677,44 @@ function CustomerRow({
 
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [statusOpen])
+
+  useEffect(() => {
+    if (!statusOpen) {
+      setStatusMenuPosition(null)
+      return
+    }
+
+    function positionStatusMenu() {
+      const trigger = statusRef.current?.querySelector('.cl-status-btn')
+        ?.getBoundingClientRect()
+      if (!trigger) return
+
+      const menuWidth = 150
+      const estimatedMenuHeight = 140
+      const viewportPadding = 8
+      const left = Math.min(
+        Math.max(viewportPadding, trigger.left),
+        window.innerWidth - menuWidth - viewportPadding,
+      )
+
+      if (trigger.bottom + estimatedMenuHeight <= window.innerHeight) {
+        setStatusMenuPosition({ left, top: trigger.bottom + 4 })
+      } else {
+        setStatusMenuPosition({
+          left,
+          bottom: window.innerHeight - trigger.top + 4,
+        })
+      }
+    }
+
+    positionStatusMenu()
+    window.addEventListener('resize', positionStatusMenu)
+    window.addEventListener('scroll', positionStatusMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionStatusMenu)
+      window.removeEventListener('scroll', positionStatusMenu, true)
+    }
   }, [statusOpen])
 
   const statusMeta = STATUS_META[customer.status]
@@ -967,10 +1070,17 @@ function CustomerRow({
               )}
             </button>
 
-            {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && (
+            {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && statusMenuPosition && createPortal(
               <motion.div
+                ref={statusMenuRef}
                 className="cl-status-menu"
                 role="listbox"
+                style={{
+                  position: 'fixed',
+                  left: statusMenuPosition.left,
+                  top: statusMenuPosition.top,
+                  bottom: statusMenuPosition.bottom,
+                }}
                 variants={menuVariants}
                 initial="hidden"
                 animate="visible"
@@ -1024,7 +1134,8 @@ function CustomerRow({
                     </button>
                   )
                 })}
-              </motion.div>
+              </motion.div>,
+              document.body,
             )}
             {!isGoogle && onSendAcknowledgement && (
               <button

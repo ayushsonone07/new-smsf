@@ -455,7 +455,7 @@
   bottom: 0;
   z-index: 1200;
   display: flex;
-  width: min(410px, 100vw);
+  width: 50vw;
   flex-direction: column;
   border-left: 1px solid var(--c-border);
   background: #fff;
@@ -575,6 +575,10 @@
 
 .hnotify-drawer__empty strong { color: var(--c-text); }
 .hnotify-drawer__empty span { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .hnotify-drawer { width: 100vw; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .hnotify-backdrop,
@@ -714,6 +718,23 @@
 .icon-btn:hover {
   background: var(--c-blue-hover);
   color: var(--c-blue-dark);
+}
+
+.head-refresh-button {
+  cursor: pointer;
+}
+
+.head-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.head-refresh-button.is-refreshing svg {
+  animation: head-refresh-spin 700ms linear infinite;
+}
+
+@keyframes head-refresh-spin {
+  to { transform: rotate(360deg); }
 }
 
 .avatar {

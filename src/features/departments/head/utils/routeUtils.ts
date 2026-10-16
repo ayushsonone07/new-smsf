@@ -95,6 +95,8 @@ export function buildDepartmentRoute(
     return buildOnboardingRoute(slug, role)
   }
   const roleSegment = role?.toUpperCase() === 'USER' ? 'user' : 'head'
+  // The authenticated session department passed by callers is authoritative.
+  // The URL is only a fallback for admin previews or legacy links.
   const resolvedDept = departmentType || resolveDeptFromPath()
   if (resolvedDept) {
     const deptSlug = normalizeDepartmentSlug(resolvedDept)

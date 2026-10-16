@@ -10,6 +10,7 @@ interface ConfirmDialogProps {
   confirmLoadingLabel?: string
   cancelLabel?: string
   isLoading?: boolean
+  confirmDisabled?: boolean
   error?: string
   onClose: () => void
   onConfirm: () => void
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   confirmLoadingLabel = 'Please wait...',
   cancelLabel = 'Cancel',
   isLoading = false,
+  confirmDisabled = false,
   error,
   onClose,
   onConfirm,
@@ -54,7 +56,7 @@ export function ConfirmDialog({
         <Button
           variant="danger"
           onClick={onConfirm}
-          disabled={isLoading}
+          disabled={isLoading || confirmDisabled}
         >
           {isLoading ? confirmLoadingLabel : confirmLabel}
         </Button>

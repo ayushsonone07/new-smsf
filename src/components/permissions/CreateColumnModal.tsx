@@ -83,7 +83,7 @@ export function CreateColumnModal({
       description="Create a new column in access_customer_columns, link to a route UUID, and configure permissions."
       size="md"
     >
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.75rem' }}>
+      <form className="dynamic-permission-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.75rem' }}>
         {successMessage && (
           <div
             style={{
@@ -219,7 +219,7 @@ export function CreateColumnModal({
           </select>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+        <div className="dynamic-permission-form__actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
           <Button
             type="button"
             variant="secondary"

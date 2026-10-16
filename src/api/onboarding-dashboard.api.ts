@@ -5,7 +5,7 @@ import type {
 } from '../features/departments/types/onboarding-dashboard.types'
 
 /**
- * `GET /api/onboarding/dashboard/summary` — counts for the
+ * `GET /api/dashboard/summary` — counts for the
  * onboarding dashboard (KPIs, trend, target, status breakdown,
  * most active day, delay split).
  */
@@ -103,6 +103,11 @@ export interface OnboardingMemberPerformanceDTO {
   delayed?: number
   target?: number
   achievedPercentage?: number
+  pending?: number
+  inProgress?: number
+  cancelled?: number
+  churned?: number
+  followUp?: number
 }
 
 export interface OnboardingMembersResponse {
@@ -124,8 +129,9 @@ export interface OnboardingMembersParams {
 
 interface ApiDataWrapper<T> {
   data?: T
-  status?: number
+  status?: number | string
   message?: string
+  success?: boolean
 }
 
 /** Fallback when the session carries no `departmentType`. */
@@ -211,42 +217,6 @@ export async function getOnboardingDashboardSummary(
   params: OnboardingSummaryParams = {},
 ): Promise<OnboardingDashboardSummary> {
   const dept = params.department ?? summaryDepartment()
-
-  // 1. Primary: fetch from /api/auth/onboarding/summary
-  try {
-    const authData = await getAuthOnboardingSummary({
-      department: dept,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      allTime: params.allTime,
-    })
-
-    if (
-      authData &&
-      (authData.totalCustomers !== undefined ||
-        authData.total !== undefined ||
-        authData.teamTarget !== undefined)
-    ) {
-      return normalizeAuthSummaryToDashboardSummary(authData, {
-        startDate: params.startDate,
-        endDate: params.endDate,
-        allTime: params.allTime,
-      })
-    }
-    // If /api/auth/onboarding/summary returned 200 OK with data: null (e.g. newly created department),
-    // return a valid zero-initialized summary without throwing an error
-    if (authData === null) {
-      return normalizeAuthSummaryToDashboardSummary({}, {
-        startDate: params.startDate,
-        endDate: params.endDate,
-        allTime: params.allTime,
-      })
-    }
-  } catch (err) {
-    console.warn('Could not fetch from /api/auth/onboarding/summary, falling back:', err)
-  }
-
-  // 2. Fallback: /api/onboarding/dashboard/summary
   const search = new URLSearchParams()
 
   search.set(
@@ -268,7 +238,7 @@ export async function getOnboardingDashboardSummary(
 
   const res = await authedApiRequest<
     ApiDataWrapper<OnboardingDashboardSummary> & OnboardingDashboardSummary
-  >(`/api/onboarding/dashboard/summary?${search.toString()}`)
+  >(`/api/dashboard/summary?${search.toString()}`)
 
   if (res && 'data' in res && res.data === null) {
     return normalizeAuthSummaryToDashboardSummary({}, {
@@ -282,64 +252,63 @@ export async function getOnboardingDashboardSummary(
 }
 
 /**
- * `GET /api/onboarding/dashboard/members`
+ * `GET /api/auth/department/members/performance`
  */
 export async function getOnboardingDashboardMembers(
   params: OnboardingMembersParams = {},
 ): Promise<OnboardingMembersResponse> {
   const search = new URLSearchParams()
 
-  search.set(
-    'department',
-    params.department ?? summaryDepartment(),
-  )
+  search.set('departmentType', params.department ?? summaryDepartment())
 
   if (params.page !== undefined) search.set('page', String(params.page))
   if (params.size !== undefined) search.set('size', String(params.size))
-  if (params.startDate) search.set('startDate', params.startDate)
-  if (params.endDate) search.set('endDate', params.endDate)
-  if (params.allTime) search.set('allTime', 'true')
-
   const res = await authedApiRequest<any>(
-    `/api/onboarding/dashboard/members?${search.toString()}`,
+    `/api/auth/department/members/performance?${search.toString()}`,
   )
 
-  const payload = (res?.data ?? res) as any
+  const payload = res?.data ?? res
+  const performancePayload = payload?.data ?? payload
+  const rows = Array.isArray(performancePayload?.data)
+    ? performancePayload.data
+    : []
 
-  const rawMembers: OnboardingMemberPerformanceDTO[] = Array.isArray(payload?.teamMembers)
-    ? payload.teamMembers
-    : Array.isArray(payload?.members)
-      ? payload.members
-      : Array.isArray(payload?.content)
-        ? payload.content
-        : Array.isArray(res?.teamMembers)
-          ? res.teamMembers
-          : Array.isArray(res?.data?.teamMembers)
-            ? res.data.teamMembers
-            : Array.isArray(res?.data?.content)
-              ? res.data.content
-              : Array.isArray(payload)
-                ? payload
-                : []
+  const rawMembers: OnboardingMemberPerformanceDTO[] = rows.map(
+    (row: Record<string, unknown>) => {
+      const totalCustomers = Number(row.totalCustomers ?? 0)
+      const completed = Number(row.completedCustomers ?? 0)
+      const cancelled = Number(row.cancelledCustomers ?? 0)
+      const churned = Number(row.churnedCustomers ?? 0)
+
+      return {
+        userId: String(row.email ?? row.username ?? ''),
+        name: String(row.username ?? row.email ?? 'Unknown user'),
+        email: String(row.email ?? ''),
+        allTimeCustomers: totalCustomers,
+        assigned: totalCustomers,
+        completed,
+        delayed: cancelled + churned,
+        pending: Number(row.pendingCustomers ?? 0),
+        inProgress: Number(row.inProgressCustomers ?? 0),
+        cancelled,
+        churned,
+        followUp: Number(row.followUp ?? 0),
+        achievedPercentage:
+          totalCustomers > 0 ? (completed / totalCustomers) * 100 : 0,
+      }
+    },
+  )
 
   const totalMembers =
-    payload?.totalMembers ??
-    payload?.totalElements ??
-    payload?.total ??
-    res?.totalMembers ??
-    res?.totalElements ??
-    res?.total ??
-    rawMembers.length
+    performancePayload?.totalElements ??
+    performancePayload?.total
 
-  const page = payload?.page ?? payload?.pageNumber ?? res?.page ?? (params.page ?? 0)
-  const size = payload?.size ?? payload?.pageSize ?? res?.size ?? (params.size ?? 10)
+  const page = performancePayload?.page ?? performancePayload?.pageNumber ?? (params.page ?? 0)
+  const size = performancePayload?.size ?? performancePayload?.pageSize ?? (params.size ?? 10)
 
   const totalPages =
-    payload?.totalPages ??
-    payload?.totalPage ??
-    res?.totalPages ??
-    res?.totalPage ??
-    Math.max(1, Math.ceil(totalMembers / size))
+    performancePayload?.totalPages ??
+    performancePayload?.totalPage
 
   return {
     totalMembers,
