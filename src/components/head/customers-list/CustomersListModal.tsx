@@ -1608,19 +1608,6 @@ export function CustomersListModal({
                     </div>
                   </div>
 
-                  {/* What You Purchased */}
-                  <div className="cl-drawer__card">
-                    <div className="cl-drawer__card-head">
-                      <h3 className="cl-drawer__card-title">
-                        <Icon name="receipt" size={15} strokeWidth={2} />
-                        What You Purchased
-                      </h3>
-                    </div>
-                    <p className="cl-drawer__empty">
-                      No purchase history available
-                    </p>
-                  </div>
-
                   {/* Payment & GST */}
                   <div className="cl-drawer__card">
                     <div className="cl-drawer__card-head">
