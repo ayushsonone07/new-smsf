@@ -118,7 +118,7 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
   const query = useDepartmentFeatures(departmentId)
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
-  const effectiveDeptType = departmentType || deptFromUrl || session?.user.departmentType || undefined
+  const effectiveDeptType = session?.user.departmentType || departmentType || deptFromUrl || undefined
   const role = session?.user.role
   const isUser = role === 'USER'
   const isGoogle = isUserGoogle(effectiveDeptType)

@@ -716,6 +716,23 @@
   color: var(--c-blue-dark);
 }
 
+.head-refresh-button {
+  cursor: pointer;
+}
+
+.head-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.head-refresh-button.is-refreshing svg {
+  animation: head-refresh-spin 700ms linear infinite;
+}
+
+@keyframes head-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
 .avatar {
   display: inline-grid;
   place-items: center;

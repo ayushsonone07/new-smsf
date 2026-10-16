@@ -416,6 +416,20 @@
   margin-bottom: -4px;
 }
 
+.department-route-dropdown-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.department-route-dropdown-actions .secondary-button {
+  min-height: 34px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
 .department-route-dropdown-heading > div,
 .department-route-columns-heading > div {
   display: flex;

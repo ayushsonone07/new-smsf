@@ -4,6 +4,9 @@ import type {
   DynamicRouteResponse,
 } from '../../../api/dynamic-permission.api'
 import { PermissionToggle } from '../../../components/permissions/PermissionToggle'
+import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
+import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
+import { Button } from '../../../components/ui/Button'
 import { Select } from '../../../components/ui/Select'
 import {
   useDynamicColumns,
@@ -54,6 +57,8 @@ export function DepartmentRoutesDropdown({
   departmentType,
 }: DepartmentRoutesDropdownProps) {
   const [selectedRouteId, setSelectedRouteId] = useState('')
+  const [showRouteModal, setShowRouteModal] = useState(false)
+  const [showColumnModal, setShowColumnModal] = useState(false)
   const [routeUpdateError, setRouteUpdateError] = useState('')
   const [orderRevision, setOrderRevision] = useState(0)
   const routesQuery = useDynamicRoutes(departmentType)
@@ -191,9 +196,17 @@ export function DepartmentRoutesDropdown({
           <strong>Department routes</strong>
           <span>Select a route to see its columns.</span>
         </div>
-        {!routesQuery.isPending ? (
-          <span className="department-route-count">{routes.length} routes</span>
-        ) : null}
+        <div className="department-route-dropdown-actions">
+          <Button variant="secondary" onClick={() => setShowRouteModal(true)}>
+            <span aria-hidden="true">＋</span> Add Dynamic Route
+          </Button>
+          <Button variant="secondary" onClick={() => setShowColumnModal(true)}>
+            <span aria-hidden="true">＋</span> Add Dynamic Column
+          </Button>
+          {!routesQuery.isPending ? (
+            <span className="department-route-count">{routes.length} routes</span>
+          ) : null}
+        </div>
       </div>
 
       {updateErrorMessage ? (
@@ -401,6 +414,20 @@ export function DepartmentRoutesDropdown({
           )}
         </section>
       ) : null}
+
+      <CreateRouteModal
+        key={`route-${departmentType}`}
+        open={showRouteModal}
+        onClose={() => setShowRouteModal(false)}
+        initialDepartmentType={departmentType}
+      />
+      <CreateColumnModal
+        key={`column-${departmentType}`}
+        open={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
+        initialDepartmentType={departmentType}
+        initialRouteId={selectedRouteId}
+      />
     </div>
   )
 }

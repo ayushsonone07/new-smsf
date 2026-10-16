@@ -35,7 +35,7 @@ export function normalizeDepartmentTypeName(raw: string): string {
 
 export function normalizeDepartmentSlug(raw: string): string {
   if (!raw) return 'department'
-  const trimmed = raw.trim().toLowerCase()
+  const trimmed = raw.trim().toLowerCase().replace(/_department$/i, '')
   return (
     trimmed
       .replace(/[^a-z0-9_-]+/g, '_')

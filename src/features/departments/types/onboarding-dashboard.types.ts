@@ -1,6 +1,6 @@
 /**
  * Response of the backend onboarding dashboard endpoints
- * (`GET /api/onboarding/dashboard/summary`, `.../dashboard`) —
+ * (`GET /api/dashboard/summary`, `.../dashboard`) —
  * `OnboardingDashboardResponseDTO` of SMSB mirrored for the UI.
  *
  * All counts are scoped by the requester: a department USER

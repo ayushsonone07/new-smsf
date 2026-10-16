@@ -92,6 +92,7 @@ export async function apiRequest<T>(
   try {
     response = await fetch(url, {
       ...options,
+      cache: options.cache ?? (options.method == null || options.method === 'GET' ? 'no-store' : undefined),
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         Accept: 'application/json',

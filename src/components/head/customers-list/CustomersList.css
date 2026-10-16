@@ -976,7 +976,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 1000;
+  z-index: 5000;
   min-width: 224px;
   width: 236px;
   padding: 6px;

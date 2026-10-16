@@ -30,8 +30,6 @@ import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
-import { CreateRouteModal } from '../../../components/permissions/CreateRouteModal'
-import { CreateColumnModal } from '../../../components/permissions/CreateColumnModal'
 import './DepartmentManagementPage.css'
 
 export function DepartmentManagementPage() {
@@ -48,8 +46,6 @@ export function DepartmentManagementPage() {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false)
   const [preselectedService, setPreselectedService] =
     useState<AdminServiceItem | null>(null)
-  const [showRouteModal, setShowRouteModal] = useState(false)
-  const [showColumnModal, setShowColumnModal] = useState(false)
 
   const departmentsQuery = useDepartments()
   const createMutation = useCreateDepartment()
@@ -281,18 +277,6 @@ export function DepartmentManagementPage() {
               <div className="department-management-actions">
                 <Button
                   variant="secondary"
-                  onClick={() => setShowRouteModal(true)}
-                >
-                  <span>＋</span> Add Dynamic Route
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowColumnModal(true)}
-                >
-                  <span>＋</span> Add Dynamic Column
-                </Button>
-                <Button
-                  variant="secondary"
                   onClick={() => setShowAddServiceModal(true)}
                 >
                   <span>＋</span> Step 1: Create Service
@@ -380,19 +364,6 @@ export function DepartmentManagementPage() {
           />
         ) : null}
 
-        {showRouteModal ? (
-          <CreateRouteModal
-            open
-            onClose={() => setShowRouteModal(false)}
-          />
-        ) : null}
-
-        {showColumnModal ? (
-          <CreateColumnModal
-            open
-            onClose={() => setShowColumnModal(false)}
-          />
-        ) : null}
       </div>
     </PageLayout>
   )

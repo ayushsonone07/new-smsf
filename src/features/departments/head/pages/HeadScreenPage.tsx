@@ -25,7 +25,9 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   const location = useLocation()
   const departmentId = useHeadDepartmentId()
   const deptFromUrl = departmentName || resolveDeptFromPath(location.pathname) || undefined
-  const nav = useHeadNav(departmentId, deptFromUrl)
+  const session = getSession()
+  const effectiveDepartmentType = session?.user.departmentType || deptFromUrl
+  const nav = useHeadNav(departmentId, effectiveDepartmentType)
   const navigate = useNavigate()
   const didRedirect = useRef(false)
 
@@ -40,9 +42,8 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   if (ready && !feature) {
     const firstEnabledFeature = nav.features[0]
     if (firstEnabledFeature) {
-      const session = getSession()
       const isUser = (role?.toUpperCase() === 'USER') || (session?.user.role === 'USER')
-      const deptType = deptFromUrl || session?.user.departmentType
+      const deptType = session?.user.departmentType || deptFromUrl
       const candidate = buildDepartmentRoute(
         firstEnabledFeature.slug,
         deptType,

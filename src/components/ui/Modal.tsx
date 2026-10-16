@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
@@ -76,7 +77,7 @@ export function Modal({
     .filter(Boolean)
     .join(' ')
 
-  return (
+  return createPortal(
     <motion.div
       className="modal-backdrop"
       onMouseDown={onClose}
@@ -120,6 +121,7 @@ export function Modal({
 
         {children}
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   )
 }
