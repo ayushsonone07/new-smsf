@@ -7,6 +7,8 @@ import {
   fetchPendingTimelineRequests,
   fetchServicesForPlan,
   manageAdminPlan,
+  updateAdminServiceTimeline,
+  fetchAdminServiceFlows,
   type AdminServiceItem,
   type PlanTypeItem,
 } from '../../api/admin-services.api'
@@ -61,11 +63,19 @@ export function AdminServiceListCard({
     [],
   )
 
-  // Pending timeline approvals modal state
-  const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState(false)
+  // Service Timelines & Approvals modal state
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
+  const [timelineTab, setTimelineTab] = useState<'set' | 'pending'>('set')
+  const [timelineDeptFilter, setTimelineDeptFilter] = useState('ALL')
+  const [timelineServiceSearch, setTimelineServiceSearch] = useState('')
+  const [customDaysMap, setCustomDaysMap] = useState<Record<string, number>>({})
   const [processingTimelineId, setProcessingTimelineId] = useState<
     string | null
   >(null)
+  const [timelineFeedback, setTimelineFeedback] = useState<{
+    msg: string
+    type: 'ok' | 'err'
+  } | null>(null)
 
   const services = useMemo(
     () => servicesQuery.data ?? [],
@@ -140,20 +150,76 @@ export function AdminServiceListCard({
   const pendingTimelineQuery = useQuery({
     queryKey: ['pending-timeline-requests'],
     queryFn: fetchPendingTimelineRequests,
-    enabled: isPendingApprovalsOpen,
+    staleTime: 30_000,
   })
 
-  const decideTimelineMutation = useMutation({
-    mutationFn: decideTimelineRequest,
+  // All services with flows query for Timeline management
+  const adminFlowsQuery = useQuery({
+    queryKey: ['admin-service-flows', timelineDeptFilter],
+    queryFn: () =>
+      fetchAdminServiceFlows({
+        departmentType:
+          timelineDeptFilter !== 'ALL' ? timelineDeptFilter : undefined,
+      }),
+    enabled: isTimelineModalOpen,
+  })
+
+  const updateTimelineMutation = useMutation({
+    mutationFn: updateAdminServiceTimeline,
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['pending-timeline-requests'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['admin-service-flows'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-timeline-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['service-flows'] })
     },
     onSettled: () => {
       setProcessingTimelineId(null)
     },
   })
+
+  const decideTimelineMutation = useMutation({
+    mutationFn: decideTimelineRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-service-flows'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-timeline-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['service-flows'] })
+    },
+    onSettled: () => {
+      setProcessingTimelineId(null)
+    },
+  })
+
+  function showTimelineFeedback(msg: string, type: 'ok' | 'err' = 'ok') {
+    setTimelineFeedback({ msg, type })
+    setTimeout(() => setTimelineFeedback(null), 4000)
+  }
+
+  async function handleSetServiceTimeline(
+    serviceId: string,
+    days: number,
+    serviceName?: string,
+  ) {
+    if (!days || days < 1) {
+      showTimelineFeedback(
+        'Please enter a valid timeline (minimum 1 day).',
+        'err',
+      )
+      return
+    }
+    setProcessingTimelineId(serviceId)
+    try {
+      await updateTimelineMutation.mutateAsync({ serviceId, time: days })
+      showTimelineFeedback(
+        `Timeline for "${serviceName || 'service'}" set to ${days} days and approved!`,
+        'ok',
+      )
+    } catch (err: unknown) {
+      const errMsg =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update service timeline.'
+      showTimelineFeedback(errMsg, 'err')
+    }
+  }
 
   function handleExportCsv() {
     const headers = [
@@ -438,9 +504,28 @@ export function AdminServiceListCard({
               <>
                 <Button
                   variant="secondary"
-                  onClick={() => setIsPendingApprovalsOpen(true)}
+                  onClick={() => {
+                    setIsTimelineModalOpen(true)
+                    setTimelineTab('set')
+                  }}
+                  style={{ position: 'relative' }}
                 >
-                  ⏱ Pending Approvals
+                  ⏱ Timelines & Approvals
+                  {(pendingTimelineQuery.data ?? []).length > 0 && (
+                    <span
+                      style={{
+                        marginLeft: '6px',
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                      }}
+                    >
+                      {(pendingTimelineQuery.data ?? []).length}
+                    </span>
+                  )}
                 </Button>
                 <Button
                   variant="secondary"
@@ -1388,99 +1473,533 @@ export function AdminServiceListCard({
         )}
       </Modal>
 
-      {/* Pending Timeline Approvals Modal */}
+      {/* Service Timelines Management Modal */}
       <Modal
-        open={isPendingApprovalsOpen}
-        onClose={() => setIsPendingApprovalsOpen(false)}
+        open={isTimelineModalOpen}
+        onClose={() => setIsTimelineModalOpen(false)}
         size="lg"
-        title="Pending Timeline Approvals"
-        description="Review and approve or reject pending timeline update requests from department heads."
+        title="⏱ Service Timelines Management"
+        description="SuperAdmin direct control: Set or update turnaround timeline (in days) for any department service, or review pending approval requests."
       >
-        {pendingTimelineQuery.isLoading ? (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            Loading pending timeline requests...
-          </div>
-        ) : (pendingTimelineQuery.data ?? []).length === 0 ? (
-          <div
+        {/* Tab switchers */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            borderBottom: '1px solid #e2e8f0',
+            marginBottom: '1.25rem',
+            paddingBottom: '0.75rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setTimelineTab('set')}
             style={{
-              padding: '2rem',
-              textAlign: 'center',
-              color: '#64748b',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: timelineTab === 'set' ? '#0284c7' : '#f1f5f9',
+              color: timelineTab === 'set' ? '#ffffff' : '#475569',
+              transition: 'all 0.15s ease',
             }}
           >
-            No pending timeline requests. All timeline update requests have been
-            processed.
+            ⚡ Set / Update Any Timeline
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimelineTab('pending')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor:
+                timelineTab === 'pending' ? '#0284c7' : '#f1f5f9',
+              color: timelineTab === 'pending' ? '#ffffff' : '#475569',
+              transition: 'all 0.15s ease',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            📋 Pending Requests
+            {(pendingTimelineQuery.data ?? []).length > 0 && (
+              <span
+                style={{
+                  background:
+                    timelineTab === 'pending' ? '#ffffff' : '#ef4444',
+                  color: timelineTab === 'pending' ? '#0284c7' : '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                }}
+              >
+                {(pendingTimelineQuery.data ?? []).length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Feedback alert */}
+        {timelineFeedback && (
+          <div
+            style={{
+              padding: '0.65rem 1rem',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              backgroundColor:
+                timelineFeedback.type === 'ok' ? '#ecfdf5' : '#fef2f2',
+              color: timelineFeedback.type === 'ok' ? '#065f46' : '#991b1b',
+              border: `1px solid ${
+                timelineFeedback.type === 'ok' ? '#a7f3d0' : '#fecaca'
+              }`,
+            }}
+          >
+            {timelineFeedback.type === 'ok' ? '✓ ' : '✕ '}
+            {timelineFeedback.msg}
           </div>
-        ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Service Name</th>
-                  <th>Department</th>
-                  <th>Requested By</th>
-                  <th>TAT</th>
-                  <th className="align-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(pendingTimelineQuery.data ?? []).map((req) => {
-                  const updation =
-                    req.serviceTimeline?.timeline?.updation ?? {}
-                  const isBusy =
-                    processingTimelineId === req.departmentServiceId
-                  return (
-                    <tr key={req.departmentServiceId}>
-                      <td>
-                        <strong>{req.departmentServiceName || 'N/A'}</strong>
-                      </td>
-                      <td>
-                        <span className="dept-type-badge">
-                          {req.departmentType || 'N/A'}
-                        </span>
-                      </td>
-                      <td>{updation.requestBy || 'N/A'}</td>
-                      <td>
-                        {updation.timetobe != null
-                          ? `${updation.timetobe} days`
-                          : 'N/A'}
-                      </td>
-                      <td className="align-right">
-                        <div className="action-group">
-                          <Button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => {
-                              setProcessingTimelineId(req.departmentServiceId)
-                              decideTimelineMutation.mutate({
-                                serviceId: req.departmentServiceId,
-                                action: 'APPROVE',
-                              })
-                            }}
-                          >
-                            ✓ Approve
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            disabled={isBusy}
-                            onClick={() => {
-                              setProcessingTimelineId(req.departmentServiceId)
-                              decideTimelineMutation.mutate({
-                                serviceId: req.departmentServiceId,
-                                action: 'REJECT',
-                              })
-                            }}
-                          >
-                            ✕ Reject
-                          </Button>
-                        </div>
-                      </td>
+        )}
+
+        {/* TAB 1: Set / Update Any Timeline */}
+        {timelineTab === 'set' && (
+          <div>
+            <div
+              style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                fontSize: '0.8125rem',
+                color: '#0369a1',
+                marginBottom: '1rem',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>⚡ SuperAdmin Authority:</strong> When you set or update a
+              timeline here, it is applied and marked as <strong>APPROVED</strong>{' '}
+              immediately in the database for that department service. No second approval is needed.
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem',
+                alignItems: 'center',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    color: '#334155',
+                  }}
+                >
+                  Department:
+                </label>
+                <select
+                  value={timelineDeptFilter}
+                  onChange={(e) => setTimelineDeptFilter(e.target.value)}
+                  style={{
+                    padding: '0.45rem 0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.875rem',
+                    background: '#fff',
+                  }}
+                >
+                  <option value="ALL">All Departments</option>
+                  {availableDepartmentTypes.map((dt) => (
+                    <option key={dt} value={dt}>
+                      {dt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                type="search"
+                value={timelineServiceSearch}
+                onChange={(e) => setTimelineServiceSearch(e.target.value)}
+                placeholder="Search services by name..."
+                style={{
+                  flex: '1 1 200px',
+                  maxWidth: '320px',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.875rem',
+                }}
+              />
+            </div>
+
+            {/* Services Table */}
+            {adminFlowsQuery.isLoading ? (
+              <div
+                style={{
+                  padding: '2rem',
+                  textAlign: 'center',
+                  color: '#64748b',
+                }}
+              >
+                Loading department services and timelines...
+              </div>
+            ) : adminFlowsQuery.isError ? (
+              <div
+                style={{
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  backgroundColor: '#fef2f2',
+                  color: '#b91c1c',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Failed to load services:{' '}
+                {(adminFlowsQuery.error as Error)?.message}
+              </div>
+            ) : (() => {
+              const q = timelineServiceSearch.trim().toLowerCase()
+              const flowsList = (adminFlowsQuery.data ?? []).filter((item) => {
+                if (!q) return true
+                return (
+                  item.departmentServiceName?.toLowerCase().includes(q) ||
+                  item.departmentType?.toLowerCase().includes(q)
+                )
+              })
+
+              if (flowsList.length === 0) {
+                return (
+                  <div
+                    style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#64748b',
+                    }}
+                  >
+                    No services found for the selected department.
+                  </div>
+                )
+              }
+
+              return (
+                <div
+                  className="table-wrapper"
+                  style={{ maxHeight: '420px', overflowY: 'auto' }}
+                >
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Service Name</th>
+                        <th>Department</th>
+                        <th>Current Timeline</th>
+                        <th>Status</th>
+                        <th style={{ width: '130px' }}>New TAT (Days)</th>
+                        <th className="align-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {flowsList.map((flow) => {
+                        const timeline = flow.serviceTimeline?.timeline
+                        const currentDays = timeline?.time ?? 0
+                        const status = timeline?.updation?.status
+                        const inputVal =
+                          customDaysMap[flow.departmentServiceId] ??
+                          (currentDays > 0 ? currentDays : 3)
+                        const isBusy =
+                          processingTimelineId === flow.departmentServiceId
+
+                        return (
+                          <tr key={flow.departmentServiceId}>
+                            <td>
+                              <strong>{flow.departmentServiceName}</strong>
+                            </td>
+                            <td>
+                              <span className="dept-type-badge">
+                                {flow.departmentType}
+                              </span>
+                            </td>
+                            <td>
+                              {currentDays > 0 ? (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#e0f2fe',
+                                    color: '#0369a1',
+                                    fontWeight: 600,
+                                    fontSize: '0.8125rem',
+                                  }}
+                                >
+                                  ⏱ {currentDays}{' '}
+                                  {currentDays === 1 ? 'Day' : 'Days'}
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    color: '#94a3b8',
+                                    fontSize: '0.8125rem',
+                                  }}
+                                >
+                                  — Not set
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {status ? (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    backgroundColor:
+                                      status === 'APPROVED'
+                                        ? '#dcfce7'
+                                        : status === 'PENDING'
+                                        ? '#fef3c7'
+                                        : '#fee2e2',
+                                    color:
+                                      status === 'APPROVED'
+                                        ? '#15803d'
+                                        : status === 'PENDING'
+                                        ? '#b45309'
+                                        : '#b91c1c',
+                                  }}
+                                >
+                                  {status}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                value={inputVal}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10)
+                                  setCustomDaysMap((prev) => ({
+                                    ...prev,
+                                    [flow.departmentServiceId]: isNaN(val)
+                                      ? 0
+                                      : val,
+                                  }))
+                                }}
+                                style={{
+                                  width: '85px',
+                                  padding: '0.35rem 0.5rem',
+                                  borderRadius: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  fontSize: '0.875rem',
+                                  textAlign: 'center',
+                                }}
+                              />
+                            </td>
+                            <td className="align-right">
+                              <Button
+                                type="button"
+                                disabled={isBusy || inputVal < 1}
+                                onClick={() =>
+                                  handleSetServiceTimeline(
+                                    flow.departmentServiceId,
+                                    inputVal,
+                                    flow.departmentServiceName,
+                                  )
+                                }
+                                style={{
+                                  padding: '0.35rem 0.75rem',
+                                  fontSize: '0.8125rem',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {isBusy ? 'Saving...' : '⚡ Set Timeline'}
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* TAB 2: Pending Approvals */}
+        {timelineTab === 'pending' && (
+          <div>
+            {pendingTimelineQuery.isLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+                Loading pending timeline requests...
+              </div>
+            ) : (pendingTimelineQuery.data ?? []).length === 0 ? (
+              <div
+                style={{
+                  padding: '2rem',
+                  textAlign: 'center',
+                  color: '#64748b',
+                }}
+              >
+                No pending timeline requests. All timeline update requests have
+                been processed.
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Service Name</th>
+                      <th>Department</th>
+                      <th>Requested By</th>
+                      <th>Requested TAT</th>
+                      <th className="align-right">Actions</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {(pendingTimelineQuery.data ?? []).map((req) => {
+                      const updation =
+                        req.serviceTimeline?.timeline?.updation ?? {}
+                      const isBusy =
+                        processingTimelineId === req.departmentServiceId
+                      return (
+                        <tr key={req.departmentServiceId}>
+                          <td>
+                            <strong>
+                              {req.departmentServiceName || 'N/A'}
+                            </strong>
+                          </td>
+                          <td>
+                            <span className="dept-type-badge">
+                              {req.departmentType || 'N/A'}
+                            </span>
+                          </td>
+                          <td>{updation.requestBy || 'N/A'}</td>
+                          <td>
+                            {updation.timetobe != null ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#fef3c7',
+                                  color: '#b45309',
+                                  fontWeight: 600,
+                                  fontSize: '0.8125rem',
+                                }}
+                              >
+                                ⏱ {updation.timetobe} days
+                              </span>
+                            ) : (
+                              'N/A'
+                            )}
+                          </td>
+                          <td className="align-right">
+                            <div className="action-group">
+                              <Button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  setProcessingTimelineId(
+                                    req.departmentServiceId,
+                                  )
+                                  decideTimelineMutation.mutate(
+                                    {
+                                      serviceId: req.departmentServiceId,
+                                      action: 'APPROVE',
+                                    },
+                                    {
+                                      onSuccess: () => {
+                                        showTimelineFeedback(
+                                          `Request approved for ${
+                                            req.departmentServiceName ||
+                                            'service'
+                                          }.`,
+                                          'ok',
+                                        )
+                                      },
+                                      onError: (err: any) => {
+                                        showTimelineFeedback(
+                                          err?.message || 'Failed to approve.',
+                                          'err',
+                                        )
+                                      },
+                                    },
+                                  )
+                                }}
+                              >
+                                ✓ Approve
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  setProcessingTimelineId(
+                                    req.departmentServiceId,
+                                  )
+                                  decideTimelineMutation.mutate(
+                                    {
+                                      serviceId: req.departmentServiceId,
+                                      action: 'REJECT',
+                                    },
+                                    {
+                                      onSuccess: () => {
+                                        showTimelineFeedback(
+                                          `Request rejected for ${
+                                            req.departmentServiceName ||
+                                            'service'
+                                          }.`,
+                                          'ok',
+                                        )
+                                      },
+                                      onError: (err: any) => {
+                                        showTimelineFeedback(
+                                          err?.message || 'Failed to reject.',
+                                          'err',
+                                        )
+                                      },
+                                    },
+                                  )
+                                }}
+                              >
+                                ✕ Reject
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </Modal>

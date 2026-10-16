@@ -507,3 +507,83 @@ export async function createColumnsForRoute(
   return res as RouteColumnsSummaryResponse
 }
 
+export interface UpdateDynamicRoutePayload {
+  routeId?: string
+  routeName: string
+  departmentType?: string
+  visibility?: boolean
+}
+
+export interface UpdateDynamicColumnPayload {
+  columnId?: string
+  columnName?: string
+  routesType?: string
+  routeId?: string
+  departmentType?: string
+  readWriteAccess?: '1' | '2' | '12' | 'CAN_READ' | 'CAN_EDIT'
+  visibility?: boolean
+  enable?: boolean
+}
+
+/**
+ * Delete a dynamic route. Fails with 409 Conflict if columns are still linked to this route.
+ */
+export async function deleteDynamicRoute(routeId: string): Promise<boolean> {
+  const res = await authedApiRequest<any>(
+    `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+  return res?.success !== false
+}
+
+/**
+ * Update a dynamic route (rename, change visibility)
+ */
+export async function updateDynamicRoute(
+  routeId: string,
+  payload: UpdateDynamicRoutePayload,
+): Promise<DynamicRouteResponse> {
+  const res = await authedApiRequest<any>(
+    `/api/dynamic-permission/routes/${encodeURIComponent(routeId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
+  if (res && res.data) return res.data
+  return res as DynamicRouteResponse
+}
+
+/**
+ * Delete a dynamic column and its associated permissions
+ */
+export async function deleteDynamicColumn(columnId: string): Promise<boolean> {
+  const res = await authedApiRequest<any>(
+    `/api/dynamic-permission/columns/${encodeURIComponent(columnId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+  return res?.success !== false
+}
+
+/**
+ * Update a dynamic column (rename, change routesType, update permissions)
+ */
+export async function updateDynamicColumn(
+  columnId: string,
+  payload: UpdateDynamicColumnPayload,
+): Promise<DynamicColumnResponse> {
+  const res = await authedApiRequest<any>(
+    `/api/dynamic-permission/columns/${encodeURIComponent(columnId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
+  if (res && res.data) return res.data
+  return res as DynamicColumnResponse
+}
+
