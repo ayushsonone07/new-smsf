@@ -39,18 +39,16 @@ const sectionVariants: Variants = {
 
 export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
   const session = getSession()
-  const isSuperAdmin =
-    session?.user.role === 'SUPERADMIN' ||
-    session?.user.role === 'ADMIN' ||
-    session?.user.role?.toUpperCase() === 'ROLE_SUPERADMIN'
+  // Backend SUPERADMIN roles are normalized to ADMIN when the session is created.
+  const isSuperAdmin = session?.user.role === 'ADMIN'
 
   // Detect department from route params or URL pathname or user session
   const { departmentName } = useParams({ strict: false }) as { departmentName?: string }
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const defaultDept = useMemo(() => {
+    if (session?.user.departmentType) return session.user.departmentType
     if (departmentName) return normalizeDepartmentTypeName(departmentName)
     if (deptFromUrl) return normalizeDepartmentTypeName(deptFromUrl)
-    if (session?.user.departmentType) return session.user.departmentType
     return isSuperAdmin ? 'ALL' : 'GOOGLE_DEPARTMENT'
   }, [departmentName, deptFromUrl, session?.user.departmentType, isSuperAdmin])
 

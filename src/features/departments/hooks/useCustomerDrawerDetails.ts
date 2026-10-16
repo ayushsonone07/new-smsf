@@ -12,13 +12,23 @@ import { getSession } from '../../../app/auth/session'
 
 export function useCustomerDrawerDetails(
   customer: OnboardingCustomer | null,
+  options: {
+    profileOnly?: boolean
+    departmentType?: string
+    requestUsername?: string
+  } = {},
 ): CustomerDrawerApiDetails {
+  const profileOnly = options.profileOnly ?? false
   const session = getSession()
   const rawDept = session?.user.departmentType || ''
   const isGoogle =
     rawDept.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && window.location.pathname.startsWith('/google-head'))
-  const customerDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (rawDept || 'ONBOARDING_DEPARTMENT')
+  const customerDepartment = options.departmentType !== undefined
+    ? options.departmentType
+    : isGoogle
+      ? 'GOOGLE_DEPARTMENT'
+      : (rawDept || 'ONBOARDING_DEPARTMENT')
 
   const customerId = Number(customer?.id)
   const hasCustomerId = Number.isInteger(customerId) && customerId > 0
@@ -30,33 +40,38 @@ export function useCustomerDrawerDetails(
     queryFn: () => getCustomerProfileDetails(contact),
     enabled: isOpen && contact.length > 0,
     staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const reviewRepliesQuery = useQuery({
     queryKey: ['customer-drawer-review-replies', customerId, customerDepartment],
     queryFn: () => getCustomerReviewReplies(customerId, customerDepartment),
-    enabled: isOpen && hasCustomerId,
+    enabled:
+      isOpen &&
+      hasCustomerId &&
+      !profileOnly &&
+      customerDepartment.length > 0,
     staleTime: 0,
   })
 
   const remarksQuery = useQuery({
-    queryKey: ['customer-drawer-remarks', customerId, customerDepartment],
-    queryFn: () => getCustomerRemarks(customerId, customerDepartment),
-    enabled: isOpen && hasCustomerId,
+    queryKey: ['customer-drawer-remarks', customerId, customerDepartment, options.requestUsername],
+    queryFn: () => getCustomerRemarks(customerId, customerDepartment, options.requestUsername),
+    enabled: isOpen && hasCustomerId && !profileOnly,
     staleTime: 0,
   })
 
   const internalRemarksQuery = useQuery({
-    queryKey: ['customer-drawer-internal-remarks', customerId, customerDepartment],
-    queryFn: () => getCustomerInternalRemarks(customerId, customerDepartment),
-    enabled: isOpen && hasCustomerId,
+    queryKey: ['customer-drawer-internal-remarks', customerId, customerDepartment, options.requestUsername],
+    queryFn: () => getCustomerInternalRemarks(customerId, customerDepartment, options.requestUsername),
+    enabled: isOpen && hasCustomerId && !profileOnly,
     staleTime: 0,
   })
 
   const rowsQuery = useQuery({
-    queryKey: ['customer-drawer-rows', contact],
-    queryFn: () => getCustomerServiceRows(contact),
-    enabled: isOpen && contact.length > 0,
+    queryKey: ['customer-drawer-rows', contact, options.requestUsername],
+    queryFn: () => getCustomerServiceRows(contact, options.requestUsername),
+    enabled: isOpen && contact.length > 0 && !profileOnly,
     staleTime: 0,
   })
 
@@ -86,7 +101,7 @@ export function useCustomerDrawerDetails(
         isOpen && !contact
           ? ['Customer contact number is unavailable; contact-based details were not requested.']
           : [],
-        isOpen && !hasCustomerId
+        isOpen && !hasCustomerId && !profileOnly
           ? ['Customer ID is unavailable; remarks and review replies were not requested.']
           : [],
       ),

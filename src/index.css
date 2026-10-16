@@ -758,8 +758,20 @@ tr.is-selected-row td {
   align-items: center;
   padding: 20px 16px;
   background: rgb(15 23 42 / 55%);
-  z-index: 50;
+  z-index: 1300;
   overflow-y: auto;
+}
+
+.dynamic-permission-form__actions {
+  position: sticky;
+  bottom: -16px;
+  z-index: 2;
+  margin-right: -18px;
+  margin-left: -18px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 -8px 18px rgb(15 23 42 / 5%);
 }
 
 .modal,

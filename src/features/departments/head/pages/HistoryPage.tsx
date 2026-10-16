@@ -216,7 +216,7 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
       </motion.div>
 
       {/* ── Toolbar: Search, User Selector & Refresh ── */}
-      <motion.div className="meeting-toolbar" variants={sectionVariants}>
+      <motion.div className="history-toolbar" variants={sectionVariants}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
           <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 220 }}>
             <SearchBar
@@ -256,16 +256,6 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
           )}
         </div>
 
-        <div className="meeting-actions">
-          <button
-            type="button"
-            className="meeting-action-btn"
-            onClick={handleRefresh}
-            title="Refresh history"
-          >
-            ↻ Refresh
-          </button>
-        </div>
       </motion.div>
 
       {/* ── Task History View ── */}

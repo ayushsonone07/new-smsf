@@ -29,6 +29,9 @@ export interface CustomersListModalProps {
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
   initialTab?: DrawerTab
+  /** Fetch only the common customer profile endpoint (used by superadmin). */
+  profileOnly?: boolean
+  requestUsername?: string
 }
 
 type DrawerTab =
@@ -228,6 +231,8 @@ export function CustomersListModal({
   onClose,
   onOpenFullPage,
   initialTab,
+  profileOnly = false,
+  requestUsername,
 }: CustomersListModalProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>(initialTab ?? 'overview')
   const [closing, setClosing] = useState(false)
@@ -239,7 +244,11 @@ export function CustomersListModal({
   const queryClient = useQueryClient()
 
   const current = activeCustomer ?? customer
-  const apiDetails = useCustomerDrawerDetails(current)
+  const apiDetails = useCustomerDrawerDetails(current, {
+    profileOnly,
+    departmentType,
+    requestUsername,
+  })
 
   const [prevCustomerId, setPrevCustomerId] = useState(customer?.id)
   if (customer?.id !== prevCustomerId) {
@@ -463,7 +472,7 @@ export function CustomersListModal({
     .charAt(0)
     .toUpperCase()
 
-  const tabs: { id: DrawerTab; label: string; count?: number }[] = [
+  const allTabs: { id: DrawerTab; label: string; count?: number }[] = [
     { id: 'overview', label: 'Overview' },
     ...(duplicateItems.length > 0
       ? [
@@ -486,6 +495,15 @@ export function CustomersListModal({
     { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
     { id: 'activity', label: 'Updates', count: updates.length },
   ]
+  const tabs = profileOnly
+    ? allTabs.filter((tab) => tab.id === 'overview' || tab.id === 'business-form')
+    : allTabs
+
+  useEffect(() => {
+    if (profileOnly && activeTab !== 'overview' && activeTab !== 'business-form') {
+      setActiveTab('overview')
+    }
+  }, [activeTab, profileOnly])
 
   if (!customer || !current) return null
 
@@ -675,8 +693,8 @@ export function CustomersListModal({
             </div>
           )}
 
-          {/* Stat cards */}
-          <div className="cl-drawer__stats">
+          {/* Department statistics are unavailable to a Superadmin profile-only request. */}
+          {!profileOnly && <div className="cl-drawer__stats">
             <div className="cl-drawer__stat">
               <div className="cl-drawer__stat-label">Services</div>
               <div className="cl-drawer__stat-value">
@@ -702,7 +720,7 @@ export function CustomersListModal({
                 {customerRemarks.length} customer · {internalRemarks.length} internal
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Tabs */}
           <div className="cl-drawer__tabs" role="tablist">
