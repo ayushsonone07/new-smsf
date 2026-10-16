@@ -336,7 +336,8 @@ export async function fetchAdminServiceFlows(params?: {
     size: String(params?.size ?? 100),
   })
   if (params?.departmentType && params.departmentType !== 'ALL') {
-    query.append('departmentType', params.departmentType)
+    const normalized = normalizeDepartmentTypeName(params.departmentType)
+    query.append('departmentType', normalized || params.departmentType)
   }
   if (params?.serviceName?.trim()) {
     query.append('serviceName', params.serviceName.trim())

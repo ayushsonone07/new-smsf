@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
@@ -46,13 +46,20 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
   const { departmentName } = useParams({ strict: false }) as { departmentName?: string }
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const defaultDept = useMemo(() => {
-    if (session?.user.departmentType) return session.user.departmentType
     if (departmentName) return normalizeDepartmentTypeName(departmentName)
     if (deptFromUrl) return normalizeDepartmentTypeName(deptFromUrl)
+    if (session?.user.departmentType) return normalizeDepartmentTypeName(session.user.departmentType)
     return isSuperAdmin ? 'ALL' : 'GOOGLE_DEPARTMENT'
   }, [departmentName, deptFromUrl, session?.user.departmentType, isSuperAdmin])
 
   const [selectedDept, setSelectedDept] = useState<string>(defaultDept)
+
+  useEffect(() => {
+    if (defaultDept && defaultDept !== selectedDept) {
+      setSelectedDept(defaultDept)
+      setPage(0)
+    }
+  }, [defaultDept])
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [editingFlow, setEditingFlow] = useState<ServiceFlowItem | null>(null)
@@ -79,7 +86,7 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
         page,
         size: pageSize,
         serviceName: search || undefined,
-        departmentType: selectedDept !== 'ALL' ? selectedDept : undefined,
+        departmentType: selectedDept,
       }),
     staleTime: 30_000,
   })
