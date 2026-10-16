@@ -7,7 +7,11 @@ import {
   updateCustomerSubServiceStatus,
   sendSubServiceConfirmationMail,
 } from '../../../api/service-flow.api'
+import { normalizeDepartmentTypeName } from '../../../api/dynamic-permission.api'
+import { resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
+import { getSession } from '../../../app/auth/session'
 import type { OnboardingCustomer } from './CustomersList'
+import { recordCustomerActivity } from '../../../utils/customerActivity'
 import './ServiceFlowModal.css'
 
 export interface Phase1Step {
@@ -16,6 +20,12 @@ export interface Phase1Step {
   status: string
   createdAt?: string
   updatedAt?: string
+}
+
+export interface SubServiceFlowData {
+  name: string
+  steps: Phase1Step[]
+  overallStatus?: string
 }
 
 export interface ServiceFlowModalProps {
@@ -29,52 +39,221 @@ export interface ServiceFlowModalProps {
 }
 
 /**
- * Extracts "Phase 1" steps from the service-flow API response
- * and sorts them strictly by the order number (1 to 10).
+ * Robust department key matcher to reliably associate JSON department keys
+ * (e.g. 'GOOGLE_DEPARTMENT', 'ADVERTISEMENT_DEPARTMENT', 'AUTOWEBSION_DEPARTMENT')
+ * with UI target departments, including abbreviations and aliases.
  */
-export function extractPhase1Steps(data: any): Phase1Step[] {
-  if (!data) return []
+export function matchesDepartmentKey(deptKey: string, targetDept: string): boolean {
+  if (!deptKey || !targetDept) return false
+  const cleanKey = deptKey.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const cleanTarget = targetDept.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (cleanKey === cleanTarget) return true
 
-  let targetPhase1: any = null
+  const normKey = normalizeDepartmentTypeName(deptKey).toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const normTarget = normalizeDepartmentTypeName(targetDept).toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (normKey === normTarget) return true
 
-  function search(obj: any, depth = 0) {
-    if (!obj || depth > 8 || targetPhase1) return
-    if (typeof obj !== 'object') return
+  // Handle Ads aliases
+  const isKeyAds = cleanKey.includes('ADVERTIS') || cleanKey.includes('ADS')
+  const isTargetAds = cleanTarget.includes('ADVERTIS') || cleanTarget.includes('ADS')
+  if (isKeyAds && isTargetAds) return true
 
-    if (obj['Phase 1'] && typeof obj['Phase 1'] === 'object') {
-      targetPhase1 = obj['Phase 1']
-      return
-    }
+  // Handle Website / Automation / Autowebsion aliases
+  const isKeyWeb =
+    cleanKey.includes('AUTOWEB') || cleanKey.includes('WEBSITE') || cleanKey.includes('AUTOMATION')
+  const isTargetWeb =
+    cleanTarget.includes('AUTOWEB') || cleanTarget.includes('WEBSITE') || cleanTarget.includes('AUTOMATION')
+  if (isKeyWeb && isTargetWeb) return true
 
-    for (const key of Object.keys(obj)) {
-      if (key.trim().toLowerCase() === 'phase 1' && typeof obj[key] === 'object') {
-        targetPhase1 = obj[key]
-        return
+  // Handle Google
+  const isKeyGoogle = cleanKey.includes('GOOGLE')
+  const isTargetGoogle = cleanTarget.includes('GOOGLE')
+  if (isKeyGoogle && isTargetGoogle) return true
+
+  // Handle SMO
+  const isKeySmo = cleanKey.includes('SMO')
+  const isTargetSmo = cleanTarget.includes('SMO')
+  if (isKeySmo && isTargetSmo) return true
+
+  // Handle SEO
+  const isKeySeo = cleanKey.includes('SEO')
+  const isTargetSeo = cleanTarget.includes('SEO')
+  if (isKeySeo && isTargetSeo) return true
+
+  // Handle Onboarding
+  const isKeyOnboarding = cleanKey.includes('ONBOARDING')
+  const isTargetOnboarding = cleanTarget.includes('ONBOARDING')
+  if (isKeyOnboarding && isTargetOnboarding) return true
+
+  // Strip _DEPARTMENT suffix and compare
+  const baseKey = normKey.replace(/DEPARTMENT$/, '')
+  const baseTarget = normTarget.replace(/DEPARTMENT$/, '')
+  if (baseKey && baseTarget && baseKey === baseTarget) return true
+
+  return false
+}
+
+/**
+ * Extracts sub-services and steps from customer serviceFlowJson strictly
+ * filtered by the active department.
+ */
+export function extractDepartmentFlows(
+  data: any,
+  targetDepartment: string,
+): {
+  subServices: SubServiceFlowData[]
+  overallStatus?: string
+} {
+  if (!data) return { subServices: [] }
+
+  // 1. Locate the serviceFlowJson array
+  let flowArray: any[] = []
+  if (Array.isArray(data)) {
+    flowArray = data
+  } else if (Array.isArray(data?.data?.serviceFlowJson)) {
+    flowArray = data.data.serviceFlowJson
+  } else if (Array.isArray(data?.serviceFlowJson)) {
+    flowArray = data.serviceFlowJson
+  } else if (Array.isArray(data?.data)) {
+    flowArray = data.data
+  } else if (typeof data === 'object') {
+    flowArray = [data]
+  }
+
+  const subServicesMap = new Map<string, { steps: Phase1Step[]; overallStatus?: string }>()
+  let deptOverallStatus: string | undefined
+
+  // 2. Iterate each element in flowArray and find matching department
+  for (const item of flowArray) {
+    if (!item || typeof item !== 'object') continue
+
+    for (const [key, val] of Object.entries(item)) {
+      if (!val || typeof val !== 'object') continue
+
+      if (matchesDepartmentKey(key, targetDepartment)) {
+        const deptObj = val as Record<string, any>
+
+        for (const [subName, subVal] of Object.entries(deptObj)) {
+          if (!subVal || typeof subVal !== 'object') continue
+
+          const normSubName = subName.trim()
+          if (
+            normSubName.toUpperCase() === 'OVERALL STATUS' ||
+            normSubName.toUpperCase() === 'OVERALL_STATUS'
+          ) {
+            const serviceStatus = (subVal as any)?.['Service Status'] || subVal
+            if (serviceStatus?.status) {
+              deptOverallStatus = String(serviceStatus.status)
+            }
+            continue
+          }
+
+          // Sub-service flow
+          const steps: Phase1Step[] = []
+          for (const [stepName, stepVal] of Object.entries(subVal as Record<string, any>)) {
+            if (!stepVal || typeof stepVal !== 'object') continue
+            const order = Number(stepVal?.order ?? 999)
+            if (order < 0) continue // Skip non-flow status markers
+            steps.push({
+              stepName,
+              order,
+              status: String(stepVal?.status ?? 'PENDING'),
+              createdAt: stepVal?.createdAt,
+              updatedAt: stepVal?.updatedAt,
+            })
+          }
+
+          if (steps.length > 0) {
+            steps.sort((a, b) => a.order - b.order)
+            const existing = subServicesMap.get(normSubName)
+            if (existing) {
+              const merged = [...existing.steps]
+              for (const s of steps) {
+                if (!merged.some((m) => m.stepName === s.stepName)) {
+                  merged.push(s)
+                }
+              }
+              merged.sort((a, b) => a.order - b.order)
+              subServicesMap.set(normSubName, { steps: merged, overallStatus: deptOverallStatus })
+            } else {
+              subServicesMap.set(normSubName, { steps, overallStatus: deptOverallStatus })
+            }
+          }
+        }
       }
     }
+  }
 
-    if (Array.isArray(obj)) {
-      for (const item of obj) search(item, depth + 1)
-    } else {
-      for (const val of Object.values(obj)) search(val, depth + 1)
+  // Fallback: If not found under top-level key matching department,
+  // check if data itself is directly the department object without outer wrapper
+  if (subServicesMap.size === 0) {
+    for (const item of flowArray) {
+      if (!item || typeof item !== 'object') continue
+      for (const [subName, subVal] of Object.entries(item)) {
+        if (!subVal || typeof subVal !== 'object') continue
+        const normSubName = subName.trim()
+        if (
+          normSubName.toUpperCase() === 'OVERALL STATUS' ||
+          normSubName.toUpperCase() === 'OVERALL_STATUS'
+        ) {
+          continue
+        }
+
+        const isGoogleTarget = targetDepartment.toUpperCase().includes('GOOGLE')
+        const isAdsTarget = targetDepartment.toUpperCase().includes('AD')
+        const isTargetMatch =
+          (isGoogleTarget && normSubName.toLowerCase().includes('phase')) ||
+          (isAdsTarget && normSubName.toLowerCase().includes('ad'))
+
+        if (isTargetMatch) {
+          const steps = Object.entries(subVal as Record<string, any>)
+            .map(([sName, sVal]: [string, any]) => ({
+              stepName: sName,
+              order: Number(sVal?.order ?? 999),
+              status: String(sVal?.status ?? 'PENDING'),
+              createdAt: sVal?.createdAt,
+              updatedAt: sVal?.updatedAt,
+            }))
+            .filter((s) => s.order >= 0)
+            .sort((a, b) => a.order - b.order)
+
+          if (steps.length > 0) {
+            subServicesMap.set(normSubName, { steps })
+          }
+        }
+      }
     }
   }
 
-  search(data)
-
-  if (!targetPhase1 || typeof targetPhase1 !== 'object') {
-    return []
+  const subServices: SubServiceFlowData[] = []
+  for (const [name, val] of subServicesMap.entries()) {
+    subServices.push({
+      name,
+      steps: val.steps,
+      overallStatus: val.overallStatus || deptOverallStatus,
+    })
   }
 
-  return Object.entries(targetPhase1)
-    .map(([stepName, stepData]: [string, any]) => ({
-      stepName,
-      order: Number(stepData?.order ?? 999),
-      status: String(stepData?.status ?? 'PENDING'),
-      createdAt: stepData?.createdAt,
-      updatedAt: stepData?.updatedAt,
-    }))
-    .sort((a, b) => a.order - b.order)
+  return { subServices, overallStatus: deptOverallStatus }
+}
+
+/**
+ * Backward compatibility helper for extracting steps.
+ */
+export function extractPhase1Steps(
+  data: any,
+  preferredSubService?: string,
+  departmentType = 'GOOGLE_DEPARTMENT',
+): Phase1Step[] {
+  const { subServices } = extractDepartmentFlows(data, departmentType)
+  if (subServices.length === 0) return []
+  if (preferredSubService) {
+    const match = subServices.find(
+      (s) => s.name.trim().toLowerCase() === preferredSubService.trim().toLowerCase(),
+    )
+    if (match) return match.steps
+  }
+  return subServices[0]?.steps ?? []
 }
 
 export function ServiceFlowModal({
@@ -86,7 +265,8 @@ export function ServiceFlowModal({
   onSubServiceStatusUpdated,
   departmentType = 'GOOGLE_DEPARTMENT',
 }: ServiceFlowModalProps) {
-  const [steps, setSteps] = useState<Phase1Step[]>([])
+  const [subServices, setSubServices] = useState<SubServiceFlowData[]>([])
+  const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -100,35 +280,44 @@ export function ServiceFlowModal({
   const [confirmingStep, setConfirmingStep] = useState<Phase1Step | null>(null)
   const [isCompletingStep, setIsCompletingStep] = useState(false)
 
-  const subServiceName = 'Phase 1'
-
-  // Initialize sub-service status from customer data
-  useEffect(() => {
-    if (!customer) return
-
-    let initialStatus = 'PENDING'
-    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-      const match = customer.subServiceInfo.find((sub: any) => {
-        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
-        return name === subServiceName
-      })
-      if (match) {
-        initialStatus =
-          match?.status ||
-          (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
-          'PENDING'
+  // Resolve the actual department strictly
+  const effectiveDept = useMemo(() => {
+    if (departmentType) return normalizeDepartmentTypeName(departmentType)
+    if (typeof window !== 'undefined') {
+      const fromPath = resolveDeptFromPath(window.location.pathname)
+      if (fromPath) return normalizeDepartmentTypeName(fromPath)
+      if (
+        window.location.pathname.startsWith('/google-head') ||
+        window.location.pathname.startsWith('/google-user') ||
+        window.location.pathname.startsWith('/google')
+      ) {
+        return 'GOOGLE_DEPARTMENT'
       }
-    } else if (Array.isArray(customer.services) && customer.services.length > 0) {
-      initialStatus = customer.services[0]?.status || 'PENDING'
     }
+    const session = getSession()
+    if (session?.user.departmentType) {
+      return normalizeDepartmentTypeName(session.user.departmentType)
+    }
+    return 'GOOGLE_DEPARTMENT'
+  }, [departmentType])
 
-    setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
-  }, [customer])
+  const currentSubService = subServices[activeSubServiceIndex] || subServices[0] || null
+
+  const subServiceName = currentSubService?.name || (
+    effectiveDept.includes('ADVERTIS') || effectiveDept.includes('ADS')
+      ? 'ADS'
+      : effectiveDept.includes('GOOGLE')
+        ? 'Phase 1'
+        : 'Service Flow'
+  )
+
+  const steps = currentSubService?.steps || []
 
   // Fetch service flow steps when modal is open
   useEffect(() => {
     if (!isOpen || !customer) {
-      setSteps([])
+      setSubServices([])
+      setActiveSubServiceIndex(0)
       setError(null)
       setMessage(null)
       setIsLoading(false)
@@ -142,8 +331,44 @@ export function ServiceFlowModal({
     getCustomerServiceFlow(customer.id)
       .then((res) => {
         if (isCancelled) return
-        const parsed = extractPhase1Steps(res)
-        setSteps(parsed)
+        const { subServices: extracted, overallStatus } = extractDepartmentFlows(res, effectiveDept)
+        setSubServices(extracted)
+
+        if (extracted.length > 0) {
+          // If customer has subServiceInfo, match active index
+          let foundIndex = 0
+          if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+            const prefName =
+              customer.subServiceInfo[0]?.name ||
+              (typeof customer.subServiceInfo[0] === 'object'
+                ? Object.keys(customer.subServiceInfo[0])[0]
+                : customer.subServiceInfo[0])
+            const idx = extracted.findIndex(
+              (s) => s.name.trim().toLowerCase() === String(prefName).trim().toLowerCase(),
+            )
+            if (idx >= 0) foundIndex = idx
+          }
+          setActiveSubServiceIndex(foundIndex)
+
+          // Initial status resolution
+          let initialStatus = overallStatus || 'PENDING'
+          const activeSub = extracted[foundIndex]
+          if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+            const match = customer.subServiceInfo.find((sub: any) => {
+              const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
+              return name === activeSub.name
+            })
+            if (match) {
+              initialStatus =
+                match?.status ||
+                (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
+                initialStatus
+            }
+          } else if (Array.isArray(customer.services) && customer.services.length > 0) {
+            initialStatus = customer.services[0]?.status || initialStatus
+          }
+          setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
+        }
       })
       .catch((err: any) => {
         if (isCancelled) return
@@ -157,7 +382,29 @@ export function ServiceFlowModal({
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer])
+  }, [isOpen, customer, effectiveDept])
+
+  // Sub-service tab switch handler
+  const handleSelectSubService = (index: number) => {
+    setActiveSubServiceIndex(index)
+    setMessage(null)
+    const targetSub = subServices[index]
+    if (!targetSub || !customer) return
+    let initialStatus = targetSub.overallStatus || 'PENDING'
+    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+      const match = customer.subServiceInfo.find((sub: any) => {
+        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
+        return name === targetSub.name
+      })
+      if (match) {
+        initialStatus =
+          match?.status ||
+          (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
+          initialStatus
+      }
+    }
+    setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
+  }
 
   // Determine if all steps are completed
   const allFlowsCompleted = useMemo(() => {
@@ -187,19 +434,24 @@ export function ServiceFlowModal({
       })
 
       // Optimistic update of the step
-      const updated = steps.map((s) =>
+      const updatedSteps = steps.map((s) =>
         s.stepName === confirmingStep.stepName
           ? { ...s, status: 'COMPLETED', updatedAt: new Date().toISOString() }
           : s,
       )
-      setSteps(updated)
+
+      setSubServices((prev) =>
+        prev.map((sub, idx) =>
+          idx === activeSubServiceIndex ? { ...sub, steps: updatedSteps } : sub,
+        ),
+      )
 
       // Auto-advance sub-service from PENDING to IN_PROGRESS on first completed step
       if (subServiceStatus === 'PENDING') {
         try {
           await updateCustomerSubServiceStatus({
             customerId: customer.id,
-            departmentType,
+            departmentType: effectiveDept,
             subServiceName,
             newStatus: 'IN_PROGRESS',
           })
@@ -210,7 +462,7 @@ export function ServiceFlowModal({
         }
       }
 
-      onStepsUpdated?.(updated)
+      onStepsUpdated?.(updatedSteps)
       setMessage({
         type: 'success',
         text: `"${confirmingStep.stepName}" has been marked as completed!`,
@@ -236,7 +488,7 @@ export function ServiceFlowModal({
     try {
       await updateCustomerSubServiceStatus({
         customerId: customer.id,
-        departmentType,
+        departmentType: effectiveDept,
         subServiceName,
         newStatus,
       })
@@ -268,14 +520,22 @@ export function ServiceFlowModal({
       await sendSubServiceConfirmationMail({
         customerId: customer.id,
         subServiceName,
+        departmentType: effectiveDept,
+      })
+
+      recordCustomerActivity({
+        customerId: customer.id,
+        contact: customer.phone,
         departmentType,
+        kind: 'email-sent',
+        detail: `Acknowledgement email sent for ${subServiceName}.`,
       })
 
       // After acknowledgement is sent, update sub-service status
       try {
         await updateCustomerSubServiceStatus({
           customerId: customer.id,
-          departmentType,
+          departmentType: effectiveDept,
           subServiceName,
           newStatus: 'PENDING_CUSTOMER_ACK',
         })
@@ -359,6 +619,22 @@ export function ServiceFlowModal({
               </div>
             )}
 
+            {/* Sub-Service Tabs (if department has multiple subservices, e.g. Autowebsion) */}
+            {subServices.length > 1 && (
+              <div className="ssd-subservice-tabs">
+                {subServices.map((sub, idx) => (
+                  <button
+                    key={sub.name}
+                    type="button"
+                    className={`ssd-tab-btn ${idx === activeSubServiceIndex ? 'active' : ''}`}
+                    onClick={() => handleSelectSubService(idx)}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Sub-Service Card */}
             <div className="ssd-subservice-card">
               <div className="ssd-subservice-left">
@@ -391,7 +667,7 @@ export function ServiceFlowModal({
                 </div>
               ) : steps.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                  <p style={{ fontSize: '13px' }}>No service flow steps found.</p>
+                  <p style={{ fontSize: '13px' }}>No service flow steps found for this department.</p>
                 </div>
               ) : (
                 <div className="ssd-flow-box">
@@ -491,9 +767,10 @@ export function ServiceFlowModal({
               type="button"
               className="ssd-btn-secondary"
               onClick={() => {
-                const historyPath = window.location.pathname.includes('/google-user')
-                  ? '/google-user/history'
-                  : '/departments/google/history'
+                const historyDept = effectiveDept.toLowerCase().replace(/_department$/, '')
+                const historyPath = window.location.pathname.includes('-user')
+                  ? `/${historyDept}-user/history`
+                  : `/departments/${historyDept}/history`
                 window.location.href = historyPath
               }}
             >

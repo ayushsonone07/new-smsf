@@ -106,7 +106,13 @@ export interface CustomerServiceRow {
   }
   departmentStatuses?: Record<
     string,
-    { status?: string; onboarded?: boolean }
+    {
+      status?: string
+      onboarded?: boolean
+      updatedAt?: string
+      completedAt?: string
+      timestamp?: string
+    }
   >
   deliveryStatus?: {
     delivered?: boolean
@@ -115,8 +121,12 @@ export interface CustomerServiceRow {
     completionPercentage?: number
   }
   callStatus?: {
+    status?: string
+    connected?: boolean
     lastCallDate?: string
     callNotes?: string
+    departmentType?: string
+    updatedAt?: string
   }
   internalRemark?: string
 }
