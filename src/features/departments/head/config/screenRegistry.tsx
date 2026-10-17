@@ -63,5 +63,7 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   'manage-services': { component: ManageServicesPage as ComponentType<{ feature: FeaturePermission }>, title: 'Manage Services' },
   'salary-management': { component: SalaryManagementPage as ComponentType<{ feature: FeaturePermission }>, title: 'Salary Management' },
   'autowebision-customers': { component: AutowebisionCustomersPage, title: 'Autowebsion Customers' },
+  'website-customers': { component: AutowebisionCustomersPage, title: 'Website Customers' },
+  'automation-customers': { component: AutowebisionCustomersPage, title: 'Automation Customers' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>

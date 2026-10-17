@@ -48,8 +48,20 @@ export function areSlugsEquivalent(a: string, b: string): boolean {
   const isUsersB = normB === 'users' || normB === 'department-user' || normB === 'department-users'
   if (isUsersA && isUsersB) return true
 
-  const isCustA = normA === 'customers' || normA === 'customer-list'
-  const isCustB = normB === 'customers' || normB === 'customer-list'
+  const isCustA =
+    normA === 'customers' ||
+    normA === 'customer-list' ||
+    normA === 'all-customers' ||
+    normA === 'manage-department-customers' ||
+    normA === 'manage-department-head-customers' ||
+    normA === 'autowebision-customers'
+  const isCustB =
+    normB === 'customers' ||
+    normB === 'customer-list' ||
+    normB === 'all-customers' ||
+    normB === 'manage-department-customers' ||
+    normB === 'manage-department-head-customers' ||
+    normB === 'autowebision-customers'
   if (isCustA && isCustB) return true
 
   const isPerfA = normA === 'member-flow' || normA === 'member-performance' || normA === 'members-performance'
