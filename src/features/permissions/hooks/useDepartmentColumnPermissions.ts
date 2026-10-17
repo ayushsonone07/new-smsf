@@ -74,9 +74,21 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
     colNameClean === 'client'
   if (isCustTarget && isCustCol) return true
 
-  // 'Service' <-> 'Service Name' <-> 'Department Service Name'
-  const isServiceTarget = targetClean === 'service' || targetClean === 'servicename' || targetClean === 'departmentservicename'
-  const isServiceCol = colNameClean === 'service' || colNameClean === 'servicename' || colNameClean === 'departmentservicename'
+  // 'Service' <-> 'Service Type' <-> 'Services' <-> 'Service Name' <-> 'Department Service Name'
+  const isServiceTarget =
+    targetClean === 'service' ||
+    targetClean === 'servicetype' ||
+    targetClean === 'services' ||
+    targetClean === 'servicename' ||
+    targetClean === 'departmentservice' ||
+    targetClean === 'departmentservicename'
+  const isServiceCol =
+    colNameClean === 'service' ||
+    colNameClean === 'servicetype' ||
+    colNameClean === 'services' ||
+    colNameClean === 'servicename' ||
+    colNameClean === 'departmentservice' ||
+    colNameClean === 'departmentservicename'
   if (isServiceTarget && isServiceCol) return true
 
   // 'Phase' <-> 'Phase Name' <-> 'Stage'
@@ -124,14 +136,39 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
   const isRemarkCol = colNameClean === 'internalremark' || colNameClean === 'remark' || colNameClean === 'remarks'
   if (isRemarkTarget && isRemarkCol) return true
 
-  // 'Contact' <-> 'Phone' <-> 'Email'
-  const isContactTarget = targetClean === 'contact' || targetClean === 'phone' || targetClean === 'email'
-  const isContactCol = colNameClean === 'contact' || colNameClean === 'phone' || colNameClean === 'email'
+  // 'Contact' <-> 'Phone' <-> 'Contact Number' <-> 'Phone Number' <-> 'Mobile'
+  const isContactTarget =
+    targetClean === 'contact' ||
+    targetClean === 'phone' ||
+    targetClean === 'contactnumber' ||
+    targetClean === 'phonenumber' ||
+    targetClean === 'mobile'
+  const isContactCol =
+    colNameClean === 'contact' ||
+    colNameClean === 'phone' ||
+    colNameClean === 'contactnumber' ||
+    colNameClean === 'phonenumber' ||
+    colNameClean === 'mobile'
   if (isContactTarget && isContactCol) return true
 
-  // 'Business' <-> 'Company' <-> 'Customer'
-  const isBizTarget = targetClean === 'business' || targetClean === 'company' || targetClean === 'biz' || targetClean === 'customer'
-  const isBizCol = colNameClean === 'business' || colNameClean === 'company' || colNameClean === 'biz' || colNameClean === 'customer'
+  // 'Email' <-> 'Email ID' <-> 'Mail'
+  const isEmailTarget = targetClean === 'email' || targetClean === 'emailid' || targetClean === 'mail'
+  const isEmailCol = colNameClean === 'email' || colNameClean === 'emailid' || colNameClean === 'mail'
+  if (isEmailTarget && isEmailCol) return true
+
+  // 'Business' <-> 'Company' <-> 'Business Name' <-> 'Company Name'
+  const isBizTarget =
+    targetClean === 'business' ||
+    targetClean === 'company' ||
+    targetClean === 'biz' ||
+    targetClean === 'businessname' ||
+    targetClean === 'companyname'
+  const isBizCol =
+    colNameClean === 'business' ||
+    colNameClean === 'company' ||
+    colNameClean === 'biz' ||
+    colNameClean === 'businessname' ||
+    colNameClean === 'companyname'
   if (isBizTarget && isBizCol) return true
 
   // 'Status'

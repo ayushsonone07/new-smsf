@@ -170,15 +170,15 @@ export function CustomerListPage() {
     ? window.location.pathname.replace(/^\/+|\/+$/g, '')
     : undefined
   const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
-  const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+    useDepartmentColumnPermissions(currentDepartment)
+  const isStatusVisible = isColumnEnabled('Status', 'customer')
+  const canEditStatus = isDeptUser || canEditColumn('Status')
 
   const isAssignToVisible =
     !isDeptUser &&
-    (isColumnEnabled('Assign To') ||
-      isColumnEnabled('Assign') ||
-      isColumnEnabled('Assignee'))
+    (isColumnEnabled('Assign To', 'customer') ||
+      isColumnEnabled('Assign', 'customer') ||
+      isColumnEnabled('Assignee', 'customer'))
   const canEditAssignTo =
     !isDeptUser &&
     (canEditColumn('Assign To') ||
@@ -186,20 +186,20 @@ export function CustomerListPage() {
       canEditColumn('Assignee'))
 
   const isRemarkVisible =
-    isColumnEnabled('Internal Remark') ||
-    isColumnEnabled('Remark')
-  const canEditRemark = canEditColumn('Internal Remark') || canEditColumn('Remark')
-  const canEditServiceType = canEditColumn('Services') || canEditColumn('Service Type')
-  const canEditContact = canEditColumn('Contact')
+    isColumnEnabled('Internal Remark', 'customer') ||
+    isColumnEnabled('Remark', 'customer')
+  const canEditRemark = session?.user.role === 'USER'
 
-  const isContactVisible =
-    isColumnEnabled('Contact') ||
-    isColumnEnabled('Phone') ||
-    isColumnEnabled('Email')
+  const isContactVisible = isColumnEnabled('Contact', 'customer')
 
   const isBusinessVisible =
-    isColumnEnabled('Business') ||
-    isColumnEnabled('Company')
+    isColumnEnabled('Business', 'customer') ||
+    isColumnEnabled('Company', 'customer')
+
+  const isServiceTypeVisible =
+    isColumnEnabled('Service Type', 'customer') ||
+    isColumnEnabled('Service', 'customer') ||
+    isColumnEnabled('Services', 'customer')
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
@@ -808,9 +808,7 @@ export function CustomerListPage() {
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        showServiceType={useRowsEndpoint}
-        canEditServiceType={canEditServiceType}
-        canEditContact={canEditContact}
+        showServiceType={useRowsEndpoint && isServiceTypeVisible}
         isGoogle={isGoogle}
         onOpenServiceFlow={canEditServiceType ? (cust) => setServiceFlowCustomer(cust) : undefined}
         onOpenServiceTags={canEditServiceType ? (cust) => setServiceTagsCustomer(cust) : undefined}
