@@ -54,15 +54,45 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
   const isContactCol = colNameClean === 'contact' || colNameClean === 'phone' || colNameClean === 'email'
   if (isContactTarget && isContactCol) return true
 
-  // 'Business' <-> 'Company'
-  const isBizTarget = targetClean === 'business' || targetClean === 'company' || targetClean === 'biz'
-  const isBizCol = colNameClean === 'business' || colNameClean === 'company' || colNameClean === 'biz'
+  // 'Business' <-> 'Company' <-> 'Customer'
+  const isBizTarget = targetClean === 'business' || targetClean === 'company' || targetClean === 'biz' || targetClean === 'customer'
+  const isBizCol = colNameClean === 'business' || colNameClean === 'company' || colNameClean === 'biz' || colNameClean === 'customer'
   if (isBizTarget && isBizCol) return true
 
   // 'Status'
-  const isStatusTarget = targetClean === 'status'
-  const isStatusCol = colNameClean === 'status'
+  const isStatusTarget = targetClean === 'status' || targetClean === 'servicestatus'
+  const isStatusCol = colNameClean === 'status' || colNameClean === 'servicestatus'
   if (isStatusTarget && isStatusCol) return true
+
+  // 'Website Exists'
+  const isWebExistsTarget = targetClean === 'websiteexists' || targetClean === 'iswebsiteexists'
+  const isWebExistsCol = colNameClean === 'websiteexists' || colNameClean === 'iswebsiteexists'
+  if (isWebExistsTarget && isWebExistsCol) return true
+
+  // 'Requirement Form' <-> 'Form'
+  const isFormTarget = targetClean === 'requirementform' || targetClean === 'form' || targetClean === 'openform'
+  const isFormCol = colNameClean === 'requirementform' || colNameClean === 'form' || colNameClean === 'openform'
+  if (isFormTarget && isFormCol) return true
+
+  // 'Services' <-> 'Service' <-> 'Service Type'
+  const isSvcTarget = targetClean === 'services' || targetClean === 'service' || targetClean === 'servicetype'
+  const isSvcCol = colNameClean === 'services' || colNameClean === 'service' || colNameClean === 'servicetype'
+  if (isSvcTarget && isSvcCol) return true
+
+  // 'Expiration' <-> 'Expiry'
+  const isExpTarget = targetClean === 'expiration' || targetClean === 'expiry' || targetClean === 'serviceexpiration'
+  const isExpCol = colNameClean === 'expiration' || colNameClean === 'expiry' || colNameClean === 'serviceexpiration'
+  if (isExpTarget && isExpCol) return true
+
+  // 'Client Remark'
+  const isClientRemTarget = targetClean === 'clientremark' || targetClean === 'clientremarks'
+  const isClientRemCol = colNameClean === 'clientremark' || colNameClean === 'clientremarks'
+  if (isClientRemTarget && isClientRemCol) return true
+
+  // 'Draft Sent' <-> 'Draft' <-> 'Mail Sent'
+  const isDraftTarget = targetClean === 'draftsent' || targetClean === 'draft' || targetClean === 'mailsent' || targetClean === 'ismailsent'
+  const isDraftCol = colNameClean === 'draftsent' || colNameClean === 'draft' || colNameClean === 'mailsent' || colNameClean === 'ismailsent'
+  if (isDraftTarget && isDraftCol) return true
 
   return false
 }

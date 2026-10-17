@@ -149,8 +149,112 @@ export async function updateAutowebisionStatus(params: {
   })
 }
 
-export interface AutomationCountEntry {
-  serviceCategory: 'AUTOMATION' | 'WEBSITE' | 'AUTOWEBSION' | string
+export interface AutowebsionCategoryCounts {
+  total: number
+  pending: number
+  inProgress: number
+  completed: number
+}
+
+export interface AutowebsionSummaryCounts {
+  all: AutowebsionCategoryCounts
+  website: AutowebsionCategoryCounts
+  automation: AutowebsionCategoryCounts
+}
+
+/**
+ * Fetch combined statistics for Website & Automation in a single call,
+ * aggregated across the department without individual user email bottlenecks.
+ */
+export async function fetchAutowebsionSummaryCounts(): Promise<AutowebsionSummaryCounts> {
+  try {
+    const res = await authedApiRequest<any>('/api/autowebision/statistics/combined')
+    const data = res?.data || res || {}
+    const web: AutowebsionCategoryCounts = {
+      total: Number(data.website?.total ?? 0),
+      pending: Number(data.website?.pending ?? 0),
+      inProgress: Number(data.website?.inProgress ?? 0),
+      completed: Number(data.website?.completed ?? 0),
+    }
+    const auto: AutowebsionCategoryCounts = {
+      total: Number(data.automation?.total ?? 0),
+      pending: Number(data.automation?.pending ?? 0),
+      inProgress: Number(data.automation?.inProgress ?? 0),
+      completed: Number(data.automation?.completed ?? 0),
+    }
+    const all: AutowebsionCategoryCounts = {
+      total: web.total + auto.total,
+      pending: web.pending + auto.pending,
+      inProgress: web.inProgress + auto.inProgress,
+      completed: web.completed + auto.completed,
+    }
+    return { all, website: web, automation: auto }
+  } catch (err) {
+    console.warn('Failed to fetch combined autowebsion counts, using fallback:', err)
+    return {
+      all: { total: 0, pending: 0, inProgress: 0, completed: 0 },
+      website: { total: 0, pending: 0, inProgress: 0, completed: 0 },
+      automation: { total: 0, pending: 0, inProgress: 0, completed: 0 },
+    }
+  }
+}
+
+/**
+ * Fetch service flow detail for a specific customer and serviceType (WEBSITE / AUTOMATION).
+ */
+export async function fetchCustomerServiceFlowDetail(
+  customerId: number | string,
+  serviceType: string,
+): Promise<any> {
+  return authedApiRequest(
+    `/api/autowebision/customers/${encodeURIComponent(String(customerId))}/services/${encodeURIComponent(serviceType.toUpperCase())}/flow`,
+  )
+}
+
+/**
+ * Fetch users belonging to a specific department type (e.g. AUTOWEBSION_DEPARTMENT, WEBSITE_DEPARTMENT, AUTOMATION_DEPARTMENT)
+ */
+export async function fetchUsersByDepartmentType(
+  departmentType: string = 'AUTOWEBSION_DEPARTMENT',
+  page: number = 0,
+  size: number = 10,
+  search?: string,
+): Promise<any> {
+  const q = new URLSearchParams()
+  q.set('page', String(page))
+  q.set('size', String(size))
+  if (search) q.set('search', search)
+  return authedApiRequest(`/api/autowebision/users/department/${encodeURIComponent(departmentType)}?${q.toString()}`)
+}
+
+/**
+ * Fetch all AUTOWEBSION users (used for assigning dropdown and general list).
+ */
+export async function fetchAutowebsionUsers(
+  page: number = 0,
+  size: number = 100,
+  search?: string,
+): Promise<any> {
+  const q = new URLSearchParams()
+  q.set('page', String(page))
+  q.set('size', String(size))
+  if (search) q.set('search', search)
+  return authedApiRequest(`/api/autowebision/users?${q.toString()}`)
+}
+
+/**
+ * Fetch assigning list from meetings module for a department type.
+ */
+export async function fetchMeetingsAssigningList(
+  departmentType: string = 'AUTOWEBSION_DEPARTMENT',
+): Promise<any> {
+  return authedApiRequest(
+    `/api/meetings/users/assigning-list?departmentType=${encodeURIComponent(departmentType)}`,
+  )
+}
+
+export interface ServiceStatusCount {
+  serviceCategory: string
   total: number
   pending: number
   inProgress: number
@@ -158,19 +262,22 @@ export interface AutomationCountEntry {
 }
 
 /**
- * Fetch automation and website counts for tabs: Total, Pending, In Progress, Completed.
+ * Fetch counts of customers assigned to a specific department user:
+ * GET /api/auth/automation-count/{email}
+ * Returns counts grouped by WEBSITE, AUTOMATION, and AUTOWEBSION total.
  */
-export async function fetchAutomationCount(email?: string): Promise<AutomationCountEntry[]> {
+export async function fetchAutomationCount(email?: string): Promise<ServiceStatusCount[]> {
   const session = getSession()
   const resolvedEmail = (email || session?.user?.email || session?.user?.username || '').trim()
   if (!resolvedEmail) return []
+
   try {
-    const res = await authedApiRequest<AutomationCountEntry[]>(
+    const res = await authedApiRequest<ServiceStatusCount[]>(
       `/api/auth/automation-count/${encodeURIComponent(resolvedEmail)}`,
     )
     return Array.isArray(res) ? res : []
   } catch (err) {
-    console.error('Failed to fetch automation count:', err)
+    console.warn('Failed to fetch automation count for user:', resolvedEmail, err)
     return []
   }
 }

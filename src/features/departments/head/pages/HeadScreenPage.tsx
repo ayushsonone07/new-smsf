@@ -97,18 +97,39 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   const isAutowebsion = Boolean(
     effectiveDepartmentType && (
       normalizeDepartmentTypeName(effectiveDepartmentType) === 'AUTOWEBSION_DEPARTMENT' ||
-      effectiveDepartmentType.toUpperCase().includes('AUTOWEB')
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'WEBSITE_DEPARTMENT' ||
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'AUTOMATION_DEPARTMENT' ||
+      effectiveDepartmentType.toUpperCase().includes('AUTOWEB') ||
+      effectiveDepartmentType.toUpperCase().includes('WEBSITE') ||
+      effectiveDepartmentType.toUpperCase().includes('AUTOMATION')
     ),
   )
 
-  if (
+  const isAutowebsionCustomerScreen =
     isAutowebsion &&
     (feature.screen === 'customers' ||
-      feature.screen === 'customer-list' ||
+      (feature.screen as string) === 'customer-list' ||
+      (feature.screen as string) === 'autowebision-customers' ||
+      (feature.screen as string) === 'website-customers' ||
+      (feature.screen as string) === 'automation-customers' ||
       targetSlug === 'customers' ||
-      targetSlug === 'customer-list')
-  ) {
-    return <AutowebisionCustomersPage />
+      targetSlug === 'customer-list' ||
+      targetSlug === 'all-customers' ||
+      targetSlug === 'autowebision-customers' ||
+      targetSlug === 'website-customers' ||
+      targetSlug === 'automation-customers' ||
+      targetSlug === 'website' ||
+      targetSlug === 'automation')
+
+  if (isAutowebsionCustomerScreen) {
+    const defaultSubTab =
+      targetSlug === 'website-customers' || targetSlug === 'website' || (feature.screen as string) === 'website-customers'
+        ? 'WEBSITE'
+        : targetSlug === 'automation-customers' || targetSlug === 'automation' || (feature.screen as string) === 'automation-customers'
+          ? 'AUTOMATION'
+          : 'ALL'
+
+    return <AutowebisionCustomersPage feature={feature} defaultSubTab={defaultSubTab} />
   }
 
   return <Screen feature={feature} />

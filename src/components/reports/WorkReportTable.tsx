@@ -48,7 +48,10 @@ export function WorkReportTable({
       title: labels?.status ?? 'Status',
       width: '14%',
       render: (item) => {
-        const meta = STATUS_META[item.status]
+        const meta = STATUS_META[item.status] || {
+          label: String(item.status || 'Pending'),
+          tone: 'neutral' as const,
+        }
 
         return <Pill tone={meta.tone}>{meta.label}</Pill>
       },

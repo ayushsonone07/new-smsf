@@ -149,6 +149,7 @@ export interface PlanTypeItem {
   planTypeId: string
   planName: string
   departmentTypes: string[]
+  featureList?: string[]
   amount?: number | null
   additionalAmount?: number | null
   durationMonths?: number | null
@@ -205,6 +206,7 @@ export interface ManagePlanPayload {
   plan?: {
     planName: string
     departmentTypes: string[]
+    featureList?: string[]
     amount?: number | null
     additionalAmount?: number | null
     durationMonths?: number | null
