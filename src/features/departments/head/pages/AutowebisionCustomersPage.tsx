@@ -67,7 +67,7 @@ export function AutowebisionCustomersPage({
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
   const isCustomerVisible = isColumnEnabled('Customer') || isColumnEnabled('Business') || isColumnEnabled('Company')
-  const isContactVisible = isColumnEnabled('Contact') || isColumnEnabled('Phone') || isColumnEnabled('Email')
+  const isContactVisible = isColumnEnabled('Contact') || isColumnEnabled('Phone')
   const isRequirementFormVisible = isColumnEnabled('Requirement Form') || isColumnEnabled('Form') || isColumnEnabled('Open Form')
   const isServicesVisible = isColumnEnabled('Services') || isColumnEnabled('Service') || isColumnEnabled('Service Type')
   const isStatusVisible = isColumnEnabled('Status') || isColumnEnabled('Service Status')

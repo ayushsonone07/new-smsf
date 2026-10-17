@@ -89,14 +89,11 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
     isColumnEnabled('Remark')
   const canEditRemark = getSession()?.user.role === 'USER'
 
-  const isContactVisible =
-    isColumnEnabled('Contact') ||
-    isColumnEnabled('Phone') ||
-    isColumnEnabled('Email')
+  const isContactVisible = isColumnEnabled('Contact', 'customer')
 
   const isBusinessVisible =
-    isColumnEnabled('Business') ||
-    isColumnEnabled('Company')
+    isColumnEnabled('Business', 'customer') ||
+    isColumnEnabled('Company', 'customer')
 
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(
     () =>
