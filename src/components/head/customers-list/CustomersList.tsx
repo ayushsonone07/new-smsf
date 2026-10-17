@@ -82,6 +82,7 @@ export interface CustomersListProps {
   canEditAssignTo?: boolean
   showServiceType?: boolean
   isGoogle?: boolean
+  isDepartmentUser?: boolean
   /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
@@ -169,6 +170,7 @@ export function CustomersList({
   onOpenServiceFlow,
   onOpenServiceTags,
   isGoogle = false,
+  isDepartmentUser,
   onOpenGoogleInfo,
   showRemark = true,
   canEditRemark,
@@ -249,6 +251,7 @@ export function CustomersList({
               showContact={showContact}
               showServiceType={showServiceType}
               isGoogle={isGoogle}
+              isDepartmentUser={isDepartmentUser}
               showStatus={showStatus}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
@@ -607,6 +610,7 @@ interface CustomerRowProps {
   onOpenServiceFlow?: () => void
   onOpenServiceTags?: () => void
   isGoogle?: boolean
+  isDepartmentUser?: boolean
   onOpenGoogleInfo?: () => void
   canEdit: boolean
   showBusiness?: boolean
@@ -635,6 +639,7 @@ function CustomerRow({
   onOpenServiceFlow,
   onOpenServiceTags,
   isGoogle = false,
+  isDepartmentUser,
   onOpenGoogleInfo,
   canEdit,
   showBusiness = true,
@@ -754,6 +759,24 @@ function CustomerRow({
 
     window.open(fullUrl, '_blank')
   }
+
+  const resolvedIsGoogle = useMemo(() => {
+    if (typeof isGoogle === 'boolean') return isGoogle
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase()
+      if (path.includes('google')) return true
+    }
+    return false
+  }, [isGoogle])
+
+  const resolvedIsDeptUser = useMemo(() => {
+    if (typeof isDepartmentUser === 'boolean') return isDepartmentUser
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase()
+      if (path.includes('-user') || path.includes('/user')) return true
+    }
+    return false
+  }, [isDepartmentUser])
 
   const renderedTags = useMemo(() => {
     if (!customer.serviceTags) return []
@@ -976,41 +999,51 @@ function CustomerRow({
               <Icon name="alert" size={11} strokeWidth={2.4} />
               <span>Phase 1</span>
             </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpenServiceTags?.()
-              }}
-              title="Manage service tags"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '2px 7px',
-                borderRadius: '9999px',
-                fontSize: '11px',
-                fontWeight: 600,
-                backgroundColor: '#faf5ff',
-                color: '#7e22ce',
-                border: '1px solid #d8b4fe',
-                cursor: 'pointer',
-              }}
-            >
-              <Icon name="plus" size={10} strokeWidth={2.5} />
-              <span>Tag</span>
-            </button>
+            {resolvedIsGoogle && resolvedIsDeptUser && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenServiceTags?.()
+                }}
+                title="Manage service tags"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: '2px 7px',
+                  borderRadius: '9999px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  backgroundColor: '#faf5ff',
+                  color: '#7e22ce',
+                  border: '1px solid #d8b4fe',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon name="plus" size={10} strokeWidth={2.5} />
+                <span>Tag</span>
+              </button>
+            )}
           </div>
-          {renderedTags.length > 0 && (
+          {resolvedIsGoogle && renderedTags.length > 0 && (
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
               {renderedTags.slice(0, 2).map(({ key, label }) => (
                 <span
                   key={key}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenServiceTags?.()
-                  }}
-                  title="Click to manage service tags"
+                  onClick={
+                    resolvedIsDeptUser
+                      ? (e) => {
+                          e.stopPropagation()
+                          onOpenServiceTags?.()
+                        }
+                      : undefined
+                  }
+                  title={
+                    resolvedIsDeptUser
+                      ? 'Click to manage service tags'
+                      : label.replace(/_/g, ' ')
+                  }
                   style={{
                     display: 'inline-block',
                     fontSize: '10px',
@@ -1020,7 +1053,7 @@ function CustomerRow({
                     backgroundColor: '#fff7ed',
                     color: '#c2410c',
                     border: '1px solid #fed7aa',
-                    cursor: 'pointer',
+                    cursor: resolvedIsDeptUser ? 'pointer' : 'default',
                     maxWidth: '120px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1032,15 +1065,20 @@ function CustomerRow({
               ))}
               {renderedTags.length > 2 && (
                 <span
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenServiceTags?.()
-                  }}
+                  onClick={
+                    resolvedIsDeptUser
+                      ? (e) => {
+                          e.stopPropagation()
+                          onOpenServiceTags?.()
+                        }
+                      : undefined
+                  }
+                  title={resolvedIsDeptUser ? 'View more tags' : undefined}
                   style={{
                     fontSize: '10px',
                     fontWeight: 700,
                     color: '#6366f1',
-                    cursor: 'pointer',
+                    cursor: resolvedIsDeptUser ? 'pointer' : 'default',
                   }}
                 >
                   +{renderedTags.length - 2}

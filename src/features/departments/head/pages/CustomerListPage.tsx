@@ -805,6 +805,7 @@ export function CustomerListPage() {
         showUpdated={false}
         showServiceType={useRowsEndpoint}
         isGoogle={isGoogle}
+        isDepartmentUser={isDeptUser}
         onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
         onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
         onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
