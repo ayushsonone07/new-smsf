@@ -42,7 +42,11 @@ import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 import { recordCustomerActivity } from '../../../../utils/customerActivity'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
-import type { OnboardingCustomer, OnboardingStatus } from '../../../../components/head/customers-list/CustomersList'
+import {
+  AssigneeDropdown,
+  type OnboardingCustomer,
+  type OnboardingStatus,
+} from '../../../../components/head/customers-list/CustomersList'
 import './AutowebisionCustomers.css'
 
 export type AutowebsionSubTab = 'ALL' | 'WEBSITE' | 'AUTOMATION'
@@ -61,8 +65,25 @@ export function AutowebisionCustomersPage({
   const isDepartmentUser = session?.user.role === 'USER'
   const userEmail = session?.user.email || session?.user.username || ''
 
-  // Dynamic Column Permissions for Autowebsion Department
-  const { isColumnEnabled, canEditColumn } = useDepartmentColumnPermissions('AUTOWEBSION_DEPARTMENT')
+  // Permissions must come from the department that owns the current route.
+  // Using AUTOWEBSION_DEPARTMENT here bypassed the AUTOMATION_DEPARTMENT
+  // Head/User access configured by Admin.
+  const permissionDepartmentType = session?.user.departmentType || (
+    typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('automation')
+      ? 'AUTOMATION_DEPARTMENT'
+      : typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('website')
+        ? 'WEBSITE_DEPARTMENT'
+        : 'AUTOWEBSION_DEPARTMENT'
+  )
+  const permissionRouteName = permissionDepartmentType === 'AUTOMATION_DEPARTMENT'
+    ? 'automation_department/head/customer-list'
+    : permissionDepartmentType === 'WEBSITE_DEPARTMENT'
+      ? 'website_department/head/customer-list'
+      : undefined
+  const { isColumnEnabled, canEditColumn } = useDepartmentColumnPermissions(
+    permissionDepartmentType,
+    permissionRouteName,
+  )
 
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
@@ -81,6 +102,8 @@ export function AutowebisionCustomersPage({
   const canEditWebsiteExists = canEditColumn('Website Exists') || canEditColumn('Website') || canEditColumn('isWebsiteExists')
   const canEditStatus = canEditColumn('Status') || canEditColumn('Service Status')
   const canEditAssignee = canEditColumn('Assigned To') && !isDepartmentUser
+  const canEditContact = canEditColumn('Contact')
+  const canEditServices = canEditColumn('Services') || canEditColumn('Service Type')
 
   const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
@@ -160,6 +183,44 @@ export function AutowebisionCustomersPage({
         startDate: dateFrom || undefined,
         endDate: dateTo || undefined,
       }),
+  })
+
+  // Derive the filter badges from the same endpoint that supplies the table.
+  // This keeps Website/Automation counts accurate even when the legacy
+  // combined-statistics endpoint has no summary rows for that department.
+  const visibleCountsQuery = useQuery({
+    queryKey: [
+      'autowebisionVisibleCounts',
+      activeSubTab,
+      debouncedSearch,
+      effectiveAssignee,
+      dateFrom,
+      dateTo,
+    ],
+    queryFn: async () => {
+      const base = {
+        page: 0,
+        size: 1,
+        search: debouncedSearch || undefined,
+        departmentType: departmentTypeParam,
+        assignedUserEmail: effectiveAssignee,
+        startDate: dateFrom || undefined,
+        endDate: dateTo || undefined,
+      }
+      const [all, pending, inProgress, completed] = await Promise.all([
+        fetchLightAutowebisionCustomers(base),
+        fetchLightAutowebisionCustomers({ ...base, status: 'PENDING' }),
+        fetchLightAutowebisionCustomers({ ...base, status: 'IN_PROGRESS' }),
+        fetchLightAutowebisionCustomers({ ...base, status: 'COMPLETED' }),
+      ])
+      return {
+        total: Number(all.totalElements ?? 0),
+        pending: Number(pending.totalElements ?? 0),
+        inProgress: Number(inProgress.totalElements ?? 0),
+        completed: Number(completed.totalElements ?? 0),
+      }
+    },
+    staleTime: 20_000,
   })
 
   // 2. Fetch live combined statistics:
@@ -251,6 +312,8 @@ export function AutowebisionCustomersPage({
 
   // Compute status counts for active sub tab
   const statusCounts = useMemo(() => {
+    if (visibleCountsQuery.data) return visibleCountsQuery.data
+
     const counts = countsQuery.data
     if (!counts) {
       return {
@@ -268,7 +331,7 @@ export function AutowebisionCustomersPage({
       return counts.automation
     }
     return counts.all
-  }, [countsQuery.data, activeSubTab, customersQuery.data?.totalElements])
+  }, [visibleCountsQuery.data, countsQuery.data, activeSubTab, customersQuery.data?.totalElements])
 
   // Convert raw DTO to OnboardingCustomer for detail modal & subservice flow modal
   function toOnboardingCustomer(c: AutowebsionCustomerLightDTO, index: number): OnboardingCustomer {
@@ -315,6 +378,7 @@ export function AutowebisionCustomersPage({
 
   // Handle toggling "Website Exists"
   async function handleToggleWebsiteExists(customer: AutowebsionCustomerLightDTO) {
+    if (!canEditWebsiteExists) return
     const newStatus = !customer.isWebsiteExists
     setUpdatingWebsiteExistsId(customer.customerId)
     try {
@@ -334,6 +398,7 @@ export function AutowebisionCustomersPage({
 
   // Handle assigning user
   async function handleAssignUser(customerId: number, assigneeEmail: string) {
+    if (!canEditAssignee) return
     if (!assigneeEmail) return
     try {
       await assignAutowebisionUser({
@@ -351,6 +416,7 @@ export function AutowebisionCustomersPage({
 
   // Handle status update
   async function handleStatusChange(customer: AutowebsionCustomerLightDTO, newStatus: string) {
+    if (!canEditStatus) return
     setUpdatingStatusId(customer.customerId)
     try {
       await updateAutowebisionStatus({
@@ -371,6 +437,7 @@ export function AutowebisionCustomersPage({
 
   // Handle Airtel Click to Call
   async function handleCallCustomer(phone: string, customerName: string, customerId: number) {
+    if (!canEditContact) return
     if (!phone) {
       setToast({ type: 'error', message: 'Customer has no phone number on record.' })
       return
@@ -669,7 +736,6 @@ export function AutowebisionCustomersPage({
                   {isInternalRemarkVisible && <th style={{ minWidth: '180px' }}>INTERNAL REMARK</th>}
                   {isDraftSentVisible && <th style={{ minWidth: '130px' }}>DRAFT SENT</th>}
                   {isAssigneeVisible && <th style={{ minWidth: '180px' }}>ASSIGNED TO</th>}
-                  {isActionsVisible && <th style={{ width: '85px', textAlign: 'center' }}>ACTIONS</th>}
                 </tr>
               </thead>
               <tbody>
@@ -743,9 +809,22 @@ export function AutowebisionCustomersPage({
                       {isCustomerVisible && (
                         <td>
                           <div className="autoweb-business-cell">
-                            <strong className="autoweb-business-title" title={customer.businessName || 'Customer'}>
-                              {customer.businessName || customer.ownerName || 'Customer'}
-                            </strong>
+                            <div className="flex items-center gap-2">
+                              <strong className="autoweb-business-title" title={customer.businessName || 'Customer'}>
+                                {customer.businessName || customer.ownerName || 'Customer'}
+                              </strong>
+                              {isActionsVisible && (
+                                <button
+                                  type="button"
+                                  className="autoweb-detail-btn flex-shrink-0"
+                                  title="View complete customer details"
+                                  aria-label={`View details for ${customer.businessName || customer.ownerName || 'customer'}`}
+                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                >
+                                  <Eye size={14} />
+                                </button>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 truncate max-w-[180px]">
                               {customer.ownerName || '—'}
                             </p>
@@ -785,7 +864,7 @@ export function AutowebisionCustomersPage({
                                   type="button"
                                   className="ml-1 inline-flex items-center justify-center h-6 w-6 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
                                   title={`Click to call ${customer.phoneNumber}`}
-                                  disabled={callingCustomerId === String(customerId)}
+                                  disabled={!canEditContact || callingCustomerId === String(customerId)}
                                   onClick={() =>
                                     handleCallCustomer(
                                       customer.phoneNumber || '',
@@ -844,9 +923,10 @@ export function AutowebisionCustomersPage({
                                         : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                                     }`}
                                     onClick={() =>
-                                      setServiceFlowCustomer(toOnboardingCustomer(customer, index))
+                                      canEditServices && setServiceFlowCustomer(toOnboardingCustomer(customer, index))
                                     }
-                                    title="Click to view/update service flow checklist"
+                                    disabled={!canEditServices}
+                                    title={canEditServices ? 'Click to update service flow checklist' : 'Read only'}
                                   >
                                     {isAuto ? <Bot size={12} /> : <Globe size={12} />}
                                     <span>{sType}</span>
@@ -858,8 +938,10 @@ export function AutowebisionCustomersPage({
                                 type="button"
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
                                 onClick={() =>
-                                  setServiceFlowCustomer(toOnboardingCustomer(customer, index))
+                                  canEditServices && setServiceFlowCustomer(toOnboardingCustomer(customer, index))
                                 }
+                                disabled={!canEditServices}
+                                title={canEditServices ? 'Click to update service flow checklist' : 'Read only'}
                               >
                                 <Globe size={12} />
                                 <span>Website</span>
@@ -965,45 +1047,18 @@ export function AutowebisionCustomersPage({
                       {/* 12. Assigned To */}
                       {isAssigneeVisible && (
                         <td>
-                          <select
-                            className="autoweb-assignee-select"
-                            value={currentAssignee || ''}
-                            disabled={!canEditAssignee}
-                            onChange={(e) => handleAssignUser(customerId, e.target.value)}
-                          >
-                            <option value="">Unassigned</option>
-                            {assignees.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
+                          <AssigneeDropdown
+                            assigneeId={currentAssignee || null}
+                            assignees={assignees}
+                            isEditable={canEditAssignee}
+                            pageSize={10}
+                            onAssigneeChange={(assigneeId) => {
+                              if (assigneeId) void handleAssignUser(customerId, assigneeId)
+                            }}
+                          />
                         </td>
                       )}
 
-                      {/* 13. Actions */}
-                      {isActionsVisible && (
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              type="button"
-                              className="autoweb-detail-btn"
-                              title="View complete customer details"
-                              onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
-                            >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="autoweb-detail-btn"
-                              title="View customer service flow"
-                              onClick={() => setServiceFlowCustomer(toOnboardingCustomer(customer, index))}
-                            >
-                              <RefreshCw size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
                     </tr>
                   )
                 })}
@@ -1033,7 +1088,7 @@ export function AutowebisionCustomersPage({
         assignees={assignees}
         showStatus={true}
         showAssignTo={true}
-        departmentType="AUTOWEBSION_DEPARTMENT"
+        departmentType={permissionDepartmentType}
         onClose={() => setSelectedCustomer(null)}
       />
 
@@ -1042,7 +1097,8 @@ export function AutowebisionCustomersPage({
         customer={serviceFlowCustomer}
         isOpen={Boolean(serviceFlowCustomer)}
         onClose={() => setServiceFlowCustomer(null)}
-        departmentType="AUTOWEBSION_DEPARTMENT"
+        isEditable={canEditServices}
+        departmentType={permissionDepartmentType}
         onStepsUpdated={() => {
           customersQuery.refetch()
           countsQuery.refetch()

@@ -121,7 +121,7 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
     <HeadShell
       navItems={nav.items}
       secondaryNavItems={[]}
-      activeKey={slug}
+      activeKey={feature?.slug ?? slug}
       onNavigate={(item) => {
         if (item.to) navigate({ to: item.to })
       }}

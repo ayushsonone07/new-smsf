@@ -166,10 +166,13 @@ export function CustomerListPage() {
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
 
+  const permissionRouteName = typeof window !== 'undefined'
+    ? window.location.pathname.replace(/^\/+|\/+$/g, '')
+    : undefined
   const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions(currentDepartment)
+    useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = isDeptUser || canEditColumn('Status')
+  const canEditStatus = canEditColumn('Status')
 
   const isAssignToVisible =
     !isDeptUser &&
@@ -185,7 +188,9 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark = session?.user.role === 'USER'
+  const canEditRemark = canEditColumn('Internal Remark') || canEditColumn('Remark')
+  const canEditServiceType = canEditColumn('Services') || canEditColumn('Service Type')
+  const canEditContact = canEditColumn('Contact')
 
   const isContactVisible =
     isColumnEnabled('Contact') ||
@@ -804,9 +809,11 @@ export function CustomerListPage() {
         showBusiness={isBusinessVisible}
         showUpdated={false}
         showServiceType={useRowsEndpoint}
+        canEditServiceType={canEditServiceType}
+        canEditContact={canEditContact}
         isGoogle={isGoogle}
-        onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
-        onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
+        onOpenServiceFlow={canEditServiceType ? (cust) => setServiceFlowCustomer(cust) : undefined}
+        onOpenServiceTags={canEditServiceType ? (cust) => setServiceTagsCustomer(cust) : undefined}
         onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
         onOpenDetail={(cust, tab) => {
           setSelectedCustomer(cust)
@@ -869,6 +876,7 @@ export function CustomerListPage() {
         customer={serviceFlowCustomer}
         isOpen={Boolean(serviceFlowCustomer)}
         onClose={() => setServiceFlowCustomer(null)}
+        isEditable={canEditServiceType}
         departmentType={currentDepartment}
         onStepsUpdated={() => {
           activeCustomerQuery.refetch()
