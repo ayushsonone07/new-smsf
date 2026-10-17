@@ -139,6 +139,21 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
   const isStatusCol = colNameClean === 'status' || colNameClean === 'taskstatus'
   if (isStatusTarget && isStatusCol) return true
 
+  // 'Created' <-> 'Created Date' <-> 'Created At'
+  const isCreatedTarget = targetClean === 'created' || targetClean === 'createdat' || targetClean === 'createddate'
+  const isCreatedCol = colNameClean === 'created' || colNameClean === 'createdat' || colNameClean === 'createddate'
+  if (isCreatedTarget && isCreatedCol) return true
+
+  // 'Department' <-> 'Departments'
+  const isDeptTarget = targetClean === 'department' || targetClean === 'departments' || targetClean === 'dept'
+  const isDeptCol = colNameClean === 'department' || colNameClean === 'departments' || colNameClean === 'dept'
+  if (isDeptTarget && isDeptCol) return true
+
+  // 'Meeting Date' <-> 'Meeting' <-> 'Scheduled Date'
+  const isMeetDateTarget = targetClean === 'meetingdate' || targetClean === 'meeting' || targetClean === 'scheduleddate' || targetClean === 'meetingtime'
+  const isMeetDateCol = colNameClean === 'meetingdate' || colNameClean === 'meeting' || colNameClean === 'scheduleddate' || colNameClean === 'meetingtime'
+  if (isMeetDateTarget && isMeetDateCol) return true
+
   // 'Website Exists'
   const isWebExistsTarget = targetClean === 'websiteexists' || targetClean === 'iswebsiteexists'
   const isWebExistsCol = colNameClean === 'websiteexists' || colNameClean === 'iswebsiteexists'
