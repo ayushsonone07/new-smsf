@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateCustomer } from '../../../api/customers.api'

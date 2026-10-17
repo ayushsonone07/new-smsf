@@ -1057,6 +1057,19 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.cl-assign-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cl-assign-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
 }
 
 .cl-assign-opt {
