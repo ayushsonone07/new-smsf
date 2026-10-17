@@ -1752,6 +1752,44 @@ tr.is-selected-row td {
   border-top: 1px solid #f1f5f9;
 }
 
+.department-form-embedded {
+  width: 100%;
+}
+
+.department-form-embedded label:not(.checkbox-field):not(.inline-label),
+.department-form-modal label:not(.checkbox-field):not(.inline-label) {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.department-form-embedded input:not([type="checkbox"]):not([type="radio"]),
+.department-form-modal input:not([type="checkbox"]):not([type="radio"]),
+.department-form-embedded select,
+.department-form-modal select {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.department-form-embedded input:not([type="checkbox"]):not([type="radio"]):focus,
+.department-form-modal input:not([type="checkbox"]):not([type="radio"]):focus,
+.department-form-embedded select:focus,
+.department-form-modal select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
 
 /* ---------------------------------------------------------------
    Pill

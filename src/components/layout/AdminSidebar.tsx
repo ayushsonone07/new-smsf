@@ -9,8 +9,11 @@ import { ProfileMenu } from '../common/ProfileMenu'
 
 type NavPath =
   | '/admin'
+  | '/admin/create-department'
   | '/admin/customers'
   | '/admin/services'
+  | '/admin/timelines'
+  | '/admin/service-flow'
   | '/head'
   | '/users'
 
@@ -30,7 +33,34 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname === '/admin' ||
-      pathname.startsWith('/admin/departments'),
+      (pathname.startsWith('/admin/departments') && !pathname.includes('/create')),
+  },
+  {
+    to: '/admin/create-department',
+    label: 'Create Department',
+    icon: '➕',
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname === '/admin/create-department' ||
+      pathname === '/admin/departments/create',
+  },
+  {
+    to: '/admin/services',
+    label: 'Service List',
+    icon: '🛠',
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/services') ||
+      pathname === '/services',
+  },
+  {
+    to: '/admin/timelines',
+    label: 'Service Flow',
+    icon: '🔄',
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/timelines') ||
+      pathname.startsWith('/admin/service-flow'),
   },
   {
     to: '/admin/customers',
@@ -38,15 +68,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: '♙',
     roles: ['ADMIN'],
     isActive: (pathname) => pathname.startsWith('/admin/customers'),
-  },
-  {
-    to: '/admin/services',
-    label: 'Create Department',
-    icon: '➕',
-    roles: ['ADMIN'],
-    isActive: (pathname) =>
-      pathname.startsWith('/admin/services') ||
-      pathname === '/services',
   },
   {
     to: '/head',
@@ -144,7 +165,7 @@ export function AdminSidebar({
               }}
             >
               <span>{item.icon}</span>
-              {item.label}
+              <span>{item.label}</span>
             </a>
           )
         })}

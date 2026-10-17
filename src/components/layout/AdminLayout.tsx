@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { ProfileChip } from '../common/ProfileChip'
 
 interface AdminLayoutProps {
   children: ReactNode
@@ -62,6 +63,10 @@ export function AdminLayout({
             <img src="/mbg-card-logo.svg" alt="MBG Card" />
             <span>Admin Portal</span>
           </span>
+
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <ProfileChip />
+          </div>
         </header>
 
         {children}
