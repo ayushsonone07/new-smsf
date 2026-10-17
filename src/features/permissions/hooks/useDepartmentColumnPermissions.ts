@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { getSession } from '../../../app/auth/session'
-import { useDynamicColumns } from './useDynamicPermissions'
+import { useDynamicColumns, useDynamicRoutes } from './useDynamicPermissions'
 import type { DynamicColumnResponse } from '../../../api/dynamic-permission.api'
 import { isUserGoogle, resolveDeptFromPath } from '../../departments/head/utils/routeUtils'
 
@@ -237,6 +237,7 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
  */
 export function useDepartmentColumnPermissions(
   departmentType?: string,
+  routeName?: string,
 ): DepartmentColumnPermissionsResult {
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
@@ -247,11 +248,45 @@ export function useDepartmentColumnPermissions(
   const isHead = session?.user.role !== 'USER'
 
   const query = useDynamicColumns(dept)
-  const columns = query.data ?? []
+  const routesQuery = useDynamicRoutes(dept, Boolean(routeName))
+  const allColumns = query.data ?? []
+  const normalizedRouteName = (routeName ?? '').replace(/^\/+|\/+$/g, '').toLowerCase()
+  const requestedRouteSegment = normalizedRouteName.split('/').pop() ?? ''
+  const customerRouteAliases = new Set(['customers', 'customer-list', 'all-customers'])
+  const matchedRoute = routeName
+    ? (routesQuery.data ?? []).find(
+        (route) => {
+          const candidate = (route.routeName ?? '')
+            .replace(/^\/+|\/+$/g, '')
+            .toLowerCase()
+          const candidateSegment = candidate.split('/').pop() ?? ''
+          return (
+            candidate === normalizedRouteName ||
+            (customerRouteAliases.has(requestedRouteSegment) &&
+              customerRouteAliases.has(candidateSegment))
+          )
+        },
+      )
+    : undefined
+  const columns = routeName
+    ? allColumns.filter((column) => {
+        const columnRouteName = (column.routeName ?? '')
+          .replace(/^\/+|\/+$/g, '')
+          .toLowerCase()
+        return (
+          columnRouteName === normalizedRouteName ||
+          (matchedRoute != null &&
+            (column.routeId === matchedRoute.routeId ||
+              column.routesType === matchedRoute.routeId))
+        )
+      })
+    : allColumns
+  const permissionDataPending = query.isPending || (Boolean(routeName) && routesQuery.isPending)
 
   const isColumnEnabled = useCallback(
     (nameOrId: string, routeFilter?: string): boolean => {
       if (!nameOrId) return false
+      if (permissionDataPending) return false
       // If no columns are in DB yet, allow standard columns
       if (columns.length === 0) return true
 
@@ -277,29 +312,33 @@ export function useDepartmentColumnPermissions(
       // If column is not configured in DB at all, allow it by default
       return true
     },
-    [columns, isHead],
+    [columns, isHead, permissionDataPending],
   )
 
   const canEditColumn = useCallback(
     (nameOrId: string): boolean => {
       if (!nameOrId) return false
+      if (permissionDataPending) return false
       if (!isColumnEnabled(nameOrId)) return false
       if (columns.length === 0) return true
 
       const col = columns.find((c) => isColumnMatch(c, nameOrId))
-      if (!col) return true
+      // Once a department has an explicit column permission set, editing is
+      // fail-closed: an unconfigured/mismatched column must never become
+      // writable by default.
+      if (!col) return false
 
       const perm = isHead ? col.roleAPermission : col.roleBPermission
       return perm === '12' || perm === '2' || perm === 'CAN_EDIT'
     },
-    [columns, isHead, isColumnEnabled],
+    [columns, isHead, isColumnEnabled, permissionDataPending],
   )
 
   return {
     columns,
-    isLoading: query.isLoading,
-    isPending: query.isPending,
-    isError: query.isError,
+    isLoading: query.isLoading || routesQuery.isLoading,
+    isPending: permissionDataPending,
+    isError: query.isError || routesQuery.isError,
     isColumnEnabled,
     canEditColumn,
     refetch: query.refetch,

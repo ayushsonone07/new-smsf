@@ -166,6 +166,9 @@ export function CustomerListPage() {
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
 
+  const permissionRouteName = typeof window !== 'undefined'
+    ? window.location.pathname.replace(/^\/+|\/+$/g, '')
+    : undefined
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
@@ -807,8 +810,8 @@ export function CustomerListPage() {
         showUpdated={false}
         showServiceType={useRowsEndpoint && isServiceTypeVisible}
         isGoogle={isGoogle}
-        onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
-        onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
+        onOpenServiceFlow={canEditServiceType ? (cust) => setServiceFlowCustomer(cust) : undefined}
+        onOpenServiceTags={canEditServiceType ? (cust) => setServiceTagsCustomer(cust) : undefined}
         onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
         onOpenDetail={(cust, tab) => {
           setSelectedCustomer(cust)
@@ -871,6 +874,7 @@ export function CustomerListPage() {
         customer={serviceFlowCustomer}
         isOpen={Boolean(serviceFlowCustomer)}
         onClose={() => setServiceFlowCustomer(null)}
+        isEditable={canEditServiceType}
         departmentType={currentDepartment}
         onStepsUpdated={() => {
           activeCustomerQuery.refetch()
