@@ -48,10 +48,12 @@ export function AdminServiceListCard({
   const [planForm, setPlanForm] = useState({
     name: '',
     departmentTypes: [] as string[],
+    featureList: [] as string[],
     amount: '',
     additionalAmount: '',
     durationMonths: '',
   })
+  const [featureInput, setFeatureInput] = useState('')
   const [selectedDeptForPlan, setSelectedDeptForPlan] = useState('')
   const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set())
 
@@ -282,10 +284,12 @@ export function AdminServiceListCard({
     setPlanForm({
       name: '',
       departmentTypes: [],
+      featureList: [],
       amount: '',
       additionalAmount: '',
       durationMonths: '',
     })
+    setFeatureInput('')
     setSelectedDeptForPlan('')
     setIsAddPlanOpen(true)
   }
@@ -295,14 +299,34 @@ export function AdminServiceListCard({
     setPlanForm({
       name: plan.planName || '',
       departmentTypes: plan.departmentTypes ?? [],
+      featureList: plan.featureList ?? [],
       amount: plan.amount != null ? String(plan.amount) : '',
       additionalAmount:
         plan.additionalAmount != null ? String(plan.additionalAmount) : '',
       durationMonths:
         plan.durationMonths != null ? String(plan.durationMonths) : '',
     })
+    setFeatureInput('')
     setSelectedDeptForPlan('')
     setIsAddPlanOpen(true)
+  }
+
+  function handleAddFeature() {
+    const trimmed = featureInput.trim()
+    if (trimmed && !planForm.featureList.includes(trimmed)) {
+      setPlanForm({
+        ...planForm,
+        featureList: [...planForm.featureList, trimmed],
+      })
+      setFeatureInput('')
+    }
+  }
+
+  function handleRemoveFeature(feature: string) {
+    setPlanForm({
+      ...planForm,
+      featureList: planForm.featureList.filter((f) => f !== feature),
+    })
   }
 
   function handleSavePlan(e: React.FormEvent) {
@@ -316,6 +340,7 @@ export function AdminServiceListCard({
         plan: {
           planName: planForm.name.trim(),
           departmentTypes: planForm.departmentTypes,
+          featureList: planForm.featureList,
           amount: planForm.amount === '' ? null : Number(planForm.amount),
           additionalAmount:
             planForm.additionalAmount === ''
@@ -864,6 +889,43 @@ export function AdminServiceListCard({
                                     }`}
                                 </div>
                               )}
+                              {plan.featureList && plan.featureList.length > 0 && (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '0.25rem',
+                                    marginTop: '0.35rem',
+                                  }}
+                                >
+                                  {plan.featureList.slice(0, 2).map((feat, fIdx) => (
+                                    <span
+                                      key={fIdx}
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        background: '#ecfdf5',
+                                        color: '#047857',
+                                        border: '1px solid #a7f3d0',
+                                        borderRadius: '4px',
+                                        padding: '0.1rem 0.35rem',
+                                      }}
+                                    >
+                                      {feat}
+                                    </span>
+                                  ))}
+                                  {plan.featureList.length > 2 && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        color: '#94a3b8',
+                                        alignSelf: 'center',
+                                      }}
+                                    >
+                                      +{plan.featureList.length - 2} more
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td>
                               <div
@@ -1253,6 +1315,86 @@ export function AdminServiceListCard({
                         cursor: 'pointer',
                         color: '#dc2626',
                         fontWeight: 700,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Feature List</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="Enter plan feature (e.g. 24/7 Support, Free SSL)"
+                value={featureInput}
+                onChange={(e) => setFeatureInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddFeature()
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.55rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={
+                  !featureInput.trim() ||
+                  planForm.featureList.includes(featureInput.trim())
+                }
+                onClick={handleAddFeature}
+              >
+                + Add
+              </Button>
+            </div>
+
+            {planForm.featureList.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.35rem',
+                  marginTop: '0.5rem',
+                }}
+              >
+                {planForm.featureList.map((feat) => (
+                  <span
+                    key={feat}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.25rem 0.5rem',
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {feat}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFeature(feat)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#dc2626',
+                        fontWeight: 700,
+                        marginLeft: '0.2rem',
                       }}
                     >
                       ×
