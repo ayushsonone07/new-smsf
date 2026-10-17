@@ -11,6 +11,8 @@ import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
+import { isUserGoogle, resolveDeptFromPath } from '../utils/routeUtils'
 import './MeetingPage.css'
 
 const containerVariants: Variants = {
@@ -63,6 +65,48 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
         window.location.pathname.includes('/google-user') ||
         window.location.pathname.includes('/users')))
   const isHead = !isDepartmentUser
+
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const isGoogle = isUserGoogle(session?.user?.departmentType || deptFromUrl)
+  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (session?.user?.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
+
+  const { isColumnEnabled } = useDepartmentColumnPermissions(currentDepartment)
+
+  const isCustomerVisible = isColumnEnabled('Customer', 'history')
+  const isAssignedToVisible = isColumnEnabled('Assigned To', 'history')
+  const isServiceVisible = isColumnEnabled('Service', 'history')
+  const isPhaseVisible = isColumnEnabled('Phase', 'history')
+  const isServiceStatusVisible = isColumnEnabled('Service Status', 'history')
+  const isStatusVisible = isColumnEnabled('Status', 'history')
+  const isTimelineVisible = isColumnEnabled('Timeline', 'history')
+  const isRemarksVisible = isColumnEnabled('Remarks', 'history')
+  const isRecordVisible = isColumnEnabled('Record', 'history')
+
+  const visibleColumnsCount = [
+    isCustomerVisible,
+    isAssignedToVisible,
+    isServiceVisible,
+    isPhaseVisible,
+    isServiceStatusVisible,
+    isStatusVisible,
+    isTimelineVisible,
+    isRemarksVisible,
+    isRecordVisible,
+  ].filter(Boolean).length || 1
+
+  const isOldStatusVisible = isColumnEnabled('Old Status', 'history')
+  const isNewStatusVisible = isColumnEnabled('New Status', 'history')
+  const isUpdatedByVisible = isColumnEnabled('Updated By', 'history')
+  const isDateTimeVisible = isColumnEnabled('Date & Time', 'history')
+
+  const visibleStatusColumnsCount = [
+    true,
+    isCustomerVisible,
+    isOldStatusVisible,
+    isNewStatusVisible,
+    isUpdatedByVisible,
+    isDateTimeVisible,
+  ].filter(Boolean).length || 1
 
   const userEmail = useMemo(() => getEffectiveUserEmail(session), [session])
 
@@ -322,21 +366,21 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Customer</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Assigned To</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Phase</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Timeline</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Remarks</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Record</th>
+                      {isCustomerVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Customer</th>}
+                      {isAssignedToVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Assigned To</th>}
+                      {isServiceVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service</th>}
+                      {isPhaseVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Phase</th>}
+                      {isServiceStatusVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Service Status</th>}
+                      {isStatusVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Status</th>}
+                      {isTimelineVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Timeline</th>}
+                      {isRemarksVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Remarks</th>}
+                      {isRecordVisible && <th style={{ padding: '10px 12px', fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Record</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {historyItems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={visibleColumnsCount} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
                           No task history records found
                         </td>
                       </tr>
@@ -372,80 +416,98 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                               transition: 'background 0.15s',
                             }}
                           >
-                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
-                              {item.customerName || '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.assignedTo || item.username || item.departmentUserFilter || '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.departmentServiceName || item.serviceType || 'ONBOARDING CUSTOMER'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#475569' }}>
-                              {item.phaseName || 'Default'}
-                            </td>
-                            <td style={{ padding: '10px 12px' }}>
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '4px 10px',
-                                borderRadius: '9999px',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                background: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' ? '#3b82f6' : serviceStatus === 'COMPLETED' ? '#10b981' : '#e2e8f0',
-                                color: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' || serviceStatus === 'COMPLETED' ? '#ffffff' : '#475569',
-                                textTransform: 'uppercase'
-                              }}>
-                                {serviceStatus}
-                              </span>
-                            </td>
-                            <td style={{ padding: '10px 12px' }}>
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                borderRadius: '9999px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                border: `1px solid ${isPendingStatus ? '#fde047' : isCompletedStatus ? '#86efac' : '#cbd5e1'}`,
-                                background: isPendingStatus ? '#fef9c3' : isCompletedStatus ? '#dcfce3' : '#f1f5f9',
-                                color: isPendingStatus ? '#ca8a04' : isCompletedStatus ? '#16a34a' : '#475569',
-                                textTransform: 'capitalize'
-                              }}>
-                                {isPendingStatus && (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 22h14" />
-                                    <path d="M5 2h14" />
-                                    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
-                                    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+                            {isCustomerVisible && (
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
+                                {item.customerName || '—'}
+                              </td>
+                            )}
+                            {isAssignedToVisible && (
+                              <td style={{ padding: '10px 12px', color: '#475569' }}>
+                                {item.assignedTo || item.username || item.departmentUserFilter || '—'}
+                              </td>
+                            )}
+                            {isServiceVisible && (
+                              <td style={{ padding: '10px 12px', color: '#475569' }}>
+                                {item.departmentServiceName || item.serviceType || 'ONBOARDING CUSTOMER'}
+                              </td>
+                            )}
+                            {isPhaseVisible && (
+                              <td style={{ padding: '10px 12px', color: '#475569' }}>
+                                {item.phaseName || 'Default'}
+                              </td>
+                            )}
+                            {isServiceStatusVisible && (
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '4px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  background: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' ? '#3b82f6' : serviceStatus === 'COMPLETED' ? '#10b981' : '#e2e8f0',
+                                  color: serviceStatus === 'ACTIVE' || serviceStatus === 'REASSIGNED' || serviceStatus === 'COMPLETED' ? '#ffffff' : '#475569',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {serviceStatus}
+                                </span>
+                              </td>
+                            )}
+                            {isStatusVisible && (
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  border: `1px solid ${isPendingStatus ? '#fde047' : isCompletedStatus ? '#86efac' : '#cbd5e1'}`,
+                                  background: isPendingStatus ? '#fef9c3' : isCompletedStatus ? '#dcfce3' : '#f1f5f9',
+                                  color: isPendingStatus ? '#ca8a04' : isCompletedStatus ? '#16a34a' : '#475569',
+                                  textTransform: 'capitalize'
+                                }}>
+                                  {isPendingStatus && (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M5 22h14" />
+                                      <path d="M5 2h14" />
+                                      <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+                                      <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+                                    </svg>
+                                  )}
+                                  {!isPendingStatus && (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  )}
+                                  {status}
+                                </span>
+                              </td>
+                            )}
+                            {isTimelineVisible && (
+                              <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '12px' }}>
+                                {assignedDateStr && <div>Assigned {assignedDateStr}</div>}
+                                {endedDateStr && <div style={{ color: '#16a34a', marginTop: 2 }}>Ended {endedDateStr}</div>}
+                                {!assignedDateStr && !endedDateStr && '—'}
+                              </td>
+                            )}
+                            {isRemarksVisible && (
+                              <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                                {item.remarks || 'Assigned manually'}
+                              </td>
+                            )}
+                            {isRecordVisible && (
+                              <td style={{ padding: '10px 12px' }}>
+                                <a href="#" style={{ color: '#3b82f6', display: 'inline-flex', alignItems: 'center' }} onClick={(e) => e.preventDefault()}>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
                                   </svg>
-                                )}
-                                {!isPendingStatus && (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="20 6 9 17 4 12" />
-                                  </svg>
-                                )}
-                                {status}
-                              </span>
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '12px' }}>
-                              {assignedDateStr && <div>Assigned {assignedDateStr}</div>}
-                              {endedDateStr && <div style={{ color: '#16a34a', marginTop: 2 }}>Ended {endedDateStr}</div>}
-                              {!assignedDateStr && !endedDateStr && '—'}
-                            </td>
-                            <td style={{ padding: '10px 12px', color: '#64748b' }}>
-                              {item.remarks || 'Assigned manually'}
-                            </td>
-                            <td style={{ padding: '10px 12px' }}>
-                              <a href="#" style={{ color: '#3b82f6', display: 'inline-flex', alignItems: 'center' }} onClick={(e) => e.preventDefault()}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                  <polyline points="15 3 21 3 21 9"></polyline>
-                                  <line x1="10" y1="14" x2="21" y2="3"></line>
-                                </svg>
-                              </a>
-                            </td>
+                                </a>
+                              </td>
+                            )}
                           </tr>
                         )
                       })
@@ -525,17 +587,17 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
                       <th style={{ padding: '10px 12px', fontWeight: 600 }}>#</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Customer / Lead</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Old Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>New Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Updated By</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Date & Time</th>
+                      {isCustomerVisible && <th style={{ padding: '10px 12px', fontWeight: 600 }}>Customer / Lead</th>}
+                      {isOldStatusVisible && <th style={{ padding: '10px 12px', fontWeight: 600 }}>Old Status</th>}
+                      {isNewStatusVisible && <th style={{ padding: '10px 12px', fontWeight: 600 }}>New Status</th>}
+                      {isUpdatedByVisible && <th style={{ padding: '10px 12px', fontWeight: 600 }}>Updated By</th>}
+                      {isDateTimeVisible && <th style={{ padding: '10px 12px', fontWeight: 600 }}>Date & Time</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {statusHistoryItems.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={visibleStatusColumnsCount} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
                           No status history logs found
                         </td>
                       </tr>
@@ -549,33 +611,43 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                           }}
                         >
                           <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{page * pageSize + idx + 1}</td>
-                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
-                            {item.customerName || item.leadName || `ID: ${item.customerId || item.leadId || '—'}`}
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>
-                            <Pill tone="neutral" size="sm">
-                              {item.oldStatus || '—'}
-                            </Pill>
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>
-                            <Pill tone="success" size="sm">
-                              {item.newStatus || '—'}
-                            </Pill>
-                          </td>
-                          <td style={{ padding: '10px 12px', color: '#475569' }}>
-                            {item.updatedBy || 'System'}
-                          </td>
-                          <td style={{ padding: '10px 12px', color: '#64748b' }}>
-                            {item.createdAt
-                              ? new Date(item.createdAt).toLocaleString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : '—'}
-                          </td>
+                          {isCustomerVisible && (
+                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
+                              {item.customerName || item.leadName || `ID: ${item.customerId || item.leadId || '—'}`}
+                            </td>
+                          )}
+                          {isOldStatusVisible && (
+                            <td style={{ padding: '10px 12px' }}>
+                              <Pill tone="neutral" size="sm">
+                                {item.oldStatus || '—'}
+                              </Pill>
+                            </td>
+                          )}
+                          {isNewStatusVisible && (
+                            <td style={{ padding: '10px 12px' }}>
+                              <Pill tone="success" size="sm">
+                                {item.newStatus || '—'}
+                              </Pill>
+                            </td>
+                          )}
+                          {isUpdatedByVisible && (
+                            <td style={{ padding: '10px 12px', color: '#475569' }}>
+                              {item.updatedBy || 'System'}
+                            </td>
+                          )}
+                          {isDateTimeVisible && (
+                            <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                              {item.createdAt
+                                ? new Date(item.createdAt).toLocaleString('en-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : '—'}
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}
