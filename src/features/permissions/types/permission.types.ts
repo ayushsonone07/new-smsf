@@ -46,6 +46,9 @@ export type HeadScreenKey =
   | 'airtel-calls'
   | 'manage-services'
   | 'salary-management'
+  | 'autowebision-customers'
+  | 'website-customers'
+  | 'automation-customers'
   | 'custom'
 
 /**
