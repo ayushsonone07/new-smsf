@@ -9,7 +9,6 @@ import {
 } from '../../../api/service-flow.api'
 import {
   fetchCustomerServiceFlowDetail,
-  updateAutowebisionStatus,
 } from '../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../api/dynamic-permission.api'
 import { resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
@@ -38,7 +37,7 @@ export interface ServiceFlowModalProps {
   onClose: () => void
   isEditable?: boolean
   onStepsUpdated?: (updatedSteps: Phase1Step[]) => void
-  onSubServiceStatusUpdated?: (newStatus: string) => void
+  onSubServiceStatusUpdated?: (newStatus: string, subServiceName?: string) => void
   departmentType?: string
   serviceType?: string
 }
@@ -577,7 +576,7 @@ export function ServiceFlowModal({
             newStatus: 'IN_PROGRESS',
           })
           setSubServiceStatus('IN_PROGRESS')
-          onSubServiceStatusUpdated?.('IN_PROGRESS')
+          onSubServiceStatusUpdated?.('IN_PROGRESS', subServiceName)
         } catch {
           // ignore background update error
         }
@@ -614,27 +613,8 @@ export function ServiceFlowModal({
         newStatus,
       })
 
-      const isAutowebsion =
-        effectiveDept.includes('AUTOWEB') ||
-        effectiveDept.includes('WEBSITE') ||
-        effectiveDept.includes('AUTOMATION') ||
-        Boolean(serviceType)
-
-      if (isAutowebsion) {
-        try {
-          await updateAutowebisionStatus({
-            customerId: customer.id,
-            updatedStatus: newStatus,
-            departmentType: effectiveDept,
-            serviceType: serviceType || (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE'),
-          })
-        } catch {
-          // background sync
-        }
-      }
-
       setSubServiceStatus(newStatus)
-      onSubServiceStatusUpdated?.(newStatus)
+      onSubServiceStatusUpdated?.(newStatus, subServiceName)
       setMessage({
         type: 'success',
         text: `Sub-service status updated to ${newStatus.replace(/_/g, ' ')}!`,
@@ -680,7 +660,7 @@ export function ServiceFlowModal({
           newStatus: 'PENDING_CUSTOMER_ACK',
         })
         setSubServiceStatus('PENDING_CUSTOMER_ACK')
-        onSubServiceStatusUpdated?.('PENDING_CUSTOMER_ACK')
+        onSubServiceStatusUpdated?.('PENDING_CUSTOMER_ACK', subServiceName)
       } catch {
         // fallback
       }
