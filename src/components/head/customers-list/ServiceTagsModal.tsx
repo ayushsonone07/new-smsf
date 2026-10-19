@@ -11,6 +11,7 @@ export interface ServiceTagsModalProps {
   customer: OnboardingCustomer | null
   serviceType?: string
   onTagsUpdated?: () => void
+  readOnly?: boolean
 }
 
 interface TagItem {
@@ -179,6 +180,7 @@ export function ServiceTagsModal({
   customer,
   serviceType = 'GOOGLE SERVICE',
   onTagsUpdated,
+  readOnly = false,
 }: ServiceTagsModalProps) {
   const [search, setSearch] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -343,8 +345,14 @@ export function ServiceTagsModal({
           {/* Header */}
           <div className="stm-header">
             <div className="stm-header-title-row">
-              <h2 className="stm-title">Manage Service Tags</h2>
-              <span className="stm-case-badge">CASE_INSENSITIVE</span>
+              <h2 className="stm-title">{readOnly ? 'View Service Tags' : 'Manage Service Tags'}</h2>
+              {readOnly ? (
+                <span className="stm-case-badge" style={{ background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }}>
+                  READ ONLY
+                </span>
+              ) : (
+                <span className="stm-case-badge">CASE_INSENSITIVE</span>
+              )}
             </div>
             <button
               type="button"
@@ -357,7 +365,11 @@ export function ServiceTagsModal({
             </button>
           </div>
           <p className="stm-subtitle">
-            Add or remove service tags for <strong>{effectiveServiceType.replace(/_/g, ' ')}</strong>
+            {readOnly ? (
+              <>Service tags for <strong>{effectiveServiceType.replace(/_/g, ' ')}</strong> (Read-only view)</>
+            ) : (
+              <>Add or remove service tags for <strong>{effectiveServiceType.replace(/_/g, ' ')}</strong></>
+            )}
           </p>
 
           {/* Alert Message */}
@@ -375,187 +387,197 @@ export function ServiceTagsModal({
           )}
 
           {/* Active Tags list */}
-          {localTags.length > 0 && (
+          {localTags.length > 0 ? (
             <div className="stm-active-tags-section">
               <span className="stm-active-tags-label">Current Tags:</span>
               <div className="stm-active-tags-wrap">
                 {localTags.map((t) => (
                   <span key={t.id} className="stm-active-tag-pill" title={t.date ? `Added: ${t.date}` : undefined}>
                     {t.name}
-                    <button
-                      type="button"
-                      className="stm-active-tag-remove"
-                      onClick={() => handleDeleteActiveTag(t.id, t.name)}
-                      disabled={isSubmitting}
-                      title={`Remove tag ${t.name}`}
-                    >
-                      <Icon name="x" size={11} strokeWidth={2.5} />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className="stm-active-tag-remove"
+                        onClick={() => handleDeleteActiveTag(t.id, t.name)}
+                        disabled={isSubmitting}
+                        title={`Remove tag ${t.name}`}
+                      >
+                        <Icon name="x" size={11} strokeWidth={2.5} />
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
             </div>
-          )}
+          ) : readOnly ? (
+            <div style={{ padding: '24px 16px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+              <p style={{ margin: 0 }}>No service tags assigned to this customer.</p>
+            </div>
+          ) : null}
 
-          {/* Quick Add Predefined Tags box */}
-          {!showCustomSection ? (
-            <div className="stm-quick-section">
-              <div className="stm-quick-heading">
-                <span className="stm-lightning-icon">⚡</span>
-                <span className="stm-quick-title">Quick Add Predefined Tags</span>
-              </div>
+          {!readOnly && (
+            <>
+              {/* Quick Add Predefined Tags box */}
+              {!showCustomSection ? (
+                <div className="stm-quick-section">
+                  <div className="stm-quick-heading">
+                    <span className="stm-lightning-icon">⚡</span>
+                    <span className="stm-quick-title">Quick Add Predefined Tags</span>
+                  </div>
 
-              <div className="stm-quick-box">
-                {/* Search bar */}
-                <div className="stm-search-wrap">
-                  <span className="stm-search-icon">
-                    <Icon name="search" size={14} strokeWidth={2} />
-                  </span>
-                  <input
-                    type="text"
-                    className="stm-search-input"
-                    placeholder="Search predefined tags..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  {search && (
+                  <div className="stm-quick-box">
+                    {/* Search bar */}
+                    <div className="stm-search-wrap">
+                      <span className="stm-search-icon">
+                        <Icon name="search" size={14} strokeWidth={2} />
+                      </span>
+                      <input
+                        type="text"
+                        className="stm-search-input"
+                        placeholder="Search predefined tags..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      {search && (
+                        <button
+                          type="button"
+                          className="stm-search-clear"
+                          onClick={() => setSearch('')}
+                        >
+                          <Icon name="x" size={13} strokeWidth={2} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="stm-tags-scroll" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                      {filteredCategories.map((cat) => (
+                        <div key={cat.category} className="stm-category-group" style={{ marginBottom: '12px' }}>
+                          <h4 className="stm-category-title">
+                            {cat.category} {cat.isSparkle && <span className="stm-sparkle">✨</span>}
+                          </h4>
+                          <div className="stm-tags-pill-list">
+                            {cat.tags.map((tag) => {
+                              const isLoading = activeTagLoading === tag.name
+                              return (
+                                <button
+                                  key={tag.id}
+                                  type="button"
+                                  className={`stm-tag-pill ${cat.pillClass} ${
+                                    isLoading ? 'stm-tag-pill--loading' : ''
+                                  }`}
+                                  onClick={() => handleQuickAdd(tag)}
+                                  disabled={Boolean(activeTagLoading)}
+                                >
+                                  {isLoading ? 'Adding...' : tag.name}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      {filteredCategories.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '0.85rem' }}>
+                          No tags found matching "{search}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Custom Tag Form */
+                <form className="stm-custom-form" onSubmit={handleCustomSubmit}>
+                  <div className="stm-custom-field">
+                    <label className="stm-custom-label">
+                      Operation <span className="stm-required">*</span>
+                    </label>
+                    <div className="stm-custom-op-toggle">
+                      <button
+                        type="button"
+                        className={`stm-op-btn ${customOperation === 'add' ? 'stm-op-btn--active' : ''}`}
+                        onClick={() => setCustomOperation('add')}
+                      >
+                        Add Tag
+                      </button>
+                      <button
+                        type="button"
+                        className={`stm-op-btn ${customOperation === 'remove' ? 'stm-op-btn--active-remove' : ''}`}
+                        onClick={() => setCustomOperation('remove')}
+                      >
+                        Remove Tag
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="stm-custom-field">
+                    <label htmlFor="custom-tag-name" className="stm-custom-label">
+                      Tag Name <span className="stm-required">*</span>
+                    </label>
+                    <input
+                      id="custom-tag-name"
+                      type="text"
+                      className="stm-custom-input"
+                      placeholder="e.g. CUSTOM_FLAG"
+                      value={customTagName}
+                      onChange={(e) => setCustomTagName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="stm-custom-field">
+                    <label htmlFor="custom-tag-desc" className="stm-custom-label">
+                      Description <span className="stm-optional">(Optional)</span>
+                    </label>
+                    <textarea
+                      id="custom-tag-desc"
+                      className="stm-custom-textarea"
+                      placeholder="Reason or context for this tag..."
+                      rows={2}
+                      value={customDescription}
+                      onChange={(e) => setCustomDescription(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="stm-custom-actions">
                     <button
                       type="button"
-                      className="stm-search-clear"
-                      onClick={() => setSearch('')}
+                      className="stm-btn-cancel"
+                      onClick={() => setShowCustomSection(false)}
                     >
-                      <Icon name="x" size={13} strokeWidth={2} />
+                      Back
                     </button>
-                  )}
-                </div>
+                    <button
+                      type="submit"
+                      className="stm-btn-submit"
+                      disabled={isSubmitting || !customTagName.trim()}
+                    >
+                      {isSubmitting
+                        ? 'Processing...'
+                        : customOperation === 'add'
+                          ? 'Add Custom Tag'
+                          : 'Remove Tag'}
+                    </button>
+                  </div>
+                </form>
+              )}
 
-                <div className="stm-tags-scroll" style={{ maxHeight: '220px', overflowY: 'auto' }}>
-                  {filteredCategories.map((cat) => (
-                    <div key={cat.category} className="stm-category-group" style={{ marginBottom: '12px' }}>
-                      <h4 className="stm-category-title">
-                        {cat.category} {cat.isSparkle && <span className="stm-sparkle">✨</span>}
-                      </h4>
-                      <div className="stm-tags-pill-list">
-                        {cat.tags.map((tag) => {
-                          const isLoading = activeTagLoading === tag.name
-                          return (
-                            <button
-                              key={tag.id}
-                              type="button"
-                              className={`stm-tag-pill ${cat.pillClass} ${
-                                isLoading ? 'stm-tag-pill--loading' : ''
-                              }`}
-                              onClick={() => handleQuickAdd(tag)}
-                              disabled={Boolean(activeTagLoading)}
-                            >
-                              {isLoading ? 'Adding...' : tag.name}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                  {filteredCategories.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '16px', color: '#64748b', fontSize: '0.85rem' }}>
-                      No tags found matching "{search}"
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Custom Tag Form */
-            <form className="stm-custom-form" onSubmit={handleCustomSubmit}>
-              <div className="stm-custom-field">
-                <label className="stm-custom-label">
-                  Operation <span className="stm-required">*</span>
-                </label>
-                <div className="stm-custom-op-toggle">
-                  <button
-                    type="button"
-                    className={`stm-op-btn ${customOperation === 'add' ? 'stm-op-btn--active' : ''}`}
-                    onClick={() => setCustomOperation('add')}
-                  >
-                    Add Tag
-                  </button>
-                  <button
-                    type="button"
-                    className={`stm-op-btn ${customOperation === 'remove' ? 'stm-op-btn--active-remove' : ''}`}
-                    onClick={() => setCustomOperation('remove')}
-                  >
-                    Remove Tag
-                  </button>
-                </div>
-              </div>
-
-              <div className="stm-custom-field">
-                <label htmlFor="custom-tag-name" className="stm-custom-label">
-                  Tag Name <span className="stm-required">*</span>
-                </label>
-                <input
-                  id="custom-tag-name"
-                  type="text"
-                  className="stm-custom-input"
-                  placeholder="e.g. CUSTOM_FLAG"
-                  value={customTagName}
-                  onChange={(e) => setCustomTagName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="stm-custom-field">
-                <label htmlFor="custom-tag-desc" className="stm-custom-label">
-                  Description <span className="stm-optional">(Optional)</span>
-                </label>
-                <textarea
-                  id="custom-tag-desc"
-                  className="stm-custom-textarea"
-                  placeholder="Reason or context for this tag..."
-                  rows={2}
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="stm-custom-actions">
+              {/* Toggle between Predefined & Custom */}
+              <div className="stm-footer-toggle">
                 <button
                   type="button"
-                  className="stm-btn-cancel"
-                  onClick={() => setShowCustomSection(false)}
+                  className="stm-toggle-link"
+                  onClick={() => {
+                    setShowCustomSection(!showCustomSection)
+                    setMessage(null)
+                  }}
                 >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  className="stm-btn-submit"
-                  disabled={isSubmitting || !customTagName.trim()}
-                >
-                  {isSubmitting
-                    ? 'Processing...'
-                    : customOperation === 'add'
-                      ? 'Add Custom Tag'
-                      : 'Remove Tag'}
+                  <Icon name="settings" size={13} strokeWidth={2} />
+                  <span>
+                    {showCustomSection ? 'Back to Predefined Tags' : 'Need a custom tag? Click here'}
+                  </span>
                 </button>
               </div>
-            </form>
+            </>
           )}
-
-          {/* Toggle between Predefined & Custom */}
-          <div className="stm-footer-toggle">
-            <button
-              type="button"
-              className="stm-toggle-link"
-              onClick={() => {
-                setShowCustomSection(!showCustomSection)
-                setMessage(null)
-              }}
-            >
-              <Icon name="settings" size={13} strokeWidth={2} />
-              <span>
-                {showCustomSection ? 'Back to Predefined Tags' : 'Need a custom tag? Click here'}
-              </span>
-            </button>
-          </div>
         </motion.div>
       </div>
     </AnimatePresence>

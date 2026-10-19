@@ -28,6 +28,7 @@ export interface AutowebsionCustomerLightDTO {
   draftStatus?: string
   subServiceInfo?: any[]
   services?: any[]
+  serviceTags?: any
 }
 
 export interface AutowebsionPageResponse {

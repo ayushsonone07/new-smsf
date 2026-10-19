@@ -72,7 +72,7 @@ export interface CustomersListProps {
   onSendAcknowledgement?: (customer: OnboardingCustomer) => void
   onOpenDetail: (customer: OnboardingCustomer, tab?: string) => void
   onOpenDuplicate?: (customer: OnboardingCustomer) => void
-  onOpenServiceFlow?: (customer: OnboardingCustomer) => void
+  onOpenServiceFlow?: (customer: OnboardingCustomer, subServiceName?: string) => void
   onOpenServiceTags?: (customer: OnboardingCustomer) => void
   onOpenGoogleInfo?: (customer: OnboardingCustomer) => void
   canEdit?: boolean
@@ -216,7 +216,7 @@ export function CustomersList({
             <th className="cl-th cl-th--num">#</th>
             {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
             {showContact && <th className="cl-th cl-th--contact">Contact</th>}
-            {showServiceType && <th className="cl-th cl-th--service">Service Type</th>}
+            {showServiceType && <th className="cl-th cl-th--service">Services</th>}
             {showStatus && <th className="cl-th cl-th--status">Status</th>}
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
@@ -247,7 +247,11 @@ export function CustomersList({
               onSendAcknowledgement={onSendAcknowledgement ? () => onSendAcknowledgement(customer) : undefined}
               onOpenDetail={(tab) => onOpenDetail(customer, tab)}
               onOpenDuplicate={onOpenDuplicate ? () => onOpenDuplicate(customer) : undefined}
-              onOpenServiceFlow={onOpenServiceFlow ? () => onOpenServiceFlow(customer) : undefined}
+              onOpenServiceFlow={
+                onOpenServiceFlow
+                  ? (subName) => onOpenServiceFlow(customer, subName)
+                  : undefined
+              }
               onOpenServiceTags={onOpenServiceTags ? () => onOpenServiceTags(customer) : undefined}
               onOpenGoogleInfo={onOpenGoogleInfo ? () => onOpenGoogleInfo(customer) : undefined}
               canEdit={canEdit}
@@ -628,7 +632,7 @@ interface CustomerRowProps {
   onSendAcknowledgement?: () => void
   onOpenDetail: (tab?: string) => void
   onOpenDuplicate?: () => void
-  onOpenServiceFlow?: () => void
+  onOpenServiceFlow?: (subServiceName?: string) => void
   onOpenServiceTags?: () => void
   isGoogle?: boolean
   isDepartmentUser?: boolean
@@ -656,19 +660,16 @@ function CustomerRow({
   onRemarkChange,
   onCallCustomer,
   isCalling = false,
-  onSendAcknowledgement,
   onOpenDetail,
   onOpenDuplicate,
   onOpenServiceFlow,
-  onOpenServiceTags,
   isGoogle = false,
-  isDepartmentUser,
+  isDepartmentUser: _isDepartmentUser,
   onOpenGoogleInfo,
   canEdit,
   showBusiness = true,
   showContact = true,
   showServiceType = false,
-  canEditServiceType = true,
   canEditContact = true,
   showStatus = true,
   canEditStatus,
@@ -794,47 +795,115 @@ function CustomerRow({
     return false
   }, [isGoogle])
 
-  const resolvedIsDeptUser = useMemo(() => {
-    if (typeof isDepartmentUser === 'boolean') return isDepartmentUser
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname.toLowerCase()
-      if (path.includes('-user') || path.includes('/user')) return true
-    }
-    return false
-  }, [isDepartmentUser])
+  const isSmo = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const path = window.location.pathname.toLowerCase()
+    return path.includes('smo') || path.includes('creative')
+  }, [])
 
-  const renderedTags = useMemo(() => {
-    if (!customer.serviceTags) return []
-    if (typeof customer.serviceTags === 'string') {
-      try {
-        const parsed = JSON.parse(customer.serviceTags)
-        if (typeof parsed === 'object' && parsed !== null) {
-          return Object.entries(parsed).map(([k, v]) => ({
-            key: k,
-            label: String(v || k),
-          }))
+  const resolvedIsSmo =
+    isSmo ||
+    Boolean(customer.serviceType?.toUpperCase().includes('SMO')) ||
+    Boolean(customer.serviceType?.toUpperCase().includes('CREATIVE'))
+
+  const subServicesList = useMemo(() => {
+    // 1. From customer.subServiceInfo
+    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+      const seen = new Set<string>()
+      const list: Array<{ name: string; status: string }> = []
+      for (const item of customer.subServiceInfo) {
+        let name = ''
+        let status = 'PENDING'
+        if (typeof item === 'object' && item !== null) {
+          if (item.name) {
+            name = String(item.name)
+            status = String(item.status || 'PENDING')
+          } else {
+            const entries = Object.entries(item)
+            if (entries.length > 0) {
+              name = String(entries[0][0])
+              status = String(entries[0][1] || 'PENDING')
+            }
+          }
+        } else if (typeof item === 'string') {
+          name = item
+          status = 'PENDING'
         }
-      } catch {
-        return [{ key: customer.serviceTags, label: customer.serviceTags }]
+        name = name.trim()
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase())
+          list.push({ name, status })
+        }
       }
+      if (list.length > 0) return list
     }
-    if (Array.isArray(customer.serviceTags)) {
-      return (customer.serviceTags as any[]).map((t, idx) => {
-        const label = typeof t === 'object' && t ? (t.tagName || t.name || Object.values(t)[0]) : t
-        return {
-          key: `tag_${idx}`,
-          label: String(label || `tag_${idx}`),
+
+    // 2. From customer.services
+    if (Array.isArray(customer.services) && customer.services.length > 0) {
+      const seen = new Set<string>()
+      const list: Array<{ name: string; status: string }> = []
+      for (const s of customer.services) {
+        const name = String(s.name || (s as any).serviceType || '').trim()
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase())
+          list.push({ name, status: String(s.status || 'PENDING') })
         }
-      })
+      }
+      if (list.length > 0) return list
     }
-    if (typeof customer.serviceTags === 'object') {
-      return Object.entries(customer.serviceTags).map(([k, v]) => ({
-        key: k,
-        label: String(v || k),
-      }))
+
+    // 3. Department specific fallbacks
+    if (resolvedIsSmo) {
+      return [
+        {
+          name: 'Creative Department',
+          status:
+            customer.status === 'completed'
+              ? 'COMPLETED'
+              : customer.status === 'in-progress'
+                ? 'IN_PROGRESS'
+                : 'PENDING',
+        },
+      ]
     }
-    return []
-  }, [customer.serviceTags])
+
+    if (resolvedIsGoogle) {
+      return [
+        {
+          name: 'Phase 1',
+          status:
+            customer.status === 'completed'
+              ? 'COMPLETED'
+              : customer.status === 'in-progress'
+                ? 'IN_PROGRESS'
+                : 'PENDING',
+        },
+      ]
+    }
+
+    if (customer.serviceType) {
+      return [
+        {
+          name: customer.serviceType.replace(/_/g, ' '),
+          status:
+            customer.status === 'completed'
+              ? 'COMPLETED'
+              : customer.status === 'in-progress'
+                ? 'IN_PROGRESS'
+                : 'PENDING',
+        },
+      ]
+    }
+
+    return [{ name: 'Service Flow', status: 'PENDING' }]
+  }, [
+    customer.subServiceInfo,
+    customer.services,
+    customer.serviceType,
+    customer.status,
+    resolvedIsSmo,
+    resolvedIsGoogle,
+  ])
 
   return (
     <motion.tr className="cl-row" variants={rowVariants}>
@@ -998,122 +1067,66 @@ function CustomerRow({
         </td>
       )}
 
-      {/* Service Type */}
+      {/* Services / Sub-Services */}
       {showServiceType && (
-        <td className="cl-td" data-label="Service Type">
+        <td className="cl-td" data-label="Services">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="cl-service-type-badge"
-              onClick={() => {
-                if (canEditServiceType) onOpenServiceFlow?.()
-              }}
-              disabled={!canEditServiceType}
-              title={canEditServiceType ? 'Manage sub-service details' : 'Read only'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '3px 8px',
-                borderRadius: '8px',
-                border: '1px solid #fed7aa',
-                backgroundColor: '#fff7ed',
-                color: '#c2410c',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                cursor: canEditServiceType ? 'pointer' : 'default',
-                opacity: canEditServiceType ? 1 : 0.75,
-              }}
-            >
-              <Icon name="alert" size={11} strokeWidth={2.4} />
-              <span>Phase 1</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (canEditServiceType) onOpenServiceTags?.()
-              }}
-              disabled={!canEditServiceType}
-              title={canEditServiceType ? 'Manage service tags' : 'Read only'}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '2px 7px',
-                borderRadius: '9999px',
-                fontSize: '11px',
-                fontWeight: 600,
-                backgroundColor: '#faf5ff',
-                color: '#7e22ce',
-                border: '1px solid #d8b4fe',
-                cursor: 'pointer',
-              }}
-            >
-              <Icon name="plus" size={10} strokeWidth={2.5} />
-              <span>Tag</span>
-            </button>
-          </div>
-          {resolvedIsGoogle && renderedTags.length > 0 && (
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-              {renderedTags.slice(0, 2).map(({ key, label }) => (
-                <span
-                  key={key}
-                  onClick={
-                    resolvedIsDeptUser
-                      ? (e) => {
-                          e.stopPropagation()
-                          onOpenServiceTags?.()
-                        }
-                      : undefined
-                  }
-                  title={
-                    resolvedIsDeptUser
-                      ? 'Click to manage service tags'
-                      : label.replace(/_/g, ' ')
-                  }
+            {subServicesList.slice(0, 2).map((sub, sIdx) => {
+              const st = (sub.status || 'PENDING').toUpperCase().replace(/-/g, '_')
+              const isCompleted = st === 'COMPLETED'
+              const isInProgress = st === 'IN_PROGRESS' || st === 'INPROGRESS'
+
+              const badgeColors = isCompleted
+                ? { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', icon: 'check' as const }
+                : isInProgress
+                  ? { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', icon: 'clock' as const }
+                  : { bg: '#fffbeb', color: '#b45309', border: '#fde68a', icon: 'alert' as const }
+
+              return (
+                <button
+                  key={`${sub.name}-${sIdx}`}
+                  type="button"
+                  className="cl-service-type-badge"
+                  onClick={() => onOpenServiceFlow?.(sub.name)}
+                  title={`View sub-service flow for ${sub.name}`}
                   style={{
-                    display: 'inline-block',
-                    fontSize: '10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    border: `1px solid ${badgeColors.border}`,
+                    backgroundColor: badgeColors.bg,
+                    color: badgeColors.color,
+                    fontSize: '11.5px',
                     fontWeight: 600,
-                    padding: '1px 6px',
-                    borderRadius: '9999px',
-                    backgroundColor: '#fff7ed',
-                    color: '#c2410c',
-                    border: '1px solid #fed7aa',
-                    cursor: resolvedIsDeptUser ? 'pointer' : 'default',
-                    maxWidth: '120px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
                   }}
                 >
-                  {label.replace(/_/g, ' ')}
-                </span>
-              ))}
-              {renderedTags.length > 2 && (
-                <span
-                  onClick={
-                    resolvedIsDeptUser
-                      ? (e) => {
-                          e.stopPropagation()
-                          onOpenServiceTags?.()
-                        }
-                      : undefined
-                  }
-                  title={resolvedIsDeptUser ? 'View more tags' : undefined}
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    color: '#6366f1',
-                    cursor: resolvedIsDeptUser ? 'pointer' : 'default',
-                  }}
-                >
-                  +{renderedTags.length - 2}
-                </span>
-              )}
-            </div>
-          )}
+                  <Icon name={badgeColors.icon} size={11} strokeWidth={2.4} />
+                  <span>{sub.name}</span>
+                </button>
+              )
+            })}
+            {subServicesList.length > 2 && (
+              <button
+                type="button"
+                onClick={() => onOpenServiceFlow?.(subServicesList[0].name)}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#2563eb',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  padding: '2px 7px',
+                  borderRadius: '9999px',
+                  cursor: 'pointer',
+                }}
+              >
+                +{subServicesList.length - 2} more
+              </button>
+            )}
+          </div>
         </td>
       )}
 
@@ -1202,17 +1215,6 @@ function CustomerRow({
                 })}
               </motion.div>,
               document.body,
-            )}
-            {!isGoogle && onSendAcknowledgement && (
-              <button
-                type="button"
-                className="cl-ack-btn"
-                onClick={onSendAcknowledgement}
-                title="Send acknowledgement link"
-              >
-                <Icon name="mail" size={12} strokeWidth={1.9} />
-                <span>Send acknowledgement</span>
-              </button>
             )}
           </div>
         </td>
