@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   DynamicColumnResponse,
   DynamicRouteResponse,
@@ -20,6 +20,7 @@ import {
   useUpdateRouteStatus,
   useDeleteDynamicRoute,
   useDeleteDynamicColumn,
+  useCreateColumnsForRoute,
 } from '../../permissions/hooks/useDynamicPermissions'
 import {
   applyDynamicColumnOrder,
@@ -30,6 +31,23 @@ import {
 interface DepartmentRoutesDropdownProps {
   departmentType: string
 }
+
+const AUTOMATION_CUSTOMER_LIST_COLUMNS = [
+  'Index',
+  'Created',
+  'Customer',
+  'Contact',
+  'Requirement Form',
+  'Services',
+  'Status',
+  'Expiration',
+  'Client Remark',
+  'Internal Remark',
+  'Draft Sent',
+  'Assigned To',
+  'Website Exists',
+  'Actions',
+]
 
 function normalizeRouteName(value?: string): string {
   return (value ?? '').trim().replace(/^\/+|\/+$/g, '').toLowerCase()
@@ -80,6 +98,8 @@ export function DepartmentRoutesDropdown({
   const updateRouteStatusMutation = useUpdateRouteStatus()
   const deleteRouteMutation = useDeleteDynamicRoute()
   const deleteColumnMutation = useDeleteDynamicColumn()
+  const createRouteColumnsMutation = useCreateColumnsForRoute()
+  const provisionedRouteRef = useRef('')
   const routes = routesQuery.data ?? []
   const selectedRoute = routes.find((route) => route.routeId === selectedRouteId)
 
@@ -98,6 +118,50 @@ export function DepartmentRoutesDropdown({
     if (!deletingRoute || !columnsQuery.data) return []
     return (columnsQuery.data ?? []).filter((column) => belongsToRoute(column, deletingRoute))
   }, [deletingRoute, columnsQuery.data])
+
+  useEffect(() => {
+    if (routesQuery.isPending || columnsQuery.isPending) return
+    if (departmentType.trim().toUpperCase() !== 'AUTOMATION_DEPARTMENT') return
+
+    const automationCustomerRoute = routes.find(
+      (route) =>
+        normalizeRouteName(route.routeName) ===
+        'automation_department/head/customer-list',
+    )
+    if (!automationCustomerRoute) return
+
+    const linkedNames = new Set(
+      (columnsQuery.data ?? [])
+        .filter((column) => belongsToRoute(column, automationCustomerRoute))
+        .map((column) => column.columnName.trim().toLowerCase()),
+    )
+    const missingColumns = AUTOMATION_CUSTOMER_LIST_COLUMNS.filter(
+      (name) => !linkedNames.has(name.toLowerCase()),
+    )
+    if (missingColumns.length === 0) return
+
+    const provisionKey = `${automationCustomerRoute.routeId}:${missingColumns.join('|')}`
+    if (
+      provisionedRouteRef.current === provisionKey ||
+      createRouteColumnsMutation.isPending
+    ) return
+    provisionedRouteRef.current = provisionKey
+
+    createRouteColumnsMutation.mutate({
+      departmentType,
+      routeId: automationCustomerRoute.routeId,
+      routeName: automationCustomerRoute.routeName,
+      columnNames: missingColumns,
+      readWriteAccess: '12',
+    })
+  }, [
+    columnsQuery.data,
+    columnsQuery.isPending,
+    createRouteColumnsMutation,
+    departmentType,
+    routes,
+    routesQuery.isPending,
+  ])
 
   function moveColumn(columnId: string, direction: -1 | 1) {
     if (!selectedRoute) return
@@ -204,6 +268,7 @@ export function DepartmentRoutesDropdown({
 
   const updateErrorMessage =
     routeUpdateError ||
+    createRouteColumnsMutation.error?.message ||
     updateRouteStatusMutation.error?.message ||
     updateColumnStatusMutation.error?.message ||
     updateColumnPermissionMutation.error?.message

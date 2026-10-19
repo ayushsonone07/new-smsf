@@ -81,6 +81,8 @@ export interface CustomersListProps {
   showAssignTo?: boolean
   canEditAssignTo?: boolean
   showServiceType?: boolean
+  canEditServiceType?: boolean
+  canEditContact?: boolean
   isGoogle?: boolean
   isDepartmentUser?: boolean
   /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
@@ -167,6 +169,8 @@ export function CustomersList({
   showAssignTo = true,
   canEditAssignTo,
   showServiceType = false,
+  canEditServiceType = true,
+  canEditContact = true,
   onOpenServiceFlow,
   onOpenServiceTags,
   isGoogle = false,
@@ -250,6 +254,8 @@ export function CustomersList({
               showBusiness={showBusiness}
               showContact={showContact}
               showServiceType={showServiceType}
+              canEditServiceType={canEditServiceType}
+              canEditContact={canEditContact}
               isGoogle={isGoogle}
               isDepartmentUser={isDepartmentUser}
               showStatus={showStatus}
@@ -274,13 +280,15 @@ interface AssigneeDropdownProps {
   assignees: OnboardingAssignee[]
   isEditable: boolean
   onAssigneeChange: (assigneeId: string | null) => void
+  pageSize?: number
 }
 
-function AssigneeDropdown({
+export function AssigneeDropdown({
   assigneeId,
   assignees,
   isEditable,
   onAssigneeChange,
+  pageSize = 5,
 }: AssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -289,13 +297,12 @@ function AssigneeDropdown({
     left: number
     top?: number
     bottom?: number
+    maxHeight: number
   } | null>(null)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
-
-  const PAGE_SIZE = 5
 
   const matchedAssignee = useMemo(() => {
     if (!assigneeId) return null
@@ -326,12 +333,12 @@ function AssigneeDropdown({
     return 'unassigned'.includes(q)
   }, [searchQuery])
 
-  const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
   const paginatedAssignees = useMemo(() => {
-    const start = safePage * PAGE_SIZE
-    return filteredAssignees.slice(start, start + PAGE_SIZE)
-  }, [filteredAssignees, safePage])
+    const start = safePage * pageSize
+    return filteredAssignees.slice(start, start + pageSize)
+  }, [filteredAssignees, pageSize, safePage])
 
   // Close menus on outside click or escape
   useEffect(() => {
@@ -372,20 +379,28 @@ function AssigneeDropdown({
       const trigger = wrapRef.current?.getBoundingClientRect()
       if (!trigger) return
 
-      const menuWidth = 236
-      const estimatedMenuHeight = 330
       const viewportPadding = 8
+      const menuWidth = Math.min(320, window.innerWidth - viewportPadding * 2)
       const left = Math.min(
         Math.max(viewportPadding, trigger.left),
         window.innerWidth - menuWidth - viewportPadding,
       )
 
-      if (trigger.bottom + estimatedMenuHeight <= window.innerHeight) {
-        setMenuPosition({ left, top: trigger.bottom + 4 })
+      const spaceBelow = window.innerHeight - trigger.bottom - viewportPadding - 4
+      const spaceAbove = trigger.top - viewportPadding - 4
+      const openBelow = spaceBelow >= 240 || spaceBelow >= spaceAbove
+
+      if (openBelow) {
+        setMenuPosition({
+          left,
+          top: trigger.bottom + 4,
+          maxHeight: Math.max(160, spaceBelow),
+        })
       } else {
         setMenuPosition({
           left,
           bottom: window.innerHeight - trigger.top + 4,
+          maxHeight: Math.max(160, spaceAbove),
         })
       }
     }
@@ -452,8 +467,14 @@ function AssigneeDropdown({
           style={{
             position: 'fixed',
             left: menuPosition.left,
+             right: 'auto',
+             width: `min(320px, calc(100vw - 16px))`,
             top: menuPosition.top,
             bottom: menuPosition.bottom,
+             maxHeight: menuPosition.maxHeight,
+             overflow: 'hidden',
+             display: 'flex',
+             flexDirection: 'column',
           }}
           variants={menuVariants}
           initial="hidden"
@@ -616,6 +637,8 @@ interface CustomerRowProps {
   showBusiness?: boolean
   showContact?: boolean
   showServiceType?: boolean
+  canEditServiceType?: boolean
+  canEditContact?: boolean
   showStatus?: boolean
   canEditStatus?: boolean
   showAssignTo?: boolean
@@ -645,6 +668,8 @@ function CustomerRow({
   showBusiness = true,
   showContact = true,
   showServiceType = false,
+  canEditServiceType = true,
+  canEditContact = true,
   showStatus = true,
   canEditStatus,
   showAssignTo = true,
@@ -938,7 +963,7 @@ function CustomerRow({
               className="cl-icon-micro"
               title="Edit phone"
               aria-label="Edit phone number"
-              disabled={!canEdit}
+              disabled={!canEditContact}
             >
               <Icon name="pencil" size={12} strokeWidth={2} />
             </button>
@@ -948,7 +973,7 @@ function CustomerRow({
               title={isCalling ? 'Initiating call...' : `Call ${customer.contactName || customer.phone}`}
               aria-label={isCalling ? 'Initiating call' : 'Call customer'}
               onClick={onCallCustomer}
-              disabled={!onCallCustomer || isCalling || !customer.phone}
+              disabled={!canEditContact || !onCallCustomer || isCalling || !customer.phone}
             >
               <Icon name="phone" size={13} strokeWidth={2} />
             </button>
@@ -980,8 +1005,11 @@ function CustomerRow({
             <button
               type="button"
               className="cl-service-type-badge"
-              onClick={() => onOpenServiceFlow?.()}
-              title="Manage sub-service details"
+              onClick={() => {
+                if (canEditServiceType) onOpenServiceFlow?.()
+              }}
+              disabled={!canEditServiceType}
+              title={canEditServiceType ? 'Manage sub-service details' : 'Read only'}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -993,38 +1021,38 @@ function CustomerRow({
                 color: '#c2410c',
                 fontSize: '11.5px',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: canEditServiceType ? 'pointer' : 'default',
+                opacity: canEditServiceType ? 1 : 0.75,
               }}
             >
               <Icon name="alert" size={11} strokeWidth={2.4} />
               <span>Phase 1</span>
             </button>
-            {resolvedIsGoogle && resolvedIsDeptUser && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenServiceTags?.()
-                }}
-                title="Manage service tags"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  padding: '2px 7px',
-                  borderRadius: '9999px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  backgroundColor: '#faf5ff',
-                  color: '#7e22ce',
-                  border: '1px solid #d8b4fe',
-                  cursor: 'pointer',
-                }}
-              >
-                <Icon name="plus" size={10} strokeWidth={2.5} />
-                <span>Tag</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (canEditServiceType) onOpenServiceTags?.()
+              }}
+              disabled={!canEditServiceType}
+              title={canEditServiceType ? 'Manage service tags' : 'Read only'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                padding: '2px 7px',
+                borderRadius: '9999px',
+                fontSize: '11px',
+                fontWeight: 600,
+                backgroundColor: '#faf5ff',
+                color: '#7e22ce',
+                border: '1px solid #d8b4fe',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="plus" size={10} strokeWidth={2.5} />
+              <span>Tag</span>
+            </button>
           </div>
           {resolvedIsGoogle && renderedTags.length > 0 && (
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>

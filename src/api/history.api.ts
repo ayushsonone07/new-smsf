@@ -45,6 +45,7 @@ export interface TaskHistoryParams {
 export interface DepartmentUserAnalyticItem {
   id?: number | string
   userId?: string
+  contact?: string
   updatedBy?: string
   username?: string
   name?: string
@@ -113,8 +114,9 @@ export async function getTaskHistory(
   if (params.departmentUserFilter) {
     search.set('departmentUserFilter', params.departmentUserFilter)
   }
-  if (params.taskState && params.taskState !== 'all') {
-    search.set('taskStatus', params.taskState)
+  const validTaskStatuses = ['ACTIVE', 'COMPLETED', 'REASSIGNED', 'CANCELLED']
+  if (params.taskState && params.taskState !== 'all' && validTaskStatuses.includes(params.taskState.toUpperCase())) {
+    search.set('taskStatus', params.taskState.toUpperCase())
   }
   if (params.phaseName) search.set('phaseName', params.phaseName)
   if (params.customerName) search.set('customerName', params.customerName)
@@ -155,18 +157,31 @@ export async function getDepartmentUsersAnalytics(
   if (params.size !== undefined) search.set('size', String(params.size))
 
   const res = await authedApiRequest<
-    CustomApiResponseRaw<DepartmentUserAnalyticItem[]>
+    CustomApiResponseRaw<DepartmentUserAnalyticItem[]> | DepartmentUserAnalyticItem[]
   >(`/api/analytics/departmentUsers?${search.toString()}`)
 
-  const items = Array.isArray(res?.data) ? res.data : []
+  const items = Array.isArray(res)
+    ? res
+    : Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray((res as Record<string, unknown>)?.teamMembers)
+        ? ((res as Record<string, unknown>).teamMembers as DepartmentUserAnalyticItem[])
+        : []
+
+  const totalElements = Array.isArray(res)
+    ? res.length
+    : (res?.totalElements ?? ((res as Record<string, unknown>)?.totalMembers as number | undefined) ?? items.length)
+
   return {
     data: items,
-    pageNumber: res?.pageNumber ?? 0,
-    elementSize: res?.elementSize ?? items.length,
-    totalElements: res?.totalElements ?? items.length,
-    totalPage: res?.totalPage ?? 1,
-    first: res?.first ?? true,
-    last: res?.last ?? true,
+    teamMembers: items,
+    totalMembers: totalElements,
+    pageNumber: Array.isArray(res) ? 0 : (res?.pageNumber ?? 0),
+    elementSize: Array.isArray(res) ? items.length : (res?.elementSize ?? items.length),
+    totalElements,
+    totalPage: Array.isArray(res) ? 1 : (res?.totalPage ?? 1),
+    first: Array.isArray(res) ? true : (res?.first ?? true),
+    last: Array.isArray(res) ? true : (res?.last ?? true),
   }
 }
 
