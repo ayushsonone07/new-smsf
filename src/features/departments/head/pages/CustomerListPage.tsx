@@ -170,7 +170,7 @@ export function CustomerListPage() {
     ? window.location.pathname.replace(/^\/+|\/+$/g, '')
     : undefined
   const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions(currentDepartment)
+    useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
   const canEditStatus = isDeptUser || canEditColumn('Status')
 
@@ -200,6 +200,10 @@ export function CustomerListPage() {
     isColumnEnabled('Service Type', 'customer') ||
     isColumnEnabled('Service', 'customer') ||
     isColumnEnabled('Services', 'customer')
+  const canEditServiceType =
+    canEditColumn('Service Type') ||
+    canEditColumn('Service') ||
+    canEditColumn('Services')
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {

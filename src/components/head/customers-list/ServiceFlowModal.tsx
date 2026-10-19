@@ -7,6 +7,10 @@ import {
   updateCustomerSubServiceStatus,
   sendSubServiceConfirmationMail,
 } from '../../../api/service-flow.api'
+import {
+  fetchCustomerServiceFlowDetail,
+  updateAutowebisionStatus,
+} from '../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../api/dynamic-permission.api'
 import { resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
 import { getSession } from '../../../app/auth/session'
@@ -36,6 +40,7 @@ export interface ServiceFlowModalProps {
   onStepsUpdated?: (updatedSteps: Phase1Step[]) => void
   onSubServiceStatusUpdated?: (newStatus: string) => void
   departmentType?: string
+  serviceType?: string
 }
 
 /**
@@ -105,6 +110,104 @@ export function extractDepartmentFlows(
   overallStatus?: string
 } {
   if (!data) return { subServices: [] }
+
+  // 0. Autowebision Direct SubServiceInfo / ServiceFlowJson Response support
+  const resData = data?.data ?? data
+  const autowebSubInfo: any[] = Array.isArray(resData?.subServiceInfo)
+    ? resData.subServiceInfo
+    : []
+  const autowebFlowJson =
+    resData?.serviceFlowJson &&
+    typeof resData.serviceFlowJson === 'object' &&
+    !Array.isArray(resData.serviceFlowJson)
+      ? resData.serviceFlowJson
+      : null
+
+  if (autowebSubInfo.length > 0 || (autowebFlowJson && Object.keys(autowebFlowJson).length > 0)) {
+    const rawOverall = resData?.status || resData?.overallStatus
+    const autowebMap = new Map<string, { steps: Phase1Step[]; overallStatus?: string }>()
+
+    for (const sub of autowebSubInfo) {
+      const subName = String(
+        sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub) || 'Sub-Service',
+      ).trim()
+      const subStatus = String(
+        sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING') || 'PENDING',
+      ).toUpperCase()
+      const steps: Phase1Step[] = []
+
+      const flowStepsObj = autowebFlowJson?.[subName]
+      if (flowStepsObj && typeof flowStepsObj === 'object') {
+        for (const [sName, sVal] of Object.entries(flowStepsObj as Record<string, any>)) {
+          if (!sVal || typeof sVal !== 'object') continue
+          steps.push({
+            stepName: sName,
+            order: Number(sVal?.order ?? 999),
+            status: String(sVal?.status ?? 'PENDING'),
+            createdAt: sVal?.createdAt,
+            updatedAt: sVal?.updatedAt,
+          })
+        }
+      }
+
+      if (steps.length === 0) {
+        steps.push({
+          stepName: subName,
+          order: 1,
+          status: subStatus,
+          createdAt: resData?.createdAt,
+          updatedAt: resData?.updatedAt,
+        })
+      } else {
+        steps.sort((a, b) => a.order - b.order)
+      }
+
+      autowebMap.set(subName, {
+        steps,
+        overallStatus: subStatus,
+      })
+    }
+
+    if (autowebFlowJson) {
+      for (const [subName, sObj] of Object.entries(autowebFlowJson)) {
+        if (!autowebMap.has(subName) && sObj && typeof sObj === 'object') {
+          const steps: Phase1Step[] = []
+          for (const [sName, sVal] of Object.entries(sObj as Record<string, any>)) {
+            if (!sVal || typeof sVal !== 'object') continue
+            steps.push({
+              stepName: sName,
+              order: Number(sVal?.order ?? 999),
+              status: String(sVal?.status ?? 'PENDING'),
+              createdAt: sVal?.createdAt,
+              updatedAt: sVal?.updatedAt,
+            })
+          }
+          if (steps.length > 0) {
+            steps.sort((a, b) => a.order - b.order)
+            autowebMap.set(subName, {
+              steps,
+              overallStatus: rawOverall ? String(rawOverall).toUpperCase() : 'PENDING',
+            })
+          }
+        }
+      }
+    }
+
+    if (autowebMap.size > 0) {
+      const subServices: SubServiceFlowData[] = []
+      for (const [name, val] of autowebMap.entries()) {
+        subServices.push({
+          name,
+          steps: val.steps,
+          overallStatus: val.overallStatus,
+        })
+      }
+      return {
+        subServices,
+        overallStatus: rawOverall ? String(rawOverall).toUpperCase() : undefined,
+      }
+    }
+  }
 
   // 1. Locate the serviceFlowJson array
   let flowArray: any[] = []
@@ -264,6 +367,7 @@ export function ServiceFlowModal({
   onStepsUpdated,
   onSubServiceStatusUpdated,
   departmentType = 'GOOGLE_DEPARTMENT',
+  serviceType,
 }: ServiceFlowModalProps) {
   const [subServices, setSubServices] = useState<SubServiceFlowData[]>([])
   const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
@@ -304,11 +408,13 @@ export function ServiceFlowModal({
   const currentSubService = subServices[activeSubServiceIndex] || subServices[0] || null
 
   const subServiceName = currentSubService?.name || (
-    effectiveDept.includes('ADVERTIS') || effectiveDept.includes('ADS')
-      ? 'ADS'
-      : effectiveDept.includes('GOOGLE')
-        ? 'Phase 1'
-        : 'Service Flow'
+    serviceType
+      ? serviceType
+      : effectiveDept.includes('ADVERTIS') || effectiveDept.includes('ADS')
+        ? 'ADS'
+        : effectiveDept.includes('GOOGLE')
+          ? 'Phase 1'
+          : 'Service Flow'
   )
 
   const steps = currentSubService?.steps || []
@@ -328,7 +434,22 @@ export function ServiceFlowModal({
     setIsLoading(true)
     setError(null)
 
-    getCustomerServiceFlow(customer.id)
+    const isAutowebsion =
+      effectiveDept.includes('AUTOWEB') ||
+      effectiveDept.includes('WEBSITE') ||
+      effectiveDept.includes('AUTOMATION') ||
+      Boolean(serviceType)
+
+    const targetServiceType =
+      serviceType ||
+      (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE')
+
+    const fetchFlowPromise =
+      isAutowebsion && customer.id
+        ? fetchCustomerServiceFlowDetail(customer.id, targetServiceType)
+        : getCustomerServiceFlow(customer.id)
+
+    fetchFlowPromise
       .then((res) => {
         if (isCancelled) return
         const { subServices: extracted, overallStatus } = extractDepartmentFlows(res, effectiveDept)
@@ -351,12 +472,12 @@ export function ServiceFlowModal({
           setActiveSubServiceIndex(foundIndex)
 
           // Initial status resolution
-          let initialStatus = overallStatus || 'PENDING'
           const activeSub = extracted[foundIndex]
-          if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+          let initialStatus = activeSub?.overallStatus || overallStatus || 'PENDING'
+          if (!activeSub?.overallStatus && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
             const match = customer.subServiceInfo.find((sub: any) => {
               const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
-              return name === activeSub.name
+              return name === activeSub?.name
             })
             if (match) {
               initialStatus =
@@ -364,7 +485,7 @@ export function ServiceFlowModal({
                 (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
                 initialStatus
             }
-          } else if (Array.isArray(customer.services) && customer.services.length > 0) {
+          } else if (!activeSub?.overallStatus && Array.isArray(customer.services) && customer.services.length > 0) {
             initialStatus = customer.services[0]?.status || initialStatus
           }
           setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
@@ -382,7 +503,7 @@ export function ServiceFlowModal({
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer, effectiveDept])
+  }, [isOpen, customer, effectiveDept, serviceType])
 
   // Sub-service tab switch handler
   const handleSelectSubService = (index: number) => {
@@ -493,6 +614,25 @@ export function ServiceFlowModal({
         newStatus,
       })
 
+      const isAutowebsion =
+        effectiveDept.includes('AUTOWEB') ||
+        effectiveDept.includes('WEBSITE') ||
+        effectiveDept.includes('AUTOMATION') ||
+        Boolean(serviceType)
+
+      if (isAutowebsion) {
+        try {
+          await updateAutowebisionStatus({
+            customerId: customer.id,
+            updatedStatus: newStatus,
+            departmentType: effectiveDept,
+            serviceType: serviceType || (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE'),
+          })
+        } catch {
+          // background sync
+        }
+      }
+
       setSubServiceStatus(newStatus)
       onSubServiceStatusUpdated?.(newStatus)
       setMessage({
@@ -595,9 +735,12 @@ export function ServiceFlowModal({
           {/* Header */}
           <div className="ssd-header">
             <div className="ssd-header-info">
-              <h2 className="ssd-title">Sub-Service Details</h2>
+              <h2 className="ssd-title">
+                {serviceType ? `${serviceType} Service Flow` : 'Sub-Service Details'}
+              </h2>
               <p className="ssd-subtitle">
-                Manage sub-service status for {customer.businessName || customer.contactName}
+                Manage {serviceType ? `${serviceType} ` : ''}sub-service status for{' '}
+                {customer.businessName || customer.contactName}
               </p>
             </div>
             <button
