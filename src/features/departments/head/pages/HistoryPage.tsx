@@ -6,6 +6,7 @@ import { useTaskHistory, useDepartmentUsersAnalytics } from '../../hooks/useTask
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import { getStatusHistory, type StatusHistoryItem } from '../../../../api/status-history.api'
 import { SearchBar } from '../../../../components/head/shared/SearchBar'
+import { AssigneeDropdown } from '../../../../components/head/customers-list/CustomersList'
 import { SectionCard } from '../../../../components/head/shared/SectionCard'
 import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
@@ -14,6 +15,7 @@ import type { FeaturePermission } from '../../../permissions/types/permission.ty
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { isUserGoogle, resolveDeptFromPath } from '../utils/routeUtils'
 import './MeetingPage.css'
+import '../../../../components/head/customers-list/CustomersList.css'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -117,11 +119,24 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const [page, setPage] = useState(0)
   const pageSize = 10
 
-  // 1. Department Users (size=100) for Head filter: /api/auth/department/users?page=0&size=100
+  // Load the complete department roster; the selector paginates it locally.
   const deptUsersQuery = useDepartmentUsersList({
     page: 0,
-    size: 100,
+    size: 1000,
   })
+
+  const departmentUsers = useMemo(() => {
+    const seen = new Set<string>()
+    return (deptUsersQuery.data?.data ?? []).flatMap((user) => {
+      const email = user.email?.trim()
+      if (!email || seen.has(email.toLowerCase())) return []
+      seen.add(email.toLowerCase())
+      return [{
+        id: email,
+        name: user.username ? `${user.username} (${email})` : email,
+      }]
+    })
+  }, [deptUsersQuery.data?.data])
 
   // Date range for analytics (default: today)
   const todayIso = useMemo(() => {
@@ -270,32 +285,21 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
             />
           </div>
 
-          {/* User filter for Head: GET /api/auth/department/users?page=0&size=100 */}
+          {/* Searchable, paginated department-user filter for heads. */}
           {isHead && activeView === 'task-history' && (
-            <div style={{ minWidth: 220 }}>
-              <select
-                value={selectedUser}
-                onChange={(e) => {
-                  setSelectedUser(e.target.value)
+            <div style={{ width: 320, maxWidth: '100%' }}>
+              <AssigneeDropdown
+                assigneeId={selectedUser || null}
+                assignees={departmentUsers}
+                isEditable={!deptUsersQuery.isPending}
+                pageSize={10}
+                emptyLabel="All Department Users"
+                searchPlaceholder="Search department users..."
+                onAssigneeChange={(email) => {
+                  setSelectedUser(email || '')
                   setPage(0)
                 }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #cbd5e1',
-                  fontSize: 13,
-                  background: '#fff',
-                  color: '#1e293b',
-                }}
-              >
-                <option value="">All Department Users</option>
-                {(deptUsersQuery.data?.data ?? []).map((u) => (
-                  <option key={u.email} value={u.email}>
-                    {u.username ? `${u.username} (${u.email})` : u.email}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           )}
         </div>
