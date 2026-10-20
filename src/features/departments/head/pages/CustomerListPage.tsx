@@ -108,6 +108,7 @@ export function CustomerListPage() {
   const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
+  const [selectedSubServiceName, setSelectedSubServiceName] = useState<string | undefined>(undefined)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
   const [toast, setToast] = useState<{
@@ -171,14 +172,14 @@ export function CustomerListPage() {
     : undefined
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
-  const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = canEditColumn('Status')
+  const isStatusVisible = isColumnEnabled('Status', 'customer')
+  const canEditStatus = isDeptUser || canEditColumn('Status')
 
   const isAssignToVisible =
     !isDeptUser &&
-    (isColumnEnabled('Assign To') ||
-      isColumnEnabled('Assign') ||
-      isColumnEnabled('Assignee'))
+    (isColumnEnabled('Assign To', 'customer') ||
+      isColumnEnabled('Assign', 'customer') ||
+      isColumnEnabled('Assignee', 'customer'))
   const canEditAssignTo =
     !isDeptUser &&
     (canEditColumn('Assign To') ||
@@ -186,20 +187,24 @@ export function CustomerListPage() {
       canEditColumn('Assignee'))
 
   const isRemarkVisible =
-    isColumnEnabled('Internal Remark') ||
-    isColumnEnabled('Remark')
-  const canEditRemark = canEditColumn('Internal Remark') || canEditColumn('Remark')
-  const canEditServiceType = canEditColumn('Services') || canEditColumn('Service Type')
-  const canEditContact = canEditColumn('Contact')
+    isColumnEnabled('Internal Remark', 'customer') ||
+    isColumnEnabled('Remark', 'customer')
+  const canEditRemark = session?.user.role === 'USER'
 
-  const isContactVisible =
-    isColumnEnabled('Contact') ||
-    isColumnEnabled('Phone') ||
-    isColumnEnabled('Email')
+  const isContactVisible = isColumnEnabled('Contact', 'customer')
 
   const isBusinessVisible =
-    isColumnEnabled('Business') ||
-    isColumnEnabled('Company')
+    isColumnEnabled('Business', 'customer') ||
+    isColumnEnabled('Company', 'customer')
+
+  const isServiceTypeVisible =
+    isColumnEnabled('Service Type', 'customer') ||
+    isColumnEnabled('Service', 'customer') ||
+    isColumnEnabled('Services', 'customer')
+  const canEditServiceType =
+    canEditColumn('Service Type') ||
+    canEditColumn('Service') ||
+    canEditColumn('Services')
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
@@ -387,6 +392,7 @@ export function CustomerListPage() {
           serviceTags: extractServiceTags(c),
           subServiceInfo: (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
           services: (c as any).services || [],
+          serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
           rawCustomer: c,
         }
       })
@@ -808,12 +814,14 @@ export function CustomerListPage() {
         showContact={isContactVisible}
         showBusiness={isBusinessVisible}
         showUpdated={false}
-        showServiceType={useRowsEndpoint}
-        canEditServiceType={canEditServiceType}
-        canEditContact={canEditContact}
+        showServiceType={useRowsEndpoint && isServiceTypeVisible}
         isGoogle={isGoogle}
-        onOpenServiceFlow={canEditServiceType ? (cust) => setServiceFlowCustomer(cust) : undefined}
-        onOpenServiceTags={canEditServiceType ? (cust) => setServiceTagsCustomer(cust) : undefined}
+        isDepartmentUser={isDeptUser}
+        onOpenServiceFlow={(cust, subName) => {
+          setServiceFlowCustomer(cust)
+          setSelectedSubServiceName(subName)
+        }}
+        onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
         onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
         onOpenDetail={(cust, tab) => {
           setSelectedCustomer(cust)
@@ -875,9 +883,13 @@ export function CustomerListPage() {
       <ServiceFlowModal
         customer={serviceFlowCustomer}
         isOpen={Boolean(serviceFlowCustomer)}
-        onClose={() => setServiceFlowCustomer(null)}
+        onClose={() => {
+          setServiceFlowCustomer(null)
+          setSelectedSubServiceName(undefined)
+        }}
         isEditable={canEditServiceType}
         departmentType={currentDepartment}
+        initialSubServiceName={selectedSubServiceName}
         onStepsUpdated={() => {
           activeCustomerQuery.refetch()
         }}

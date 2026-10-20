@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { getSession } from '../../../../app/auth/session'
-import { useTaskHistory, useDepartmentUsersAnalytics } from '../../hooks/useTaskHistory'
+import { useTaskHistory } from '../../hooks/useTaskHistory'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import { getStatusHistory, type StatusHistoryItem } from '../../../../api/status-history.api'
 import { SearchBar } from '../../../../components/head/shared/SearchBar'
@@ -125,36 +125,20 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
     size: 1000,
   })
 
-  const departmentUsers = useMemo(() => {
-    const seen = new Set<string>()
-    return (deptUsersQuery.data?.data ?? []).flatMap((user) => {
-      const email = user.email?.trim()
-      if (!email || seen.has(email.toLowerCase())) return []
-      seen.add(email.toLowerCase())
-      return [{
-        id: email,
-        name: user.username ? `${user.username} (${email})` : email,
-      }]
-    })
-  }, [deptUsersQuery.data?.data])
-
-  // Date range for analytics (default: today)
-  const todayIso = useMemo(() => {
-    const d = new Date()
-    return d.toISOString().slice(0, 10)
-  }, [])
-
-  const startDate = `${todayIso}T00:00:00`
-  const endDate = `${todayIso}T23:59:59`
-
   const departmentUserFilter = isHead
     ? (selectedUser || undefined)
     : (userEmail || undefined)
 
+  // Only pass backend-supported statuses (ACTIVE, COMPLETED, etc.) to backend
+  const backendTaskStatus =
+    statusFilter === 'ACTIVE' || statusFilter === 'COMPLETED'
+      ? statusFilter
+      : undefined
+
   // 2. Task History Query: /api/task-history/department?pageNumber=0&pageSize=10
   const historyQuery = useTaskHistory({
     departmentUserFilter,
-    taskState: statusFilter === 'all' ? undefined : statusFilter,
+    taskState: backendTaskStatus,
     customerName: search || undefined,
     pageNumber: page,
     pageSize,
@@ -174,24 +158,44 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
     staleTime: 30_000,
   })
 
-  // 4. Analytics Query
-  const analyticsQuery = useDepartmentUsersAnalytics({
-    userId: departmentUserFilter,
-    startDate,
-    endDate,
-    page: 0,
-    size: 10,
-  })
+  const rawHistoryItems = historyQuery.data?.data ?? []
+  const historyItems = useMemo(() => {
+    if (statusFilter === 'PENDING') {
+      return rawHistoryItems.filter(
+        (i) =>
+          String(i.serviceStatus || '').toUpperCase() === 'PENDING' ||
+          String(i.status || '').toUpperCase() === 'PENDING',
+      )
+    }
+    if (statusFilter === 'IN_PROGRESS') {
+      return rawHistoryItems.filter(
+        (i) =>
+          String(i.serviceStatus || '').toUpperCase() === 'IN_PROGRESS' ||
+          String(i.status || '').toUpperCase() === 'IN_PROGRESS',
+      )
+    }
+    return rawHistoryItems
+  }, [rawHistoryItems, statusFilter])
 
-  const historyItems = historyQuery.data?.data ?? []
-  const totalElements = historyQuery.data?.totalElements ?? 0
+  const totalElements =
+    statusFilter === 'PENDING' || statusFilter === 'IN_PROGRESS'
+      ? historyItems.length
+      : (historyQuery.data?.totalElements ?? 0)
 
   const statusHistoryItems = statusHistoryQuery.data?.data ?? []
   const totalStatusElements = statusHistoryQuery.data?.totalElements ?? statusHistoryItems.length
 
-  const activeCount = historyItems.filter((i) => i.status === 'ACTIVE' || i.isActive).length
-  const completedCount = historyItems.filter((i) => i.status === 'COMPLETED').length
-  const pendingCount = historyItems.filter((i) => i.serviceStatus === 'PENDING').length
+  const activeCount = rawHistoryItems.filter(
+    (i) => String(i.status || '').toUpperCase() === 'ACTIVE' || i.isActive,
+  ).length
+  const completedCount = rawHistoryItems.filter(
+    (i) => String(i.status || '').toUpperCase() === 'COMPLETED',
+  ).length
+  const pendingCount = rawHistoryItems.filter(
+    (i) =>
+      String(i.serviceStatus || '').toUpperCase() === 'PENDING' ||
+      String(i.status || '').toUpperCase() === 'PENDING',
+  ).length
 
   function handleSearchChange(val: string) {
     setSearch(val)
@@ -206,7 +210,6 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   function handleRefresh() {
     void historyQuery.refetch()
     void statusHistoryQuery.refetch()
-    void analyticsQuery.refetch()
   }
 
   if (activeView === 'task-history' && historyQuery.isPending && !historyQuery.data) {
