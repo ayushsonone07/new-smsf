@@ -283,7 +283,21 @@ export interface DepartmentCustomerRowItem {
     duplicateCount?: number
     hasDuplicate?: boolean
     hasDuplicateCustomer?: boolean
+    amountPaid?: number | string
+    amountPending?: number | string
+    paidAmount?: number | string
   }
+  columnData?: Record<string, unknown> | null
+  delivered?: boolean
+  isDelivered?: boolean
+  serviceDeliverySent?: boolean
+  deliveryStatus?: {
+    isDelivered?: boolean
+    delivered?: boolean
+    deliveryDate?: string
+    hasServiceHistory?: boolean
+    completionPercentage?: number | null
+  } | null
   assignedUserEmail?: string
   assignedUserName?: string
   assignedTo?: string
@@ -379,6 +393,40 @@ export async function getDepartmentCustomerRows(params: {
     totalPage,
     pageNumber: res?.pageNumber ?? res?.data?.pageNumber ?? (params.page ?? 0),
   }
+}
+
+/**
+ * `PATCH /api/auth/update-current-data?customerId=X&currentData=Y`
+ *
+ * Updates the admin-provisioned custom column current value (e.g. the
+ * support "Delivery Status" dropdown). Mirrors SMSF's
+ * updateCustomerColumnCurrentData thunk.
+ */
+export async function updateCustomerColumnCurrentData(params: {
+  customerId: number | string
+  currentData: string
+}): Promise<Record<string, unknown> | null> {
+  const session = getSession()
+  const search = new URLSearchParams({
+    customerId: String(params.customerId),
+    currentData: params.currentData,
+  })
+  const res = await authedApiRequest<{
+    success?: boolean
+    message?: string
+    data?: Record<string, unknown>
+  }>(`/api/auth/update-current-data?${search.toString()}`, {
+    method: 'PATCH',
+    headers: {
+      username: session?.user.email || session?.user.username || '',
+    },
+  })
+
+  if (res && res.success === false) {
+    throw new Error(res.message || 'Failed to update delivery status')
+  }
+
+  return res?.data ?? null
 }
 
 export interface CreateDepartmentUserRequest {

@@ -34,6 +34,21 @@ export function useUpdateRoundRobinStatus(departmentType: string) {
   return useMutation({
     mutationFn: (enabled: boolean) =>
       updateRoundRobinStatus(departmentType, enabled),
+    onMutate: async (enabled) => {
+      const queryKey = roundRobinStatusQueryKey(departmentType)
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<boolean>(queryKey)
+      queryClient.setQueryData(queryKey, enabled)
+      return { previous }
+    },
+    onError: (_error, _enabled, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(
+          roundRobinStatusQueryKey(departmentType),
+          context.previous,
+        )
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: roundRobinStatusQueryKey(departmentType),
