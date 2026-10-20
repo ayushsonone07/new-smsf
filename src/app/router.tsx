@@ -147,6 +147,12 @@ const indexRoute = createRoute({
   component: RegisterBusinessPage,
 })
 
+const registerBusinessRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/register-business',
+  component: RegisterBusinessPage,
+})
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
@@ -767,6 +773,7 @@ const dynamicDepartmentScreenRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  registerBusinessRoute,
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,

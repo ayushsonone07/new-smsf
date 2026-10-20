@@ -12,6 +12,7 @@ export interface PlanAmount {
   additionalAmount: number | null
   durationMonths: number | null
   enabled: boolean
+  featureList?: string[]
 }
 
 /** Payload accepted by `POST /api/auth/customers/register`. */
