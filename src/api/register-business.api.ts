@@ -59,6 +59,37 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   return response.data ?? []
 }
 
+export interface VerifyPaymentResult {
+  success: boolean
+  message?: string
+  data?: {
+    amount?: number | null
+    paidAt?: string | null
+  }
+}
+
+/**
+ * Verifies a payment ID against a phone number. `POST /api/payment/verify`.
+ */
+export async function verifyPayment(
+  phoneNumber: string,
+  paymentId: string,
+): Promise<VerifyPaymentResult> {
+  const response = await apiRequest<CustomApiResponse<{ amount?: number | null; paidAt?: string | null }>>(
+    '/api/payment/verify',
+    {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber, paymentId }),
+    },
+  )
+
+  return {
+    success: Boolean(response.success),
+    message: response.message,
+    data: response.data ?? undefined,
+  }
+}
+
 /**
  * Registers a customer. `POST /api/auth/customers/register`.
  *
