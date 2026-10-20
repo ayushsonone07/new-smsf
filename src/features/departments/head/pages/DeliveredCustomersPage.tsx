@@ -451,11 +451,11 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
             <table className="delivered-table">
               <thead>
                 <tr>
+                  <th>Customer Name</th>
                   <th>Business Name</th>
                   <th>Delivery Status</th>
                   <th>Paid Amount</th>
                   <th>Assigned To</th>
-                  <th>Customer Name</th>
                 </tr>
               </thead>
               <tbody>
@@ -469,6 +469,19 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                     row.paidAmount
                   return (
                     <tr key={id || index}>
+                      <td>
+                        <div className="delivered-customer-cell">
+                          <button
+                            type="button"
+                            className="delivered-eye"
+                            aria-label={`View ${rowOwnerName(row)}`}
+                            onClick={() => setSelectedRow(row)}
+                          >
+                            <Icon name="eye" size={15} />
+                          </button>
+                          <span>{rowOwnerName(row)}</span>
+                        </div>
+                      </td>
                       <td className="delivered-business">{rowBusinessName(row)}</td>
                       <td>
                         <span
@@ -492,19 +505,6 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                         ) : (
                           assignedLabel(row)
                         )}
-                      </td>
-                      <td>
-                        <div className="delivered-customer-cell">
-                          <button
-                            type="button"
-                            className="delivered-eye"
-                            aria-label={`View ${rowOwnerName(row)}`}
-                            onClick={() => setSelectedRow(row)}
-                          >
-                            <Icon name="eye" size={15} />
-                          </button>
-                          <span>{rowOwnerName(row)}</span>
-                        </div>
                       </td>
                     </tr>
                   )
