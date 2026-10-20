@@ -7,6 +7,9 @@ import {
   updateCustomerSubServiceStatus,
   sendSubServiceConfirmationMail,
 } from '../../../api/service-flow.api'
+import {
+  fetchCustomerServiceFlowDetail,
+} from '../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../api/dynamic-permission.api'
 import { resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
 import { getSession } from '../../../app/auth/session'
@@ -34,8 +37,10 @@ export interface ServiceFlowModalProps {
   onClose: () => void
   isEditable?: boolean
   onStepsUpdated?: (updatedSteps: Phase1Step[]) => void
-  onSubServiceStatusUpdated?: (newStatus: string) => void
+  onSubServiceStatusUpdated?: (newStatus: string, subServiceName?: string) => void
   departmentType?: string
+  serviceType?: string
+  initialSubServiceName?: string
 }
 
 /**
@@ -70,9 +75,9 @@ export function matchesDepartmentKey(deptKey: string, targetDept: string): boole
   const isTargetGoogle = cleanTarget.includes('GOOGLE')
   if (isKeyGoogle && isTargetGoogle) return true
 
-  // Handle SMO
-  const isKeySmo = cleanKey.includes('SMO')
-  const isTargetSmo = cleanTarget.includes('SMO')
+  // Handle SMO / Creative Department
+  const isKeySmo = cleanKey.includes('SMO') || cleanKey.includes('CREATIVE')
+  const isTargetSmo = cleanTarget.includes('SMO') || cleanTarget.includes('CREATIVE')
   if (isKeySmo && isTargetSmo) return true
 
   // Handle SEO
@@ -105,6 +110,104 @@ export function extractDepartmentFlows(
   overallStatus?: string
 } {
   if (!data) return { subServices: [] }
+
+  // 0. Autowebision Direct SubServiceInfo / ServiceFlowJson Response support
+  const resData = data?.data ?? data
+  const autowebSubInfo: any[] = Array.isArray(resData?.subServiceInfo)
+    ? resData.subServiceInfo
+    : []
+  const autowebFlowJson =
+    resData?.serviceFlowJson &&
+    typeof resData.serviceFlowJson === 'object' &&
+    !Array.isArray(resData.serviceFlowJson)
+      ? resData.serviceFlowJson
+      : null
+
+  if (autowebSubInfo.length > 0 || (autowebFlowJson && Object.keys(autowebFlowJson).length > 0)) {
+    const rawOverall = resData?.status || resData?.overallStatus
+    const autowebMap = new Map<string, { steps: Phase1Step[]; overallStatus?: string }>()
+
+    for (const sub of autowebSubInfo) {
+      const subName = String(
+        sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub) || 'Sub-Service',
+      ).trim()
+      const subStatus = String(
+        sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING') || 'PENDING',
+      ).toUpperCase()
+      const steps: Phase1Step[] = []
+
+      const flowStepsObj = autowebFlowJson?.[subName]
+      if (flowStepsObj && typeof flowStepsObj === 'object') {
+        for (const [sName, sVal] of Object.entries(flowStepsObj as Record<string, any>)) {
+          if (!sVal || typeof sVal !== 'object') continue
+          steps.push({
+            stepName: sName,
+            order: Number(sVal?.order ?? 999),
+            status: String(sVal?.status ?? 'PENDING'),
+            createdAt: sVal?.createdAt,
+            updatedAt: sVal?.updatedAt,
+          })
+        }
+      }
+
+      if (steps.length === 0) {
+        steps.push({
+          stepName: subName,
+          order: 1,
+          status: subStatus,
+          createdAt: resData?.createdAt,
+          updatedAt: resData?.updatedAt,
+        })
+      } else {
+        steps.sort((a, b) => a.order - b.order)
+      }
+
+      autowebMap.set(subName, {
+        steps,
+        overallStatus: subStatus,
+      })
+    }
+
+    if (autowebFlowJson) {
+      for (const [subName, sObj] of Object.entries(autowebFlowJson)) {
+        if (!autowebMap.has(subName) && sObj && typeof sObj === 'object') {
+          const steps: Phase1Step[] = []
+          for (const [sName, sVal] of Object.entries(sObj as Record<string, any>)) {
+            if (!sVal || typeof sVal !== 'object') continue
+            steps.push({
+              stepName: sName,
+              order: Number(sVal?.order ?? 999),
+              status: String(sVal?.status ?? 'PENDING'),
+              createdAt: sVal?.createdAt,
+              updatedAt: sVal?.updatedAt,
+            })
+          }
+          if (steps.length > 0) {
+            steps.sort((a, b) => a.order - b.order)
+            autowebMap.set(subName, {
+              steps,
+              overallStatus: rawOverall ? String(rawOverall).toUpperCase() : 'PENDING',
+            })
+          }
+        }
+      }
+    }
+
+    if (autowebMap.size > 0) {
+      const subServices: SubServiceFlowData[] = []
+      for (const [name, val] of autowebMap.entries()) {
+        subServices.push({
+          name,
+          steps: val.steps,
+          overallStatus: val.overallStatus,
+        })
+      }
+      return {
+        subServices,
+        overallStatus: rawOverall ? String(rawOverall).toUpperCase() : undefined,
+      }
+    }
+  }
 
   // 1. Locate the serviceFlowJson array
   let flowArray: any[] = []
@@ -234,6 +337,31 @@ export function extractDepartmentFlows(
     })
   }
 
+  const isSmoTarget =
+    targetDepartment.toUpperCase().includes('SMO') ||
+    targetDepartment.toUpperCase().includes('CREATIVE')
+
+  if (subServices.length === 0 && isSmoTarget) {
+    subServices.push({
+      name: 'Creative Department',
+      steps: [
+        {
+          stepName: 'UGC Video Link',
+          order: 1,
+          status: 'PENDING',
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          stepName: 'Festival Bundle Link',
+          order: 2,
+          status: 'PENDING',
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      overallStatus: deptOverallStatus || 'PENDING',
+    })
+  }
+
   return { subServices, overallStatus: deptOverallStatus }
 }
 
@@ -264,6 +392,8 @@ export function ServiceFlowModal({
   onStepsUpdated,
   onSubServiceStatusUpdated,
   departmentType = 'GOOGLE_DEPARTMENT',
+  serviceType,
+  initialSubServiceName,
 }: ServiceFlowModalProps) {
   const [subServices, setSubServices] = useState<SubServiceFlowData[]>([])
   const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
@@ -301,15 +431,30 @@ export function ServiceFlowModal({
     return 'GOOGLE_DEPARTMENT'
   }, [departmentType])
 
+  const isSmo = useMemo(() => {
+    return (
+      effectiveDept.includes('SMO') ||
+      effectiveDept.includes('CREATIVE') ||
+      (typeof window !== 'undefined' &&
+        (window.location.pathname.toLowerCase().includes('smo') ||
+          window.location.pathname.toLowerCase().includes('creative')))
+    )
+  }, [effectiveDept])
+
   const currentSubService = subServices[activeSubServiceIndex] || subServices[0] || null
 
-  const subServiceName = currentSubService?.name || (
-    effectiveDept.includes('ADVERTIS') || effectiveDept.includes('ADS')
-      ? 'ADS'
-      : effectiveDept.includes('GOOGLE')
-        ? 'Phase 1'
-        : 'Service Flow'
-  )
+  const subServiceName =
+    currentSubService?.name ||
+    initialSubServiceName ||
+    (serviceType
+      ? serviceType
+      : isSmo
+        ? 'Creative Department'
+        : effectiveDept.includes('ADVERTIS') || effectiveDept.includes('ADS')
+          ? 'ADS'
+          : effectiveDept.includes('GOOGLE')
+            ? 'Phase 1'
+            : 'Service Flow')
 
   const steps = currentSubService?.steps || []
 
@@ -328,35 +473,59 @@ export function ServiceFlowModal({
     setIsLoading(true)
     setError(null)
 
-    getCustomerServiceFlow(customer.id)
+    const isAutowebsion =
+      effectiveDept.includes('AUTOWEB') ||
+      effectiveDept.includes('WEBSITE') ||
+      effectiveDept.includes('AUTOMATION') ||
+      Boolean(serviceType)
+
+    const targetServiceType =
+      serviceType ||
+      (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE')
+
+    const fetchFlowPromise =
+      isAutowebsion && customer.id
+        ? fetchCustomerServiceFlowDetail(customer.id, targetServiceType)
+        : getCustomerServiceFlow(customer.id)
+
+    fetchFlowPromise
       .then((res) => {
         if (isCancelled) return
         const { subServices: extracted, overallStatus } = extractDepartmentFlows(res, effectiveDept)
         setSubServices(extracted)
 
         if (extracted.length > 0) {
-          // If customer has subServiceInfo, match active index
+          // If initialSubServiceName is provided or customer has subServiceInfo, match active index
           let foundIndex = 0
-          if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-            const prefName =
-              customer.subServiceInfo[0]?.name ||
-              (typeof customer.subServiceInfo[0] === 'object'
-                ? Object.keys(customer.subServiceInfo[0])[0]
-                : customer.subServiceInfo[0])
+          const targetName = (
+            initialSubServiceName ||
+            (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo[0]
+              ? customer.subServiceInfo[0]?.name ||
+                (typeof customer.subServiceInfo[0] === 'object'
+                  ? Object.keys(customer.subServiceInfo[0])[0]
+                  : customer.subServiceInfo[0])
+              : '') ||
+            ''
+          ).trim().toLowerCase()
+
+          if (targetName) {
             const idx = extracted.findIndex(
-              (s) => s.name.trim().toLowerCase() === String(prefName).trim().toLowerCase(),
+              (s) =>
+                s.name.trim().toLowerCase() === targetName ||
+                s.name.trim().toLowerCase().includes(targetName) ||
+                targetName.includes(s.name.trim().toLowerCase()),
             )
             if (idx >= 0) foundIndex = idx
           }
           setActiveSubServiceIndex(foundIndex)
 
           // Initial status resolution
-          let initialStatus = overallStatus || 'PENDING'
           const activeSub = extracted[foundIndex]
-          if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+          let initialStatus = activeSub?.overallStatus || overallStatus || 'PENDING'
+          if (!activeSub?.overallStatus && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
             const match = customer.subServiceInfo.find((sub: any) => {
               const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
-              return name === activeSub.name
+              return name === activeSub?.name
             })
             if (match) {
               initialStatus =
@@ -364,7 +533,7 @@ export function ServiceFlowModal({
                 (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
                 initialStatus
             }
-          } else if (Array.isArray(customer.services) && customer.services.length > 0) {
+          } else if (!activeSub?.overallStatus && Array.isArray(customer.services) && customer.services.length > 0) {
             initialStatus = customer.services[0]?.status || initialStatus
           }
           setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
@@ -382,7 +551,7 @@ export function ServiceFlowModal({
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer, effectiveDept])
+  }, [isOpen, customer, effectiveDept, serviceType])
 
   // Sub-service tab switch handler
   const handleSelectSubService = (index: number) => {
@@ -412,11 +581,6 @@ export function ServiceFlowModal({
       steps.length > 0 &&
       steps.every((s) => s.status.toUpperCase() === 'COMPLETED')
     )
-  }, [steps])
-
-  // Next available uncompleted step index
-  const nextAvailableIndex = useMemo(() => {
-    return steps.findIndex((s) => s.status.toUpperCase() !== 'COMPLETED')
   }, [steps])
 
   // Confirm and complete a flow step
@@ -456,7 +620,7 @@ export function ServiceFlowModal({
             newStatus: 'IN_PROGRESS',
           })
           setSubServiceStatus('IN_PROGRESS')
-          onSubServiceStatusUpdated?.('IN_PROGRESS')
+          onSubServiceStatusUpdated?.('IN_PROGRESS', subServiceName)
         } catch {
           // ignore background update error
         }
@@ -494,7 +658,7 @@ export function ServiceFlowModal({
       })
 
       setSubServiceStatus(newStatus)
-      onSubServiceStatusUpdated?.(newStatus)
+      onSubServiceStatusUpdated?.(newStatus, subServiceName)
       setMessage({
         type: 'success',
         text: `Sub-service status updated to ${newStatus.replace(/_/g, ' ')}!`,
@@ -540,7 +704,7 @@ export function ServiceFlowModal({
           newStatus: 'PENDING_CUSTOMER_ACK',
         })
         setSubServiceStatus('PENDING_CUSTOMER_ACK')
-        onSubServiceStatusUpdated?.('PENDING_CUSTOMER_ACK')
+        onSubServiceStatusUpdated?.('PENDING_CUSTOMER_ACK', subServiceName)
       } catch {
         // fallback
       }
@@ -595,9 +759,12 @@ export function ServiceFlowModal({
           {/* Header */}
           <div className="ssd-header">
             <div className="ssd-header-info">
-              <h2 className="ssd-title">Sub-Service Details</h2>
+              <h2 className="ssd-title">
+                {serviceType ? `${serviceType} Service Flow` : 'Sub-Service Details'}
+              </h2>
               <p className="ssd-subtitle">
-                Manage sub-service status for {customer.businessName || customer.contactName}
+                {isEditable ? 'Manage sub-service status for ' : 'View sub-service flow for '}
+                {customer.businessName || customer.contactName}
               </p>
             </div>
             <button
@@ -639,7 +806,7 @@ export function ServiceFlowModal({
             <div className="ssd-subservice-card">
               <div className="ssd-subservice-left">
                 <div className="ssd-subservice-icon">
-                  <Icon name="brief" size={20} strokeWidth={2} />
+                  <Icon name="tag" size={18} strokeWidth={2} />
                 </div>
                 <div>
                   <h3 className="ssd-subservice-name">{subServiceName}</h3>
@@ -670,102 +837,176 @@ export function ServiceFlowModal({
                   <p style={{ fontSize: '13px' }}>No service flow steps found for this department.</p>
                 </div>
               ) : (
-                <div className="ssd-flow-box">
-                  {steps.map((step, index) => {
-                    const isCompleted = step.status.toUpperCase() === 'COMPLETED'
-                    const isNextAvailable = index === nextAvailableIndex
+                <div className="ssd-flow-container">
+                  <div className="ssd-flow-header">
+                    <div className="ssd-flow-header-title">
+                      <span className="ssd-dot ssd-dot--blue" />
+                      <span>Service Flow Steps</span>
+                    </div>
+                    <div className="ssd-flow-counts">
+                      <span className="ssd-count-item">
+                        <span className="ssd-dot ssd-dot--emerald" />
+                        {steps.filter((s) => s.status.toUpperCase() === 'COMPLETED').length} completed
+                      </span>
+                      <span className="ssd-count-item">
+                        <span className="ssd-dot ssd-dot--blue" />
+                        {
+                          steps.filter(
+                            (s) =>
+                              s.status.toUpperCase() === 'IN_PROGRESS' ||
+                              s.status.toUpperCase() === 'IN-PROGRESS',
+                          ).length
+                        }{' '}
+                        in progress
+                      </span>
+                      <span className="ssd-count-item">
+                        <span className="ssd-dot ssd-dot--amber" />
+                        {
+                          steps.filter(
+                            (s) =>
+                              s.status.toUpperCase() === 'PENDING' ||
+                              s.status.toUpperCase() === 'PENDING_CUSTOMER_ACK',
+                          ).length
+                        }{' '}
+                        pending
+                      </span>
+                    </div>
+                  </div>
 
-                    let itemClass = 'ssd-step-item--pending'
-                    if (isCompleted) itemClass = 'ssd-step-item--completed'
-                    else if (isNextAvailable) itemClass = 'ssd-step-item--next'
+                  <div className="ssd-step-list">
+                    {steps.map((step, index) => {
+                      const isCompleted = step.status.toUpperCase() === 'COMPLETED'
+                      const isInProgress =
+                        step.status.toUpperCase() === 'IN_PROGRESS' ||
+                        step.status.toUpperCase() === 'IN-PROGRESS'
+                      const dotClass = isCompleted
+                        ? 'ssd-dot--emerald'
+                        : isInProgress
+                          ? 'ssd-dot--blue'
+                          : 'ssd-dot--amber'
 
-                    return (
-                      <div
-                        key={step.stepName}
-                        className={`ssd-step-item ${itemClass}`}
-                        onClick={() => {
-                          if (!isCompleted && isEditable) {
-                            setConfirmingStep(step)
+                      const badgeClass = isCompleted
+                        ? 'ssd-badge--completed'
+                        : isInProgress
+                          ? 'ssd-badge--in-progress'
+                          : 'ssd-badge--pending'
+
+                      const stepIcon = isCompleted ? (
+                        <Icon name="check" size={13} strokeWidth={2.8} className="text-emerald-600" />
+                      ) : isInProgress ? (
+                        <Icon name="clock" size={12} strokeWidth={2.2} className="text-blue-600" />
+                      ) : (
+                        <Icon name="alert" size={12} strokeWidth={2.2} className="text-amber-500" />
+                      )
+
+                      const dateSource = step.updatedAt || step.createdAt
+                      const formattedDate = dateSource
+                        ? new Date(dateSource).toLocaleDateString('en-US')
+                        : new Date().toLocaleDateString('en-US')
+
+                      return (
+                        <div
+                          key={step.stepName}
+                          className={`ssd-step-row ${!isCompleted && isEditable ? 'ssd-step-row--clickable' : ''}`}
+                          onClick={() => {
+                            if (!isCompleted && isEditable) {
+                              setConfirmingStep(step)
+                            }
+                          }}
+                          title={
+                            !isCompleted && isEditable
+                              ? `Click to mark "${step.stepName}" as completed`
+                              : undefined
                           }
-                        }}
-                      >
-                        <div className="ssd-step-indicator">
-                          {isCompleted ? (
-                            <Icon name="check" size={16} strokeWidth={3} className="text-emerald-600" />
-                          ) : isNextAvailable ? (
-                            <div className="ssd-radio-outer">
-                              <div className="ssd-radio-inner" />
+                        >
+                          <div className="ssd-step-num">{index + 1}</div>
+                          <span className={`ssd-dot ${dotClass}`} />
+                          <div className="ssd-step-content">
+                            <div className="ssd-step-title-wrap">
+                              <span className="ssd-step-title">{step.stepName}</span>
+                              {stepIcon}
                             </div>
-                          ) : (
-                            <div className="ssd-circle-pending" />
-                          )}
+                            <span className="ssd-step-date">Updated: {formattedDate}</span>
+                          </div>
+                          <span className={`ssd-badge ${badgeClass}`}>
+                            {isCompleted ? 'COMPLETED' : isInProgress ? 'IN PROGRESS' : 'PENDING'}
+                          </span>
                         </div>
-
-                        <span className="ssd-step-name">
-                          {index + 1}. {step.stepName}
-                        </span>
-
-                        {isCompleted ? (
-                          <span className="ssd-pill ssd-pill--completed">Completed</span>
-                        ) : isNextAvailable ? (
-                          <span className="ssd-pill ssd-pill--next">Next</span>
-                        ) : null}
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Change Status Section */}
-            <div className="ssd-section">
-              <h4 className="ssd-section-title">Change Status</h4>
-              <select
-                className="ssd-select"
-                value={subServiceStatus}
-                onChange={(e) => handleStatusDropdownChange(e.target.value)}
-                disabled={!allFlowsCompleted || isUpdatingStatus || !isEditable}
-              >
-                <option value="PENDING" disabled={subServiceStatus !== 'PENDING'}>
-                  Pending
-                </option>
-                <option value="IN_PROGRESS" disabled={subServiceStatus !== 'IN_PROGRESS'}>
-                  Service Status is In Progress
-                </option>
-                <option
-                  value="PENDING_CUSTOMER_ACK"
-                  disabled={subServiceStatus !== 'PENDING_CUSTOMER_ACK'}
-                >
-                  Pending Customer Acknowledgement
-                </option>
-                <option value="COMPLETED" disabled={!allFlowsCompleted}>
-                  Completed
-                </option>
-              </select>
+            {/* Read-Only Notice Box for Department Head */}
+            {!isEditable && (
+              <div className="ssd-readonly-box">
+                <Icon name="alert" size={16} strokeWidth={2.2} className="ssd-readonly-icon" />
+                <div className="ssd-readonly-content">
+                  <p className="ssd-readonly-title">Read-Only View</p>
+                  <p className="ssd-readonly-desc">
+                    As a department head, you can view the service flow but cannot modify it. Contact
+                    the assigned user to make changes.
+                  </p>
+                </div>
+              </div>
+            )}
 
-              {!allFlowsCompleted && (
-                <p className="ssd-hint">Complete all service flow steps to enable status change</p>
-              )}
-
-              {allFlowsCompleted && isEditable && (
-                <button
-                  type="button"
-                  className="ssd-ack-btn"
-                  onClick={handleSendAcknowledgement}
-                  disabled={isSendingAck}
+            {/* Change Status Section (Department User) */}
+            {isEditable && (
+              <div className="ssd-section">
+                <h4 className="ssd-section-title">Change Status</h4>
+                <select
+                  className="ssd-select"
+                  value={subServiceStatus}
+                  onChange={(e) => handleStatusDropdownChange(e.target.value)}
+                  disabled={!allFlowsCompleted || isUpdatingStatus}
                 >
-                  <Icon name="mail" size={15} strokeWidth={2} />
-                  <span>{isSendingAck ? 'Sending Acknowledgement...' : 'Send Acknowledgement'}</span>
-                </button>
-              )}
-            </div>
+                  <option value="PENDING" disabled={subServiceStatus !== 'PENDING'}>
+                    Pending
+                  </option>
+                  <option value="IN_PROGRESS" disabled={subServiceStatus !== 'IN_PROGRESS'}>
+                    Service Status is In Progress
+                  </option>
+                  <option
+                    value="PENDING_CUSTOMER_ACK"
+                    disabled={subServiceStatus !== 'PENDING_CUSTOMER_ACK'}
+                  >
+                    Pending Customer Acknowledgement
+                  </option>
+                  <option value="COMPLETED" disabled={!allFlowsCompleted}>
+                    Completed
+                  </option>
+                </select>
+
+                {!allFlowsCompleted && (
+                  <p className="ssd-hint">Complete all service flow steps to enable status change</p>
+                )}
+
+                {allFlowsCompleted && (
+                  <button
+                    type="button"
+                    className="ssd-ack-btn"
+                    onClick={handleSendAcknowledgement}
+                    disabled={isSendingAck}
+                  >
+                    <Icon name="mail" size={15} strokeWidth={2} />
+                    <span>{isSendingAck ? 'Sending Acknowledgement...' : 'Send Acknowledgement'}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Footer */}
-          <div className="ssd-footer">
+          {/* Footer Stacked Buttons */}
+          <div className="ssd-footer-stacked">
+            <button type="button" className="ssd-btn-stacked" onClick={onClose}>
+              Close
+            </button>
             <button
               type="button"
-              className="ssd-btn-secondary"
+              className="ssd-btn-stacked"
               onClick={() => {
                 const historyDept = effectiveDept.toLowerCase().replace(/_department$/, '')
                 const historyPath = window.location.pathname.includes('-user')
@@ -774,11 +1015,8 @@ export function ServiceFlowModal({
                 window.location.href = historyPath
               }}
             >
-              <Icon name="book" size={14} strokeWidth={2} />
+              <Icon name="book" size={15} strokeWidth={2} />
               <span>View History</span>
-            </button>
-            <button type="button" className="ssd-btn-secondary" onClick={onClose}>
-              Close
             </button>
           </div>
         </motion.div>

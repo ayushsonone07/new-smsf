@@ -28,6 +28,7 @@ export interface AutowebsionCustomerLightDTO {
   draftStatus?: string
   subServiceInfo?: any[]
   services?: any[]
+  serviceTags?: any
 }
 
 export interface AutowebsionPageResponse {
@@ -204,10 +205,11 @@ export async function fetchAutowebsionSummaryCounts(): Promise<AutowebsionSummar
  */
 export async function fetchCustomerServiceFlowDetail(
   customerId: number | string,
-  serviceType: string,
+  serviceType: string = 'WEBSITE',
 ): Promise<any> {
+  const normType = serviceType.toUpperCase().includes('AUTO') ? 'AUTOMATION' : 'WEBSITE'
   return authedApiRequest(
-    `/api/autowebision/customers/${encodeURIComponent(String(customerId))}/services/${encodeURIComponent(serviceType.toUpperCase())}/flow`,
+    `/api/autowebision/customers/${encodeURIComponent(String(customerId))}/services/${encodeURIComponent(normType)}/flow`,
   )
 }
 

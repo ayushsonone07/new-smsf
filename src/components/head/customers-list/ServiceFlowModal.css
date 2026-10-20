@@ -489,4 +489,194 @@
   border-color: #2563eb;
 }
 
+/* ── Precise Screenshot Parity (.ssd-dot, .ssd-flow-container, .ssd-readonly-box, .ssd-footer-stacked) ── */
+
+.ssd-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ssd-dot--blue {
+  background: #3b82f6;
+}
+
+.ssd-dot--emerald {
+  background: #10b981;
+}
+
+.ssd-dot--amber {
+  background: #f59e0b;
+}
+
+.ssd-flow-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ssd-flow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ssd-flow-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ssd-flow-counts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.ssd-count-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ssd-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssd-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  user-select: none;
+}
+
+.ssd-step-row--clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ssd-step-row--clickable:hover {
+  background-color: #f8fafc;
+}
+
+.ssd-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.ssd-step-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ssd-step-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ssd-step-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ssd-step-date {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Read-Only Notice Box for Department Head */
+.ssd-readonly-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  margin-top: 4px;
+}
+
+.ssd-readonly-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ssd-readonly-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.ssd-readonly-desc {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #2563eb;
+  line-height: 1.45;
+}
+
+/* Stacked footer buttons matching screenshot */
+.ssd-footer-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 22px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.ssd-btn-stacked {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.ssd-btn-stacked:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+
 
