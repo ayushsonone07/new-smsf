@@ -5,8 +5,13 @@ import { getSession } from '../../../../app/auth/session'
 import { useTaskHistory } from '../../hooks/useTaskHistory'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
 import { getStatusHistory, type StatusHistoryItem } from '../../../../api/status-history.api'
+import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { SearchBar } from '../../../../components/head/shared/SearchBar'
-import { AssigneeDropdown } from '../../../../components/head/customers-list/CustomersList'
+import {
+  AssigneeDropdown,
+  type OnboardingAssignee,
+} from '../../../../components/head/customers-list/CustomersList'
 import { SectionCard } from '../../../../components/head/shared/SectionCard'
 import { Pill } from '../../../../components/ui/Pill'
 import { LoadingState } from '../../../../components/ui/LoadingState'
@@ -120,10 +125,53 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const pageSize = 10
 
   // Load the complete department roster; the selector paginates it locally.
-  const deptUsersQuery = useDepartmentUsersList({
-    page: 0,
-    size: 1000,
+  const normalizedDeptType = normalizeDepartmentTypeName(currentDepartment)
+  const isAutowebsionDept =
+    normalizedDeptType === 'AUTOWEBSION_DEPARTMENT' ||
+    normalizedDeptType === 'WEBSITE_DEPARTMENT' ||
+    normalizedDeptType === 'AUTOMATION_DEPARTMENT'
+
+  // Automation/Website/Autowebsion members live behind a dedicated endpoint;
+  // the generic department-users endpoint does not return them.
+  const autowebUsersQuery = useQuery({
+    queryKey: ['history-autowebision-users', normalizedDeptType],
+    queryFn: () => fetchUsersByDepartmentType(normalizedDeptType, 0, 1000),
+    enabled: isHead && isAutowebsionDept,
+    staleTime: 30_000,
   })
+
+  const deptUsersQuery = useDepartmentUsersList(
+    {
+      page: 0,
+      size: 1000,
+    },
+    { enabled: isHead && !isAutowebsionDept },
+  )
+
+  const departmentUsers = useMemo<OnboardingAssignee[]>(() => {
+    const source = isAutowebsionDept
+      ? (autowebUsersQuery.data?.data ?? autowebUsersQuery.data)
+      : deptUsersQuery.data?.data
+    const list: Array<{ email?: string; username?: string }> = Array.isArray(
+      source,
+    )
+      ? source
+      : Array.isArray(source?.data)
+        ? source.data
+        : []
+    return list
+      .filter((user) => Boolean(user.email))
+      .map((user) => ({
+        id: user.email as string,
+        name: user.username
+          ? `${user.username} (${user.email})`
+          : (user.email as string),
+      }))
+  }, [isAutowebsionDept, autowebUsersQuery.data, deptUsersQuery.data])
+
+  const usersLoading = isAutowebsionDept
+    ? autowebUsersQuery.isPending
+    : deptUsersQuery.isPending
 
   const departmentUserFilter = isHead
     ? (selectedUser || undefined)
@@ -294,7 +342,7 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
               <AssigneeDropdown
                 assigneeId={selectedUser || null}
                 assignees={departmentUsers}
-                isEditable={!deptUsersQuery.isPending}
+                isEditable={!usersLoading}
                 pageSize={10}
                 emptyLabel="All Department Users"
                 searchPlaceholder="Search department users..."
