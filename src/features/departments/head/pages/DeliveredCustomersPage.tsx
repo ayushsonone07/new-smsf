@@ -218,6 +218,25 @@ function rowOwnerName(row: DepartmentCustomerRowItem): string {
   )
 }
 
+function rowEmail(row: DepartmentCustomerRowItem): string {
+  return row.customerDetails?.email ?? row.email ?? ''
+}
+
+function rowPhone(row: DepartmentCustomerRowItem): string {
+  return row.customerDetails?.phoneNumber ?? row.phoneNumber ?? ''
+}
+
+function formatRowDate(value: string | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
+
 function readBoolean(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value
   if (typeof value === 'string') {
@@ -265,6 +284,13 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
     row: DepartmentCustomerRowItem
     initialData: Partial<DeliveryConfirmationData> | null
   } | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 4500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -423,6 +449,16 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
 
   return (
     <div className="delivered-page" data-feature={feature?.slug}>
+      {toast && (
+        <div className="delivered-toast" role="status">
+          <span>✓</span>
+          <div>
+            <strong>Sent successfully</strong>
+            <p>{toast}</p>
+          </div>
+          <button type="button" aria-label="Dismiss" onClick={() => setToast(null)}>×</button>
+        </div>
+      )}
       <div className="delivered-toolbar">
         <div>
           <h2 className="delivered-title">Delivered Customers</h2>
@@ -509,10 +545,24 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                           >
                             <Icon name="eye" size={15} />
                           </button>
-                          <span>{rowOwnerName(row)}</span>
+                          <div className="delivered-cell-details">
+                            <strong>{rowOwnerName(row)}</strong>
+                            {rowPhone(row) && <small>{rowPhone(row)}</small>}
+                          </div>
                         </div>
                       </td>
-                      <td className="delivered-business">{rowBusinessName(row)}</td>
+                      <td className="delivered-business">
+                        <div className="delivered-cell-details">
+                          <strong>{rowBusinessName(row)}</strong>
+                          {(rowEmail(row) || row.createdAt) && (
+                            <small>
+                              {rowEmail(row)}
+                              {rowEmail(row) && row.createdAt ? ' · ' : ''}
+                              {formatRowDate(row.createdAt)}
+                            </small>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -593,10 +643,11 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
           customerName={rowOwnerName(deliveryModal.row)}
           initialData={deliveryModal.initialData}
           onClose={() => setDeliveryModal(null)}
-          onSuccess={async () => {
+          onSuccess={async (result) => {
             await queryClient.invalidateQueries({
               queryKey: ['department-customer-rows'],
             })
+            setToast(result.message || 'Delivery confirmation sent successfully.')
           }}
         />
       )}

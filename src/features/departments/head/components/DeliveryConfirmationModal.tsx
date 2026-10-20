@@ -3,6 +3,7 @@ import { Modal } from '../../../../components/ui/Modal'
 import {
   updateDeliveryConfirmation,
   type DeliveryConfirmationData,
+  type DeliveryConfirmationResult,
 } from '../../../../api/department-users.api'
 import './DeliveryConfirmationModal.css'
 
@@ -46,7 +47,7 @@ interface Props {
   customerName: string
   initialData?: Partial<DeliveryConfirmationData> | null
   onClose: () => void
-  onSuccess: () => void | Promise<void>
+  onSuccess: (result: DeliveryConfirmationResult) => void | Promise<void>
 }
 
 export function DeliveryConfirmationModal({
@@ -71,8 +72,8 @@ export function DeliveryConfirmationModal({
     setSaving(true)
     setError(null)
     try {
-      await updateDeliveryConfirmation(customerId, form)
-      await onSuccess()
+      const result = await updateDeliveryConfirmation(customerId, form)
+      await onSuccess(result)
       onClose()
     } catch (submitError) {
       setError(

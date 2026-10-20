@@ -337,6 +337,12 @@ export interface DeliveryConfirmationData {
   profileLink: string
 }
 
+export interface DeliveryConfirmationResult {
+  message: string
+  emailSent: boolean
+  whatsappSent: boolean
+}
+
 /** Loads the saved Support delivery links used to prefill the confirmation form. */
 export async function getCustomerDeliveryLinks(
   customerId: number | string,
@@ -367,7 +373,7 @@ export async function getCustomerDeliveryLinks(
 export async function updateDeliveryConfirmation(
   customerId: number | string,
   data: DeliveryConfirmationData,
-): Promise<unknown> {
+): Promise<DeliveryConfirmationResult> {
   const res = await authedApiRequest<any>(
     '/api/auth/customer-service/service-delivery-confirmation',
     {
@@ -379,7 +385,23 @@ export async function updateDeliveryConfirmation(
   if (res?.success === false) {
     throw new Error(res.message || 'Failed to update delivery confirmation')
   }
-  return res?.data ?? res
+
+  const message = String(res?.message || '')
+  const result = {
+    message,
+    emailSent: /email:\s*sent/i.test(message),
+    whatsappSent: /whatsapp:\s*sent/i.test(message),
+  }
+
+  // The backend deliberately returns HTTP 200 even when either delivery
+  // channel was skipped or failed, so the message is the authoritative result.
+  if (!result.emailSent || !result.whatsappSent) {
+    throw new Error(
+      `Delivery unsuccessful. ${message || 'Email or WhatsApp was not sent.'}`,
+    )
+  }
+
+  return result
 }
 
 /**

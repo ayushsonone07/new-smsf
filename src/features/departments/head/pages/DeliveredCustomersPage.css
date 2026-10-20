@@ -4,6 +4,46 @@
   gap: 1rem;
 }
 
+.delivered-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  width: min(390px, calc(100vw - 2rem));
+  padding: .85rem 1rem;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  background: #ecfdf5;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 16%);
+  color: #047857;
+}
+
+.delivered-toast > span {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #fff;
+  font-weight: 700;
+}
+
+.delivered-toast div { flex: 1; }
+.delivered-toast strong { font-size: .86rem; }
+.delivered-toast p { margin: .15rem 0 0; font-size: .75rem; }
+.delivered-toast button {
+  border: 0;
+  background: transparent;
+  color: #047857;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
 .delivered-toolbar {
   display: flex;
   align-items: flex-start;
@@ -112,7 +152,7 @@
 .delivered-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: .85rem;
+  font-size: .99rem;
 }
 
 .delivered-table th {
@@ -120,8 +160,8 @@
   border-bottom: 1px solid #eef2f7;
   background: #f8fafc;
   color: #64748b;
-  font-size: .72rem;
-  font-weight: 600;
+  font-size: .90rem;
+  font-weight: 900;
   letter-spacing: .04em;
   text-align: left;
   text-transform: uppercase;
@@ -144,9 +184,36 @@
 }
 
 .delivered-business {
-  min-width: 180px;
+  min-width: 250px;
   color: #172033;
   font-weight: 500;
+}
+
+.delivered-cell-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: .22rem;
+}
+
+.delivered-cell-details strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivered-cell-details small {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .delivered-amount {
@@ -204,7 +271,8 @@
 
 .delivered-assignee {
   position: relative;
-  min-width: 170px;
+  width: 210px;
+  max-width: 100%;
 }
 
 .delivered-assignee__trigger {
@@ -355,7 +423,7 @@
   display: flex;
   align-items: center;
   gap: .55rem;
-  min-width: 160px;
+  min-width: 190px;
 }
 
 .delivered-eye {
