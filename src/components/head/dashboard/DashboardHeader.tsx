@@ -3,6 +3,7 @@ import { Icon } from '../shared/Icon'
 import { useNotificationCenter } from '../layout/NotificationCenter'
 import { getSession } from '../../../app/auth/session'
 import { useHeadShell } from '../layout/HeadShellContext'
+import { DateRangePicker } from '../customers-list/CustomersListFilters'
 
 export interface DashboardHeaderProps {
   onRefresh?: () => void
@@ -10,6 +11,9 @@ export interface DashboardHeaderProps {
   onToggleNotifications?: () => void
   datePeriod?: string
   onDatePeriodChange?: (period: string) => void
+  customDateFrom?: string
+  customDateTo?: string
+  onCustomDateRangeChange?: (from: string, to: string) => void
   /** Name after "Welcome back,". */
   greetingName?: string
   /** Line under the greeting — defaults to "Showing <period> · <today>". */
@@ -18,7 +22,6 @@ export interface DashboardHeaderProps {
 
 const PERIOD_OPTIONS = [
   'Today',
-  'Yesterday',
   'Last 7 days',
   'This month',
   'Custom range',
@@ -34,6 +37,9 @@ export function DashboardHeader({
   onToggleNotifications,
   datePeriod = 'Today',
   onDatePeriodChange,
+  customDateFrom = '',
+  customDateTo = '',
+  onCustomDateRangeChange,
   greetingName = 'Onboarding Department',
   subtitle,
 }: DashboardHeaderProps) {
@@ -41,6 +47,9 @@ export function DashboardHeader({
   const canAccessNotifications = getSession()?.user.role !== 'USER'
   const shell = useHeadShell()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showCustomRange, setShowCustomRange] = useState(false)
+  const [draftFrom, setDraftFrom] = useState(customDateFrom)
+  const [draftTo, setDraftTo] = useState(customDateTo)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const todayLabel = new Date().toLocaleDateString(
@@ -109,7 +118,7 @@ export function DashboardHeader({
 
           {dropdownOpen && (
             <div className="hdb-banner__dropdown-menu" role="listbox">
-              {PERIOD_OPTIONS.map((opt) => (
+              {!showCustomRange ? PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt}
                   type="button"
@@ -119,13 +128,52 @@ export function DashboardHeader({
                     datePeriod === opt ? 'is-active' : ''
                   }`}
                   onClick={() => {
+                    if (opt === 'Custom range') {
+                      setDraftFrom(customDateFrom)
+                      setDraftTo(customDateTo)
+                      setShowCustomRange(true)
+                      return
+                    }
                     onDatePeriodChange?.(opt)
                     setDropdownOpen(false)
                   }}
                 >
                   {opt}
                 </button>
-              ))}
+              )) : (
+                <div className="hdb-custom-range hdb-custom-range--calendar">
+                  <button
+                    type="button"
+                    className="hdb-custom-range__back"
+                    onClick={() => setShowCustomRange(false)}
+                  >
+                    <Icon name="chevronLeft" size={14} /> Date range
+                  </button>
+                  <DateRangePicker
+                    label="Dashboard"
+                    from={draftFrom}
+                    to={draftTo}
+                    autoOpen
+                    hideTrigger
+                    onChange={(from, to) => {
+                      setDraftFrom(from)
+                      setDraftTo(to)
+                      onCustomDateRangeChange?.(from, to)
+                      onDatePeriodChange?.('Custom range')
+                      setShowCustomRange(false)
+                      setDropdownOpen(false)
+                    }}
+                    onReset={() => {
+                      setDraftFrom('')
+                      setDraftTo('')
+                    }}
+                    onDismiss={() => {
+                      setShowCustomRange(false)
+                      setDropdownOpen(false)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
