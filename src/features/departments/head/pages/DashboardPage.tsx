@@ -64,7 +64,7 @@ function shiftDays(date: Date, days: number): Date {
   return next
 }
 
-function rangeFor(period: string): {
+function rangeFor(period: string, customRange?: { from: string; to: string }): {
   startDate?: string
   endDate?: string
   allTime?: boolean
@@ -73,16 +73,15 @@ function rangeFor(period: string): {
   const end = toIsoDate(today)
 
   switch (period) {
-    case 'Yesterday': {
-      const yesterday = toIsoDate(shiftDays(today, -1))
-      return { startDate: yesterday, endDate: yesterday }
-    }
     case 'Last 7 days':
-    case 'Custom range':
       return {
         startDate: toIsoDate(shiftDays(today, -6)),
         endDate: end,
       }
+    case 'Custom range':
+      return customRange?.from && customRange?.to
+        ? { startDate: customRange.from, endDate: customRange.to }
+        : { startDate: end, endDate: end }
     case 'This month':
       return {
         startDate: toIsoDate(
@@ -200,10 +199,14 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')
+  const [customRange, setCustomRange] = useState({ from: '', to: '' })
   const [refreshKey, setRefreshKey] = useState(0)
   const department = currentDepartment
 
-  const range = useMemo(() => rangeFor(datePeriod), [datePeriod])
+  const range = useMemo(
+    () => rangeFor(datePeriod, customRange),
+    [datePeriod, customRange],
+  )
 
   const summaryParams: OnboardingSummaryParams = useMemo(
     () => ({
@@ -413,6 +416,9 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
           greetingName={departmentLabel(currentDepartment)}
           datePeriod={datePeriod}
           onDatePeriodChange={setDatePeriod}
+          customDateFrom={customRange.from}
+          customDateTo={customRange.to}
+          onCustomDateRangeChange={(from, to) => setCustomRange({ from, to })}
           onRefresh={handleRefresh}
         />
       </motion.div>

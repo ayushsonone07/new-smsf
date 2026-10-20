@@ -1048,10 +1048,9 @@ export function RegisterBusinessPage() {
             <button
               type="button"
               onClick={() => navigate({ to: '/login' as never })}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-3.5 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:shadow sm:text-sm"
-            >
-              <span className="text-sm">↪</span>
-              HRM Login
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-5 py-2 text-white hover:bg-white hover:text-black hover:border-1 duration-250"
+            > 
+              Login
             </button>
             <span className="whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500">
               {completedCount}/{SECTIONS.length} done
