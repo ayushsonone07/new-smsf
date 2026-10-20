@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -9,30 +10,27 @@ import {
   Eye,
   EyeOff,
   Hash,
+  Lock,
   MapPin,
   Package,
   Wallet,
 } from 'lucide-react'
-import { LoginModal } from '../../auth/components/LoginModal'
 import {
   fetchPlanAmounts,
   fetchPlansWithDepartments,
   registerCustomer,
-  uploadPaymentScreenshot,
+  verifyPayment,
 } from '../../../api/register-business.api'
 import type {
-  CustomerRegistrationRequest,
   PlanAmount,
   PlanWithDepartments,
-  RegisteredCustomer,
 } from '../types/register-business.types'
 
 /* ─────────────────────────────────────────────────────────────────
-   Single-page "Register Your Business" form ported from SMSF's
-   RegisterBusiness.tsx. Same fields, validation rules and submit
-   payload, laid out as one continuous page with four sections.
-   Public page: submits to POST /api/auth/customers/register, gated by
-   the REGISTRATION_PASSWORD passkey from .env.
+   Single-page version of the "Register Your Business" form from SMSF
+   (RegisterBusiness.tsx). Exact copy of UI, layout, step-locking,
+   payment verification, GST toggle, package selection, and passkey
+   submission directly to backend.
    ───────────────────────────────────────────────────────────────── */
 
 const INDIAN_CITIES = Object.freeze([
@@ -69,8 +67,18 @@ const INITIAL_FORM_DATA = {
   onboardingCity: 'Jabalpur',
 }
 
-/* Cities where onboarding is currently done. Add a city here to offer it on the form. */
+/* Cities where onboarding is currently done. */
 const ONBOARDING_CITIES = ['Jabalpur', 'Delhi']
+
+/* Result of verifying a payment ID, tied to the exact phone + payment ID it was checked for. */
+type PaymentCheck = {
+  status: 'verifying' | 'verified' | 'failed'
+  phone: string
+  paymentId: string
+  message?: string
+  amount?: number | null
+  paidAt?: string | null
+}
 
 const INITIAL_VALIDATION_ERRORS = {
   email: '',
@@ -79,13 +87,8 @@ const INITIAL_VALIDATION_ERRORS = {
   city: '',
 }
 
-const REGISTRATION_PASSWORD =
-  import.meta.env.REGISTRATION_PASSWORD ?? ''
-
-const GST_RATE = 0.18
-/* Plans of this duration are shown first in the plan filter. */
-const DEFAULT_PLAN_MONTHS = 15
-const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024
+const REGISTRATION_PASSKEY =
+  import.meta.env.VITE_REGISTRATION_PASSKEY || 'MBG@1234'
 
 type SectionId = 'business' | 'packages' | 'financial' | 'final'
 type ToastVariant = 'default' | 'success' | 'destructive'
@@ -121,7 +124,13 @@ const isValidServiceMonths = (value: string) =>
 const monthsLabel = (months: number) =>
   `${months} month${months === 1 ? '' : 's'}`
 
-/** "GOOGLE_DEPARTMENT" -> "Google", "SERVICE_DELIVERY_DEPARTMENT" -> "Service Delivery", "SEO_DEPARTMENT" -> "SEO". */
+/* Plans of this duration are shown first in the plan filter. */
+const DEFAULT_PLAN_MONTHS = 15
+
+/* GST rate applied on a plan's price (shown as "+18%" on plan cards). */
+const GST_RATE = 0.18
+
+/** "GOOGLE_DEPARTMENT" -> "Google", "SERVICE_DELIVERY_DEPARTMENT" -> "Service Delivery". */
 function departmentLabel(raw: string) {
   return (raw || '')
     .replace(/_?DEPARTMENT$/i, '')
@@ -148,18 +157,31 @@ function departmentDot(label: string) {
   return DOT_COLORS[hash % DOT_COLORS.length]
 }
 
-function apiErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) return error.message
-  return fallback
-}
-
 export function RegisterBusinessPage() {
+  const navigate = useNavigate()
+
+  // Queries for plans and pricing
+  const plansQuery = useQuery({
+    queryKey: ['register-business', 'plans-with-departments'],
+    queryFn: fetchPlansWithDepartments,
+    staleTime: 30_000,
+  })
+
+  const amountsQuery = useQuery({
+    queryKey: ['register-business', 'plan-amounts'],
+    queryFn: fetchPlanAmounts,
+    staleTime: 30_000,
+  })
+
+  const plans: PlanWithDepartments[] = plansQuery.data ?? []
+  const isLoadingPlans = plansQuery.isLoading
+  const planAmounts: PlanAmount[] = amountsQuery.data ?? []
+
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
   const [validationErrors, setValidationErrors] = useState({
     ...INITIAL_VALIDATION_ERRORS,
   })
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set())
-  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set())
 
   const [cityInput, setCityInput] = useState('')
   const [showCityDropdown, setShowCityDropdown] = useState(false)
@@ -169,54 +191,26 @@ export function RegisterBusinessPage() {
   const [showPasskeyModal, setShowPasskeyModal] = useState(false)
   const [passkey, setPasskey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  /* The login screen opens first; "Register your business" there reveals this form. */
-  const [loginOpen, setLoginOpen] = useState(true)
 
+  const [paymentCheck, setPaymentCheck] = useState<PaymentCheck | null>(null)
+
+  /* Plan duration filter. null = default 15-months plans if exist. */
+  const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
+  /* Toggle 18% GST addition on packages */
+  const [includeGst, setIncludeGst] = useState(true)
+
+  /* Currently viewed plan's features in modal */
+  const [viewingFeaturesPlan, setViewingFeaturesPlan] = useState<{
+    name: string
+    features: string[]
+  } | null>(null)
+
+  // Internal toast notification
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const toastTimer = useRef<number | null>(null)
 
-  /* Payment screenshot step, shown after a successful registration. */
-  const [registered, setRegistered] = useState<RegisteredCustomer | null>(null)
-  const [billingAddress, setBillingAddress] = useState('')
-  const [screenshotUrl, setScreenshotUrl] = useState('')
-  const [isUploadingSS, setIsUploadingSS] = useState(false)
-  /* Payment screenshot picked in the form; uploaded right after the customer is registered. */
-  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
-
-  /* Plan duration filter. null = not chosen yet. */
-  const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
-  /* true once the user picks "Custom" to type Service Months. */
-  const [customMonths, setCustomMonths] = useState(false)
-
-  const businessRef = useRef<HTMLDivElement>(null)
-  const packagesRef = useRef<HTMLDivElement>(null)
-  const financialRef = useRef<HTMLDivElement>(null)
-  const finalRef = useRef<HTMLDivElement>(null)
-
-  const plansQuery = useQuery({
-    queryKey: ['register-business', 'plans-with-departments'],
-    queryFn: fetchPlansWithDepartments,
-    staleTime: 30_000,
-  })
-  const plans = useMemo<PlanWithDepartments[]>(
-    () => plansQuery.data ?? [],
-    [plansQuery.data],
-  )
-  const isLoadingPlans = plansQuery.isPending
-
-  const amountsQuery = useQuery({
-    queryKey: ['register-business', 'plan-amounts'],
-    queryFn: fetchPlanAmounts,
-    staleTime: 30_000,
-  })
-  const planAmounts: PlanAmount[] = amountsQuery.data ?? []
-
   const showToast = useCallback(
-    (
-      title: string,
-      description?: string,
-      variant: ToastVariant = 'default',
-    ) => {
+    ({ title, description, variant }: ToastMessage) => {
       setToast({ title, description, variant })
       if (toastTimer.current) {
         window.clearTimeout(toastTimer.current)
@@ -233,6 +227,11 @@ export function RegisterBusinessPage() {
       }
     }
   }, [])
+
+  const businessRef = useRef<HTMLDivElement>(null)
+  const packagesRef = useRef<HTMLDivElement>(null)
+  const financialRef = useRef<HTMLDivElement>(null)
+  const finalRef = useRef<HTMLDivElement>(null)
 
   const scrollToSection = useCallback((id: SectionId) => {
     const refs: Record<SectionId, React.RefObject<HTMLDivElement | null>> = {
@@ -272,8 +271,7 @@ export function RegisterBusinessPage() {
     }
     if (showCityDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
-      return () =>
-        document.removeEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showCityDropdown])
 
@@ -291,17 +289,18 @@ export function RegisterBusinessPage() {
         salesPersonName: 100,
         leadType: 50,
         groupLink: 300,
-        paymentId: 100,
+        paymentId: 50,
+        passkey: 300,
       }
 
       if (limits[field] && value.length > limits[field]) {
-        showToast(
-          'Character Limit Exceeded',
-          `${field
+        showToast({
+          title: 'Character Limit Exceeded',
+          description: `${field
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, (s) => s.toUpperCase())} cannot exceed ${limits[field]} characters`,
-          'destructive',
-        )
+          variant: 'destructive',
+        })
         return
       }
 
@@ -369,8 +368,173 @@ export function RegisterBusinessPage() {
     [handleInputChange],
   )
 
+  const resetForm = useCallback(() => {
+    setFormData({ ...INITIAL_FORM_DATA })
+    setValidationErrors({ ...INITIAL_VALIDATION_ERRORS })
+    setTouchedFields(new Set())
+    setCityInput('')
+    setPasskey('')
+    setDurationFilter(null)
+    setIncludeGst(true)
+    setViewingFeaturesPlan(null)
+    setPaymentCheck(null)
+  }, [])
+
+  /* ─── Payment ID verification. Tied to exact phone + payment ID checked. ─── */
+  const paymentPhone = formData.phoneNumber.trim()
+  const paymentIdInput = formData.paymentId.trim()
+  const canEnterPaymentId = validatePhoneNumber(paymentPhone)
+  const currentPaymentCheck =
+    paymentCheck &&
+    paymentCheck.phone === paymentPhone &&
+    paymentCheck.paymentId === paymentIdInput
+      ? paymentCheck
+      : null
+  const isVerifyingPayment = currentPaymentCheck?.status === 'verifying'
+  const paymentVerified =
+    canEnterPaymentId && currentPaymentCheck?.status === 'verified'
+  const verifiedPaymentAmount =
+    paymentVerified && currentPaymentCheck?.amount != null
+      ? Number(currentPaymentCheck.amount)
+      : null
+
+  const handleVerifyPayment = useCallback(async () => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = formData.paymentId.trim()
+    if (!validatePhoneNumber(phone) || !paymentId) return
+
+    const isSameCheck = (prev: PaymentCheck | null) =>
+      !!prev && prev.phone === phone && prev.paymentId === paymentId
+    setPaymentCheck({ status: 'verifying', phone, paymentId })
+
+    try {
+      const res = await verifyPayment(phone, paymentId)
+      setPaymentCheck((prev) => {
+        if (!isSameCheck(prev)) return prev
+        return res.success
+          ? {
+              status: 'verified',
+              phone,
+              paymentId,
+              amount: res.data?.amount ?? null,
+              paidAt: res.data?.paidAt ?? null,
+            }
+          : {
+              status: 'failed',
+              phone,
+              paymentId,
+              message: res.message || 'Payment could not be verified',
+            }
+      })
+
+      if (res.success && res.data?.amount != null) {
+        const verifiedAmt = Number(res.data.amount)
+        setFormData((prev) => {
+          const total = parseInt(prev.totalAmount) || 0
+          const remaining = total - verifiedAmt
+          return {
+            ...prev,
+            amountPaid: String(verifiedAmt),
+            amountRemaining: remaining > 0 ? String(remaining) : '',
+          }
+        })
+      }
+    } catch (error: any) {
+      setPaymentCheck((prev) =>
+        isSameCheck(prev)
+          ? {
+              status: 'failed',
+              phone,
+              paymentId,
+              message: error?.message || 'Payment could not be verified',
+            }
+          : prev,
+      )
+    }
+  }, [formData.phoneNumber, formData.paymentId])
+
+  /* ─── Plan pricing from planAmounts ─── */
+  const priceOf = useCallback(
+    (planName: string) => {
+      const row = planAmounts.find((a) => a.planName === planName)
+      const amount =
+        (Number(row?.amount) || 0) + (Number(row?.additionalAmount) || 0)
+      return {
+        amount,
+        withGst: Math.round(amount * (1 + GST_RATE)),
+        hasPrice: row?.amount != null || row?.additionalAmount != null,
+        months: Number(row?.durationMonths) || 0,
+        featureList: row?.featureList ?? [],
+      }
+    },
+    [planAmounts],
+  )
+
+  /* What the selected plans add up to. */
+  const selectedPlans = plans.filter((p) =>
+    formData.selectedPackages?.includes(p.id),
+  )
+  const autoTotal = selectedPlans.reduce(
+    (sum, p) =>
+      sum + (includeGst ? priceOf(p.name).withGst : priceOf(p.name).amount),
+    0,
+  )
+  const autoMonths = selectedPlans.reduce(
+    (max, p) => Math.max(max, priceOf(p.name).months),
+    0,
+  )
+  const hasUnpricedSelection = selectedPlans.some(
+    (p) => !priceOf(p.name).hasPrice,
+  )
+  const totalLocked = autoTotal > 0 && !hasUnpricedSelection
+  const monthsLocked = autoMonths > 0
+
+  /* Handle package selection with verified payment amount restriction */
   const handlePackageToggle = useCallback(
     (packageId: string, checked?: boolean) => {
+      const pkg = plans.find((p) => p.id === packageId)
+      const isCurrentlySelected =
+        formData.selectedPackages?.includes(packageId)
+      const willSelect =
+        checked !== undefined ? checked : !isCurrentlySelected
+
+      if (willSelect && verifiedPaymentAmount != null && pkg) {
+        const pkgPrice = includeGst
+          ? priceOf(pkg.name).withGst
+          : priceOf(pkg.name).amount
+        if (pkgPrice > verifiedPaymentAmount) {
+          showToast({
+            title: 'Package Exceeds Verified Amount',
+            description: `${pkg.name} price (₹${pkgPrice.toLocaleString('en-IN')}) exceeds verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+            variant: 'destructive',
+          })
+          return
+        }
+
+        const otherSelectedCost = (formData.selectedPackages || [])
+          .filter((id) => id !== packageId)
+          .reduce((sum, id) => {
+            const p = plans.find((pl) => pl.id === id)
+            return (
+              sum +
+              (p
+                ? includeGst
+                  ? priceOf(p.name).withGst
+                  : priceOf(p.name).amount
+                : 0)
+            )
+          }, 0)
+
+        if (otherSelectedCost + pkgPrice > verifiedPaymentAmount) {
+          showToast({
+            title: 'Total Exceeds Verified Amount',
+            description: `Total amount (₹${(otherSelectedCost + pkgPrice).toLocaleString('en-IN')}) cannot exceed verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+            variant: 'destructive',
+          })
+          return
+        }
+      }
+
       setFormData((prev) => {
         const selected = prev.selectedPackages || []
         let updated: string[]
@@ -386,68 +550,89 @@ export function RegisterBusinessPage() {
         return { ...prev, selectedPackages: updated }
       })
     },
-    [],
+    [
+      formData.selectedPackages,
+      plans,
+      priceOf,
+      includeGst,
+      verifiedPaymentAmount,
+      showToast,
+    ],
   )
 
-  const handleToggleDepartments = useCallback(
-    (packageId: string, event: React.MouseEvent) => {
-      event.stopPropagation()
-      setExpandedPlans((prev) => {
-        const next = new Set(prev)
-        if (next.has(packageId)) next.delete(packageId)
-        else next.add(packageId)
-        return next
-      })
-    },
-    [],
-  )
+  /* Total Amount follows the selected plans */
+  const lastAutoTotal = useRef(0)
+  useEffect(() => {
+    if (autoTotal === lastAutoTotal.current) return
+    const hadAutoTotal = lastAutoTotal.current > 0
+    lastAutoTotal.current = autoTotal
+    if (autoTotal <= 0 && !hadAutoTotal) return
+    const value = autoTotal > 0 ? String(autoTotal) : ''
+    setFormData((prev) => {
+      if (prev.paymentType === 'full-time') {
+        return {
+          ...prev,
+          totalAmount: value,
+          amountPaid: value,
+          amountRemaining: '',
+        }
+      }
+      const remaining = autoTotal - (parseInt(prev.amountPaid) || 0)
+      return {
+        ...prev,
+        totalAmount: value,
+        amountRemaining: remaining > 0 ? String(remaining) : '',
+      }
+    })
+  }, [autoTotal])
 
-  const resetForm = useCallback(() => {
-    setFormData({ ...INITIAL_FORM_DATA })
-    setValidationErrors({ ...INITIAL_VALIDATION_ERRORS })
-    setTouchedFields(new Set())
-    setExpandedPlans(new Set())
-    setCityInput('')
-    setPasskey('')
-    setDurationFilter(null)
-    setCustomMonths(false)
-  }, [])
+  /* Service Months follows the longest selected plan */
+  useEffect(() => {
+    if (autoMonths <= 0) return
+    const value = String(autoMonths)
+    setFormData((prev) =>
+      prev.expirationInMonths === value
+        ? prev
+        : { ...prev, expirationInMonths: value },
+    )
+  }, [autoMonths])
 
-  /* ─── Plan-derived values (price, totals, durations) ─── */
-  const priceOf = (planName: string) => {
-    const row = planAmounts.find((a) => a.planName === planName)
-    const amount =
-      (Number(row?.amount) || 0) + (Number(row?.additionalAmount) || 0)
-    return {
-      amount,
-      withGst: Math.round(amount * (1 + GST_RATE)),
-      hasPrice: row?.amount != null || row?.additionalAmount != null,
-      months: Number(row?.durationMonths) || 0,
-    }
-  }
+  /* Duration filter for the plan cards */
+  const durationOptions = useMemo(() => {
+    return Array.from(
+      new Set(plans.map((p) => priceOf(p.name).months).filter((m) => m > 0)),
+    ).sort((x, y) => x - y)
+  }, [plans, priceOf])
 
-  const selectedPlans = plans.filter((p) =>
-    formData.selectedPackages?.includes(p.id),
-  )
-  const autoTotal = selectedPlans.reduce(
-    (sum, p) => sum + priceOf(p.name).withGst,
-    0,
-  )
-  const autoMonths = selectedPlans.reduce(
-    (max, p) => Math.max(max, priceOf(p.name).months),
-    0,
-  )
-  const hasUnpricedSelection = selectedPlans.some(
-    (p) => !priceOf(p.name).hasPrice,
-  )
-  const totalLocked = autoTotal > 0 && !hasUnpricedSelection
-  const monthsLocked = autoMonths > 0 && !customMonths
-  /* Service Months: the selected plan's duration unless the user chose Custom. */
-  const effectiveMonths = monthsLocked
-    ? String(autoMonths)
-    : formData.expirationInMonths
+  const chosenDuration =
+    durationFilter === 'all' ||
+    (durationFilter !== null && durationOptions.includes(durationFilter))
+      ? durationFilter
+      : null
+  const activeDuration: number | 'all' =
+    chosenDuration ??
+    (durationOptions.includes(DEFAULT_PLAN_MONTHS)
+      ? DEFAULT_PLAN_MONTHS
+      : 'all')
+  const visiblePlans =
+    activeDuration === 'all'
+      ? plans
+      : plans.filter(
+          (p) =>
+            priceOf(p.name).months === activeDuration ||
+            formData.selectedPackages?.includes(p.id),
+        )
 
-  /* ─── Section completion (drives the sticky header progress) ─── */
+  const paymentError =
+    canEnterPaymentId && currentPaymentCheck?.status === 'failed'
+      ? currentPaymentCheck.message || ''
+      : ''
+  const paidOn =
+    paymentVerified && currentPaymentCheck?.paidAt
+      ? new Date(currentPaymentCheck.paidAt)
+      : null
+
+  /* ─── Section completion (drives sticky nav checkmarks & locking) ─── */
   const businessComplete =
     !!formData.ownerName &&
     !!formData.businessName &&
@@ -458,18 +643,20 @@ export function RegisterBusinessPage() {
     !!(formData.city || cityInput).trim() &&
     !!formData.onboardingCity
 
-  const packagesComplete = (formData.selectedPackages?.length || 0) > 0
+  const packagesComplete =
+    paymentVerified && (formData.selectedPackages?.length || 0) > 0
 
   const financialComplete = (() => {
     if (!formData.paymentType || !formData.totalAmount || !formData.amountPaid)
       return false
-    if (!isValidServiceMonths(effectiveMonths)) return false
-    if (!screenshotFile) return false
-    if (
-      formData.paymentType === 'part-time' &&
-      (!formData.amountRemaining || !formData.remainingAmountDueDate)
-    )
-      return false
+    if (!isValidServiceMonths(formData.expirationInMonths)) return false
+    if (formData.paymentType === 'part-time') {
+      if (!formData.amountRemaining || !formData.remainingAmountDueDate)
+        return false
+      const paid = parseInt(formData.amountPaid) || 0
+      const remaining = parseInt(formData.amountRemaining) || 0
+      if (paid > remaining) return false
+    }
     if (!formData.invoiceOption) return false
     if (formData.invoiceOption === 'gstin' && !formData.gstinForInvoice)
       return false
@@ -487,8 +674,13 @@ export function RegisterBusinessPage() {
     final: finalComplete,
   }
 
-  /* ─── Combined validation — same rules/order/messages as the SMSF wizard. ─── */
+  const completedCount = Object.values(sectionStatus).filter(Boolean).length
+  const progressPct = Math.round((completedCount / SECTIONS.length) * 100)
+  const selectedCount = formData.selectedPackages?.length || 0
+
+  /* ─── Combined validation — same rules/order/messages as SMSF ─── */
   const handleFinalSubmit = useCallback(() => {
+    // 1. Business details
     const errors = { ...INITIAL_VALIDATION_ERRORS }
     let hasErrors = false
     const requiredStep1Fields = [
@@ -500,8 +692,8 @@ export function RegisterBusinessPage() {
       'websiteRequired',
     ]
     const missingFields: string[] = []
-    const fieldNames: { [key: string]: string } = {
-      ownerName: 'Owner Name',
+    const fieldNames: Record<string, string> = {
+      ownerName: 'Client Name',
       businessName: 'Business Name',
       email: 'Email',
       phoneNumber: 'Phone Number',
@@ -547,13 +739,14 @@ export function RegisterBusinessPage() {
     if (hasErrors) {
       setValidationErrors(errors)
       setTouchedFields(new Set(requiredStep1Fields))
-      showToast(
-        'Validation Error',
-        missingFields.length > 0
-          ? `Missing or invalid fields: ${missingFields.join(', ')}`
-          : 'Please fill all required fields correctly.',
-        'destructive',
-      )
+      showToast({
+        title: 'Validation Error',
+        description:
+          missingFields.length > 0
+            ? `Missing or invalid fields: ${missingFields.join(', ')}`
+            : 'Please fill all required fields correctly.',
+        variant: 'destructive',
+      })
       scrollToSection('business')
       return
     }
@@ -562,118 +755,176 @@ export function RegisterBusinessPage() {
       handleInputChange('city', cityInput.trim())
     }
 
+    // 2. Packages
     if (!formData.selectedPackages || formData.selectedPackages.length === 0) {
-      showToast(
-        'Selection Required',
-        'Please select at least one package',
-        'destructive',
-      )
+      showToast({
+        title: 'Selection Required',
+        description: 'Please select at least one package',
+        variant: 'destructive',
+      })
       scrollToSection('packages')
       return
     }
 
-    if (!isValidServiceMonths(effectiveMonths)) {
-      showToast(
-        'Service Months Required',
-        'Please enter service months between 1 and 60',
-        'destructive',
-      )
-      scrollToSection('financial')
-      return
-    }
-    if (formData.paymentType === 'part-time') {
-      if (!formData.amountRemaining || !formData.remainingAmountDueDate) {
-        showToast(
-          'Validation Error',
-          'Please fill all financial fields for part-time payment',
-          'destructive',
-        )
-        scrollToSection('financial')
+    if (paymentVerified && verifiedPaymentAmount != null) {
+      const currentTotal = parseInt(formData.totalAmount) || autoTotal
+      if (currentTotal > verifiedPaymentAmount) {
+        showToast({
+          title: 'Amount Exceeds Verified Payment',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) cannot exceed your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+          variant: 'destructive',
+        })
+        scrollToSection('packages')
         return
       }
     }
-    if (!formData.invoiceOption) {
-      showToast(
-        'Invoice Required',
-        'Please provide either GSTIN or Complete Address',
-        'destructive',
-      )
-      scrollToSection('financial')
-      return
-    }
-    if (formData.invoiceOption === 'gstin' && !formData.gstinForInvoice) {
-      showToast('GSTIN Required', 'Please enter GSTIN number', 'destructive')
-      scrollToSection('financial')
-      return
-    }
-    if (formData.invoiceOption === 'address' && !formData.completeAddress) {
-      showToast(
-        'Address Required',
-        'Please enter complete address',
-        'destructive',
-      )
-      scrollToSection('financial')
-      return
-    }
-    const missingFinancial = ['paymentType', 'totalAmount', 'amountPaid'].some(
-      (field) => !(formData[field as keyof typeof formData] as string),
-    )
-    if (missingFinancial) {
-      showToast(
-        'Validation Error',
-        'Please fill all required fields correctly',
-        'destructive',
-      )
-      scrollToSection('financial')
-      return
-    }
-    if (!screenshotFile) {
-      showToast(
-        'Payment Screenshot Required',
-        'Please attach the payment screenshot',
-        'destructive',
-      )
+
+    // 3. Financial info
+    if (!isValidServiceMonths(formData.expirationInMonths)) {
+      showToast({
+        title: 'Service Months Required',
+        description: 'Please enter service months between 1 and 60',
+        variant: 'destructive',
+      })
       scrollToSection('financial')
       return
     }
 
+    if (formData.paymentType === 'part-time') {
+      if (!formData.amountRemaining || !formData.remainingAmountDueDate) {
+        showToast({
+          title: 'Validation Error',
+          description: 'Please fill all financial fields for part-time payment',
+          variant: 'destructive',
+        })
+        scrollToSection('financial')
+        return
+      }
+      const paid = parseInt(formData.amountPaid) || 0
+      const total = parseInt(formData.totalAmount) || 0
+      const remaining = total - paid
+      if (paid > remaining) {
+        showToast({
+          title: 'Validation Error',
+          description: `Amount Paid (₹${paid.toLocaleString('en-IN')}) must be less than or equal to Amount Remaining (₹${remaining.toLocaleString('en-IN')}) for part-time payment.`,
+          variant: 'destructive',
+        })
+        scrollToSection('financial')
+        return
+      }
+    }
+
+    if (!formData.invoiceOption) {
+      showToast({
+        title: 'Invoice Required',
+        description: 'Please provide either GSTIN or Complete Address',
+        variant: 'destructive',
+      })
+      scrollToSection('financial')
+      return
+    }
+    if (formData.invoiceOption === 'gstin' && !formData.gstinForInvoice) {
+      showToast({
+        title: 'GSTIN Required',
+        description: 'Please enter GSTIN number',
+        variant: 'destructive',
+      })
+      scrollToSection('financial')
+      return
+    }
+    if (formData.invoiceOption === 'address' && !formData.completeAddress) {
+      showToast({
+        title: 'Address Required',
+        description: 'Please enter complete address',
+        variant: 'destructive',
+      })
+      scrollToSection('financial')
+      return
+    }
+
+    const missingFinancial = [
+      'paymentType',
+      'totalAmount',
+      'amountPaid',
+    ].some((field) => !(formData[field as keyof typeof formData] as string))
+    if (missingFinancial) {
+      showToast({
+        title: 'Validation Error',
+        description: 'Please fill all required fields correctly',
+        variant: 'destructive',
+      })
+      scrollToSection('financial')
+      return
+    }
+    if (!paymentVerified) {
+      showToast({
+        title: 'Payment Not Verified',
+        description: 'Please enter the payment ID and verify it',
+        variant: 'destructive',
+      })
+      scrollToSection('financial')
+      return
+    }
+
+    // 4. Final details
     if (!formData.salesPersonName) {
-      showToast(
-        'Sales Person Name Required',
-        "Please enter the sales person's name",
-        'destructive',
-      )
+      showToast({
+        title: 'Sales Person Name Required',
+        description: "Please enter the sales person's name",
+        variant: 'destructive',
+      })
       scrollToSection('final')
       return
     }
     if (!formData.leadType) {
-      showToast('Lead Type Required', 'Please enter the lead type', 'destructive')
+      showToast({
+        title: 'Lead Type Required',
+        description: 'Please enter the lead type',
+        variant: 'destructive',
+      })
       scrollToSection('final')
       return
     }
 
     setShowPasskeyModal(true)
-  }, [formData, cityInput, effectiveMonths, handleInputChange, showToast, scrollToSection, screenshotFile])
+  }, [
+    formData,
+    cityInput,
+    handleInputChange,
+    showToast,
+    scrollToSection,
+    paymentVerified,
+    verifiedPaymentAmount,
+    autoTotal,
+  ])
 
+  /* ─── Passkey submit & registration ─── */
   const handlePasskeySubmit = useCallback(async () => {
     if (!passkey.trim()) {
-      showToast('Password Required', 'Please enter the registration password', 'destructive')
+      showToast({
+        title: 'Passkey Required',
+        description: 'Please enter the registration passkey',
+        variant: 'destructive',
+      })
       return
     }
-    if (!REGISTRATION_PASSWORD) {
-      showToast(
-        'Registration Unavailable',
-        'Registration password is not configured.',
-        'destructive',
-      )
+    if (passkey !== REGISTRATION_PASSKEY) {
+      showToast({
+        title: 'Invalid Passkey',
+        description:
+          'The passkey you entered is incorrect. Please try again.',
+        variant: 'destructive',
+      })
       return
     }
-    if (passkey !== REGISTRATION_PASSWORD) {
-      showToast(
-        'Invalid Password',
-        'The password you entered is incorrect. Please try again.',
-        'destructive',
-      )
+    if (!paymentVerified) {
+      showToast({
+        title: 'Payment Not Verified',
+        description: 'Please verify the payment ID before registering',
+        variant: 'destructive',
+      })
+      setShowPasskeyModal(false)
+      scrollToSection('financial')
       return
     }
 
@@ -688,9 +939,12 @@ export function RegisterBusinessPage() {
           })
           .join(', ') || ''
 
-      const isWebsiteIncluded = ['yes', '1', 'true', '✓'].includes(
-        formData.websiteRequired.toLowerCase(),
-      )
+      const isWebsiteIncluded = [
+        'yes',
+        '1',
+        'true',
+        '✓',
+      ].includes(formData.websiteRequired.toLowerCase())
         ? 'yes'
         : 'no'
       const gstinOrAddress =
@@ -698,14 +952,14 @@ export function RegisterBusinessPage() {
           ? formData.gstinForInvoice
           : formData.completeAddress
 
-      const customerData: CustomerRegistrationRequest = {
+      const customerData = {
         clientName: formData.ownerName,
         businessName: formData.businessName,
         clientEmail: formData.email,
         clientNumber: formData.phoneNumber,
         city: formData.city,
         packageNames,
-        serviceMonth: effectiveMonths,
+        serviceMonth: formData.expirationInMonths,
         salesPersonName: formData.salesPersonName,
         amountPaid: formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
@@ -718,183 +972,90 @@ export function RegisterBusinessPage() {
         source: 'root',
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
-        ...(formData.paymentId?.trim()
-          ? { paymentId: formData.paymentId.trim() }
-          : {}),
+        paymentId: formData.paymentId.trim(),
       }
 
       await registerCustomer(customerData)
 
-      showToast(
-        'Registration Successful',
-        'Customer has been registered successfully!',
-        'success',
-      )
-
-      // The customer now exists — upload the picked screenshot and save it.
-      if (screenshotFile) {
-        const customer: RegisteredCustomer = {
-          phone: formData.phoneNumber.trim(),
-          email: formData.email.trim(),
-          businessName: formData.businessName.trim(),
-          ownerName: formData.ownerName.trim(),
-          gstNumber:
-            formData.invoiceOption === 'gstin'
-              ? formData.gstinForInvoice.trim()
-              : '',
-        }
-        const address =
-          formData.invoiceOption === 'address'
-            ? formData.completeAddress.trim()
-            : ''
-        try {
-          await uploadPaymentScreenshot(screenshotFile, customer, address)
-          showToast(
-            'Screenshot Saved',
-            'Payment screenshot uploaded and saved for this customer.',
-            'success',
-          )
-        } catch (uploadError: unknown) {
-          showToast(
-            'Screenshot Not Saved',
-            `Customer is registered, but the screenshot failed: ${apiErrorMessage(
-              uploadError,
-              'upload error',
-            )}. Please try again.`,
-            'destructive',
-          )
-          setRegistered(customer)
-          setBillingAddress(address)
-          setScreenshotUrl('')
-        }
-        setScreenshotFile(null)
-      }
-
+      showToast({
+        title: 'Registration Successful',
+        description: 'Customer has been registered successfully!',
+        variant: 'success',
+      })
       resetForm()
       setIsSubmitting(false)
       setShowPasskeyModal(false)
-    } catch (error: unknown) {
-      showToast(
-        'Registration Failed',
-        error instanceof Error
-          ? error.message
-          : 'Failed to register customer. Please try again.',
-        'destructive',
-      )
+    } catch (error: any) {
+      const errorMessage =
+        error?.message ||
+        'Failed to register customer. Please try again.'
+      showToast({
+        title: 'Registration Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      })
       setIsSubmitting(false)
     }
-  }, [passkey, formData, effectiveMonths, plans, showToast, resetForm, screenshotFile])
-
-  const completedCount = Object.values(sectionStatus).filter(Boolean).length
-  const progressPct = Math.round((completedCount / SECTIONS.length) * 100)
-  const selectedCount = formData.selectedPackages?.length || 0
-
-  /* Total Amount follows the selected plans, and clears when the last priced plan is removed. */
-  const lastAutoTotal = useRef(0)
-  useEffect(() => {
-    if (autoTotal === lastAutoTotal.current) return
-    const hadAutoTotal = lastAutoTotal.current > 0
-    lastAutoTotal.current = autoTotal
-    if (autoTotal <= 0 && !hadAutoTotal) return
-    const value = autoTotal > 0 ? String(autoTotal) : ''
-    setFormData((prev) => {
-      if (prev.paymentType === 'full-time') {
-        return { ...prev, totalAmount: value, amountPaid: value, amountRemaining: '' }
-      }
-      const remaining = autoTotal - (parseInt(prev.amountPaid) || 0)
-      return {
-        ...prev,
-        totalAmount: value,
-        amountRemaining: remaining > 0 ? String(remaining) : '',
-      }
-    })
-  }, [autoTotal])
-
-  const durationOptions = Array.from(
-    new Set(
-      plans.map((p) => priceOf(p.name).months).filter((m) => m > 0),
-    ),
-  ).sort((x, y) => x - y)
-  const chosenDuration =
-    durationFilter === 'all' ||
-    (durationFilter !== null && durationOptions.includes(durationFilter))
-      ? durationFilter
-      : null
-  const activeDuration: number | 'all' =
-    chosenDuration ??
-    (durationOptions.includes(DEFAULT_PLAN_MONTHS)
-      ? DEFAULT_PLAN_MONTHS
-      : 'all')
-  const visiblePlans =
-    activeDuration === 'all'
-      ? plans
-      : plans.filter(
-          (p) =>
-            priceOf(p.name).months === activeDuration ||
-            formData.selectedPackages?.includes(p.id),
-        )
-
-  /* Retry from the popup, used only when the automatic upload after registration failed. */
-  const handleScreenshotRetry = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file || !registered) return
-    setIsUploadingSS(true)
-    try {
-      setScreenshotUrl(
-        await uploadPaymentScreenshot(file, registered, billingAddress),
-      )
-      showToast(
-        'Upload & Save Successful',
-        'Payment screenshot uploaded and details saved.',
-        'success',
-      )
-    } catch (error: unknown) {
-      showToast(
-        'Upload Failed',
-        apiErrorMessage(error, 'Failed to upload screenshot.'),
-        'destructive',
-      )
-    } finally {
-      setIsUploadingSS(false)
-    }
-  }
+  }, [
+    passkey,
+    formData,
+    plans,
+    showToast,
+    resetForm,
+    paymentVerified,
+    scrollToSection,
+  ])
 
   const inputClass = (hasError?: boolean) =>
-    `h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900 outline-none transition focus:ring-2 ${
-      hasError
-        ? 'border-red-500 ring-1 ring-red-200 focus:ring-red-100'
-        : 'border-slate-200 focus:border-blue-400 focus:ring-blue-100'
+    `h-9 w-full rounded-md border bg-white px-3 py-1 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+      hasError ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 hover:border-slate-300'
     }`
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ─── Sticky header: back, brand, progress ─── */}
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      {/* ─── Sticky header: back, title, progress ─── */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto grid h-14 max-w-4xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setLoginOpen(true)}
-            className="inline-flex items-center gap-1.5 justify-self-start py-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-blue-700"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <div className="flex min-w-0 items-center gap-2">
-            <img
-              src="/mbg-card-logo.svg"
-              alt="MBG logo"
-              className="h-7 w-7 flex-shrink-0 rounded-lg"
-            />
-            <h1 className="truncate font-bold text-slate-900">
-              Register Your Business
-            </h1>
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  window.history.back()
+                } else {
+                  navigate({ to: '/login' as never })
+                }
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+            <div className="flex min-w-0 items-center gap-2">
+              <img
+                src="https://www.mbgcard.in/mbg_logo.png"
+                alt="MBG logo"
+                className="h-7 w-7 flex-shrink-0 rounded-lg"
+              />
+              <h1 className="truncate font-bold text-slate-900">
+                Register Your Business
+              </h1>
+            </div>
           </div>
-          <span className="justify-self-end text-xs font-semibold tabular-nums text-slate-500">
-            {completedCount}/{SECTIONS.length} done
-          </span>
+
+          <div className="flex shrink-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => navigate({ to: '/login' as never })}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-5 py-2 text-white hover:bg-white hover:text-black hover:border-1 duration-250"
+            > 
+              Login
+            </button>
+            <span className="whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500">
+              {completedCount}/{SECTIONS.length} done
+            </span>
+          </div>
         </div>
         <div className="h-0.5 bg-slate-100">
           <div
@@ -937,7 +1098,9 @@ export function RegisterBusinessPage() {
               label="Email"
               htmlFor="email"
               required
-              error={shouldShowError('email') ? validationErrors.email : ''}
+              error={
+                shouldShowError('email') ? validationErrors.email : ''
+              }
             >
               <input
                 id="email"
@@ -1002,15 +1165,14 @@ export function RegisterBusinessPage() {
                 {showCityDropdown && filteredCities.length > 0 && (
                   <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
                     {filteredCities.slice(0, 10).map((city) => (
-                      <button
+                      <div
                         key={city}
-                        type="button"
                         onClick={() => handleCitySelect(city)}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-blue-50"
+                        className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-blue-50"
                       >
                         <MapPin className="h-3.5 w-3.5 text-slate-400" />
                         {city}
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1025,11 +1187,10 @@ export function RegisterBusinessPage() {
                   <ChoiceCard
                     key={city}
                     id={`onboarding-city-${city}`}
-                    name="onboardingCity"
                     value={city}
-                    checked={formData.onboardingCity === city}
+                    selected={formData.onboardingCity === city}
                     label={city}
-                    onChange={() => handleInputChange('onboardingCity', city)}
+                    onSelect={(val) => handleInputChange('onboardingCity', val)}
                   />
                 ))}
               </div>
@@ -1041,19 +1202,17 @@ export function RegisterBusinessPage() {
               <div className="grid grid-cols-2 gap-2">
                 <ChoiceCard
                   id="website-yes"
-                  name="websiteRequired"
                   value="yes"
-                  checked={formData.websiteRequired === 'yes'}
+                  selected={formData.websiteRequired === 'yes'}
                   label="Yes"
-                  onChange={() => handleInputChange('websiteRequired', 'yes')}
+                  onSelect={(val) => handleInputChange('websiteRequired', val)}
                 />
                 <ChoiceCard
                   id="website-no"
-                  name="websiteRequired"
                   value="no"
-                  checked={formData.websiteRequired === 'no'}
+                  selected={formData.websiteRequired === 'no'}
                   label="No"
-                  onChange={() => handleInputChange('websiteRequired', 'no')}
+                  onSelect={(val) => handleInputChange('websiteRequired', val)}
                 />
               </div>
             </div>
@@ -1064,21 +1223,21 @@ export function RegisterBusinessPage() {
               <div className="grid grid-cols-2 gap-2">
                 <ChoiceCard
                   id="webinar-yes"
-                  name="isWebinarClient"
                   value="yes"
-                  checked={formData.isWebinarClient.toLowerCase() === 'yes'}
+                  selected={formData.isWebinarClient.toLowerCase() === 'yes'}
                   label="Yes"
-                  onChange={() =>
-                    handleInputChange('isWebinarClient', 'YES')
+                  onSelect={(val) =>
+                    handleInputChange('isWebinarClient', val.toUpperCase())
                   }
                 />
                 <ChoiceCard
                   id="webinar-no"
-                  name="isWebinarClient"
                   value="no"
-                  checked={formData.isWebinarClient.toLowerCase() === 'no'}
+                  selected={formData.isWebinarClient.toLowerCase() === 'no'}
                   label="No"
-                  onChange={() => handleInputChange('isWebinarClient', 'NO')}
+                  onSelect={(val) =>
+                    handleInputChange('isWebinarClient', val.toUpperCase())
+                  }
                 />
               </div>
             </div>
@@ -1094,19 +1253,21 @@ export function RegisterBusinessPage() {
                   onChange={(e) => handleInputChange('remark', e.target.value)}
                   placeholder="Any additional information"
                   rows={2}
-                  className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </Field>
             </div>
           </div>
         </Section>
 
-        {/* ═══ 2 — Packages ═══ */}
+        {/* ═══ 2 — Select Packages & Verify Payment ═══ */}
         <Section
           innerRef={packagesRef}
           index={2}
           title="Select Packages"
           complete={packagesComplete}
+          locked={!businessComplete}
+          lockedMessage="Please complete Business Details in Step 1 first."
           aside={
             selectedCount > 0 ? (
               <span className="text-xs font-semibold text-blue-600">
@@ -1115,7 +1276,125 @@ export function RegisterBusinessPage() {
             ) : null
           }
         >
-          {isLoadingPlans && plans.length === 0 ? (
+          {/* Note: First verify payment, then select package */}
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200/80 bg-blue-50/90 p-3.5 text-xs text-blue-900 shadow-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
+            <div className="space-y-0.5">
+              <p className="font-bold text-blue-950">
+                Note: Firstly verify payment, then select package
+              </p>
+              <p className="leading-relaxed text-blue-700">
+                Please enter and verify the customer's payment ID first. Once
+                verified, you will be able to select packages within your
+                verified payment amount.
+              </p>
+            </div>
+          </div>
+
+          {/* Payment Verification Box */}
+          <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+            <Field
+              label="Payment ID"
+              htmlFor="paymentId"
+              required
+              error={paymentError}
+              hint={
+                !canEnterPaymentId
+                  ? 'A valid 10-digit phone number in Step 1 is required to verify payment'
+                  : paymentVerified
+                    ? undefined
+                    : isVerifyingPayment
+                      ? 'Verifying payment with payment gateway…'
+                      : `Enter payment ID (e.g. pay_…) for phone number ${paymentPhone}`
+              }
+            >
+              <div className="flex gap-2">
+                <input
+                  id="paymentId"
+                  value={formData.paymentId}
+                  disabled={!canEnterPaymentId || isVerifyingPayment}
+                  onChange={(e) =>
+                    handleInputChange(
+                      'paymentId',
+                      e.target.value.replace(/\s/g, ''),
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void handleVerifyPayment()
+                    }
+                  }}
+                  placeholder={
+                    canEnterPaymentId
+                      ? 'Enter payment ID (e.g. pay_...)'
+                      : 'Enter phone number in Step 1 first'
+                  }
+                  className={`${inputClass(!!paymentError)} flex-1 ${
+                    !canEnterPaymentId ? 'cursor-not-allowed bg-slate-100' : ''
+                  } ${paymentVerified ? 'border-emerald-400 bg-emerald-50/40' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleVerifyPayment()}
+                  disabled={
+                    !canEnterPaymentId ||
+                    !paymentIdInput ||
+                    isVerifyingPayment ||
+                    paymentVerified
+                  }
+                  className={`h-9 shrink-0 rounded-md px-4 text-sm font-semibold transition-colors ${
+                    paymentVerified
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-600 disabled:opacity-100'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  }`}
+                >
+                  {paymentVerified ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Check className="h-4 w-4" />
+                      Verified
+                    </span>
+                  ) : isVerifyingPayment ? (
+                    'Verifying…'
+                  ) : (
+                    'Verify Payment'
+                  )}
+                </button>
+              </div>
+              {paymentVerified && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                  <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+                  <span>
+                    Payment Verified:{' '}
+                    <strong>
+                      ₹{verifiedPaymentAmount?.toLocaleString('en-IN')}
+                    </strong>{' '}
+                    paid
+                    {paidOn &&
+                      !isNaN(paidOn.getTime()) &&
+                      ` on ${paidOn.toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}`}
+                  </span>
+                </div>
+              )}
+            </Field>
+          </div>
+
+          {!paymentVerified ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center text-sm text-slate-500">
+              <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
+              <p className="font-semibold text-slate-700">
+                Packages are locked
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Please enter and verify the Payment ID above to view and select
+                available packages.
+              </p>
+            </div>
+          ) : isLoadingPlans && plans.length === 0 ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[0, 1, 2, 3].map((i) => (
                 <div
@@ -1131,6 +1410,18 @@ export function RegisterBusinessPage() {
             </div>
           ) : (
             <>
+              {verifiedPaymentAmount != null && (
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+                    Verified Payment:{' '}
+                    <strong>
+                      ₹{verifiedPaymentAmount.toLocaleString('en-IN')}
+                    </strong>
+                    . Only packages within this amount can be selected.
+                  </span>
+                </div>
+              )}
               {durationOptions.length > 0 && (
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-xs font-medium text-slate-500">
@@ -1157,31 +1448,61 @@ export function RegisterBusinessPage() {
                     pkg.id,
                   )
                   const price = priceOf(pkg.name)
-                  const expanded = expandedPlans.has(pkg.id)
+                  const pkgCost = includeGst ? price.withGst : price.amount
+                  const isExceedingPayment =
+                    verifiedPaymentAmount != null &&
+                    pkgCost > verifiedPaymentAmount
                   return (
                     <div
                       key={pkg.id}
-                      onClick={() => handlePackageToggle(pkg.id)}
-                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all ${
-                        isSelected
-                          ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500'
-                          : 'border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
+                      onClick={() => {
+                        if (isExceedingPayment) {
+                          showToast({
+                            title: 'Package Exceeds Verified Amount',
+                            description: `${pkg.name} price (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+                            variant: 'destructive',
+                          })
+                          return
+                        }
+                        handlePackageToggle(pkg.id)
+                      }}
+                      className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
+                        isExceedingPayment
+                          ? 'cursor-not-allowed border-slate-200 bg-slate-100/70 opacity-60'
+                          : isSelected
+                            ? 'cursor-pointer border-blue-500 bg-blue-50/50 ring-1 ring-blue-500'
+                            : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) =>
-                          handlePackageToggle(pkg.id, e.target.checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 cursor-pointer accent-blue-600"
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isSelected}
+                        disabled={isExceedingPayment}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePackageToggle(pkg.id)
+                        }}
+                        className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-slate-300 bg-white hover:border-blue-400'
+                        }`}
                         aria-label={`Select ${pkg.name}`}
-                      />
+                      >
+                        {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                      </button>
                       <div className="min-w-0 flex-1">
-                        <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
-                          {pkg.name}
-                        </h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
+                            {pkg.name}
+                          </h3>
+                          {isExceedingPayment && (
+                            <span className="flex-shrink-0 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                              Exceeds payment
+                            </span>
+                          )}
+                        </div>
                         {(price.hasPrice || price.months > 0) && (
                           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
                             {price.hasPrice && (
@@ -1189,8 +1510,7 @@ export function RegisterBusinessPage() {
                                 <span className="text-sm font-bold text-emerald-600">
                                   ₹{price.amount.toLocaleString('en-IN')}
                                 </span>{' '}
-                                +18% = ₹
-                                {price.withGst.toLocaleString('en-IN')}
+                                +18% = ₹{price.withGst.toLocaleString('en-IN')}
                               </span>
                             )}
                             {price.months > 0 && (
@@ -1202,10 +1522,7 @@ export function RegisterBusinessPage() {
                         )}
                         {(pkg.departments?.length || 0) > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {(expanded
-                              ? pkg.departments
-                              : pkg.departments.slice(0, 4)
-                            ).map((dept) => {
+                            {pkg.departments.map((dept) => {
                               const label = departmentLabel(dept)
                               return (
                                 <span
@@ -1213,27 +1530,32 @@ export function RegisterBusinessPage() {
                                   className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700"
                                 >
                                   <span
-                                    className={`h-1.5 w-1.5 rounded-full ${departmentDot(
-                                      label,
-                                    )}`}
+                                    className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
                                   />
                                   {label}
                                 </span>
                               )
                             })}
-                            {pkg.departments.length > 4 && (
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleToggleDepartments(pkg.id, e)
-                                }
-                                className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-blue-600 hover:border-blue-300"
-                              >
-                                {expanded
-                                  ? 'Show less'
-                                  : `+${pkg.departments.length - 4} more`}
-                              </button>
-                            )}
+                          </div>
+                        )}
+                        {price.featureList && price.featureList.length > 0 && (
+                          <div
+                            className="mt-2.5 border-t border-slate-200/60 pt-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingFeaturesPlan({
+                                  name: pkg.name,
+                                  features: price.featureList,
+                                })
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-100"
+                            >
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Features ({price.featureList.length})</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1251,6 +1573,8 @@ export function RegisterBusinessPage() {
           index={3}
           title="Financial Information"
           complete={financialComplete}
+          locked={!packagesComplete}
+          lockedMessage="Please verify payment and select your package in Step 2 first."
         >
           <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">
@@ -1261,32 +1585,13 @@ export function RegisterBusinessPage() {
                 >
                   Service Months <span className="text-red-500">*</span>
                 </label>
-                {autoMonths > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (customMonths) {
-                        setCustomMonths(false)
-                      } else {
-                        handleInputChange(
-                          'expirationInMonths',
-                          String(autoMonths),
-                        )
-                        setCustomMonths(true)
-                      }
-                    }}
-                    className="text-[11px] font-semibold text-blue-600 hover:underline"
-                  >
-                    {customMonths ? 'Use plan duration' : 'Custom'}
-                  </button>
-                )}
               </div>
               <input
                 id="expirationInMonths"
                 type="number"
                 min="1"
                 max="60"
-                value={effectiveMonths}
+                value={formData.expirationInMonths}
                 disabled={monthsLocked}
                 onChange={(e) =>
                   handleInputChange('expirationInMonths', e.target.value)
@@ -1301,25 +1606,46 @@ export function RegisterBusinessPage() {
                   ? selectedPlans.length > 1
                     ? 'Longest duration among the selected plans'
                     : "From the selected plan's duration"
-                  : customMonths && autoMonths > 0
-                    ? `Custom duration (plan duration is ${monthsLabel(
-                        autoMonths,
-                      )})`
-                    : 'Fills automatically when the selected plan has a duration'}
+                  : 'Fills automatically when the selected plan has a duration'}
               </p>
             </div>
-            <Field
-              label="Total Amount (₹)"
-              htmlFor="totalAmount"
-              required
-              hint={
-                totalLocked
-                  ? 'Auto-calculated from the selected plans (incl. 18% GST)'
-                  : hasUnpricedSelection && selectedPlans.length > 0
-                    ? 'A selected plan has no price set — enter the total'
-                    : undefined
-              }
-            >
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <label
+                  htmlFor="totalAmount"
+                  className="text-xs font-medium text-slate-600"
+                >
+                  Total Amount (₹) <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 transition-colors hover:bg-slate-200/70">
+                  <span className="cursor-pointer select-none text-[11px] font-medium text-slate-600">
+                    18% GST
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={includeGst}
+                    onClick={() => setIncludeGst(!includeGst)}
+                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      includeGst ? 'bg-blue-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        includeGst ? 'translate-x-3' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  <span
+                    className={`select-none text-[10px] font-bold ${
+                      includeGst ? 'text-emerald-600' : 'text-slate-400'
+                    }`}
+                  >
+                    {includeGst ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+              </div>
               <input
                 id="totalAmount"
                 type="number"
@@ -1340,15 +1666,14 @@ export function RegisterBusinessPage() {
                       'amountRemaining',
                       remaining > 0 ? remaining.toString() : '',
                     )
-                    if (formData.paymentType === 'full-time') {
+                    if (formData.paymentType === 'full-time')
                       handleInputChange('amountPaid', value)
-                    }
                   } else if (value.length > 12) {
-                    showToast(
-                      'Amount Limit Exceeded',
-                      'Total amount cannot exceed 12 digits',
-                      'destructive',
-                    )
+                    showToast({
+                      title: 'Amount Limit Exceeded',
+                      description: 'Total amount cannot exceed 12 digits',
+                      variant: 'destructive',
+                    })
                   }
                 }}
                 placeholder={
@@ -1360,7 +1685,17 @@ export function RegisterBusinessPage() {
                   totalLocked ? 'cursor-not-allowed bg-slate-100' : ''
                 }`}
               />
-            </Field>
+              <p className="text-[11px] text-slate-400">
+                {totalLocked
+                  ? includeGst
+                    ? 'Auto-calculated from the selected plans (incl. 18% GST)'
+                    : 'Auto-calculated from the selected plans (excl. GST)'
+                  : hasUnpricedSelection && selectedPlans.length > 0
+                    ? 'A selected plan has no price set — enter the total'
+                    : undefined}
+              </p>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-600">
                 Payment Type <span className="text-red-500">*</span>
@@ -1368,74 +1703,87 @@ export function RegisterBusinessPage() {
               <div className="grid grid-cols-2 gap-2">
                 <ChoiceCard
                   id="payment-full"
-                  name="paymentType"
                   value="full-time"
-                  checked={formData.paymentType === 'full-time'}
+                  selected={formData.paymentType === 'full-time'}
                   label="Full Time"
-                  onChange={() => {
-                    handleInputChange('paymentType', 'full-time')
-                    handleInputChange(
-                      'amountPaid',
-                      formData.totalAmount || '',
-                    )
+                  onSelect={(value) => {
+                    handleInputChange('paymentType', value)
+                    handleInputChange('amountPaid', formData.totalAmount || '')
                     handleInputChange('amountRemaining', '')
                     handleInputChange('remainingAmountDueDate', '')
                   }}
                 />
                 <ChoiceCard
                   id="payment-part"
-                  name="paymentType"
                   value="part-time"
-                  checked={formData.paymentType === 'part-time'}
+                  selected={formData.paymentType === 'part-time'}
                   label="Part Time"
-                  onChange={() => {
-                    handleInputChange('paymentType', 'part-time')
+                  onSelect={(value) => {
+                    handleInputChange('paymentType', value)
                     handleInputChange('amountPaid', '')
                   }}
                 />
               </div>
             </div>
-            <Field
-              label="Amount Paid (₹)"
-              htmlFor="amountPaid"
-              required
-              hint={
-                formData.paymentType === 'full-time'
-                  ? 'Same as total for full payment'
-                  : undefined
-              }
-            >
-              <input
-                id="amountPaid"
-                type="number"
-                min="0"
-                value={
-                  formData.paymentType === 'full-time'
-                    ? formData.totalAmount || ''
-                    : formData.amountPaid
-                }
-                disabled={formData.paymentType === 'full-time'}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (value === '' || /^\d+$/.test(value)) {
-                    handleInputChange('amountPaid', value)
-                    const total = parseInt(formData.totalAmount) || 0
-                    const paid = parseInt(value) || 0
-                    const remaining = total - paid
-                    handleInputChange(
-                      'amountRemaining',
-                      remaining > 0 ? remaining.toString() : '',
-                    )
+
+            {(() => {
+              const paidNum = parseInt(formData.amountPaid) || 0
+              const remainingNum =
+                (parseInt(formData.totalAmount) || 0) - paidNum
+              const isPartTimeInvalid =
+                formData.paymentType === 'part-time' &&
+                paidNum > 0 &&
+                remainingNum >= 0 &&
+                paidNum > remainingNum
+              return (
+                <Field
+                  label="Amount Paid (₹)"
+                  htmlFor="amountPaid"
+                  required
+                  error={
+                    isPartTimeInvalid
+                      ? `Amount Paid (₹${paidNum.toLocaleString('en-IN')}) must be ≤ Amount Remaining (₹${remainingNum.toLocaleString('en-IN')})`
+                      : undefined
                   }
-                }}
-                placeholder="Enter paid amount"
-                className={`${inputClass()} ${
-                  formData.paymentType === 'full-time'
-                    ? 'cursor-not-allowed bg-slate-100'
-                    : ''
-                }`}
-              />
-            </Field>
+                  hint={
+                    formData.paymentType === 'full-time'
+                      ? 'Same as total for full payment'
+                      : undefined
+                  }
+                >
+                  <input
+                    id="amountPaid"
+                    type="number"
+                    min="0"
+                    value={
+                      formData.paymentType === 'full-time'
+                        ? formData.totalAmount || ''
+                        : formData.amountPaid
+                    }
+                    disabled={formData.paymentType === 'full-time'}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === '' || /^\d+$/.test(value)) {
+                        handleInputChange('amountPaid', value)
+                        const total = parseInt(formData.totalAmount) || 0
+                        const paid = parseInt(value) || 0
+                        const remaining = total - paid
+                        handleInputChange(
+                          'amountRemaining',
+                          remaining > 0 ? remaining.toString() : '',
+                        )
+                      }
+                    }}
+                    placeholder="Enter paid amount"
+                    className={`${inputClass(isPartTimeInvalid)} ${
+                      formData.paymentType === 'full-time'
+                        ? 'cursor-not-allowed bg-slate-100'
+                        : ''
+                    }`}
+                  />
+                </Field>
+              )
+            })()}
 
             {formData.paymentType === 'part-time' && (
               <>
@@ -1463,64 +1811,13 @@ export function RegisterBusinessPage() {
                     type="date"
                     value={formData.remainingAmountDueDate}
                     onChange={(e) =>
-                      handleInputChange(
-                        'remainingAmountDueDate',
-                        e.target.value,
-                      )
+                      handleInputChange('remainingAmountDueDate', e.target.value)
                     }
                     className={`${inputClass()} w-full`}
                   />
                 </Field>
               </>
             )}
-
-            <div className="sm:col-span-2 lg:col-span-3">
-              <Field
-                label="Payment Screenshot"
-                htmlFor="paymentScreenshot"
-                required
-                hint={
-                  screenshotFile
-                    ? undefined
-                    : 'Image of the payment confirmation. It is uploaded and saved once the customer is registered.'
-                }
-              >
-                {screenshotFile ? (
-                  <div className="flex h-9 items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-sm">
-                    <span className="truncate font-medium text-emerald-800">
-                      {screenshotFile.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setScreenshotFile(null)}
-                      className="flex-shrink-0 text-xs font-semibold text-slate-500 hover:text-red-600"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    id="paymentScreenshot"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null
-                      e.target.value = ''
-                      if (file && file.size > MAX_SCREENSHOT_BYTES) {
-                        showToast(
-                          'File Too Large',
-                          'Payment screenshot must be 5 MB or smaller.',
-                          'destructive',
-                        )
-                        return
-                      }
-                      setScreenshotFile(file)
-                    }}
-                    className={`${inputClass()} cursor-pointer`}
-                  />
-                )}
-              </Field>
-            </div>
 
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-3">
               <div className="space-y-1">
@@ -1530,23 +1827,21 @@ export function RegisterBusinessPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <ChoiceCard
                     id="invoice-gstin"
-                    name="invoiceOption"
                     value="gstin"
-                    checked={formData.invoiceOption === 'gstin'}
+                    selected={formData.invoiceOption === 'gstin'}
                     label="GSTIN"
-                    onChange={() => {
-                      handleInputChange('invoiceOption', 'gstin')
+                    onSelect={(value) => {
+                      handleInputChange('invoiceOption', value)
                       handleInputChange('completeAddress', '')
                     }}
                   />
                   <ChoiceCard
                     id="invoice-address"
-                    name="invoiceOption"
                     value="address"
-                    checked={formData.invoiceOption === 'address'}
+                    selected={formData.invoiceOption === 'address'}
                     label="Address"
-                    onChange={() => {
-                      handleInputChange('invoiceOption', 'address')
+                    onSelect={(value) => {
+                      handleInputChange('invoiceOption', value)
                       handleInputChange('gstinForInvoice', '')
                     }}
                   />
@@ -1560,7 +1855,9 @@ export function RegisterBusinessPage() {
                     required
                     hint="15 characters, uppercase"
                     error={
-                      shouldShowError('gstin') ? validationErrors.gstin : ''
+                      shouldShowError('gstin')
+                        ? validationErrors.gstin
+                        : ''
                     }
                   >
                     <input
@@ -1591,7 +1888,7 @@ export function RegisterBusinessPage() {
                       }
                       placeholder="Enter complete billing address"
                       rows={2}
-                      className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </Field>
                 )}
@@ -1606,9 +1903,15 @@ export function RegisterBusinessPage() {
           index={4}
           title="Final Details"
           complete={finalComplete}
+          locked={!financialComplete}
+          lockedMessage="Please complete Financial Information in Step 3 first."
         >
           <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-            <Field label="Sales Person Name" htmlFor="salesPersonName" required>
+            <Field
+              label="Sales Person Name"
+              htmlFor="salesPersonName"
+              required
+            >
               <input
                 id="salesPersonName"
                 value={formData.salesPersonName}
@@ -1628,31 +1931,23 @@ export function RegisterBusinessPage() {
                 className={inputClass()}
               />
             </Field>
-            <Field label="WhatsApp Group Link (optional)" htmlFor="groupLink">
+            <Field
+              label="WhatsApp Group Link (optional)"
+              htmlFor="groupLink"
+            >
               <input
                 id="groupLink"
                 type="url"
                 value={formData.groupLink}
-                onChange={(e) =>
-                  handleInputChange('groupLink', e.target.value)
-                }
+                onChange={(e) => handleInputChange('groupLink', e.target.value)}
                 placeholder="https://chat.whatsapp.com/…"
-                className={inputClass()}
-              />
-            </Field>
-            <Field label="Payment Id (optional)" htmlFor="paymentId">
-              <input
-                id="paymentId"
-                value={formData.paymentId}
-                onChange={(e) => handleInputChange('paymentId', e.target.value)}
-                placeholder="Enter payment id"
                 className={inputClass()}
               />
             </Field>
           </div>
         </Section>
 
-        {/* ─── Submit ─── */}
+        {/* ─── Submit button ─── */}
         <div className="pb-6">
           <button
             type="button"
@@ -1662,98 +1957,12 @@ export function RegisterBusinessPage() {
             Complete Registration
           </button>
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            By registering, you agree to our Terms of Service and Privacy
-            Policy.
+            By registering, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
       </div>
 
-      {/* ─── Payment screenshot step (after a successful registration) ─── */}
-      {registered && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                <Check className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-base font-bold text-slate-900">
-                  Customer registered
-                </h3>
-                <p className="truncate text-xs text-slate-500">
-                  {registered.businessName} · {registered.phone}
-                </p>
-              </div>
-            </div>
-
-            <Field
-              label="Billing Address (optional)"
-              htmlFor="ssBillingAddress"
-            >
-              <textarea
-                id="ssBillingAddress"
-                value={billingAddress}
-                onChange={(e) => setBillingAddress(e.target.value)}
-                placeholder="Enter billing address"
-                rows={2}
-                disabled={isUploadingSS || !!screenshotUrl}
-                className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-              />
-            </Field>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
-                Payment Screenshot
-              </label>
-              {screenshotUrl ? (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
-                  <span className="font-medium text-emerald-700">
-                    Screenshot uploaded
-                  </span>
-                  <a
-                    href={screenshotUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:underline"
-                  >
-                    View
-                  </a>
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleScreenshotRetry}
-                    disabled={isUploadingSS}
-                    className="h-10 w-full cursor-pointer rounded-md border border-slate-200 bg-white px-3 text-sm"
-                  />
-                  <p className="text-[11px] text-slate-500">
-                    {isUploadingSS
-                      ? 'Uploading…'
-                      : 'The earlier upload failed. Choose the payment confirmation image again.'}
-                  </p>
-                </>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setRegistered(null)}
-              disabled={isUploadingSS}
-              className={`w-full rounded-xl py-2.5 font-semibold transition-colors ${
-                screenshotUrl
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300'
-              }`}
-            >
-              {screenshotUrl ? 'Done' : 'Skip for now'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Password (passkey) modal ─── */}
+      {/* ─── Passkey modal ─── */}
       {showPasskeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
@@ -1763,7 +1972,7 @@ export function RegisterBusinessPage() {
               </span>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Enter Password
+                  Enter Passkey
                 </h3>
                 <p className="text-xs text-slate-500">
                   Required to complete the registration.
@@ -1775,12 +1984,10 @@ export function RegisterBusinessPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={passkey}
                 onChange={(e) => setPasskey(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && handlePasskeySubmit()
-                }
-                placeholder="Enter registration password"
+                onKeyDown={(e) => e.key === 'Enter' && handlePasskeySubmit()}
+                placeholder="Enter passkey"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
-                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
               <button
                 type="button"
@@ -1802,16 +2009,16 @@ export function RegisterBusinessPage() {
                   setShowPasskeyModal(false)
                   setPasskey('')
                 }}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 disabled={isSubmitting}
-                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 font-semibold text-slate-700 transition-colors hover:border-blue-300"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handlePasskeySubmit}
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                 disabled={isSubmitting || !passkey.trim()}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Registering...' : 'Register'}
               </button>
@@ -1820,25 +2027,79 @@ export function RegisterBusinessPage() {
         </div>
       )}
 
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+      {/* ─── Features Modal ─── */}
+      {viewingFeaturesPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center gap-2.5 border-b border-slate-100 p-5 pb-3">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                <Check className="h-4 w-4 stroke-[2.5]" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-bold text-slate-900">
+                  {viewingFeaturesPlan.name}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Included Features ({viewingFeaturesPlan.features.length})
+                </p>
+              </div>
+            </div>
 
-      {/* ─── Toast ─── */}
+            <div className="max-h-[60vh] flex-1 space-y-2 overflow-y-auto p-5">
+              {viewingFeaturesPlan.features.map((feature, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2.5 rounded-lg border border-slate-200/80 bg-slate-50/60 p-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-100/60"
+                >
+                  <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <Check className="h-2.5 w-2.5 stroke-[3]" />
+                  </span>
+                  <span className="break-words font-medium leading-relaxed">
+                    {feature}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-3">
+              <button
+                type="button"
+                onClick={() => setViewingFeaturesPlan(null)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Toast notification ─── */}
       {toast && (
         <div
           role="status"
           aria-live="polite"
-          className={`fixed right-4 top-4 z-[60] max-w-sm rounded-xl border px-4 py-3 shadow-lg ${
+          className={`fixed right-4 top-4 z-[60] max-w-sm rounded-xl border px-4 py-3 shadow-lg transition-all ${
             toast.variant === 'destructive'
-              ? 'border-red-200 bg-red-50 text-red-800'
+              ? 'border-red-200 bg-red-50 text-red-900'
               : toast.variant === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-slate-200 bg-white text-slate-800'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : 'border-slate-200 bg-white text-slate-900'
           }`}
         >
-          <p className="text-sm font-semibold">{toast.title}</p>
-          {toast.description && (
-            <p className="mt-0.5 text-xs opacity-80">{toast.description}</p>
-          )}
+          <div className="flex items-start gap-2.5">
+            {toast.variant === 'destructive' ? (
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+            ) : toast.variant === 'success' ? (
+              <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold">{toast.title}</p>
+              {toast.description && (
+                <p className="mt-0.5 text-xs opacity-90">{toast.description}</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1846,7 +2107,7 @@ export function RegisterBusinessPage() {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Presentational helpers — no state, no side effects.
+   Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
 
 function FilterChip({
@@ -1880,6 +2141,8 @@ function Section({
   title,
   complete,
   aside,
+  locked,
+  lockedMessage,
   children,
 }: {
   innerRef: React.RefObject<HTMLDivElement | null>
@@ -1887,12 +2150,16 @@ function Section({
   title: string
   complete: boolean
   aside?: React.ReactNode
+  locked?: boolean
+  lockedMessage?: string
   children: React.ReactNode
 }) {
   return (
     <section
       ref={innerRef}
-      className="scroll-mt-20 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      className={`scroll-mt-20 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all sm:p-5 ${
+        locked ? 'border-slate-200/70 bg-slate-50/60' : ''
+      }`}
     >
       <div className="mb-3.5 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -1900,16 +2167,42 @@ function Section({
             className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${
               complete
                 ? 'bg-emerald-500 text-white'
-                : 'bg-slate-100 text-slate-500'
+                : locked
+                  ? 'bg-slate-200 text-slate-400'
+                  : 'bg-blue-600 text-white'
             }`}
           >
             {complete ? <Check className="h-3.5 w-3.5" /> : index}
           </span>
-          <h2 className="truncate text-sm font-bold text-slate-900">{title}</h2>
+          <h2
+            className={`truncate text-sm font-bold ${
+              locked ? 'text-slate-400' : 'text-slate-900'
+            }`}
+          >
+            {title}
+          </h2>
+          {locked && (
+            <span className="flex select-none items-center gap-1 rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+              <Lock className="h-3 w-3 text-slate-400" /> Locked
+            </span>
+          )}
         </div>
         {aside}
       </div>
-      {children}
+      {locked ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500">
+          <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
+          <p className="font-semibold text-slate-700">
+            {lockedMessage || 'Please complete the previous step first.'}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            This section will unlock automatically once previous step details
+            are filled.
+          </p>
+        </div>
+      ) : (
+        children
+      )}
     </section>
   )
 }
@@ -1952,36 +2245,35 @@ function Field({
 
 function ChoiceCard({
   id,
-  name,
   value,
-  checked,
+  selected,
   label,
-  onChange,
+  onSelect,
 }: {
   id: string
-  name: string
   value: string
-  checked: boolean
+  selected: boolean
   label: string
-  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void
+  onSelect: (val: string) => void
 }) {
   return (
     <label
       htmlFor={id}
+      onClick={() => onSelect(value)}
       className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 transition-colors ${
-        checked
+        selected
           ? 'border-blue-500 bg-blue-50 text-blue-900'
           : 'border-slate-200 text-slate-700 hover:border-blue-300'
       }`}
     >
       <input
-        id={id}
         type="radio"
-        name={name}
+        id={id}
+        name={id}
         value={value}
-        checked={checked}
-        onChange={onChange}
-        className="h-4 w-4 flex-shrink-0 accent-blue-600"
+        checked={selected}
+        onChange={() => onSelect(value)}
+        className="h-4 w-4 accent-blue-600"
       />
       <span className="truncate text-sm font-medium">{label}</span>
     </label>

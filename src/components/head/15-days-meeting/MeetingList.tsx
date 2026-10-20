@@ -5,6 +5,9 @@ import { Pill } from '../../ui/Pill'
 import { Icon } from '../shared/Icon'
 import { IconButton } from '../shared/IconButton'
 import type { IconName } from '../shared/iconPaths'
+import { getSession } from '../../../app/auth/session'
+import { useDepartmentColumnPermissions } from '../../../features/permissions/hooks/useDepartmentColumnPermissions'
+import { isUserGoogle, resolveDeptFromPath } from '../../../features/departments/head/utils/routeUtils'
 import './MeetingList.css'
 
 const tbodyVariants: Variants = {
@@ -45,6 +48,7 @@ export interface Meeting {
 }
 
 export interface MeetingListProps {
+  departmentType?: string
   meetings: Meeting[]
   statusFilter: 'all' | 'done' | 'not-done'
   searchQuery: string
@@ -60,6 +64,7 @@ export interface MeetingListProps {
  * Columns: CREATED | CUSTOMER | DEPARTMENT | MEETING DATE | ACTIONS
  */
 export function MeetingList({
+  departmentType,
   meetings,
   statusFilter,
   searchQuery,
@@ -69,6 +74,19 @@ export function MeetingList({
   onMessageClick,
   onHistoryClick,
 }: MeetingListProps) {
+  const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const isGoogle = isUserGoogle(departmentType || session?.user?.departmentType || deptFromUrl)
+  const effectiveDept = isGoogle ? 'GOOGLE_DEPARTMENT' : (departmentType || session?.user?.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
+
+  const { isColumnEnabled } = useDepartmentColumnPermissions(effectiveDept)
+
+  const isCreatedVisible = isColumnEnabled('Created', 'meeting')
+  const isCustomerVisible = isColumnEnabled('Customer', 'meeting')
+  const isDepartmentVisible = isColumnEnabled('Department', 'meeting')
+  const isMeetingDateVisible = isColumnEnabled('Meeting Date', 'meeting')
+  const isActionsVisible = isColumnEnabled('Actions', 'meeting')
+
   const filteredMeetings = useMemo(() => {
     let result = meetings
 
@@ -120,11 +138,11 @@ export function MeetingList({
       <table className="meeting-list__table" role="grid">
         <thead>
           <tr>
-            <th className="meeting-list__th meeting-list__th--created" scope="col">CREATED</th>
-            <th className="meeting-list__th meeting-list__th--customer" scope="col">CUSTOMER</th>
-            <th className="meeting-list__th meeting-list__th--department" scope="col">DEPARTMENT</th>
-            <th className="meeting-list__th meeting-list__th--date" scope="col">MEETING DATE</th>
-            <th className="meeting-list__th meeting-list__th--actions" scope="col">ACTIONS</th>
+            {isCreatedVisible && <th className="meeting-list__th meeting-list__th--created" scope="col">CREATED</th>}
+            {isCustomerVisible && <th className="meeting-list__th meeting-list__th--customer" scope="col">CUSTOMER</th>}
+            {isDepartmentVisible && <th className="meeting-list__th meeting-list__th--department" scope="col">DEPARTMENT</th>}
+            {isMeetingDateVisible && <th className="meeting-list__th meeting-list__th--date" scope="col">MEETING DATE</th>}
+            {isActionsVisible && <th className="meeting-list__th meeting-list__th--actions" scope="col">ACTIONS</th>}
           </tr>
         </thead>
         <motion.tbody
@@ -138,75 +156,85 @@ export function MeetingList({
               className="meeting-list__row"
               variants={rowVariants}
             >
-              <td className="meeting-list__td meeting-list__td--created" data-label="Created">
-                <div className="meeting-list__date-row">
-                  <span className="meeting-list__date-label">{formatDate(meeting.createdAt)}</span>
-                  <span className="meeting-list__time-label">{formatTime(meeting.createdAt)}</span>
-                </div>
-              </td>
-              <td className="meeting-list__td meeting-list__td--customer" data-label="Customer">
-                <div className="meeting-list__customer-cell">
-                  <div className="meeting-list__customer-name">{meeting.customer.name}</div>
-                  <div className="meeting-list__customer-company">{meeting.customer.company}</div>
-                  <div className="meeting-list__customer-contact">
-                    {meeting.customer.phone} · {meeting.customer.email}
+              {isCreatedVisible && (
+                <td className="meeting-list__td meeting-list__td--created" data-label="Created">
+                  <div className="meeting-list__date-row">
+                    <span className="meeting-list__date-label">{formatDate(meeting.createdAt)}</span>
+                    <span className="meeting-list__time-label">{formatTime(meeting.createdAt)}</span>
                   </div>
-                </div>
-              </td>
-              <td className="meeting-list__td meeting-list__td--department" data-label="Department">
-                <div className="meeting-list__department-pills">
-                  {meeting.departments.map(dept => (
-                    <DepartmentPill
-                      key={dept.id}
-                      department={dept}
-                      onClick={() => onDepartmentClick(meeting, dept)}
+                </td>
+              )}
+              {isCustomerVisible && (
+                <td className="meeting-list__td meeting-list__td--customer" data-label="Customer">
+                  <div className="meeting-list__customer-cell">
+                    <div className="meeting-list__customer-name">{meeting.customer.name}</div>
+                    <div className="meeting-list__customer-company">{meeting.customer.company}</div>
+                    <div className="meeting-list__customer-contact">
+                      {meeting.customer.phone} · {meeting.customer.email}
+                    </div>
+                  </div>
+                </td>
+              )}
+              {isDepartmentVisible && (
+                <td className="meeting-list__td meeting-list__td--department" data-label="Department">
+                  <div className="meeting-list__department-pills">
+                    {meeting.departments.map(dept => (
+                      <DepartmentPill
+                        key={dept.id}
+                        department={dept}
+                        onClick={() => onDepartmentClick(meeting, dept)}
+                      />
+                    ))}
+                  </div>
+                </td>
+              )}
+              {isMeetingDateVisible && (
+                <td className="meeting-list__td meeting-list__td--date" data-label="Meeting date">
+                  <div className="meeting-list__date-row">
+                    <span className="meeting-list__date-label">{formatDate(meeting.meetingDate)}</span>
+                    <span className="meeting-list__time-label">{formatTime(meeting.meetingDate)}</span>
+                  </div>
+                </td>
+              )}
+              {isActionsVisible && (
+                <td className="meeting-list__td meeting-list__td--actions" data-label="Actions">
+                  <div className="meeting-list__actions">
+                    <Button
+                      variant="primary"
+                      className="meeting-list__done-btn"
+                      onClick={() => onMarkDone(meeting.id)}
+                      disabled={meeting.isDone}
+                    >
+                      <Icon name="check" size={14} strokeWidth={2.5} />
+                      <span>{meeting.isDone ? 'Done' : 'Mark Done'}</span>
+                    </Button>
+                    <IconButton
+                      icon="phone"
+                      label="Call customer"
+                      size={28}
+                      iconSize={14}
+                      variant="outline"
+                      onClick={() => onPhoneClick(meeting)}
                     />
-                  ))}
-                </div>
-              </td>
-              <td className="meeting-list__td meeting-list__td--date" data-label="Meeting date">
-                <div className="meeting-list__date-row">
-                  <span className="meeting-list__date-label">{formatDate(meeting.meetingDate)}</span>
-                  <span className="meeting-list__time-label">{formatTime(meeting.meetingDate)}</span>
-                </div>
-              </td>
-              <td className="meeting-list__td meeting-list__td--actions" data-label="Actions">
-                <div className="meeting-list__actions">
-                  <Button
-                    variant="primary"
-                    className="meeting-list__done-btn"
-                    onClick={() => onMarkDone(meeting.id)}
-                    disabled={meeting.isDone}
-                  >
-                    <Icon name="check" size={14} strokeWidth={2.5} />
-                    <span>{meeting.isDone ? 'Done' : 'Mark Done'}</span>
-                  </Button>
-                  <IconButton
-                    icon="phone"
-                    label="Call customer"
-                    size={28}
-                    iconSize={14}
-                    variant="outline"
-                    onClick={() => onPhoneClick(meeting)}
-                  />
-                  <IconButton
-                    icon="mail"
-                    label="Message customer"
-                    size={28}
-                    iconSize={14}
-                    variant="outline"
-                    onClick={() => onMessageClick(meeting)}
-                  />
-                  <IconButton
-                    icon="history"
-                    label="View history"
-                    size={28}
-                    iconSize={14}
-                    variant="outline"
-                    onClick={() => onHistoryClick(meeting)}
-                  />
-                </div>
-              </td>
+                    <IconButton
+                      icon="mail"
+                      label="Message customer"
+                      size={28}
+                      iconSize={14}
+                      variant="outline"
+                      onClick={() => onMessageClick(meeting)}
+                    />
+                    <IconButton
+                      icon="history"
+                      label="View history"
+                      size={28}
+                      iconSize={14}
+                      variant="outline"
+                      onClick={() => onHistoryClick(meeting)}
+                    />
+                  </div>
+                </td>
+              )}
             </motion.tr>
           ))}
         </motion.tbody>

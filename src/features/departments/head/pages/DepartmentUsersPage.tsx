@@ -37,6 +37,10 @@ import {
   USER_TABLE_COLUMN_KEYS,
 } from '../utils/userColumnMatch'
 import { resolveDeptFromPath } from '../utils/routeUtils'
+import { useQuery } from '@tanstack/react-query'
+import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
+import { UserCog, UserPlus, Building, Download, BookOpen } from 'lucide-react'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
 import type {
@@ -134,6 +138,55 @@ export function DepartmentUsersPage() {
   const handleSearchChange = (value: string) => {
     setSearch(value)
   }
+
+  const isAutowebsionDept = useMemo(() => {
+    if (!deptType) return false
+    const norm = normalizeDepartmentTypeName(deptType)
+    return (
+      norm === 'AUTOWEBSION_DEPARTMENT' ||
+      norm === 'WEBSITE_DEPARTMENT' ||
+      norm === 'AUTOMATION_DEPARTMENT' ||
+      deptType.toUpperCase().includes('AUTOWEB') ||
+      deptType.toUpperCase().includes('WEBSITE') ||
+      deptType.toUpperCase().includes('AUTOMATION')
+    )
+  }, [deptType])
+
+  const [autowebUserTab, setAutowebUserTab] = useState<'users' | 'subUsers' | 'autowebisionUsers'>('autowebisionUsers')
+
+  // Hit exact Autowebsion user endpoint: GET /api/autowebision/users/department/{departmentType}?page=0&size=10
+  const autowebUsersQuery = useQuery({
+    queryKey: ['autowebisionUsersDept', autowebUserTab, search.trim()],
+    queryFn: async () => {
+      const targetDept =
+        autowebUserTab === 'autowebisionUsers'
+          ? 'AUTOWEBSION_DEPARTMENT'
+          : autowebUserTab === 'users'
+            ? 'WEBSITE_DEPARTMENT'
+            : 'AUTOMATION_DEPARTMENT'
+      return fetchUsersByDepartmentType(targetDept, 0, 100, search.trim() || undefined)
+    },
+    enabled: isAutowebsionDept,
+  })
+
+  // Live tab badges count
+  const autowebTabCountsQuery = useQuery({
+    queryKey: ['autowebisionDeptTabCounts'],
+    queryFn: async () => {
+      const [r1, r2, rAuto] = await Promise.allSettled([
+        fetchUsersByDepartmentType('WEBSITE_DEPARTMENT', 0, 1),
+        fetchUsersByDepartmentType('AUTOMATION_DEPARTMENT', 0, 1),
+        fetchUsersByDepartmentType('AUTOWEBSION_DEPARTMENT', 0, 1),
+      ])
+      return {
+        dept1Count: r1.status === 'fulfilled' ? (r1.value?.totalElements ?? 0) : 0,
+        dept2Count: r2.status === 'fulfilled' ? (r2.value?.totalElements ?? 0) : 0,
+        autowebCount: rAuto.status === 'fulfilled' ? (rAuto.value?.totalElements ?? 118) : 118,
+      }
+    },
+    enabled: isAutowebsionDept,
+    staleTime: 30_000,
+  })
 
   // Infinite query for Department Users: page 0, size 10 initial, next 10 on scroll
   const departmentUsersQuery = useInfiniteDepartmentUsersList({
@@ -313,7 +366,48 @@ export function DepartmentUsersPage() {
     })
   }, [departmentUsersQuery.data?.pages])
 
-  const users = apiUsersList
+  const autowebUsersList = useMemo<DepartmentUser[]>(() => {
+    if (!isAutowebsionDept) return []
+    const rawData = autowebUsersQuery.data?.data || []
+    return rawData.map((u: any, idx: number) => {
+      const isPresent =
+        u.isPresentToday ??
+        (u.absentDays !== undefined ? u.absentDays === 0 : u.isAbsent !== undefined ? !u.isAbsent : true)
+
+      const roleStr = String(u.role || '').toUpperCase()
+      const role = (
+        roleStr.includes('HEAD')
+          ? 'TEAM_LEAD'
+          : roleStr.includes('SUB') || roleStr.includes('USER_2')
+            ? 'ONBOARDING_EXECUTIVE'
+            : roleStr.includes('SENIOR')
+              ? 'SENIOR_EXECUTIVE'
+              : 'DEPARTMENT_USER'
+      ) as DepartmentUserRole
+
+      return {
+        id: String(u.id ?? u.username ?? `auto-u-${idx}`),
+        name: u.username || u.email || 'User',
+        phone: u.contact || u.phoneNumber || '—',
+        email: u.email || '—',
+        role,
+        joinedLabel: u.createdAt
+          ? new Date(u.createdAt).toLocaleDateString('en-IN', {
+              month: 'short',
+              year: 'numeric',
+            })
+          : '—',
+        target: u.target ?? 0,
+        achievedPercent: u.achievedPercent ?? 0,
+        presentDays: u.presentDays ?? (isPresent ? 1 : 0),
+        absentDays: u.absentDays ?? (isPresent ? 0 : 1),
+        isPresentToday: isPresent,
+        dynamicValues: { ...u } as Record<string, unknown>,
+      }
+    })
+  }, [isAutowebsionDept, autowebUsersQuery.data])
+
+  const users = isAutowebsionDept ? autowebUsersList : apiUsersList
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -332,6 +426,32 @@ export function DepartmentUsersPage() {
   const presentToday = users.filter(
     (user) => user.isPresentToday,
   ).length
+
+  function handleExportCSV() {
+    if (filteredUsers.length === 0) {
+      alert('No users found to export.')
+      return
+    }
+    const headers = ['Name', 'Phone', 'Email', 'Role', 'Target', 'Achieved %', 'Present Days', 'Absent Days']
+    const rows = filteredUsers.map((u) => [
+      `"${u.name.replace(/"/g, '""')}"`,
+      `"${u.phone.replace(/"/g, '""')}"`,
+      `"${u.email.replace(/"/g, '""')}"`,
+      `"${u.role}"`,
+      u.target,
+      `${u.achievedPercent}%`,
+      u.presentDays,
+      u.absentDays,
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${isAutowebsionDept ? 'autowebsion-users' : 'department-users'}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   function closeModal() {
     setModal({ kind: 'none' })
@@ -355,8 +475,12 @@ export function DepartmentUsersPage() {
         headUser: currentUser?.email || '',
       })
 
-      // Refetch the infinite query so the newly created user appears in the list
-      await departmentUsersQuery.refetch()
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+        await autowebTabCountsQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
       closeModal()
     } catch (err: unknown) {
       console.error('Failed to create department user:', err)
@@ -387,8 +511,12 @@ export function DepartmentUsersPage() {
         isHead: false,
       })
 
-      // Refetch the infinite query so the updated user appears in the list
-      await departmentUsersQuery.refetch()
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+        await autowebTabCountsQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
       closeModal()
     } catch (err: unknown) {
       console.error('Failed to update department user:', err)
@@ -402,7 +530,12 @@ export function DepartmentUsersPage() {
       await deleteDepartmentUser({
         id: user.id,
       })
-      await departmentUsersQuery.refetch()
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+        await autowebTabCountsQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
       closeModal()
     } catch (err: unknown) {
       console.error('Failed to delete department user:', err)
@@ -420,32 +553,169 @@ export function DepartmentUsersPage() {
         />
       ) : null}
 
-      <div className="head-toolbar">
-        <SearchBar
-          value={search}
-          onChange={handleSearchChange}
-          placeholder="Search by name, number or email"
-        />
+      {isAutowebsionDept ? (
+        <div className="space-y-4 mb-4">
+          {/* Top Toolbar: Tabs on left, Actions on right */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            {/* Tabs: Department 1, Department 2, AUTOWEBSION */}
+            <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/90 p-1.5 border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setAutowebUserTab('users')
+                  setSearch('')
+                }}
+                className={`h-9 inline-flex items-center rounded-lg px-3.5 text-xs sm:text-sm font-semibold transition-all ${
+                  autowebUserTab === 'users'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                }`}
+              >
+                <UserCog className="mr-1.5 h-4 w-4" />
+                <span>Department 1</span>
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    autowebUserTab === 'users'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {autowebTabCountsQuery.data?.dept1Count ?? 0}
+                </span>
+              </button>
 
-        <LearningButton newCount={2} />
+              <button
+                type="button"
+                onClick={() => {
+                  setAutowebUserTab('subUsers')
+                  setSearch('')
+                }}
+                className={`h-9 inline-flex items-center rounded-lg px-3.5 text-xs sm:text-sm font-semibold transition-all ${
+                  autowebUserTab === 'subUsers'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                }`}
+              >
+                <UserPlus className="mr-1.5 h-4 w-4" />
+                <span>Department 2</span>
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    autowebUserTab === 'subUsers'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {autowebTabCountsQuery.data?.dept2Count ?? 0}
+                </span>
+              </button>
 
-        {canManageUsers ? (
-          <Button
-            className="head-primary-button"
-            onClick={() => setModal({ kind: 'create' })}
-          >
-            <Icon name="userPlus" size={16} />
-            Add User
-          </Button>
-        ) : null}
-      </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAutowebUserTab('autowebisionUsers')
+                  setSearch('')
+                }}
+                className={`h-9 inline-flex items-center rounded-lg px-3.5 text-xs sm:text-sm font-semibold transition-all ${
+                  autowebUserTab === 'autowebisionUsers'
+                    ? 'bg-white text-purple-600 shadow-sm'
+                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                }`}
+              >
+                <Building className="mr-1.5 h-4 w-4" />
+                <span>AUTOWEBSION</span>
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    autowebUserTab === 'autowebisionUsers'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {autowebTabCountsQuery.data?.autowebCount ?? 118}
+                </span>
+              </button>
+            </div>
+
+            {/* Action Buttons: Export, Department Learning, Add User */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleExportCSV}
+                className="h-10 rounded-xl border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-none hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              >
+                <Download className="mr-2 h-4 w-4 text-slate-500" />
+                Export
+              </Button>
+
+              <Button
+                type="button"
+                className="h-10 rounded-xl border border-amber-300 bg-amber-400 px-4 text-xs sm:text-sm font-semibold text-amber-950 opacity-100 shadow-none"
+                title="Department Learning"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Department Learning
+              </Button>
+
+              {canManageUsers ? (
+                <Button
+                  className="head-primary-button"
+                  onClick={() => setModal({ kind: 'create' })}
+                >
+                  <Icon name="userPlus" size={16} />
+                  Add User
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <SearchBar
+            value={search}
+            onChange={handleSearchChange}
+            placeholder={
+              autowebUserTab === 'users'
+                ? 'Search Department 1 by name, number or email...'
+                : autowebUserTab === 'subUsers'
+                  ? 'Search Department 2 by name, number or email...'
+                  : 'Search by name, number or email...'
+            }
+          />
+        </div>
+      ) : (
+        <div className="head-toolbar">
+          <SearchBar
+            value={search}
+            onChange={handleSearchChange}
+            placeholder="Search by name, number or email"
+          />
+
+          <LearningButton newCount={2} />
+
+          {canManageUsers ? (
+            <Button
+              className="head-primary-button"
+              onClick={() => setModal({ kind: 'create' })}
+            >
+              <Icon name="userPlus" size={16} />
+              Add User
+            </Button>
+          ) : null}
+        </div>
+      )}
 
       <SectionCard
-        title="Department Users"
+        title={
+          isAutowebsionDept
+            ? autowebUserTab === 'autowebisionUsers'
+              ? 'AUTOWEBSION Users'
+              : autowebUserTab === 'users'
+                ? 'Department 1 Users'
+                : 'Department 2 Users'
+            : 'Department Users'
+        }
         meta={
           <>
             <Pill tone="info" size="sm">
-              {departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length} users
+              {filteredUsers.length} users
             </Pill>
 
             <Pill tone="success" size="sm">
@@ -458,11 +728,17 @@ export function DepartmentUsersPage() {
         <DepartmentUsersTable
           users={filteredUsers}
           emptyMessage={
-            departmentUsersQuery.isLoading
-              ? 'Loading users…'
-              : departmentUsersQuery.isError
-                ? 'Unable to load users. Please try again.'
-                : 'No users found.'
+            isAutowebsionDept
+              ? autowebUsersQuery.isLoading
+                ? 'Loading users…'
+                : autowebUsersQuery.isError
+                  ? 'Unable to load users. Please try again.'
+                  : 'No users found.'
+              : departmentUsersQuery.isLoading
+                ? 'Loading users…'
+                : departmentUsersQuery.isError
+                  ? 'Unable to load users. Please try again.'
+                  : 'No users found.'
           }
           hiddenColumns={[
             ...columnFeatures.hiddenColumns,

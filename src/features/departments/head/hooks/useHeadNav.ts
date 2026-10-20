@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useDepartmentFeatures } from '../../../permissions/hooks/useDepartmentFeatures'
 import {
   isRouteMatch,
@@ -8,6 +9,8 @@ import type { HeadNavItem } from '../types/head.types'
 import type { FeaturePermission, HeadScreenKey } from '../../../permissions/types/permission.types'
 import type { IconName } from '../../../../components/head/shared/iconPaths'
 import { getSession } from '../../../../app/auth/session'
+import { fetchAutomationCount } from '../../../../api/autowebsion.api'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import {
   buildDepartmentRoute,
   buildGoogleRoute,
@@ -118,39 +121,177 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
   const query = useDepartmentFeatures(departmentId)
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
-  const effectiveDeptType = session?.user.departmentType || departmentType || deptFromUrl || undefined
+  const rawDept = session?.user.departmentType || departmentType || deptFromUrl || undefined
+  const isGoogle = isUserGoogle(rawDept)
+  const isOnboarding = isUserOnboarding(rawDept)
+  const effectiveDeptType = isGoogle ? 'GOOGLE_DEPARTMENT' : rawDept
   const role = session?.user.role
   const isUser = role === 'USER'
-  const isGoogle = isUserGoogle(effectiveDeptType)
-  const isOnboarding = isUserOnboarding(effectiveDeptType)
   const basePath = isUser ? '/users' : '/head'
 
   const routePerms = useDepartmentRoutePermissions(effectiveDeptType)
 
+  const isAutowebsion = Boolean(
+    effectiveDeptType && (
+      normalizeDepartmentTypeName(effectiveDeptType) === 'AUTOWEBSION_DEPARTMENT' ||
+      normalizeDepartmentTypeName(effectiveDeptType) === 'WEBSITE_DEPARTMENT' ||
+      normalizeDepartmentTypeName(effectiveDeptType) === 'AUTOMATION_DEPARTMENT' ||
+      effectiveDeptType.toUpperCase().includes('AUTOWEB') ||
+      effectiveDeptType.toUpperCase().includes('WEBSITE') ||
+      effectiveDeptType.toUpperCase().includes('AUTOMATION')
+    ),
+  )
+
+  const automationCountQuery = useQuery({
+    queryKey: ['userAutomationCountNav', session?.user?.email],
+    queryFn: () => fetchAutomationCount(session?.user?.email),
+    enabled: Boolean(isUser && isAutowebsion && session?.user?.email),
+    staleTime: 60_000,
+  })
+
   const features = useMemo<FeaturePermission[]>(() => {
     if (isGoogle) {
       const screensList = isUser ? GOOGLE_USER_SCREENS : GOOGLE_HEAD_SCREENS
-      return screensList.map((item, index) => {
-        const existing = (query.data ?? []).find(
-          (f) => f.slug === item.slug || f.screen === item.screen,
+      const baseGoogleFeatures: FeaturePermission[] = screensList
+        .filter(
+          (item) =>
+            routePerms.isRouteEnabled(item.slug) &&
+            routePerms.isRouteEnabled(buildGoogleRoute(item.slug, role)),
         )
-        return {
-          id: existing?.id ?? `google-feat-${item.slug}`,
+        .map((item, index) => {
+          const existing = (query.data ?? []).find(
+            (f) => f.slug === item.slug || f.screen === item.screen,
+          )
+          return {
+            id: existing?.id ?? `google-feat-${item.slug}`,
+            departmentId,
+            name: item.label,
+            description: existing?.description ?? item.label,
+            enabled: true,
+            userVisible: true,
+            roleAPermission: existing?.roleAPermission ?? 'CAN_EDIT',
+            roleBPermission: existing?.roleBPermission ?? 'CAN_READ',
+            screen: item.screen,
+            slug: item.slug,
+            icon: item.icon,
+            order: index,
+            category: 'screens',
+            kind: 'screen',
+          }
+        })
+
+      if (routePerms.routes.length > 0) {
+        const customGoogleFeatures: FeaturePermission[] = routePerms.routes
+          .filter(
+            (r) =>
+              r.routeName &&
+              routePerms.isRouteEnabled(r.routeName) &&
+              !baseGoogleFeatures.some((f) => isRouteMatch(r, f.slug)),
+          )
+          .map((r, idx) => {
+            const cleanSlug = extractCleanSlug(r.routeName)
+            const matchedStd = screensList.find(
+              (s) => s.slug === cleanSlug || isRouteMatch(r, s.slug),
+            )
+            return {
+              id: `custom-route-${r.routeId || cleanSlug}`,
+              departmentId,
+              name: matchedStd?.label ?? formatRouteLabel(r.routeName),
+              description: `Dynamic route (${r.routeName})`,
+              enabled: true,
+              userVisible: true,
+              roleAPermission: 'CAN_EDIT',
+              roleBPermission: 'CAN_READ',
+              screen: matchedStd?.screen ?? 'custom',
+              slug: matchedStd?.slug ?? cleanSlug,
+              icon: matchedStd?.icon ?? 'brief',
+              order: baseGoogleFeatures.length + idx,
+              category: 'screens',
+              kind: 'screen',
+            }
+          })
+        return [...baseGoogleFeatures, ...customGoogleFeatures]
+      }
+
+      return baseGoogleFeatures
+    }
+
+    if (isUser && isAutowebsion) {
+      const countData = automationCountQuery.data || []
+      const hasWebsiteFromCount = countData.some(
+        (c) => c.serviceCategory?.toUpperCase() === 'WEBSITE' && c.total > 0,
+      )
+      const hasAutomationFromCount = countData.some(
+        (c) => c.serviceCategory?.toUpperCase() === 'AUTOMATION' && c.total > 0,
+      )
+
+      const isExplicitWebsite = effectiveDeptType?.toUpperCase().includes('WEBSITE')
+      const isExplicitAutomation = effectiveDeptType?.toUpperCase().includes('AUTOMATION')
+
+      const showWebsite =
+        hasWebsiteFromCount ||
+        isExplicitWebsite ||
+        (!hasAutomationFromCount && !isExplicitAutomation)
+
+      const showAutomation =
+        hasAutomationFromCount ||
+        isExplicitAutomation ||
+        (!hasWebsiteFromCount && !isExplicitWebsite)
+
+      const autowebsionScreens: Array<{
+        key: string
+        label: string
+        icon: IconName
+        slug: string
+        screen: HeadScreenKey
+      }> = [
+        { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
+        { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+      ]
+
+      if (showWebsite) {
+        autowebsionScreens.push({
+          key: 'website-customers',
+          label: 'Website Customers',
+          icon: 'globe',
+          slug: 'website-customers',
+          screen: 'website-customers',
+        })
+      }
+
+      if (showAutomation) {
+        autowebsionScreens.push({
+          key: 'automation-customers',
+          label: 'Automation Customers',
+          icon: 'bot',
+          slug: 'automation-customers',
+          screen: 'automation-customers',
+        })
+      }
+
+      autowebsionScreens.push(
+        { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
+        { key: 'help-center', label: 'Help and Support Tickets', icon: 'help', slug: 'help-center', screen: 'help-center' },
+      )
+
+      return autowebsionScreens
+        .filter((item) => routePerms.isRouteEnabled(item.slug))
+        .map((item, index) => ({
+          id: `autoweb-user-${item.slug}`,
           departmentId,
           name: item.label,
-          description: existing?.description ?? item.label,
+          description: item.label,
           enabled: true,
           userVisible: true,
-          roleAPermission: existing?.roleAPermission ?? 'CAN_EDIT',
-          roleBPermission: existing?.roleBPermission ?? 'CAN_READ',
+          roleAPermission: 'CAN_EDIT',
+          roleBPermission: 'CAN_READ',
           screen: item.screen,
           slug: item.slug,
           icon: item.icon,
           order: index,
           category: 'screens',
           kind: 'screen',
-        }
-      })
+        }))
     }
 
     if (isUser) {
@@ -288,16 +429,26 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
           routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
       )
       .sort((a, b) => a.order - b.order)
-  }, [isGoogle, isUser, isOnboarding, query.data, departmentId, role, routePerms])
+  }, [isGoogle, isUser, isOnboarding, isAutowebsion, automationCountQuery.data, effectiveDeptType, query.data, departmentId, role, routePerms])
 
   const items = useMemo<HeadNavItem[]>(() => {
     if (isGoogle) {
-      const screensList = isUser ? GOOGLE_USER_SCREENS : GOOGLE_HEAD_SCREENS
-      return screensList.map((item) => ({
-        key: item.key,
-        label: item.label,
-        icon: item.icon,
-        to: buildGoogleRoute(item.slug, role),
+      return features
+        .filter((feature) => feature.slug !== 'fetch-rc')
+        .map((feature) => ({
+          key: feature.slug,
+          label: feature.name,
+          icon: feature.icon,
+          to: buildGoogleRoute(feature.slug, role),
+        }))
+    }
+
+    if (isUser && isAutowebsion) {
+      return features.map((feature) => ({
+        key: feature.slug,
+        label: feature.name,
+        icon: feature.icon,
+        to: buildDepartmentRoute(feature.slug, effectiveDeptType, role),
       }))
     }
 
@@ -328,7 +479,7 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
           ? buildOnboardingRoute(feature.slug, role)
           : buildDepartmentRoute(feature.slug, effectiveDeptType, role),
       }))
-  }, [isGoogle, isUser, features, basePath, isOnboarding, role, routePerms, effectiveDeptType])
+  }, [isGoogle, isUser, isAutowebsion, features, basePath, isOnboarding, role, routePerms, effectiveDeptType])
 
   const PROFILE_MENU_SCREENS: Record<
     string,
@@ -355,7 +506,16 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
   }
 
   const bySlug = (slug: string): FeaturePermission | undefined => {
-    const s = slug === 'customer-list' ? 'customers' : slug
+    const isCustomerSlug =
+      slug === 'customer-list' ||
+      slug === 'customers' ||
+      slug === 'all-customers' ||
+      slug === 'autowebision-customers' ||
+      slug === 'website-customers' ||
+      slug === 'automation-customers' ||
+      slug === 'website' ||
+      slug === 'automation'
+    const s = isCustomerSlug ? 'customers' : slug
 
     if (PROFILE_MENU_SCREENS[s]) {
       const meta = PROFILE_MENU_SCREENS[s]
@@ -376,15 +536,48 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
       }
     }
 
-    if (!isGoogle && !routePerms.isRouteEnabled(s)) {
+    if (
+      slug === 'website-customers' ||
+      slug === 'website' ||
+      slug === 'automation-customers' ||
+      slug === 'automation'
+    ) {
+      const isWeb = slug === 'website-customers' || slug === 'website'
+      return {
+        id: `feature-${slug}`,
+        departmentId,
+        name: isWeb ? 'Website Customers' : 'Automation Customers',
+        description: isWeb ? 'Website Customers' : 'Automation Customers',
+        screen: isWeb ? 'website-customers' : 'automation-customers',
+        slug,
+        icon: isWeb ? 'globe' : 'bot',
+        enabled: true,
+        kind: 'screen',
+        order: 99,
+        roleAPermission: 'CAN_EDIT',
+        roleBPermission: 'CAN_READ',
+        category: 'screens',
+      }
+    }
+
+    if (!isGoogle && !isAutowebsion && !routePerms.isRouteEnabled(s)) {
       return undefined
     }
     const found = features.find(
       (feature) =>
         feature.slug === s ||
         feature.screen === s ||
-        (s === 'customers' && feature.slug === 'customer-list') ||
-        (s === 'customer-list' && feature.slug === 'customers') ||
+        (isCustomerSlug &&
+          (feature.slug === 'customer-list' ||
+            feature.slug === 'customers' ||
+            feature.slug === 'all-customers' ||
+            feature.slug === 'website-customers' ||
+            feature.slug === 'automation-customers' ||
+            feature.screen === 'customer-list' ||
+            feature.screen === 'customers' ||
+            (feature.screen as string) === 'autowebision-customers' ||
+            (feature.screen as string) === 'website-customers' ||
+            (feature.screen as string) === 'automation-customers')) ||
         (s === 'department-user' && (feature.slug === 'users' || feature.slug === 'department-user')) ||
         (s === 'users' && (feature.slug === 'department-user' || feature.slug === 'users')) ||
         (s === 'member-performance' && (feature.slug === 'member-flow' || feature.slug === 'member-performance')) ||
@@ -392,7 +585,7 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
     )
     if (found) return found
 
-    if (!isGoogle && !isOnboarding && routePerms.routes.length > 0) {
+    if (!isOnboarding && routePerms.routes.length > 0) {
       const matchedDbRoute = routePerms.routes.find(
         (r) => extractCleanSlug(r.routeName) === s || isRouteMatch(r, s),
       )
@@ -483,11 +676,14 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
   }
 
   const isRouteEnabled = (slugOrPath: string): boolean => {
-    if (isGoogle) return true
     if (
       slugOrPath === 'airtel-calls' ||
       slugOrPath === 'manage-services' ||
-      slugOrPath === 'salary-management'
+      slugOrPath === 'salary-management' ||
+      slugOrPath === 'website-customers' ||
+      slugOrPath === 'automation-customers' ||
+      slugOrPath === 'website' ||
+      slugOrPath === 'automation'
     ) {
       return true
     }

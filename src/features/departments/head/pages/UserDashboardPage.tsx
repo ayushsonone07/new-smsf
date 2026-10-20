@@ -17,7 +17,25 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryKpis } from '../../types/onboarding-dashboard.types'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
-import { resolveDeptFromPath } from '../utils/routeUtils'
+import { resolveDeptFromPath, buildDepartmentRoute } from '../utils/routeUtils'
+import { useNavigate } from '@tanstack/react-router'
+import {
+  Users,
+  Clock,
+  Activity,
+  CheckCircle,
+  RefreshCw,
+  Globe,
+  Bot,
+  Layers,
+  TrendingUp,
+  BarChart2,
+  ArrowRight,
+} from 'lucide-react'
+import {
+  fetchAutomationCount,
+  fetchLightAutowebisionCustomers,
+} from '../../../../api/autowebsion.api'
 import '../../../../components/head/dashboard/Dashboard.css'
 
 const containerVariants: Variants = {
@@ -66,21 +84,20 @@ function shiftDays(date: Date, days: number): Date {
  * "Custom range" has no date picker yet — it falls back to the
  * last 7 days.
  */
-function rangeFor(period: string): DateRange {
+function rangeFor(period: string, customRange?: { from: string; to: string }): DateRange {
   const today = new Date()
   const end = toIsoDate(today)
 
   switch (period) {
-    case 'Yesterday': {
-      const yesterday = toIsoDate(shiftDays(today, -1))
-      return { startDate: yesterday, endDate: yesterday }
-    }
     case 'Last 7 days':
-    case 'Custom range':
       return {
         startDate: toIsoDate(shiftDays(today, -6)),
         endDate: end,
       }
+    case 'Custom range':
+      return customRange?.from && customRange?.to
+        ? { startDate: customRange.from, endDate: customRange.to }
+        : { startDate: end, endDate: end }
     case 'This month':
       return {
         startDate: toIsoDate(
@@ -118,19 +135,568 @@ function percent(part: number, total: number): string {
   return `${Math.round((part / total) * 100)}%`
 }
 
+function SemiGauge({ pct }: { pct: number }) {
+  const r = 68
+  const cx = 90
+  const cy = 85
+  const circ = Math.PI * r
+  const clamped = Math.max(0, Math.min(100, pct))
+  const offset = circ * (1 - clamped / 100)
+  return (
+    <svg width="180" height="105" viewBox="0 0 180 105" className="overflow-visible">
+      <path
+        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none"
+        stroke="#f1f5f9"
+        strokeWidth="14"
+        strokeLinecap="round"
+      />
+      <path
+        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none"
+        stroke="#10b981"
+        strokeWidth="14"
+        strokeLinecap="round"
+        strokeDasharray={`${circ}`}
+        strokeDashoffset={offset}
+        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+      />
+      <text
+        x={cx}
+        y={cy - 4}
+        textAnchor="middle"
+        fill="#0f172a"
+        style={{ fontSize: 24, fontWeight: 700 }}
+      >
+        {clamped}%
+      </text>
+      <text
+        x={cx}
+        y={cy + 16}
+        textAnchor="middle"
+        fill="#94a3b8"
+        style={{ fontSize: 11, fontWeight: 500 }}
+      >
+        avg performance
+      </text>
+    </svg>
+  )
+}
+
+function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) {
+  const session = getSession()
+  const userEmail = session?.user.email || session?.user.username || ''
+  const navigate = useNavigate()
+
+  const query = useQuery({
+    queryKey: ['userAutomationCount', userEmail],
+    queryFn: () => fetchAutomationCount(userEmail),
+    enabled: Boolean(userEmail),
+  })
+
+  const countData = query.data || []
+  const webEntry = countData.find((c) => c.serviceCategory?.toUpperCase() === 'WEBSITE') || {
+    serviceCategory: 'WEBSITE',
+    total: 0,
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+  }
+  const autoEntry = countData.find((c) => c.serviceCategory?.toUpperCase() === 'AUTOMATION') || {
+    serviceCategory: 'AUTOMATION',
+    total: 0,
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+  }
+  const allEntry = countData.find((c) => c.serviceCategory?.toUpperCase() === 'AUTOWEBSION') || {
+    serviceCategory: 'AUTOWEBSION',
+    total: webEntry.total + autoEntry.total,
+    pending: webEntry.pending + autoEntry.pending,
+    inProgress: webEntry.inProgress + autoEntry.inProgress,
+    completed: webEntry.completed + autoEntry.completed,
+  }
+
+  const hasWebsiteAssigned = webEntry.total > 0 || rawDepartment.toUpperCase().includes('WEBSITE')
+  const hasAutomationAssigned = autoEntry.total > 0 || rawDepartment.toUpperCase().includes('AUTOMATION')
+  const hasBoth =
+    (hasWebsiteAssigned && hasAutomationAssigned) ||
+    (!hasWebsiteAssigned && !hasAutomationAssigned && rawDepartment.toUpperCase().includes('AUTOWEB'))
+
+  const [tab, setTab] = useState<'ALL' | 'WEBSITE' | 'AUTOMATION'>(
+    hasBoth ? 'ALL' : hasAutomationAssigned ? 'AUTOMATION' : 'WEBSITE',
+  )
+  const [chartMode, setChartMode] = useState<'bar' | 'realtime'>('bar')
+
+  const userCustomersQuery = useQuery({
+    queryKey: ['userAutowebCustomers', tab, userEmail],
+    queryFn: () => {
+      const dept =
+        tab === 'WEBSITE'
+          ? 'WEBSITE_DEPARTMENT'
+          : tab === 'AUTOMATION'
+            ? 'AUTOMATION_DEPARTMENT'
+            : undefined
+      return fetchLightAutowebisionCustomers({
+        page: 0,
+        size: 5,
+        departmentType: dept,
+        assignedUserEmail: userEmail,
+      })
+    },
+    enabled: Boolean(userEmail),
+  })
+
+  if (query.isPending) {
+    return <LoadingState message="Loading your personal dashboard..." />
+  }
+
+  if (query.isError) {
+    return (
+      <ErrorState
+        title="Unable to load dashboard"
+        message={query.error.message}
+        onRetry={() => {
+          void query.refetch()
+          void userCustomersQuery.refetch()
+        }}
+      />
+    )
+  }
+
+  const activeEntry = tab === 'WEBSITE' ? webEntry : tab === 'AUTOMATION' ? autoEntry : allEntry
+  const completionRate =
+    activeEntry.total > 0 ? Math.round((activeEntry.completed / activeEntry.total) * 100) : 0
+  const inProgressRate =
+    activeEntry.total > 0 ? Math.round((activeEntry.inProgress / activeEntry.total) * 100) : 0
+  const efficiencyScore =
+    activeEntry.total > 0
+      ? Math.round(((activeEntry.completed + activeEntry.inProgress) / activeEntry.total) * 100)
+      : 0
+  const avgPerformance = Math.round((completionRate + efficiencyScore) / 2)
+
+  return (
+    <motion.div
+      className="p-6 max-w-7xl mx-auto space-y-6"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      {/* Top Banner */}
+      <motion.div
+        variants={sectionVariants}
+        className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl text-white shadow-md">
+            <TrendingUp className="h-7 w-7" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              Department Dashboard 👋
+            </h1>
+            <p className="text-slate-500 text-xs md:text-sm mt-0.5">
+              Welcome back, <span className="font-semibold text-slate-700">{session?.user.name || 'User'}</span>. Here is your personal task & performance overview.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+            {hasBoth ? (
+              <>
+                <Layers size={13} />
+                <span>Website & Automation</span>
+              </>
+            ) : hasAutomationAssigned ? (
+              <>
+                <Bot size={13} />
+                <span>Automation User</span>
+              </>
+            ) : (
+              <>
+                <Globe size={13} />
+                <span>Website User</span>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void query.refetch()
+              void userCustomersQuery.refetch()
+            }}
+            disabled={query.isFetching || userCustomersQuery.isFetching}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
+          >
+            <RefreshCw size={13} className={query.isFetching || userCustomersQuery.isFetching ? 'animate-spin text-blue-600' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Tabs if user has both assigned */}
+      {hasBoth && (
+        <motion.div variants={sectionVariants} className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('ALL')
+                void query.refetch()
+              }}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                tab === 'ALL'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers size={14} />
+              <span>Autowebsion ({allEntry.total})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('WEBSITE')
+                void query.refetch()
+              }}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                tab === 'WEBSITE'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Globe size={14} />
+              <span>Website ({webEntry.total})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('AUTOMATION')
+                void query.refetch()
+              }}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                tab === 'AUTOMATION'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Bot size={14} />
+              <span>Automation ({autoEntry.total})</span>
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* 4 KPI Cards */}
+      <motion.div variants={sectionVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[140px]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Customers</span>
+            <div className="p-2.5 rounded-xl text-white bg-blue-600 shadow-xs">
+              <Users size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-extrabold text-slate-900">{activeEntry.total.toLocaleString()}</div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">{completionRate}% completion rate</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[140px]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Services</span>
+            <div className="p-2.5 rounded-xl text-white bg-amber-500 shadow-xs">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-extrabold text-amber-600">{activeEntry.pending.toLocaleString()}</div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">Awaiting action</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[140px]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">In Progress</span>
+            <div className="p-2.5 rounded-xl text-white bg-indigo-600 shadow-xs">
+              <Activity size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-extrabold text-indigo-600">{activeEntry.inProgress.toLocaleString()}</div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">{inProgressRate}% actively processing</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[140px]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed Services</span>
+            <div className="p-2.5 rounded-xl text-white bg-emerald-600 shadow-xs">
+              <CheckCircle size={18} />
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-extrabold text-emerald-600">{activeEntry.completed.toLocaleString()}</div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">{completionRate}% successfully delivered</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Performance Summary & Analytics */}
+      <motion.div variants={sectionVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Performance Summary */}
+        <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[300px]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg text-white shadow-xs">
+                <TrendingUp size={18} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">Performance Summary</h3>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Live Metrics</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-6 my-auto">
+            <div className="flex-shrink-0 flex justify-center">
+              <SemiGauge pct={avgPerformance} />
+            </div>
+            <div className="flex-1 w-full space-y-3">
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Completion rate</p>
+                    <p className="text-[11px] text-slate-400">Services delivered</p>
+                  </div>
+                </div>
+                <span className="text-xs font-extrabold text-purple-600">{completionRate}%</span>
+              </div>
+
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Efficiency score</p>
+                    <p className="text-[11px] text-slate-400">Active vs pending</p>
+                  </div>
+                </div>
+                <span className="text-xs font-extrabold text-emerald-600">{efficiencyScore}%</span>
+              </div>
+
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Pending services</p>
+                    <p className="text-[11px] text-slate-400">Awaiting action</p>
+                  </div>
+                </div>
+                <span className="text-xs font-extrabold text-amber-600">{activeEntry.pending}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Service Analytics */}
+        <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[300px]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg text-white shadow-xs">
+                <BarChart2 size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Service Analytics</h3>
+                <p className="text-[11px] text-slate-500">Breakdown of assigned customer tasks</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setChartMode('bar')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  chartMode === 'bar' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Bar
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMode('realtime')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  chartMode === 'realtime' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Real-time
+              </button>
+            </div>
+          </div>
+
+          {chartMode === 'bar' ? (
+            <div className="space-y-4 my-auto">
+              {hasBoth ? (
+                <>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                      <span className="text-blue-700 flex items-center gap-1.5"><Globe size={13} /> Website ({webEntry.total})</span>
+                      <span className="text-slate-500">{webEntry.completed} completed ({webEntry.total > 0 ? Math.round((webEntry.completed / webEntry.total) * 100) : 0}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden flex">
+                      <div style={{ width: `${webEntry.total > 0 ? (webEntry.completed / webEntry.total) * 100 : 0}%` }} className="bg-emerald-500 h-full" />
+                      <div style={{ width: `${webEntry.total > 0 ? (webEntry.inProgress / webEntry.total) * 100 : 0}%` }} className="bg-indigo-500 h-full" />
+                      <div style={{ width: `${webEntry.total > 0 ? (webEntry.pending / webEntry.total) * 100 : 0}%` }} className="bg-amber-400 h-full" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                      <span className="text-purple-700 flex items-center gap-1.5"><Bot size={13} /> Automation ({autoEntry.total})</span>
+                      <span className="text-slate-500">{autoEntry.completed} completed ({autoEntry.total > 0 ? Math.round((autoEntry.completed / autoEntry.total) * 100) : 0}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden flex">
+                      <div style={{ width: `${autoEntry.total > 0 ? (autoEntry.completed / autoEntry.total) * 100 : 0}%` }} className="bg-emerald-500 h-full" />
+                      <div style={{ width: `${autoEntry.total > 0 ? (autoEntry.inProgress / autoEntry.total) * 100 : 0}%` }} className="bg-indigo-500 h-full" />
+                      <div style={{ width: `${autoEntry.total > 0 ? (autoEntry.pending / autoEntry.total) * 100 : 0}%` }} className="bg-amber-400 h-full" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span className="text-slate-700 font-bold">{activeEntry.serviceCategory} ({activeEntry.total})</span>
+                    <span className="text-slate-500">{activeEntry.completed} completed</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden flex">
+                    <div style={{ width: `${activeEntry.total > 0 ? (activeEntry.completed / activeEntry.total) * 100 : 0}%` }} className="bg-emerald-500 h-full" />
+                    <div style={{ width: `${activeEntry.total > 0 ? (activeEntry.inProgress / activeEntry.total) * 100 : 0}%` }} className="bg-indigo-500 h-full" />
+                    <div style={{ width: `${activeEntry.total > 0 ? (activeEntry.pending / activeEntry.total) * 100 : 0}%` }} className="bg-amber-400 h-full" />
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Completed</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" /> In Progress</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Pending</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-end justify-around h-36 pt-2 border-b border-slate-100">
+              {[
+                { label: 'Total', val: activeEntry.total, color: 'bg-blue-500' },
+                { label: 'Done', val: activeEntry.completed, color: 'bg-emerald-500' },
+                { label: 'Active', val: activeEntry.inProgress, color: 'bg-indigo-500' },
+                { label: 'Pending', val: activeEntry.pending, color: 'bg-amber-400' },
+              ].map((bar) => {
+                const maxVal = Math.max(activeEntry.total, 1)
+                const h = Math.max(14, Math.round((bar.val / maxVal) * 95))
+                return (
+                  <div key={bar.label} className="flex flex-col items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">{bar.val}</span>
+                    <div
+                      className={`w-10 rounded-t-md transition-all duration-500 ${bar.color}`}
+                      style={{ height: `${h}px` }}
+                    />
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase">{bar.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Quick Action Navigation Links */}
+      <motion.div variants={sectionVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {hasWebsiteAssigned && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/70 rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-blue-600 rounded-xl text-white shadow-xs">
+                <Globe size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Website Customers ({webEntry.total})</h4>
+                <p className="text-xs text-slate-600">View and update your assigned website customer tasks</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const target = buildDepartmentRoute('website-customers', rawDepartment, 'USER')
+                navigate({ to: target as never })
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            >
+              <span>View List</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        )}
+
+        {hasAutomationAssigned && (
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/70 rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-purple-600 rounded-xl text-white shadow-xs">
+                <Bot size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Automation Customers ({autoEntry.total})</h4>
+                <p className="text-xs text-slate-600">View and update your assigned automation customer tasks</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const target = buildDepartmentRoute('automation-customers', rawDepartment, 'USER')
+                navigate({ to: target as never })
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            >
+              <span>View List</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /**
- * Personal dashboard of a logged-in department USER — the same
- * widgets as the head dashboard, but the counts come from
- * `GET /api/dashboard/summary` which scopes every
- * number to the requesting user.
+ * Personal dashboard of a logged-in department USER — routes between
+ * Autowebsion / Website / Automation personal dashboard and standard dashboard.
  */
 export function UserDashboardPage() {
+  const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
+  const isAutowebsion = Boolean(
+    rawDepartment && (
+      rawDepartment.toUpperCase().includes('AUTOWEB') ||
+      rawDepartment.toUpperCase().includes('WEBSITE') ||
+      rawDepartment.toUpperCase().includes('AUTOMATION')
+    ) ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.includes('autoweb') ||
+      window.location.pathname.includes('website') ||
+      window.location.pathname.includes('automation')
+    ))
+  )
+
+  if (isAutowebsion) {
+    return <AutowebsionUserDashboard rawDepartment={rawDepartment} />
+  }
+
+  return <StandardUserDashboard rawDepartment={rawDepartment} />
+}
+
+function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
   const [datePeriod, setDatePeriod] = useState('Today')
+  const [customRange, setCustomRange] = useState({ from: '', to: '' })
   const [refreshKey, setRefreshKey] = useState(0)
   const session = getSession()
   const name = session?.user.name ?? 'there'
-  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
-  const rawDepartment = session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' &&
@@ -138,8 +704,8 @@ export function UserDashboardPage() {
         window.location.pathname.startsWith('/google')))
 
   const range = useMemo(
-    () => rangeFor(datePeriod),
-    [datePeriod],
+    () => rangeFor(datePeriod, customRange),
+    [datePeriod, customRange],
   )
   const summaryParams = useMemo(
     () => ({
@@ -343,6 +909,9 @@ export function UserDashboardPage() {
           greetingName={name}
           datePeriod={datePeriod}
           onDatePeriodChange={setDatePeriod}
+          customDateFrom={customRange.from}
+          customDateTo={customRange.to}
+          onCustomDateRangeChange={(from, to) => setCustomRange({ from, to })}
           onRefresh={handleRefresh}
           subtitle={
             isGoogle

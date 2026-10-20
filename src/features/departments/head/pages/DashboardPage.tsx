@@ -33,6 +33,11 @@ import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboarding
 import {
   type OnboardingSummaryParams,
 } from '../../../../api/onboarding-dashboard.api'
+import {
+  Globe,
+  Bot,
+  Layers,
+} from 'lucide-react'
 
 const containerVariants: Variants = {
   hidden: {},
@@ -59,7 +64,7 @@ function shiftDays(date: Date, days: number): Date {
   return next
 }
 
-function rangeFor(period: string): {
+function rangeFor(period: string, customRange?: { from: string; to: string }): {
   startDate?: string
   endDate?: string
   allTime?: boolean
@@ -68,16 +73,15 @@ function rangeFor(period: string): {
   const end = toIsoDate(today)
 
   switch (period) {
-    case 'Yesterday': {
-      const yesterday = toIsoDate(shiftDays(today, -1))
-      return { startDate: yesterday, endDate: yesterday }
-    }
     case 'Last 7 days':
-    case 'Custom range':
       return {
         startDate: toIsoDate(shiftDays(today, -6)),
         endDate: end,
       }
+    case 'Custom range':
+      return customRange?.from && customRange?.to
+        ? { startDate: customRange.from, endDate: customRange.to }
+        : { startDate: end, endDate: end }
     case 'This month':
       return {
         startDate: toIsoDate(
@@ -104,18 +108,86 @@ function departmentLabel(departmentType: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase()) + ' Department'
 }
 
-export function DashboardPage() {
-  return getSession()?.user.role === 'USER' ? (
-    <UserDashboardPage />
-  ) : (
-    <HeadDashboard />
+const AUTOWEBSION_HEAD_TABS = [
+  { key: 'AUTOWEBSION_DEPARTMENT', label: 'Autowebsion', icon: Layers },
+  { key: 'AUTOMATION_DEPARTMENT', label: 'Automation', icon: Bot },
+  { key: 'WEBSITE_DEPARTMENT', label: 'Website', icon: Globe },
+] as const
+
+function AutowebsionMergedHeadDashboard({ rawDepartment }: { rawDepartment: string }) {
+  const session = getSession()
+  const userDept = session?.user.departmentType || rawDepartment || 'AUTOWEBSION_DEPARTMENT'
+  const ownDept =
+    AUTOWEBSION_HEAD_TABS.find((t) => t.key.toUpperCase() === userDept.toUpperCase())?.key ||
+    'AUTOWEBSION_DEPARTMENT'
+
+  const [selectedDept, setSelectedDept] = useState<string>(ownDept)
+
+  return (
+    <div className="w-full min-h-full">
+      {/* Scope Switcher Tabs: Autowebsion | Automation | Website */}
+      <div className="px-6 pt-5 pb-0 max-w-7xl mx-auto">
+        <div className="inline-flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+          {AUTOWEBSION_HEAD_TABS.map((tab) => {
+            const isSelected = selectedDept === tab.key
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setSelectedDept(tab.key)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <Icon size={14} />
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Render HeadDashboard with key to force fresh API fetch per department */}
+      <HeadDashboard key={selectedDept} overrideDepartment={selectedDept} />
+    </div>
   )
 }
 
-function HeadDashboard() {
+export function DashboardPage() {
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const rawDepartment = session?.user.departmentType || deptFromUrl || ''
+  const isAutowebsion = Boolean(
+    rawDepartment && (
+      rawDepartment.toUpperCase().includes('AUTOWEB') ||
+      rawDepartment.toUpperCase().includes('WEBSITE') ||
+      rawDepartment.toUpperCase().includes('AUTOMATION')
+    ) ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.includes('autoweb') ||
+      window.location.pathname.includes('website') ||
+      window.location.pathname.includes('automation')
+    ))
+  )
+
+  if (session?.user.role === 'USER') {
+    return <UserDashboardPage />
+  }
+
+  if (isAutowebsion) {
+    return <AutowebsionMergedHeadDashboard rawDepartment={rawDepartment} />
+  }
+
+  return <HeadDashboard />
+}
+
+function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } = {}) {
+  const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const rawDepartment = overrideDepartment || session?.user.departmentType || deptFromUrl || ''
   const isGoogle =
     rawDepartment.toUpperCase().includes('GOOGLE') ||
     (typeof window !== 'undefined' && (
@@ -127,10 +199,14 @@ function HeadDashboard() {
   const [selectedMember, setSelectedMember] =
     useState<TeamMemberPerformance | null>(null)
   const [datePeriod, setDatePeriod] = useState('Today')
+  const [customRange, setCustomRange] = useState({ from: '', to: '' })
   const [refreshKey, setRefreshKey] = useState(0)
   const department = currentDepartment
 
-  const range = useMemo(() => rangeFor(datePeriod), [datePeriod])
+  const range = useMemo(
+    () => rangeFor(datePeriod, customRange),
+    [datePeriod, customRange],
+  )
 
   const summaryParams: OnboardingSummaryParams = useMemo(
     () => ({
@@ -340,6 +416,9 @@ function HeadDashboard() {
           greetingName={departmentLabel(currentDepartment)}
           datePeriod={datePeriod}
           onDatePeriodChange={setDatePeriod}
+          customDateFrom={customRange.from}
+          customDateTo={customRange.to}
+          onCustomDateRangeChange={(from, to) => setCustomRange({ from, to })}
           onRefresh={handleRefresh}
         />
       </motion.div>

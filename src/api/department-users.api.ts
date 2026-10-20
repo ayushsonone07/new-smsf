@@ -283,7 +283,21 @@ export interface DepartmentCustomerRowItem {
     duplicateCount?: number
     hasDuplicate?: boolean
     hasDuplicateCustomer?: boolean
+    amountPaid?: number | string
+    amountPending?: number | string
+    paidAmount?: number | string
   }
+  columnData?: Record<string, unknown> | null
+  delivered?: boolean
+  isDelivered?: boolean
+  serviceDeliverySent?: boolean
+  deliveryStatus?: {
+    isDelivered?: boolean
+    delivered?: boolean
+    deliveryDate?: string
+    hasServiceHistory?: boolean
+    completionPercentage?: number | null
+  } | null
   assignedUserEmail?: string
   assignedUserName?: string
   assignedTo?: string
@@ -306,6 +320,88 @@ export interface DepartmentCustomerRowsPageResponse {
   totalElements: number
   totalPage: number
   pageNumber: number
+}
+
+export interface DeliveryConfirmationData {
+  invoice: string
+  positiveReviewQrUsername: string
+  positiveReviewQrPassword: string
+  positiveReviewQr: string
+  googlePerformanceDashboard: string
+  creativeBundle: string
+  website: string
+  automationDashboard: string
+  automationLoginId: string
+  monthlyBlogPromotion: string
+  aiVideo: string
+  profileLink: string
+}
+
+export interface DeliveryConfirmationResult {
+  message: string
+  emailSent: boolean
+  whatsappSent: boolean
+}
+
+/** Loads the saved Support delivery links used to prefill the confirmation form. */
+export async function getCustomerDeliveryLinks(
+  customerId: number | string,
+  customerUsername: string,
+): Promise<Partial<DeliveryConfirmationData> | null> {
+  const search = new URLSearchParams({ customerId: String(customerId) })
+  const res = await authedApiRequest<any>(
+    `/api/auth/customer/delivery-links?${search.toString()}`,
+    { headers: { username: customerUsername } },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Failed to load delivery links')
+  }
+
+  const links = res?.data ?? res
+  if (!links || typeof links !== 'object') return null
+
+  return {
+    ...links,
+    profileLink: links.googleBusinessProfileLink ?? links.profileLink ?? '',
+    positiveReviewQrUsername:
+      links.reviewUsUsername ?? links.positiveReviewQrUsername ?? '',
+  }
+}
+
+/** Sends the complete service-delivery confirmation for a customer. */
+export async function updateDeliveryConfirmation(
+  customerId: number | string,
+  data: DeliveryConfirmationData,
+): Promise<DeliveryConfirmationResult> {
+  const res = await authedApiRequest<any>(
+    '/api/auth/customer-service/service-delivery-confirmation',
+    {
+      method: 'POST',
+      body: JSON.stringify({ customerId, ...data }),
+    },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Failed to update delivery confirmation')
+  }
+
+  const message = String(res?.message || '')
+  const result = {
+    message,
+    emailSent: /email:\s*sent/i.test(message),
+    whatsappSent: /whatsapp:\s*sent/i.test(message),
+  }
+
+  // The backend deliberately returns HTTP 200 even when either delivery
+  // channel was skipped or failed, so the message is the authoritative result.
+  if (!result.emailSent || !result.whatsappSent) {
+    throw new Error(
+      `Delivery unsuccessful. ${message || 'Email or WhatsApp was not sent.'}`,
+    )
+  }
+
+  return result
 }
 
 /**
@@ -379,6 +475,40 @@ export async function getDepartmentCustomerRows(params: {
     totalPage,
     pageNumber: res?.pageNumber ?? res?.data?.pageNumber ?? (params.page ?? 0),
   }
+}
+
+/**
+ * `PATCH /api/auth/update-current-data?customerId=X&currentData=Y`
+ *
+ * Updates the admin-provisioned custom column current value (e.g. the
+ * support "Delivery Status" dropdown). Mirrors SMSF's
+ * updateCustomerColumnCurrentData thunk.
+ */
+export async function updateCustomerColumnCurrentData(params: {
+  customerId: number | string
+  currentData: string
+}): Promise<Record<string, unknown> | null> {
+  const session = getSession()
+  const search = new URLSearchParams({
+    customerId: String(params.customerId),
+    currentData: params.currentData,
+  })
+  const res = await authedApiRequest<{
+    success?: boolean
+    message?: string
+    data?: Record<string, unknown>
+  }>(`/api/auth/update-current-data?${search.toString()}`, {
+    method: 'PATCH',
+    headers: {
+      username: session?.user.email || session?.user.username || '',
+    },
+  })
+
+  if (res && res.success === false) {
+    throw new Error(res.message || 'Failed to update delivery status')
+  }
+
+  return res?.data ?? null
 }
 
 export interface CreateDepartmentUserRequest {

@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { getSession } from '../../../app/auth/session'
 import { useDynamicRoutes } from './useDynamicPermissions'
 import type { DynamicColumnResponse, DynamicRouteResponse } from '../../../api/dynamic-permission.api'
-import { resolveDeptFromPath } from '../../departments/head/utils/routeUtils'
+import { isUserGoogle, resolveDeptFromPath } from '../../departments/head/utils/routeUtils'
 
 export interface DepartmentRoutePermissionsResult {
   routes: DynamicRouteResponse[]
@@ -48,8 +48,20 @@ export function areSlugsEquivalent(a: string, b: string): boolean {
   const isUsersB = normB === 'users' || normB === 'department-user' || normB === 'department-users'
   if (isUsersA && isUsersB) return true
 
-  const isCustA = normA === 'customers' || normA === 'customer-list'
-  const isCustB = normB === 'customers' || normB === 'customer-list'
+  const isCustA =
+    normA === 'customers' ||
+    normA === 'customer-list' ||
+    normA === 'all-customers' ||
+    normA === 'manage-department-customers' ||
+    normA === 'manage-department-head-customers' ||
+    normA === 'autowebision-customers'
+  const isCustB =
+    normB === 'customers' ||
+    normB === 'customer-list' ||
+    normB === 'all-customers' ||
+    normB === 'manage-department-customers' ||
+    normB === 'manage-department-head-customers' ||
+    normB === 'autowebision-customers'
   if (isCustA && isCustB) return true
 
   const isPerfA = normA === 'member-flow' || normA === 'member-performance' || normA === 'members-performance'
@@ -63,6 +75,20 @@ export function areSlugsEquivalent(a: string, b: string): boolean {
   const isHistA = normA === 'history' || normA === 'task-history' || normA === 'my-analytics' || normA === 'analytics'
   const isHistB = normB === 'history' || normB === 'task-history' || normB === 'my-analytics' || normB === 'analytics'
   if (isHistA && isHistB) return true
+
+  const isMeetA =
+    normA === 'meeting' ||
+    normA === 'meetings' ||
+    normA === '15-days-meeting' ||
+    normA === '15-days-meetings' ||
+    normA === '15-day-meeting'
+  const isMeetB =
+    normB === 'meeting' ||
+    normB === 'meetings' ||
+    normB === '15-days-meeting' ||
+    normB === '15-days-meetings' ||
+    normB === '15-day-meeting'
+  if (isMeetA && isMeetB) return true
 
   return false
 }
@@ -163,7 +189,10 @@ export function useDepartmentRoutePermissions(
 ): DepartmentRoutePermissionsResult {
   const session = getSession()
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
-  const dept = departmentType || session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT'
+  const isGoogle = isUserGoogle(departmentType || session?.user.departmentType)
+  const dept = isGoogle
+    ? 'GOOGLE_DEPARTMENT'
+    : (departmentType || session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
   const isHead = session?.user.role !== 'USER'
 
   const query = useDynamicRoutes(dept)

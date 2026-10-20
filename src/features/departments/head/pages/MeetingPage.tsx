@@ -15,6 +15,7 @@ import {
 } from '../../hooks/useFollowUpMeetings'
 import { markMeetingDone, type CustomerFollowUpItem } from '../../../../api/meetings.api'
 import { getSession } from '../../../../app/auth/session'
+import { isUserGoogle, resolveDeptFromPath } from '../utils/routeUtils'
 import './MeetingPage.css'
 
 const controlsVariants: Variants = {
@@ -164,21 +165,25 @@ export function MeetingPage() {
   const isUser = session?.user?.role === 'USER'
   const userEmail = session?.user?.email || session?.user?.username || ''
 
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
+  const isGoogle = isUserGoogle(session?.user?.departmentType || deptFromUrl)
+  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (session?.user?.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
+
   // 1. Assigning users list API (only for head/admin, disabled for department user)
-  const assigningUsersQuery = useAssigningUsers('ONBOARDING_DEPARTMENT', {
+  const assigningUsersQuery = useAssigningUsers(currentDepartment, {
     enabled: !isUser,
   })
 
   // Common query params
   const baseParams = useMemo(
     () => ({
-      departmentType: 'ONBOARDING_DEPARTMENT',
+      departmentType: currentDepartment,
       searchParam: search || undefined,
       filteredUser: isUser ? userEmail : (selectedUser || undefined),
       createdAtFrom: dateFrom || undefined,
       createdAtTo: dateTo || undefined,
     }),
-    [isUser, userEmail, search, selectedUser, dateFrom, dateTo],
+    [currentDepartment, isUser, userEmail, search, selectedUser, dateFrom, dateTo],
   )
 
   // 2. Counts API (/recent?size=1&days=15 and /due?size=1)
@@ -453,6 +458,7 @@ export function MeetingPage() {
       </motion.div>
 
       <MeetingList
+        departmentType={currentDepartment}
         meetings={meetings}
         statusFilter={statusFilter}
         searchQuery={search}

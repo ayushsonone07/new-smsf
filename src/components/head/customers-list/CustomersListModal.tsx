@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateCustomer } from '../../../api/customers.api'
@@ -1408,7 +1409,7 @@ export function CustomersListModal({
                     </div>
 
                     <div className="cl-drawer__bill-upload">
-                      <label className="cl-drawer__bill-drop">
+                      {/* <label className="cl-drawer__bill-drop">
                         <Icon name="upload" size={22} strokeWidth={1.8} />
                         <strong>
                           {billFile
@@ -1425,8 +1426,31 @@ export function CustomersListModal({
                           disabled={billUploading}
                           onChange={handleBillFileChange}
                         />
-                      </label>
+                      </label> */}
 
+                      <label className={`cl-drawer__bill-drop${billFile ? ' has-file' : ''}${billUploading ? ' is-disabled' : ''}`}>
+                        <Icon name="upload" size={20} strokeWidth={1.8} />
+                        <span className="cl-drawer__bill-drop-text">
+                          <strong title={billFile?.name}>
+                            {billFile ? billFile.name : 'Upload document here'}
+                          </strong>
+                          <span>
+                            {billFile
+                              ? 'Click to choose a different file'
+                              : billingInfo.billUrl
+                                ? 'Choose a replacement · PDF, DOC, DOCX, image or video'
+                                : 'PDF, DOC, DOCX, image or video'}
+                          </span>
+                        </span>
+                        <span className="cl-drawer__bill-drop-btn">Browse</span>
+                        <input
+                          ref={billInputRef}
+                          type="file"
+                          accept={BILL_FILE_ACCEPT}
+                          disabled={billUploading}
+                          onChange={handleBillFileChange}
+                        />
+                      </label>
                       {billUploading && (
                         <div className="cl-drawer__bill-progress" role="status">
                           <span className="cl-drawer__bill-progress-track">

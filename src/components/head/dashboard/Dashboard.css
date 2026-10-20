@@ -131,6 +131,80 @@
   font-weight: 600;
 }
 
+.hdb-custom-range {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  padding: 12px;
+}
+
+.hdb-banner__dropdown-menu:has(.hdb-custom-range) {
+  width: 284px;
+}
+
+.hdb-custom-range--calendar .cl-range-picker {
+  position: static;
+}
+
+.hdb-custom-range--calendar .cl-date-picker {
+  top: calc(100% + 12px);
+  right: 12px;
+}
+
+.hdb-custom-range__back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hdb-custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.hdb-custom-range input[type='date'] {
+  height: 38px;
+  padding: 0 9px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  outline: 0;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.hdb-custom-range input[type='date']:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+}
+
+.hdb-custom-range__apply {
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hdb-custom-range__apply:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
 .hdb-banner__btn {
   display: grid;
   place-items: center;
