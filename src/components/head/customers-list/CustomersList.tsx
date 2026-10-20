@@ -285,6 +285,8 @@ interface AssigneeDropdownProps {
   isEditable: boolean
   onAssigneeChange: (assigneeId: string | null) => void
   pageSize?: number
+  emptyLabel?: string
+  searchPlaceholder?: string
 }
 
 export function AssigneeDropdown({
@@ -293,6 +295,8 @@ export function AssigneeDropdown({
   isEditable,
   onAssigneeChange,
   pageSize = 5,
+  emptyLabel = 'Unassigned',
+  searchPlaceholder = 'Search assignee...',
 }: AssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -334,8 +338,8 @@ export function AssigneeDropdown({
   const showUnassigned = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return true
-    return 'unassigned'.includes(q)
-  }, [searchQuery])
+    return emptyLabel.toLowerCase().includes(q)
+  }, [searchQuery, emptyLabel])
 
   const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
@@ -438,7 +442,7 @@ export function AssigneeDropdown({
       <button
         type="button"
         className="cl-assign-btn"
-        title={matchedAssignee ? matchedAssignee.name : assigneeId || 'Unassigned'}
+        title={matchedAssignee ? matchedAssignee.name : assigneeId || emptyLabel}
         onClick={() => setIsOpen((o) => !o)}
         disabled={!isEditable}
         aria-expanded={isOpen}
@@ -456,7 +460,7 @@ export function AssigneeDropdown({
         <span className="cl-assign-name">
           {matchedAssignee
             ? matchedAssignee.name
-            : assigneeId || 'Unassigned'}
+            : assigneeId || emptyLabel}
         </span>
         {isEditable && (
           <Icon name="chevronDown" size={12} strokeWidth={2.5} />
@@ -498,7 +502,7 @@ export function AssigneeDropdown({
               }}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
-              placeholder="Search assignee..."
+              placeholder={searchPlaceholder}
             />
             {searchQuery && (
               <button
@@ -531,7 +535,7 @@ export function AssigneeDropdown({
               }}
             >
               <Avatar name="?" size={20} tone="muted" />
-              <span className="cl-assign-opt-name">Unassigned</span>
+              <span className="cl-assign-opt-name">{emptyLabel}</span>
               {isUnassignedSelected && (
                 <Icon name="check" size={13} strokeWidth={2.5} className="cl-assign-check" />
               )}
