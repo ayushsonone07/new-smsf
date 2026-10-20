@@ -1,0 +1,92 @@
+.delivery-confirmation-modal {
+  max-height: min(90vh, 760px);
+  overflow: hidden;
+}
+
+.delivery-confirmation-form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(90vh - 110px);
+}
+
+.delivery-confirmation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  overflow-y: auto;
+}
+
+.delivery-confirmation-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  color: #334155;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.delivery-confirmation-fields input {
+  height: 40px;
+  padding: 0 .75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  outline: 0;
+  color: #172033;
+  font: inherit;
+  font-weight: 400;
+}
+
+.delivery-confirmation-fields input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 12%);
+}
+
+.delivery-confirmation-error {
+  margin: 1rem 1.25rem 0;
+  padding: .65rem .8rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: .8rem;
+}
+
+.delivery-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .65rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #eef2f7;
+}
+
+.delivery-confirmation-actions button {
+  min-width: 88px;
+  height: 38px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.delivery-confirmation-actions .is-secondary {
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  color: #475569;
+}
+
+.delivery-confirmation-actions .is-primary {
+  border: 1px solid #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.delivery-confirmation-actions button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+@media (max-width: 640px) {
+  .delivery-confirmation-fields { grid-template-columns: 1fr; }
+}

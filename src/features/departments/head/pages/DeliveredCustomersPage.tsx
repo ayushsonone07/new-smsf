@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { PermissionToggle } from '../../../../components/permissions/PermissionToggle'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
+import { DeliveryConfirmationModal } from '../components/DeliveryConfirmationModal'
 import type {
   OnboardingAssignee,
   OnboardingCustomer,
@@ -12,6 +13,8 @@ import { getSession } from '../../../../app/auth/session'
 import { getAssigningUsers } from '../../../../api/meetings.api'
 import {
   assignCustomerUser,
+  getCustomerDeliveryLinks,
+  type DeliveryConfirmationData,
   type DepartmentCustomerRowItem,
 } from '../../../../api/department-users.api'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
@@ -246,6 +249,7 @@ function isRowDelivered(row: DepartmentCustomerRowItem): boolean {
 export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps) {
   const session = getSession()
   const isHead = session?.user.role !== 'USER'
+  const isUser = session?.user.role === 'USER'
   const queryClient = useQueryClient()
 
   const [page, setPage] = useState(0)
@@ -256,6 +260,11 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
   const [assigneeOverrides, setAssigneeOverrides] = useState<Record<string, string>>({})
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [loadingDeliveryId, setLoadingDeliveryId] = useState<string | null>(null)
+  const [deliveryModal, setDeliveryModal] = useState<{
+    row: DepartmentCustomerRowItem
+    initialData: Partial<DeliveryConfirmationData> | null
+  } | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -352,6 +361,27 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
       )
     } finally {
       setAssigningId(null)
+    }
+  }
+
+  async function openDeliveryModal(row: DepartmentCustomerRowItem) {
+    const id = rowId(row)
+    if (!id || loadingDeliveryId) return
+    const customerUsername = row.customerDetails?.email ?? row.email ?? ''
+    setLoadingDeliveryId(id)
+    setActionError(null)
+    try {
+      const initialData = customerUsername
+        ? await getCustomerDeliveryLinks(id, customerUsername)
+        : null
+      setDeliveryModal({ row, initialData })
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Failed to load delivery details',
+      )
+      setDeliveryModal({ row, initialData: null })
+    } finally {
+      setLoadingDeliveryId(null)
     }
   }
 
@@ -484,13 +514,19 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                       </td>
                       <td className="delivered-business">{rowBusinessName(row)}</td>
                       <td>
-                        <span
-                          className={`delivered-badge ${
+                        <button
+                          type="button"
+                          className={`delivered-badge delivered-status-button ${
                             delivered ? 'is-delivered' : 'is-not-delivered'
                           }`}
+                          disabled={!isUser || loadingDeliveryId === id}
+                          title={isUser ? 'Edit delivery status' : undefined}
+                          onClick={() => void openDeliveryModal(row)}
                         >
-                          {delivered ? 'Delivered' : 'Not Delivered'}
-                        </span>
+                          {loadingDeliveryId === id
+                            ? 'Loading...'
+                            : delivered ? 'Delivered' : 'Not Delivered'}
+                        </button>
                       </td>
                       <td className="delivered-amount">{formatAmount(paid)}</td>
                       <td>
@@ -547,6 +583,21 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
           assignees={assigneeOptions}
           departmentType={SUPPORT_DEPARTMENT}
           onClose={() => setSelectedRow(null)}
+        />
+      )}
+
+      {deliveryModal && (
+        <DeliveryConfirmationModal
+          open
+          customerId={rowId(deliveryModal.row)}
+          customerName={rowOwnerName(deliveryModal.row)}
+          initialData={deliveryModal.initialData}
+          onClose={() => setDeliveryModal(null)}
+          onSuccess={async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ['department-customer-rows'],
+            })
+          }}
         />
       )}
     </div>

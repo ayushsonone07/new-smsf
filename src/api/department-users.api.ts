@@ -322,6 +322,66 @@ export interface DepartmentCustomerRowsPageResponse {
   pageNumber: number
 }
 
+export interface DeliveryConfirmationData {
+  invoice: string
+  positiveReviewQrUsername: string
+  positiveReviewQrPassword: string
+  positiveReviewQr: string
+  googlePerformanceDashboard: string
+  creativeBundle: string
+  website: string
+  automationDashboard: string
+  automationLoginId: string
+  monthlyBlogPromotion: string
+  aiVideo: string
+  profileLink: string
+}
+
+/** Loads the saved Support delivery links used to prefill the confirmation form. */
+export async function getCustomerDeliveryLinks(
+  customerId: number | string,
+  customerUsername: string,
+): Promise<Partial<DeliveryConfirmationData> | null> {
+  const search = new URLSearchParams({ customerId: String(customerId) })
+  const res = await authedApiRequest<any>(
+    `/api/auth/customer/delivery-links?${search.toString()}`,
+    { headers: { username: customerUsername } },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Failed to load delivery links')
+  }
+
+  const links = res?.data ?? res
+  if (!links || typeof links !== 'object') return null
+
+  return {
+    ...links,
+    profileLink: links.googleBusinessProfileLink ?? links.profileLink ?? '',
+    positiveReviewQrUsername:
+      links.reviewUsUsername ?? links.positiveReviewQrUsername ?? '',
+  }
+}
+
+/** Sends the complete service-delivery confirmation for a customer. */
+export async function updateDeliveryConfirmation(
+  customerId: number | string,
+  data: DeliveryConfirmationData,
+): Promise<unknown> {
+  const res = await authedApiRequest<any>(
+    '/api/auth/customer-service/service-delivery-confirmation',
+    {
+      method: 'POST',
+      body: JSON.stringify({ customerId, ...data }),
+    },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Failed to update delivery confirmation')
+  }
+  return res?.data ?? res
+}
+
 /**
  * `GET /api/auth/department/customer/rows?page=0&size=10&compatible=true`
  */

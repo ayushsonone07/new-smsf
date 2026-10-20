@@ -166,6 +166,24 @@
   white-space: nowrap;
 }
 
+.delivered-status-button {
+  border: 0;
+  font-family: inherit;
+}
+
+.delivered-status-button:not(:disabled) {
+  cursor: pointer;
+}
+
+.delivered-status-button:not(:disabled):hover {
+  filter: brightness(.96);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 10%);
+}
+
+.delivered-status-button:disabled {
+  cursor: default;
+}
+
 .delivered-badge::before {
   content: '';
   width: 6px;
