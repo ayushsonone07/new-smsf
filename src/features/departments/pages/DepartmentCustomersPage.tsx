@@ -25,6 +25,7 @@ import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { notifyCustomerDeleted } from '../../../api/notification-factory'
 
 type DepartmentRole =
   | 'department-head'
@@ -138,6 +139,7 @@ export function DepartmentCustomersPage() {
 
     deleteMutation.mutate(customerToDelete.id, {
       onSuccess: () => {
+        notifyCustomerDeleted(customerToDelete)
         setCustomerToDelete(null)
       },
     })

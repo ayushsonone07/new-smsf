@@ -23,6 +23,7 @@ import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import './DepartmentManagementPage.css'
+import { notifyHeadDeleted } from '../../../api/notification-factory'
 
 export function DepartmentManagementPage() {
   const navigate = useNavigate()
@@ -139,6 +140,7 @@ export function DepartmentManagementPage() {
       departmentToDelete.email || departmentToDelete.id,
       {
         onSuccess: () => {
+          notifyHeadDeleted(departmentToDelete.name || departmentToDelete.username || '', departmentToDelete.email || '')
           setDepartmentToDelete(null)
         },
       },

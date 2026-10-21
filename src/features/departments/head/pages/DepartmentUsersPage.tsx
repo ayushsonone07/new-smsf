@@ -38,6 +38,7 @@ import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useQuery } from '@tanstack/react-query'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
+import { notifyUserCreated, notifyUserDeleted, notifyUserUpdated } from '../../../../api/notification-factory'
 import { UserCog, UserPlus, Building, Download, BookOpen, UsersRound } from 'lucide-react'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
@@ -477,6 +478,7 @@ export function DepartmentUsersPage() {
         isHead: false,
         headUser: currentUser?.email || '',
       })
+      notifyUserCreated(values.username || values.name || '', values.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -513,6 +515,7 @@ export function DepartmentUsersPage() {
         departmentType: deptType,
         isHead: false,
       })
+      notifyUserUpdated(values.username || values.name || user.name || '', values.email || user.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -533,6 +536,7 @@ export function DepartmentUsersPage() {
       await deleteDepartmentUser({
         id: user.id,
       })
+      notifyUserDeleted(user.name || '', user.email || '')
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
         await autowebTabCountsQuery.refetch()
