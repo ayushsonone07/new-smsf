@@ -78,7 +78,7 @@ export function BulkAssignModal({
     const seen = new Set<string>()
     return (usersQuery.data?.data ?? []).filter((user) => {
       const email = user.email?.trim().toLowerCase()
-      if (!email || seen.has(email) || user.isHead) return false
+      if (!email || seen.has(email)) return false
       if (
         user.departmentType &&
         session?.user.departmentType &&

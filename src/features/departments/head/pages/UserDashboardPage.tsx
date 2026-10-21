@@ -84,21 +84,20 @@ function shiftDays(date: Date, days: number): Date {
  * "Custom range" has no date picker yet — it falls back to the
  * last 7 days.
  */
-function rangeFor(period: string): DateRange {
+function rangeFor(period: string, customRange?: { from: string; to: string }): DateRange {
   const today = new Date()
   const end = toIsoDate(today)
 
   switch (period) {
-    case 'Yesterday': {
-      const yesterday = toIsoDate(shiftDays(today, -1))
-      return { startDate: yesterday, endDate: yesterday }
-    }
     case 'Last 7 days':
-    case 'Custom range':
       return {
         startDate: toIsoDate(shiftDays(today, -6)),
         endDate: end,
       }
+    case 'Custom range':
+      return customRange?.from && customRange?.to
+        ? { startDate: customRange.from, endDate: customRange.to }
+        : { startDate: end, endDate: end }
     case 'This month':
       return {
         startDate: toIsoDate(
@@ -694,6 +693,7 @@ export function UserDashboardPage() {
 
 function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
   const [datePeriod, setDatePeriod] = useState('Today')
+  const [customRange, setCustomRange] = useState({ from: '', to: '' })
   const [refreshKey, setRefreshKey] = useState(0)
   const session = getSession()
   const name = session?.user.name ?? 'there'
@@ -704,8 +704,8 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         window.location.pathname.startsWith('/google')))
 
   const range = useMemo(
-    () => rangeFor(datePeriod),
-    [datePeriod],
+    () => rangeFor(datePeriod, customRange),
+    [datePeriod, customRange],
   )
   const summaryParams = useMemo(
     () => ({
@@ -909,6 +909,9 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
           greetingName={name}
           datePeriod={datePeriod}
           onDatePeriodChange={setDatePeriod}
+          customDateFrom={customRange.from}
+          customDateTo={customRange.to}
+          onCustomDateRangeChange={(from, to) => setCustomRange({ from, to })}
           onRefresh={handleRefresh}
           subtitle={
             isGoogle

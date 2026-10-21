@@ -2442,6 +2442,16 @@
   position: relative;
 }
 
+.cl-range-picker--embedded {
+  width: 0;
+  height: 0;
+}
+
+.cl-range-picker--embedded .cl-date-picker {
+  top: 8px;
+  right: -4px;
+}
+
 .cl-range-picker__trigger {
   display: inline-flex;
   align-items: center;

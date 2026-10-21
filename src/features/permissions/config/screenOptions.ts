@@ -18,6 +18,7 @@ export const SCREEN_OPTIONS: Array<{
   { value: 'meeting', label: '15 Days Meeting', defaultSlug: 'meeting', defaultIcon: 'calendar' },
   { value: 'sop', label: 'SOP', defaultSlug: 'sop', defaultIcon: 'flow' },
   { value: 'help-center', label: 'Help Center', defaultSlug: 'help-center', defaultIcon: 'help' },
+  { value: 'delivered', label: 'Delivered Customers', defaultSlug: 'delivered', defaultIcon: 'brief' },
   { value: 'custom', label: 'Custom page', defaultSlug: '', defaultIcon: 'brief' },
 ]
 

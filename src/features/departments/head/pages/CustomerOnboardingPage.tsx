@@ -15,7 +15,6 @@ import { CustomersListSearchBar } from '../../../../components/head/customers-li
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
 import { OnboardingConfirmationModal } from '../../../../components/head/customers-list/OnboardingConfirmationModal'
 import '../../../../components/head/customers-list/CustomersList.css'
-import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { getSession } from '../../../../app/auth/session'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
@@ -25,10 +24,7 @@ import type { FeaturePermission } from '../../../permissions/types/permission.ty
 import { updateOnboardingStatus } from '../../../../api/department-users.api'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 
-const ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map((user) => ({
-  id: user.id,
-  name: user.name,
-}))
+const ASSIGNEES: OnboardingAssignee[] = []
 
 interface OnboardingOverrides {
   status?: OnboardingStatus
@@ -117,7 +113,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
           assigneeId:
             override && 'assigneeId' in override
               ? override.assigneeId ?? null
-              : ASSIGNEES[index % ASSIGNEES.length]?.id ?? null,
+              : null,
           remark: override?.remark ?? '',
           updatedLabel: index === 0 ? 'Just now' : `${index + 1}h ago`,
           businessRelationType: index < 3 ? (index === 0 ? 'main' : 'branch') : undefined,

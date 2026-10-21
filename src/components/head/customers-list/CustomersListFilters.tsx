@@ -178,14 +178,20 @@ export function DateRangePicker({
   to,
   onChange,
   onReset,
+  autoOpen = false,
+  hideTrigger = false,
+  onDismiss,
 }: {
   label: string
   from: string
   to: string
   onChange: (from: string, to: string) => void
   onReset: () => void
+  autoOpen?: boolean
+  hideTrigger?: boolean
+  onDismiss?: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [viewMonth, setViewMonth] = useState(() =>
     monthStart(from ? new Date(`${from}T00:00:00`) : new Date()),
   )
@@ -208,11 +214,15 @@ export function DateRangePicker({
         !pickerRef.current?.contains(event.target)
       ) {
         setOpen(false)
+        onDismiss?.()
       }
     }
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {
+        setOpen(false)
+        onDismiss?.()
+      }
     }
 
     document.addEventListener('mousedown', closeOnOutsideClick)
@@ -240,6 +250,7 @@ export function DateRangePicker({
     setDraftTo(value)
     onChange(draftFrom, value)
     setOpen(false)
+    onDismiss?.()
   }
 
   function selectQuickRange(days: number) {
@@ -249,6 +260,7 @@ export function DateRangePicker({
     setDraftFrom(start)
     setDraftTo(end)
     setOpen(false)
+    onDismiss?.()
   }
 
   function resetRange() {
@@ -256,11 +268,12 @@ export function DateRangePicker({
     setDraftTo('')
     onReset()
     setOpen(false)
+    onDismiss?.()
   }
 
   return (
-    <div className="cl-range-picker" ref={pickerRef}>
-      <button
+    <div className={`cl-range-picker${hideTrigger ? ' cl-range-picker--embedded' : ''}`} ref={pickerRef}>
+      {!hideTrigger && <button
         type="button"
         className={`cl-range-picker__trigger${open ? ' is-open' : ''}${hasRange ? ' has-range' : ''}`}
         onClick={showPicker}
@@ -269,7 +282,7 @@ export function DateRangePicker({
       >
         <Icon name="calendarSmall" size={20} />
         <span>{buttonLabel}</span>
-      </button>
+      </button>}
 
       {open && (
         <div className="cl-date-picker" role="dialog" aria-label={`${label} date range`}>
