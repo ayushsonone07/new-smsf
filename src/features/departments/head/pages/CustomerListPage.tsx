@@ -19,6 +19,10 @@ import { ServiceFlowModal } from '../../../../components/head/customers-list/Ser
 import { GoogleInfoModal } from '../../../../components/head/customers-list/GoogleInfoModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
 import {
+  SubServiceValidationModal,
+  type SubServiceStatusItem,
+} from '../../../../components/head/customers-list/SubServiceValidationModal'
+import {
   updateDepartmentServiceStatus,
   extractServiceTags,
   getDepartmentConfig,
@@ -99,6 +103,14 @@ export function CustomerListPage() {
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
   const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
+  const [validationModal, setValidationModal] = useState<{
+    open: boolean
+    type: 'incomplete' | 'acknowledgment'
+    message: string
+    detail?: string
+    subServices?: SubServiceStatusItem[]
+    customer?: OnboardingCustomer
+  } | null>(null)
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
   const [selectedSubServiceName, setSelectedSubServiceName] = useState<string | undefined>(undefined)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
@@ -680,18 +692,100 @@ export function CustomerListPage() {
         filteredCustomers.find((c) => c.id === customerId) ||
         onboardingCustomers.find((c) => c.id === customerId)
 
-      let allDone = false
-      if (Array.isArray(target?.subServiceInfo) && target.subServiceInfo.length > 0) {
-        allDone = target.subServiceInfo.every((sub: any) => {
-          const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
-          return String(st).toUpperCase() === 'COMPLETED'
-        })
-      } else if (Array.isArray(target?.services) && target.services.length > 0) {
-        allDone = target.services.every((s: any) => String(s?.status).toUpperCase() === 'COMPLETED')
+      const allStatuses: string[] = []
+      const subServices =
+        Array.isArray(target?.subServiceInfo) && target.subServiceInfo.length > 0
+          ? target.subServiceInfo
+          : Array.isArray((target as any)?.rawCustomer?.subServiceInfo) &&
+              (target as any).rawCustomer.subServiceInfo.length > 0
+            ? (target as any).rawCustomer.subServiceInfo
+            : null
+
+      const services =
+        Array.isArray(target?.services) && target.services.length > 0
+          ? target.services
+          : Array.isArray((target as any)?.rawCustomer?.services) &&
+              (target as any).rawCustomer.services.length > 0
+            ? (target as any).rawCustomer.services
+            : null
+
+      if (subServices) {
+        for (const sub of subServices) {
+          const st =
+            sub?.status ||
+            sub?.subServiceStatus ||
+            (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+          if (st) allStatuses.push(String(st).trim().toUpperCase())
+        }
+      } else if (services) {
+        for (const s of services) {
+          if (Array.isArray(s?.subServices) && s.subServices.length > 0) {
+            for (const sub of s.subServices) {
+              const st =
+                sub?.status ||
+                sub?.subServiceStatus ||
+                (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+              if (st) allStatuses.push(String(st).trim().toUpperCase())
+            }
+          } else if (s?.status) {
+            allStatuses.push(String(s.status).trim().toUpperCase())
+          }
+        }
       }
 
-      if (!allDone) {
-        alert('All sub-services must be completed and acknowledgement sent before marking the main service as completed.')
+      const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
+      const isAck = (st: string) =>
+        st.includes('ACK') ||
+        st === 'PENDING_CUSTOMER_ACK' ||
+        st === 'ACKNOWLEDGEMENT_PENDING' ||
+        st === 'PENDING_ACK'
+
+      const parsedSubList: SubServiceStatusItem[] = []
+      if (subServices) {
+        for (const sub of subServices) {
+          const name = sub?.name || sub?.subServiceName || (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : 'Sub-service')
+          const st = sub?.status || sub?.subServiceStatus || (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+          if (st) parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
+        }
+      } else if (services) {
+        for (const s of services) {
+          if (Array.isArray(s?.subServices) && s.subServices.length > 0) {
+            for (const sub of s.subServices) {
+              const name = sub?.name || sub?.subServiceName || 'Sub-service'
+              const st = sub?.status || sub?.subServiceStatus || (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+              if (st) parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
+            }
+          } else if (s?.status) {
+            parsedSubList.push({ name: s.serviceType || 'Service', status: String(s.status).trim().toUpperCase() })
+          }
+        }
+      }
+
+      if (allStatuses.length === 0) {
+        setValidationModal({
+          open: true,
+          type: 'incomplete',
+          message: 'Please complete subservice',
+          detail: 'All sub-services must be completed before marking the main service as completed.',
+          customer: target,
+        })
+        return
+      }
+
+      const allCompleted = allStatuses.every(isDone)
+      if (!allCompleted) {
+        const hasUnfinished = allStatuses.some((st) => !isDone(st) && !isAck(st))
+        const isAckState = !hasUnfinished && allStatuses.some(isAck)
+        setValidationModal({
+          open: true,
+          type: isAckState ? 'acknowledgment' : 'incomplete',
+          message: isAckState ? 'Complete your acknowledgment' : 'Please complete subservice',
+          detail: isAckState
+            ? 'All sub-services are completed, but customer acknowledgment is pending confirmation.'
+            : 'All sub-services must be marked as completed before this service can be finalized.',
+          subServices: parsedSubList,
+          customer: target,
+        })
         return
       }
     }
@@ -903,6 +997,25 @@ export function CustomerListPage() {
         customer={googleInfoCustomer}
         isOpen={Boolean(googleInfoCustomer)}
         onClose={() => setGoogleInfoCustomer(null)}
+      />
+
+      {/* Sub-Service Validation / Acknowledgment Modal */}
+      <SubServiceValidationModal
+        open={Boolean(validationModal?.open)}
+        type={validationModal?.type || 'incomplete'}
+        message={validationModal?.message || 'Please complete subservice'}
+        detail={validationModal?.detail}
+        subServices={validationModal?.subServices}
+        onClose={() => setValidationModal(null)}
+        onOpenSubServices={
+          validationModal?.customer
+            ? () => {
+                const targetCustomer = validationModal.customer!
+                setServiceFlowCustomer(targetCustomer)
+                setSelectedSubServiceName(undefined)
+              }
+            : undefined
+        }
       />
 
       <OnboardingConfirmationModal
