@@ -23,6 +23,8 @@ export interface Customer {
   assigneeId?: string | null
   remark?: string
   remarkType?: string
+  departmentType?: string
+  serviceType?: string
   updatedLabel?: string
   contactDate?: string
   businessRelationType?: CustomerBusinessRelationType
@@ -49,6 +51,8 @@ export interface UpdateCustomerRequest {
   assigneeId?: string | null
   remark?: string
   remarkType?: string
+  departmentType?: string
+  serviceType?: string
   updatedLabel?: string
   contactDate?: string
   businessRelationType?: CustomerBusinessRelationType

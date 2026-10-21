@@ -23,8 +23,7 @@ import {
   Loader2,
   ChevronsUpDown,
   MessageSquare,
-  Plus,
-} from 'lucide-react'
+  } from 'lucide-react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -34,6 +33,10 @@ import { ServiceFlowModal } from '../../../../components/head/customers-list/Ser
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
 import { SendDraftModal } from '../../../../components/head/customers-list/SendDraftModal'
 import { DraftHistoryModal } from '../../../../components/head/customers-list/DraftHistoryModal'
+import {
+  SubServiceValidationModal,
+  type SubServiceStatusItem,
+} from '../../../../components/head/customers-list/SubServiceValidationModal'
 import { extractServiceTags } from '../../../../api/service-flow.api'
 import {
   sendWebsiteDraftMail,
@@ -42,6 +45,9 @@ import {
 } from '../../../../api/website-draft.api'
 import {
   getCustomerInternalRemarks,
+  getCustomerReviewReplies,
+  getCustomerRemarks,
+  addClientRemark,
   type CustomerRemark,
 } from '../../../../api/customer-drawer.api'
 import {
@@ -98,13 +104,19 @@ export function AutowebisionCustomersPage({
   // Permissions must come from the department that owns the current route.
   // Using AUTOWEBSION_DEPARTMENT here bypassed the AUTOMATION_DEPARTMENT
   // Head/User access configured by Admin.
-  const permissionDepartmentType = session?.user.departmentType || (
-    typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('automation')
-      ? 'AUTOMATION_DEPARTMENT'
-      : typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('website')
-        ? 'WEBSITE_DEPARTMENT'
-        : 'AUTOWEBSION_DEPARTMENT'
-  )
+  const isAutomationScreen =
+    defaultSubTab === 'AUTOMATION' ||
+    (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('automation'))
+
+  const isWebsiteScreen =
+    defaultSubTab === 'WEBSITE' ||
+    (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('website'))
+
+  const permissionDepartmentType = isAutomationScreen
+    ? 'AUTOMATION_DEPARTMENT'
+    : isWebsiteScreen
+      ? 'WEBSITE_DEPARTMENT'
+      : (session?.user.departmentType || 'AUTOWEBSION_DEPARTMENT')
   const permissionRouteName = permissionDepartmentType === 'AUTOMATION_DEPARTMENT'
     ? 'automation_department/head/customer-list'
     : permissionDepartmentType === 'WEBSITE_DEPARTMENT'
@@ -155,6 +167,89 @@ export function AutowebisionCustomersPage({
     }
   }, [defaultSubTab])
 
+  const handleOpenClientRemarkDialog = useCallback(
+    async (customer: AutowebsionCustomerLightDTO) => {
+      const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
+        activeSubTab === 'AUTOMATION' || isAutomationScreen
+          ? 'AUTOMATION_DEPARTMENT'
+          : activeSubTab === 'WEBSITE' || isWebsiteScreen
+            ? 'WEBSITE_DEPARTMENT'
+            : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
+                ? 'AUTOMATION_DEPARTMENT'
+                : 'WEBSITE_DEPARTMENT')
+
+      const initialText = customer.clientRemark?.trim()
+      const initialRemarks: Array<{ reply: string; timestamp: string; staffName?: string }> = initialText
+        ? [{ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' }]
+        : []
+
+      setViewingClientRemark({
+        customerId: customer.customerId,
+        name: customer.businessName || customer.ownerName || 'Customer',
+        departmentType: targetDept,
+        remarks: initialRemarks,
+        loading: true,
+        error: null,
+      })
+      setNewClientRemarkText('')
+
+      try {
+        const [reviewRepliesRes, generalRemarksRes] = await Promise.allSettled([
+          getCustomerReviewReplies(customer.customerId, targetDept),
+          getCustomerRemarks(customer.customerId, targetDept, userEmail),
+        ])
+
+        const list: Array<{ reply: string; timestamp: string; staffName?: string }> = []
+        const seen = new Set<string>()
+
+        if (reviewRepliesRes.status === 'fulfilled' && Array.isArray(reviewRepliesRes.value)) {
+          reviewRepliesRes.value.forEach((r) => {
+            const text = (r.reply || '').trim()
+            if (text && !seen.has(text)) {
+              seen.add(text)
+              list.push({
+                reply: text,
+                timestamp: r.timestamp || '',
+                staffName: r.staffName || '',
+              })
+            }
+          })
+        }
+
+        if (generalRemarksRes.status === 'fulfilled' && generalRemarksRes.value?.clientRemark) {
+          generalRemarksRes.value.clientRemark.forEach((r) => {
+            const text = (r.remark || (r as any).clientRemark || '').trim()
+            if (text && !seen.has(text)) {
+              seen.add(text)
+              list.push({
+                reply: text,
+                timestamp: r.timestamp || '',
+                staffName: r.staffName || '',
+              })
+            }
+          })
+        }
+
+        if (list.length === 0 && initialText) {
+          list.push({ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' })
+        }
+
+        setViewingClientRemark((prev) =>
+          prev && prev.customerId === customer.customerId
+            ? { ...prev, remarks: list, loading: false }
+            : prev,
+        )
+      } catch (err: any) {
+        setViewingClientRemark((prev) =>
+          prev && prev.customerId === customer.customerId
+            ? { ...prev, loading: false, error: err?.message || 'Failed to load client remarks' }
+            : prev,
+        )
+      }
+    },
+    [activeSubTab, isAutomationScreen, isWebsiteScreen, userEmail],
+  )
+
   // Modals state
   const [selectedCustomer, setSelectedCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceFlowTarget, setServiceFlowTarget] = useState<{
@@ -165,13 +260,30 @@ export function AutowebisionCustomersPage({
     customer: OnboardingCustomer
     serviceType: string
   } | null>(null)
-  const [viewingClientRemark, setViewingClientRemark] = useState<{ name: string; remark: string } | null>(null)
+  const [viewingClientRemark, setViewingClientRemark] = useState<{
+    customerId: number
+    name: string
+    departmentType: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT'
+    remarks: Array<{ reply: string; timestamp: string; staffName?: string }>
+    loading: boolean
+    error?: string | null
+  } | null>(null)
+  const [newClientRemarkText, setNewClientRemarkText] = useState('')
+  const [isSubmittingClientRemark, setIsSubmittingClientRemark] = useState(false)
   const [viewingDuplicate, setViewingDuplicate] = useState<{ name: string; customerId: number } | null>(null)
   const [updatingWebsiteExistsId, setUpdatingWebsiteExistsId] = useState<number | null>(null)
   const [confirmWebsiteExistsTarget, setConfirmWebsiteExistsTarget] = useState<AutowebsionCustomerLightDTO | null>(null)
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [localStatusMap, setLocalStatusMap] = useState<Record<string, string>>({})
+  const [validationModal, setValidationModal] = useState<{
+    open: boolean
+    type: 'incomplete' | 'acknowledgment'
+    message: string
+    detail?: string
+    subServices?: SubServiceStatusItem[]
+  } | null>(null)
 
   // On-demand Internal Remarks state
   const [activeRemarkPopoverKey, setActiveRemarkPopoverKey] = useState<string | null>(null)
@@ -487,6 +599,26 @@ export function AutowebisionCustomersPage({
     return 'Pending'
   }
 
+  function getServicePillStyle(status: string): { btnClass: string; iconClass: string } {
+    const s = String(status || 'PENDING').toUpperCase().replace(/-/g, '_')
+    if (s.includes('COMPLETE')) {
+      return {
+        btnClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100',
+        iconClass: 'text-emerald-600',
+      }
+    }
+    if (s.includes('PROGRESS')) {
+      return {
+        btnClass: 'bg-blue-50 text-blue-700 border-blue-200/80 hover:bg-blue-100',
+        iconClass: 'text-blue-600',
+      }
+    }
+    return {
+      btnClass: 'bg-[#fff8eb] text-[#b45309] border-amber-200/80 hover:bg-amber-100/70',
+      iconClass: 'text-amber-700',
+    }
+  }
+
   // Helper to extract sub-services for a customer and service type
   function getSubServicesForCustomer(
     customer: AutowebsionCustomerLightDTO,
@@ -562,6 +694,7 @@ export function AutowebisionCustomersPage({
   ): {
     subServices: Array<{ name: string; status: string }>
     allCompleted: boolean
+    isWaitingAck: boolean
     incompleteNames: string[]
   } {
     const subServices = getSubServicesForCustomer(customer, targetServiceType)
@@ -570,21 +703,29 @@ export function AutowebisionCustomersPage({
       return {
         subServices: [],
         allCompleted: true,
+        isWaitingAck: false,
         incompleteNames: [],
       }
     }
 
-    const incomplete = subServices.filter((s) => {
-      const st = s.status.toUpperCase()
-      return st !== 'COMPLETED' && st !== 'COMPLETE'
-    })
+    const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
+    const isAck = (st: string) =>
+      st.includes('ACK') ||
+      st === 'PENDING_CUSTOMER_ACK' ||
+      st === 'ACKNOWLEDGEMENT_PENDING' ||
+      st === 'PENDING_ACK'
 
+    const incomplete = subServices.filter((s) => !isDone(s.status.toUpperCase()))
     const allCompleted = incomplete.length === 0
     const incompleteNames = incomplete.map((s) => s.name)
+
+    const hasUnfinished = incomplete.some((s) => !isAck(s.status.toUpperCase()))
+    const isWaitingAck = !allCompleted && !hasUnfinished && incomplete.some((s) => isAck(s.status.toUpperCase()))
 
     return {
       subServices,
       allCompleted,
+      isWaitingAck,
       incompleteNames,
     }
   }
@@ -823,6 +964,8 @@ export function AutowebisionCustomersPage({
     targetServiceType?: 'WEBSITE' | 'AUTOMATION',
   ) {
     if (!canEditStatus) return
+    const mapKey = `${customer.customerId}_${targetServiceType || 'ALL'}`
+    setLocalStatusMap((prev) => ({ ...prev, [mapKey]: newStatus }))
     setUpdatingStatusId(customer.customerId)
     try {
       const targetDept =
@@ -845,6 +988,11 @@ export function AutowebisionCustomersPage({
       await customersQuery.refetch()
       await countsQuery.refetch()
     } catch (err: unknown) {
+      setLocalStatusMap((prev) => {
+        const next = { ...prev }
+        delete next[mapKey]
+        return next
+      })
       const msg = err instanceof Error ? err.message : 'Failed to update status'
       setToast({ type: 'error', message: msg })
     } finally {
@@ -867,9 +1015,21 @@ export function AutowebisionCustomersPage({
       const check = checkSubServicesCompletion(customer, targetServiceType)
 
       if (!check.allCompleted) {
+        const msg = check.isWaitingAck
+          ? 'Complete your acknowledgment'
+          : 'Please complete subservice'
         setToast({
           type: 'error',
-          message: 'Firstly complete SubService first',
+          message: msg,
+        })
+        setValidationModal({
+          open: true,
+          type: check.isWaitingAck ? 'acknowledgment' : 'incomplete',
+          message: msg,
+          detail: check.isWaitingAck
+            ? 'All sub-services are completed, but customer acknowledgment is pending confirmation.'
+            : 'All sub-services must be marked as completed before this service can be finalized.',
+          subServices: check.subServices,
         })
         return
       }
@@ -1337,8 +1497,17 @@ export function AutowebisionCustomersPage({
                       })
                     : ''
 
-                  const websiteStatus = getWebsiteServiceStatus(customer)
-                  const automationStatus = getAutomationServiceStatus(customer)
+                  const websiteStatus =
+                    localStatusMap[`${customer.customerId}_WEBSITE`] ||
+                    localStatusMap[`${customer.customerId}_ALL`] ||
+                    getWebsiteServiceStatus(customer)
+                  const automationStatus =
+                    localStatusMap[`${customer.customerId}_AUTOMATION`] ||
+                    localStatusMap[`${customer.customerId}_ALL`] ||
+                    getAutomationServiceStatus(customer)
+
+                  const webPill = getServicePillStyle(websiteStatus)
+                  const autoPill = getServicePillStyle(automationStatus)
 
                   const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
                   const services = Array.isArray(customer.services) ? customer.services : []
@@ -1498,163 +1667,108 @@ export function AutowebisionCustomersPage({
                       {isServicesVisible && (
                         <td>
                           <div className="flex flex-col gap-1 items-start">
-                            {activeSubTab === 'WEBSITE' ? (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
-                                  onClick={() =>
-                                    setServiceFlowTarget({
-                                      customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                      serviceType: 'WEBSITE',
-                                    })
-                                  }
-                                  title="Click to view Website service flow"
-                                >
-                                  <Globe size={11} className="text-blue-600 flex-shrink-0" />
-                                  <span>Website</span>
-                                </button>
-                                {isDepartmentUser && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenServiceTags(customer, index, 'WEBSITE')}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
-                                    title="Add service tag"
-                                  >
-                                    <Plus size={10} strokeWidth={2.5} />
-                                    <span>Tag</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : activeSubTab === 'AUTOMATION' ? (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
-                                  onClick={() =>
-                                    setServiceFlowTarget({
-                                      customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                      serviceType: 'AUTOMATION',
-                                    })
-                                  }
-                                  title="Click to view Automation service flow"
-                                >
-                                  <Bot size={11} className="text-purple-600 flex-shrink-0" />
-                                  <span>Automation</span>
-                                </button>
-                                {isDepartmentUser && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenServiceTags(customer, index, 'AUTOMATION')}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
-                                    title="Add service tag"
-                                  >
-                                    <Plus size={10} strokeWidth={2.5} />
-                                    <span>Tag</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : hasWebsite && hasAutomation ? (
-                              <div className="flex flex-col gap-1 items-start">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
-                                    onClick={() =>
-                                      setServiceFlowTarget({
-                                        customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                        serviceType: 'WEBSITE',
-                                      })
-                                    }
-                                    title="Click to view Website service flow"
-                                  >
-                                    <Globe size={11} className="text-blue-600 flex-shrink-0" />
-                                    <span>Website</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
-                                    onClick={() =>
-                                      setServiceFlowTarget({
-                                        customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                        serviceType: 'AUTOMATION',
-                                      })
-                                    }
-                                    title="Click to view Automation service flow"
-                                  >
-                                    <Bot size={11} className="text-purple-600 flex-shrink-0" />
-                                    <span>Automation</span>
-                                  </button>
-                                  {isDepartmentUser && (
+                                {activeSubTab === 'WEBSITE' ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenServiceTags(customer, index)}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
-                                      title="Add service tag"
+                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
+                                      onClick={() =>
+                                        setServiceFlowTarget({
+                                          customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                          serviceType: 'WEBSITE',
+                                        })
+                                      }
+                                      title="Click to view Website service flow"
                                     >
-                                      <Plus size={10} strokeWidth={2.5} />
-                                      <span>Tag</span>
+                                      <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
+                                      <span>Website</span>
                                     </button>
-                                  )}
-                                </div>
-                              </div>
-                            ) : hasAutomation ? (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
-                                  onClick={() =>
-                                    setServiceFlowTarget({
-                                      customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                      serviceType: 'AUTOMATION',
-                                    })
-                                  }
-                                  title="Click to view Automation service flow"
-                                >
-                                  <Bot size={11} className="text-purple-600 flex-shrink-0" />
-                                  <span>Automation</span>
-                                </button>
-                                {isDepartmentUser && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenServiceTags(customer, index, 'AUTOMATION')}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
-                                    title="Add service tag"
-                                  >
-                                    <Plus size={10} strokeWidth={2.5} />
-                                    <span>Tag</span>
-                                  </button>
+                                  </div>
+                                ) : activeSubTab === 'AUTOMATION' ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
+                                      onClick={() =>
+                                        setServiceFlowTarget({
+                                          customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                          serviceType: 'AUTOMATION',
+                                        })
+                                      }
+                                      title="Click to view Automation service flow"
+                                    >
+                                      <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
+                                      <span>Automation</span>
+                                    </button>
+                                  </div>
+                                ) : hasWebsite && hasAutomation ? (
+                                  <div className="flex flex-col gap-1 items-start">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <button
+                                        type="button"
+                                        className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
+                                        onClick={() =>
+                                          setServiceFlowTarget({
+                                            customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                            serviceType: 'WEBSITE',
+                                          })
+                                        }
+                                        title="Click to view Website service flow"
+                                      >
+                                        <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
+                                        <span>Website</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
+                                        onClick={() =>
+                                          setServiceFlowTarget({
+                                            customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                            serviceType: 'AUTOMATION',
+                                          })
+                                        }
+                                        title="Click to view Automation service flow"
+                                      >
+                                        <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
+                                        <span>Automation</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : hasAutomation ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
+                                      onClick={() =>
+                                        setServiceFlowTarget({
+                                          customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                          serviceType: 'AUTOMATION',
+                                        })
+                                      }
+                                      title="Click to view Automation service flow"
+                                    >
+                                      <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
+                                      <span>Automation</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
+                                      onClick={() =>
+                                        setServiceFlowTarget({
+                                          customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                          serviceType: 'WEBSITE',
+                                        })
+                                      }
+                                      title="Click to view Website service flow"
+                                    >
+                                      <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
+                                      <span>Website</span>
+                                    </button>
+                                  </div>
                                 )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
-                                  onClick={() =>
-                                    setServiceFlowTarget({
-                                      customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                      serviceType: 'WEBSITE',
-                                    })
-                                  }
-                                  title="Click to view Website service flow"
-                                >
-                                  <Globe size={11} className="text-blue-600 flex-shrink-0" />
-                                  <span>Website</span>
-                                </button>
-                                {isDepartmentUser && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenServiceTags(customer, index, 'WEBSITE')}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
-                                    title="Add service tag"
-                                  >
-                                    <Plus size={10} strokeWidth={2.5} />
-                                    <span>Tag</span>
-                                  </button>
-                                )}
-                              </div>
-                            )}
 
                             {/* Rendered Service Tags: visible to both Department User and Head */}
                             {(() => {
@@ -1883,13 +1997,8 @@ export function AutowebisionCustomersPage({
                         <td>
                           <button
                             type="button"
-                            onClick={() =>
-                              setViewingClientRemark({
-                                name: customer.businessName || customer.ownerName || 'Customer',
-                                remark: customer.clientRemark || 'No client remark entered yet.',
-                              })
-                            }
-                            className="inline-flex items-center justify-center bg-pink-50 hover:bg-pink-100 rounded-md px-3 py-1.5 transition-colors border border-pink-100"
+                            onClick={() => handleOpenClientRemarkDialog(customer)}
+                            className="inline-flex items-center justify-center bg-pink-50 hover:bg-pink-100 rounded-md px-3 py-1.5 transition-colors border border-pink-100 cursor-pointer"
                           >
                             <span className="text-xs font-medium text-pink-700 truncate max-w-[140px]">
                               {customer.clientRemark || 'Click to View'}
@@ -2198,7 +2307,17 @@ export function AutowebisionCustomersPage({
         assignees={assignees}
         showStatus={true}
         showAssignTo={!isDepartmentUser}
-        departmentType={permissionDepartmentType}
+        departmentType={
+          activeSubTab === 'AUTOMATION' || isAutomationScreen
+            ? 'AUTOMATION_DEPARTMENT'
+            : activeSubTab === 'WEBSITE' || isWebsiteScreen
+              ? 'WEBSITE_DEPARTMENT'
+              : (selectedCustomer?.serviceType?.toUpperCase().includes('AUTOMATION')
+                  ? 'AUTOMATION_DEPARTMENT'
+                  : selectedCustomer?.serviceType?.toUpperCase().includes('WEBSITE')
+                    ? 'WEBSITE_DEPARTMENT'
+                    : permissionDepartmentType)
+        }
         onClose={() => setSelectedCustomer(null)}
       />
 
@@ -2287,28 +2406,139 @@ export function AutowebisionCustomersPage({
 
       {/* Client Remark Dialog */}
       {viewingClientRemark && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-slate-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150"
+          onClick={() => setViewingClientRemark(null)}
+        >
+          <div
+            className="w-full max-w-xl bg-white rounded-2xl p-6 shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Client Remark</h3>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-pink-50 text-pink-700 border border-pink-200">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    Client Remark - {viewingClientRemark.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Client remarks and replies ({viewingClientRemark.departmentType === 'AUTOMATION_DEPARTMENT' ? 'Automation' : 'Website'})
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 onClick={() => setViewingClientRemark(null)}
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="py-4">
-              <p className="text-xs font-semibold text-slate-500 mb-1">{viewingClientRemark.name}</p>
-              <div className="p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-slate-700 whitespace-pre-wrap">
-                {viewingClientRemark.remark}
-              </div>
+
+            {/* Add Remark Form */}
+            {session?.user?.role !== 'CUSTOMER' && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (!newClientRemarkText.trim() || isSubmittingClientRemark) return
+                  setIsSubmittingClientRemark(true)
+                  try {
+                    await addClientRemark(
+                      viewingClientRemark.customerId,
+                      newClientRemarkText.trim(),
+                      viewingClientRemark.departmentType,
+                    )
+                    const newEntry = {
+                      reply: newClientRemarkText.trim(),
+                      timestamp: new Date().toISOString(),
+                      staffName: session?.user?.name || session?.user?.username || 'You',
+                    }
+                    setViewingClientRemark((prev) =>
+                      prev ? { ...prev, remarks: [newEntry, ...prev.remarks] } : prev,
+                    )
+                    setNewClientRemarkText('')
+                    queryClient.invalidateQueries({ queryKey: ['autowebisionCustomers'] })
+                  } catch (err: any) {
+                    console.error('Failed to add client remark', err)
+                  } finally {
+                    setIsSubmittingClientRemark(false)
+                  }
+                }}
+                className="pt-4 flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={newClientRemarkText}
+                  onChange={(e) => setNewClientRemarkText(e.target.value)}
+                  placeholder="Add a new client remark..."
+                  disabled={isSubmittingClientRemark}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingClientRemark || !newClientRemarkText.trim()}
+                  className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                >
+                  {isSubmittingClientRemark ? 'Adding...' : 'Add'}
+                </button>
+              </form>
+            )}
+
+            {/* Body */}
+            <div className="py-4 max-h-[50vh] overflow-y-auto space-y-3">
+              {viewingClientRemark.loading && viewingClientRemark.remarks.length === 0 && (
+                <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <Loader2 size={24} className="animate-spin text-pink-600" />
+                  <p className="text-xs font-medium">Fetching client remarks...</p>
+                </div>
+              )}
+
+              {viewingClientRemark.error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+                  {viewingClientRemark.error}
+                </div>
+              )}
+
+              {!viewingClientRemark.loading &&
+                !viewingClientRemark.error &&
+                viewingClientRemark.remarks.length === 0 && (
+                  <div className="p-4 bg-pink-50/50 border border-pink-100 rounded-xl text-center">
+                    <p className="text-xs font-semibold text-pink-700">No client remark entered yet.</p>
+                    <p className="text-[11px] text-slate-500 mt-1">Use the input above to add the first client remark.</p>
+                  </div>
+                )}
+
+              {viewingClientRemark.remarks.map((rem, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl border border-pink-100 bg-pink-50/30 hover:bg-pink-50/50 transition-colors"
+                >
+                  <p className="text-xs font-medium text-slate-800 whitespace-pre-wrap">{rem.reply}</p>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-pink-100/60 text-[10px] text-slate-500">
+                    {rem.staffName && (
+                      <span className="font-semibold text-pink-700 bg-pink-100/80 px-1.5 py-0.5 rounded">
+                        {rem.staffName}
+                      </span>
+                    )}
+                    {rem.timestamp && (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Clock size={10} />
+                        {formatRemarkTimestamp(rem.timestamp)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex justify-end pt-2">
+
+            {/* Footer */}
+            <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
                 type="button"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl cursor-pointer"
                 onClick={() => setViewingClientRemark(null)}
               >
                 Close
@@ -2618,6 +2848,16 @@ export function AutowebisionCustomersPage({
           customerEmail={selectedCustomerForDraft.email || ''}
         />
       )}
+
+      {/* Sub-Service Validation / Acknowledgment Modal */}
+      <SubServiceValidationModal
+        open={Boolean(validationModal?.open)}
+        type={validationModal?.type || 'incomplete'}
+        message={validationModal?.message || 'Please complete subservice'}
+        detail={validationModal?.detail}
+        subServices={validationModal?.subServices}
+        onClose={() => setValidationModal(null)}
+      />
 
       {/* Confirm Website Exists Modal matching Screenshot 2 */}
       {confirmWebsiteExistsTarget && (
