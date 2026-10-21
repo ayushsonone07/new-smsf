@@ -368,8 +368,10 @@ export function CustomersListModal({
     if (!current?.id || !editingRemarkText.trim() || isSavingRemark) return
     setIsSavingRemark(true)
     try {
-      await updateCustomer(current.id, { remark: editingRemarkText.trim() })
+      await updateCustomer(current.id, { remark: editingRemarkText.trim(), remarkType: 'INTERNAL', departmentType, serviceType: departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-internal-remarks'] })
       await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
       setEditingRemark(null)
     } catch (error) {
       console.error('Failed to update remark', error)
@@ -631,12 +633,70 @@ export function CustomersListModal({
   const serviceRow = relevantServiceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
-  const hasDepartmentServiceSummary = serviceRow?.departmentStatuses != null
-  const services = getDepartmentServices(
-    serviceRow?.departmentStatuses,
-    serviceRow,
-    departmentType,
-  )
+  interface DrawerDepartmentServiceItem {
+    name: string
+    status?: OnboardingStatus
+    row?: CustomerServiceRow
+  }
+
+  const services: DrawerDepartmentServiceItem[] = useMemo(() => {
+    if (serviceRow?.departmentStatuses != null) {
+      return getDepartmentServices(
+        serviceRow.departmentStatuses,
+        serviceRow,
+        departmentType,
+      )
+    }
+
+    // Fallback 1: current.subServiceInfo (e.g. Automation / Website sub-services)
+    if (Array.isArray(current?.subServiceInfo) && current.subServiceInfo.length > 0) {
+      return current.subServiceInfo.map((sub: any): DrawerDepartmentServiceItem => {
+        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+        const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'pending')
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)),
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 2: current.services
+    if (Array.isArray(current?.services) && current.services.length > 0) {
+      return current.services.map((s: any): DrawerDepartmentServiceItem => {
+        const name = s?.serviceType || s?.name || 'Service'
+        const status = s?.status || 'pending'
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)),
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 3: rawCustomer serviceTypes
+    const raw = current?.rawCustomer as any
+    if (Array.isArray(raw?.serviceTypes) && raw.serviceTypes.length > 0) {
+      return raw.serviceTypes.map((st: string): DrawerDepartmentServiceItem => ({
+        name: formatServiceName(st),
+        status: current?.status,
+        row: undefined,
+      }))
+    }
+
+    if (current?.serviceType && current.serviceType !== '—') {
+      return [{
+        name: formatServiceName(current.serviceType),
+        status: current?.status,
+        row: undefined,
+      }]
+    }
+
+    return []
+  }, [serviceRow, departmentType, current])
+
+  const hasDepartmentServiceSummary =
+    serviceRow?.departmentStatuses != null || services.length > 0
   const doneCount = services.filter((s) => s.status === 'completed').length
   const internalRemarkEntries = useMemo(() => {
     const list =
@@ -1222,7 +1282,7 @@ export function CustomersListModal({
                         
                         setIsAddingRemark(true)
                         try {
-                          await updateCustomer(current.id, { remark: value, remarkType: 'INTERNAL' })
+                          await updateCustomer(current.id, { remark: value, remarkType: 'INTERNAL', departmentType, serviceType: departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined })
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-internal-remarks'] })
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
