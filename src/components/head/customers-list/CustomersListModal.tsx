@@ -34,6 +34,7 @@ import {
   getCustomerActivities,
   type CustomerActivityEvent,
 } from '../../../utils/customerActivity'
+import { getRecurringTimeline } from '../../../api/history.api'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -58,6 +59,7 @@ type DrawerTab =
   | 'bill-upload'
   | 'remarks'
   | 'activity'
+  | 'recurring'
 
 const STATUS_LABEL: Record<OnboardingStatus, string> = {
   pending: 'Pending',
@@ -309,6 +311,17 @@ export function CustomersListModal({
     requestUsername,
   })
   const [localActivities, setLocalActivities] = useState<CustomerActivityEvent[]>([])
+  const recurringCustomerId = Number(current?.id)
+
+  const recurringQuery = useQuery({
+    queryKey: ['customer-recurring-timeline', current?.id, departmentType],
+    queryFn: () =>
+      getRecurringTimeline(recurringCustomerId, departmentType || ''),
+    enabled:
+      Boolean(customer && departmentType && Number.isFinite(recurringCustomerId)) &&
+      activeTab === 'recurring',
+    staleTime: 15_000,
+  })
 
   useEffect(() => {
     const refreshActivities = () => {
@@ -773,13 +786,19 @@ export function CustomersListModal({
     { id: 'business-form', label: 'Business form' },
     { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
     { id: 'activity', label: 'Updates', count: updates.length },
+    {
+      id: 'recurring',
+      label: 'Recurring',
+      count: recurringQuery.data?.events.length,
+    },
   ]
   const tabs = profileOnly
-    ? allTabs.filter((tab) => tab.id === 'overview' || tab.id === 'business-form')
+    ? allTabs.filter((tab) =>
+        tab.id === 'overview' || tab.id === 'business-form' || tab.id === 'recurring')
     : allTabs
 
   useEffect(() => {
-    if (profileOnly && activeTab !== 'overview' && activeTab !== 'business-form') {
+    if (profileOnly && !['overview', 'business-form', 'recurring'].includes(activeTab)) {
       setActiveTab('overview')
     } else if (activeTab === 'bill-upload' && !showBillUploadTab) {
       setActiveTab('overview')
@@ -1902,6 +1921,132 @@ export function CustomersListModal({
                 </ol>
               ) : (
                 <p className="cl-drawer__empty">No updates have been recorded.</p>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'recurring' && (
+            <motion.div
+              className="cl-drawer__card"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__card-head">
+                <div>
+                  <h3>Recurring lifecycle</h3>
+                  <p className="cl-drawer__card-meta">
+                    Complete department history from creation through expiration for {businessName}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="cl-drawer__outline-btn"
+                  onClick={() => recurringQuery.refetch()}
+                  disabled={recurringQuery.isFetching}
+                >
+                  {recurringQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+
+              {recurringQuery.isLoading ? (
+                <p className="cl-drawer__empty">Loading recurring updates…</p>
+              ) : recurringQuery.isError ? (
+                <div>
+                  <p className="cl-drawer__empty">
+                    {recurringQuery.error instanceof Error
+                      ? recurringQuery.error.message
+                      : 'Unable to load recurring updates.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="cl-drawer__outline-btn"
+                    onClick={() => recurringQuery.refetch()}
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : recurringQuery.data ? (
+                <>
+                  <DetailGrid
+                    title="Current recurring summary"
+                    data={{
+                      createdAt: recurringQuery.data.createdAt,
+                      updatedAt: recurringQuery.data.updatedAt,
+                      expirationAt: recurringQuery.data.expirationAt,
+                      currentStatus: recurringQuery.data.currentStatus,
+                      assignedTo: recurringQuery.data.currentAssignedUser,
+                      department: recurringQuery.data.departmentType,
+                    }}
+                  />
+                  {recurringQuery.data.services.length > 0 && (
+                    <DetailGrid
+                      title="Department services"
+                      data={Object.fromEntries(
+                        recurringQuery.data.services.map((service, index) => [
+                          service.serviceType || `Service ${index + 1}`,
+                          [service.status, service.assignedUser, service.expirationAt ? `Expires ${formatTimestamp(service.expirationAt)}` : '']
+                            .filter(Boolean)
+                            .join(' · '),
+                        ]),
+                      )}
+                    />
+                  )}
+                  {recurringQuery.data.events.length > 0 ? (
+                    <ol className="cl-drawer__timeline">
+                  {recurringQuery.data.events.map((entry, index) => {
+                    const eventLabel: Record<string, string> = {
+                      CUSTOMER_CREATED: 'Customer created',
+                      SERVICE_CREATED: 'Service created',
+                      USER_ASSIGNED: 'User assigned',
+                      USER_REASSIGNED: 'User reassigned',
+                      STATUS_CHANGED: 'Status changed',
+                      SERVICE_EXPIRATION: 'Service expiration',
+                    }
+                    return (
+                      <li
+                        key={`${entry.id ?? entry.occurredAt ?? index}-${index}`}
+                        className="cl-drawer__timeline-item"
+                      >
+                        <span className="cl-drawer__timeline-icon">
+                          <Icon name="history" size={16} strokeWidth={1.8} />
+                        </span>
+                        <div>
+                          <strong>
+                            {eventLabel[entry.type] || entry.type.replaceAll('_', ' ')}
+                          </strong>
+                          <p>
+                            {[
+                              entry.serviceType,
+                              entry.phaseName,
+                              entry.fromUser && entry.toUser
+                                ? `${entry.fromUser} → ${entry.toUser}`
+                                : entry.toUser,
+                              entry.oldValue && entry.newValue
+                                ? `${entry.oldValue} → ${entry.newValue}`
+                                : entry.newValue,
+                              entry.performedBy ? `By ${entry.performedBy}` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          {entry.remarks ? <p>{entry.remarks}</p> : null}
+                          <time dateTime={entry.occurredAt}>
+                            {formatTimestamp(entry.occurredAt)}
+                          </time>
+                        </div>
+                      </li>
+                    )
+                  })}
+                    </ol>
+                  ) : (
+                    <p className="cl-drawer__empty">No lifecycle events have been recorded.</p>
+                  )}
+                </>
+              ) : (
+                <p className="cl-drawer__empty">
+                  No recurring lifecycle has been recorded for this customer.
+                </p>
               )}
             </motion.div>
           )}
