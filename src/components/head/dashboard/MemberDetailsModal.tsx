@@ -20,96 +20,13 @@ export interface MemberDetailsModalProps {
 
 type ModalTab = 'all' | 'delayed' | 'in-progress' | 'pending' | 'completed'
 
-const SAMPLE_ABHISHEK_ITEMS: MemberWorkItem[] = [
-  {
-    id: 'w-1',
-    customerName: 'Sharma Sweets',
-    contactAndCity: 'Rakesh Sharma · Jaipur',
-    status: 'Completed',
-    delayDays: 0,
-    remark: 'Handover done, client happy.',
-  },
-  {
-    id: 'w-2',
-    customerName: 'Green Leaf Cafe',
-    contactAndCity: 'Priya Nair · Kochi',
-    status: 'Completed',
-    delayDays: 0,
-    remark: 'Handover done, client happy.',
-  },
-  {
-    id: 'w-3',
-    customerName: 'Urban Threads',
-    contactAndCity: 'Imran Khan · Lucknow',
-    status: 'Completed',
-    delayDays: 0,
-    remark: 'Handover done, client happy.',
-  },
-  {
-    id: 'w-4',
-    customerName: 'Pixel Print Hub',
-    contactAndCity: 'Neha Gupta · Indore',
-    status: 'Pending',
-    delayDays: 11,
-    delaySide: 'CLIENT',
-    reason: 'Payment pending from client',
-    remark: 'Demo done, awaiting confirmation.',
-  },
-  {
-    id: 'w-5',
-    customerName: 'Royal Dental Care',
-    contactAndCity: 'Dr. Vivek Rao · Hyderabad',
-    status: 'Completed',
-    delayDays: 0,
-    remark: 'Handover done, client happy.',
-  },
-  {
-    id: 'w-6',
-    customerName: 'FitZone Gym',
-    contactAndCity: 'Karan Malhotra · Chandigarh',
-    status: 'Completed',
-    delayDays: 0,
-    remark: 'Handover done, client happy.',
-  },
-  {
-    id: 'w-7',
-    customerName: 'Shree Ganesh Hardware',
-    contactAndCity: 'Mahesh Patel · Surat',
-    status: 'Pending',
-    delayDays: 11,
-    delaySide: 'OURS',
-    reason: 'Design team slot pending',
-    remark: 'Shared theme options on WhatsApp.',
-  },
-  {
-    id: 'w-8',
-    customerName: 'Blue Bell School',
-    contactAndCity: 'Anita Joseph · Bengaluru',
-    status: 'Pending',
-    delayDays: 7,
-    delaySide: 'CLIENT',
-    reason: 'Payment pending from client',
-    remark: 'Requirement form filled partially.',
-  },
-  {
-    id: 'w-9',
-    customerName: 'Spice Route Kitchen',
-    contactAndCity: 'Arjun Menon · Chennai',
-    status: 'In progress',
-    delayDays: 10,
-    delaySide: 'OURS',
-    reason: 'Domain setup pending at our end',
-    remark: 'Demo done, awaiting confirmation.',
-  },
-]
-
 /**
  * Member Details Modal matching the reference screenshot.
  * Displays member KPI summary, filter tabs, and customer work items table.
  */
 export function MemberDetailsModal({
   member,
-  workItems = SAMPLE_ABHISHEK_ITEMS,
+  workItems = [],
   onClose,
 }: MemberDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<ModalTab>('all')

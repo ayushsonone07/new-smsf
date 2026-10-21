@@ -12,10 +12,6 @@ import { UserFormModal } from '../../../../components/head/users/UserFormModal'
 import { BulkAssignModal } from '../../../../components/head/users/BulkAssignModal'
 import { StaffReportModal } from '../../../../components/reports/StaffReportModal'
 import { Icon } from '../../../../components/head/shared/Icon'
-import {
-  sampleDailyTargetByUser,
-  sampleWorkItemsByUser,
-} from '../../../../api/mock/head.db'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
@@ -291,28 +287,21 @@ export function DepartmentUsersPage() {
     return null
   }, [memberDetailsQuery.data, modal])
 
-  // Get items from member details or fallback to mock
+  // Get items from member details
   const items = useMemo(() => {
     if (memberDetailsQuery.data?.customers?.length) {
       return convertToWorkReportItems(memberDetailsQuery.data.customers)
     }
-    // Fallback to mock data
-    if (modal.kind === 'report' && modal.user) {
-      return sampleWorkItemsByUser[modal.user.id] ?? []
-    }
     return []
-  }, [memberDetailsQuery.data, modal])
+  }, [memberDetailsQuery.data])
 
-  // Get target from member details or fallback
+  // Get target from member details
   const target = useMemo(() => {
     if (memberDetailsQuery.data?.statistics?.target) {
       return memberDetailsQuery.data.statistics.target
     }
-    if (modal.kind === 'report' && modal.user) {
-      return sampleDailyTargetByUser[modal.user.id] ?? 0
-    }
     return 0
-  }, [memberDetailsQuery.data, modal])
+  }, [memberDetailsQuery.data])
 
   // Map API users to DepartmentUser table structure across all infinite pages
   const apiUsersList = useMemo<DepartmentUser[]>(() => {

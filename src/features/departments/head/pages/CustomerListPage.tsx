@@ -25,7 +25,6 @@ import {
   getServiceFlows,
 } from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
-import { sampleDepartmentUsers } from '../../../../api/mock/head.db'
 import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
@@ -50,13 +49,6 @@ import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 import { recordCustomerActivity } from '../../../../utils/customerActivity'
-
-const FALLBACK_ASSIGNEES: OnboardingAssignee[] = sampleDepartmentUsers.map(
-  (user) => ({
-    id: user.id,
-    name: user.name,
-  }),
-)
 
 /**
  * Head panel — Customer List. Renders the customers-list UI
@@ -236,8 +228,8 @@ export function CustomerListPage() {
         name: u.username ? `${u.username} (${u.email})` : u.email,
       }))
     }
-    return isGoogle ? [] : FALLBACK_ASSIGNEES
-  }, [isGoogle, isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
+    return []
+  }, [isUser, userEmail, session?.user?.name, assigningUsersQuery.data])
 
   // Reset page when filters/search change
   const handleSearchChange = (value: string) => {

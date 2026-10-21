@@ -85,6 +85,23 @@ const DYNAMIC_DEPARTMENT_HEAD_SCREENS: Array<{
   { key: 'help-support', label: 'Help & Support', icon: 'help', slug: 'help-support', screen: 'help-support' },
 ]
 
+const ONBOARDING_HEAD_SCREENS: Array<{
+  key: string
+  label: string
+  icon: IconName
+  slug: string
+  screen: HeadScreenKey
+}> = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
+  { key: 'users', label: 'Department Users', icon: 'userPlus', slug: 'users', screen: 'users' },
+  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customers', screen: 'customers' },
+  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+  { key: 'meeting', label: '15 Days Meeting', icon: 'calendar', slug: 'meeting', screen: 'meeting' },
+  { key: 'sop', label: 'SOP', icon: 'flow', slug: 'sop', screen: 'sop' },
+  { key: 'help-center', label: 'Help Center', icon: 'help', slug: 'help-center', screen: 'help-center' },
+  { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
+]
+
 function extractCleanSlug(routeName: string): string {
   const trimmed = routeName
     .trim()
@@ -420,15 +437,45 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
       return [...stdFeatures, ...customFeatures]
     }
 
-    return (query.data ?? [])
+    // Onboarding Department Head: admin-configured features when present,
+    // otherwise fall back to the standard onboarding head screens.
+    const configuredScreens = (query.data ?? []).filter(
+      (feature) => feature.kind === 'screen',
+    )
+
+    if (configuredScreens.length > 0) {
+      return configuredScreens
+        .filter(
+          (feature) =>
+            feature.enabled &&
+            routePerms.isRouteEnabled(feature.slug) &&
+            routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
+        )
+        .sort((a, b) => a.order - b.order)
+    }
+
+    return ONBOARDING_HEAD_SCREENS
       .filter(
-        (feature) =>
-          feature.kind === 'screen' &&
-          feature.enabled &&
-          routePerms.isRouteEnabled(feature.slug) &&
-          routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
+        (item) =>
+          routePerms.isRouteEnabled(item.slug) &&
+          routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)),
       )
-      .sort((a, b) => a.order - b.order)
+      .map((item, index) => ({
+        id: `onboarding-feat-${item.slug}`,
+        departmentId,
+        name: item.label,
+        description: item.label,
+        enabled: true,
+        userVisible: true,
+        roleAPermission: 'CAN_EDIT',
+        roleBPermission: 'CAN_READ',
+        screen: item.screen,
+        slug: item.slug,
+        icon: item.icon,
+        order: index,
+        category: 'screens',
+        kind: 'screen',
+      }))
   }, [isGoogle, isUser, isOnboarding, isAutowebsion, automationCountQuery.data, effectiveDeptType, query.data, departmentId, role, routePerms])
 
   const items = useMemo<HeadNavItem[]>(() => {
