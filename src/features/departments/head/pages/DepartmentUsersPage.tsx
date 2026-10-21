@@ -9,6 +9,7 @@ import { ImpersonationBanner } from '../../../../components/head/layout/Imperson
 import { DepartmentUsersTable } from '../../../../components/head/users/DepartmentUsersTable'
 import { UserDetails } from '../../../../components/head/users/UserDetails'
 import { UserFormModal } from '../../../../components/head/users/UserFormModal'
+import { BulkAssignModal } from '../../../../components/head/users/BulkAssignModal'
 import { StaffReportModal } from '../../../../components/reports/StaffReportModal'
 import { Icon } from '../../../../components/head/shared/Icon'
 import {
@@ -40,7 +41,7 @@ import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useQuery } from '@tanstack/react-query'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
-import { UserCog, UserPlus, Building, Download, BookOpen } from 'lucide-react'
+import { UserCog, UserPlus, Building, Download, BookOpen, UsersRound } from 'lucide-react'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
 import type {
@@ -58,6 +59,7 @@ import type {
 type ModalState =
   | { kind: 'none' }
   | { kind: 'create' }
+  | { kind: 'bulkAssign' }
   | { kind: 'edit'; user: DepartmentUser }
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
@@ -657,13 +659,24 @@ export function DepartmentUsersPage() {
               </Button>
 
               {canManageUsers ? (
-                <Button
-                  className="head-primary-button"
-                  onClick={() => setModal({ kind: 'create' })}
-                >
-                  <Icon name="userPlus" size={16} />
-                  Add User
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setModal({ kind: 'bulkAssign' })}
+                    className="h-10 rounded-xl border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-none hover:bg-slate-50"
+                  >
+                    <UsersRound className="mr-2 h-4 w-4 text-blue-600" />
+                    Bulk Assign
+                  </Button>
+                  <Button
+                    className="head-primary-button"
+                    onClick={() => setModal({ kind: 'create' })}
+                  >
+                    <Icon name="userPlus" size={16} />
+                    Add User
+                  </Button>
+                </>
               ) : null}
             </div>
           </div>
@@ -691,13 +704,23 @@ export function DepartmentUsersPage() {
           <LearningButton newCount={2} />
 
           {canManageUsers ? (
-            <Button
-              className="head-primary-button"
-              onClick={() => setModal({ kind: 'create' })}
-            >
-              <Icon name="userPlus" size={16} />
-              Add User
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setModal({ kind: 'bulkAssign' })}
+                className="inline-flex items-center gap-2"
+              >
+                <UsersRound className="h-4 w-4" />
+                Bulk Assign
+              </Button>
+              <Button
+                className="head-primary-button"
+                onClick={() => setModal({ kind: 'create' })}
+              >
+                <Icon name="userPlus" size={16} />
+                Add User
+              </Button>
+            </>
           ) : null}
         </div>
       )}
@@ -767,6 +790,20 @@ export function DepartmentUsersPage() {
           mode="create"
           onClose={closeModal}
           onSubmit={handleCreate}
+        />
+      ) : null}
+
+      {canManageUsers ? (
+        <BulkAssignModal
+          open={modal.kind === 'bulkAssign'}
+          onClose={closeModal}
+          onTransferred={async () => {
+            if (isAutowebsionDept) {
+              await autowebUsersQuery.refetch()
+            } else {
+              await departmentUsersQuery.refetch()
+            }
+          }}
         />
       ) : null}
 
