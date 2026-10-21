@@ -127,7 +127,7 @@
 .billing-modal__body { padding: 1.35rem; }
 .billing-modal .billing-upload-drop { display: grid !important; place-items: center; align-content: center; gap: .45rem; min-height: 145px; margin: 0; border: 1px dashed #bfd0e8; border-radius: 12px; background: #f8fafc; color: #64748b; cursor: pointer; text-align: center; }
 .billing-upload-drop strong { color: #172033; }
-.billing-upload-drop span { display: block; font-weight: 400; }
+.billing-upload-drop span { display: block; font-weight: 500; }
 .billing-upload-drop input { display: none !important; }
 .billing-upload-file { margin: .75rem 0 0; color: #2563eb; font-size: .8rem; overflow-wrap: anywhere; }
 .billing-error { margin: .65rem 0 0; color: #dc2626; font-size: .8rem; }

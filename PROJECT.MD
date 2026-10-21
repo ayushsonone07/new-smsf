@@ -224,7 +224,7 @@ pixel-match hai. Tokens `.hshell` par CSS variables me:
 | Blue / hover | `#2459e0` / `#1a45b8` |
 | Yellow | `#ffc629` (active nav bar, badges, brand mark) |
 | BG / border | `#f4f6fb` / `#e6e9f0` |
-| Font | Jost 14px (Google Fonts link `index.html` me) |
+| Font | Jost Variable, 13px base, weights 500/600/700 (`src/index.css`) |
 | Sidebar | 236px open / 64px collapsed (`is-collapsed`) |
 
 Shell features: collapsible sidebar, yellow active bar, account card (email + actual session role),
@@ -268,6 +268,42 @@ dropdown ("Mark all read"), impersonation strip ("You are logged in as X").
 ---
 
 ## Styling Conventions
+
+### Global Typography Contract (mandatory for every AI agent)
+
+All new and edited UI must follow the shared typography system defined in
+`src/index.css`. This is a project-wide rule, not a page-specific preference.
+
+- Use only `var(--app-font-family)` or `font-family: inherit` for normal UI text.
+  The global family is **Jost Variable**. Do not introduce Inter, Roboto, Poppins,
+  browser-default fonts, or another font import for application UI.
+- Normal body, table, and detail text uses weight `600`. Never use `300`, `400`,
+  `500`, `normal`, thin, or light font weights for application text.
+- Labels, buttons, tabs, navigation, table headers, badges, and important metadata use
+  weight `600`.
+- Page titles, section headings, card titles, totals, and intentional emphasis use
+  weight `700`. Reserve `800` for rare hero metrics, not ordinary text.
+- Inherit the global `1.45` line-height for body copy. Multi-line notifications,
+  descriptions, and table details must remain comfortably readable.
+- Do not set a component-wide font family. Components inherit the global font tokens;
+  monospace is allowed only for code, identifiers, or technical logs.
+- Do not make text smaller than `12px`. Use at least `13px` for primary table values,
+  emails, names, notification messages, inputs, and buttons. Supporting metadata may be
+  `12px` with weight `600`.
+- Preserve hierarchy: readable does not mean every element is equally bold. Use the
+  600/700 scale consistently and use color and spacing only as secondary cues.
+- Before completing UI work, search changed CSS for `font-family`, `font-weight: 300`,
+  and `font-weight: 400`; replace violations unless they are an explicitly documented
+  code or technical-text exception.
+
+Canonical tokens:
+
+```css
+font-family: var(--app-font-family);
+font-weight: var(--app-font-weight-body);    /* 600 */
+font-weight: var(--app-font-weight-label);   /* 600 */
+font-weight: var(--app-font-weight-heading); /* 700 */
+```
 
 - Admin screens: plain CSS `src/index.css`. Head panel: `src/styles/head.css`
   (`@import` index.css ki 2nd line par). Tailwind v4 bhi loaded hai (`@import "tailwindcss"`).

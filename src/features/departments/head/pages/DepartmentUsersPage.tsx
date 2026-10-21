@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -12,6 +12,7 @@ import { UserFormModal } from '../../../../components/head/users/UserFormModal'
 import { BulkAssignModal } from '../../../../components/head/users/BulkAssignModal'
 import { StaffReportModal } from '../../../../components/reports/StaffReportModal'
 import { Icon } from '../../../../components/head/shared/Icon'
+import '../../../../components/head/customers-list/CustomersList.css'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
@@ -37,6 +38,7 @@ import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useQuery } from '@tanstack/react-query'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
+import { notifyUserCreated, notifyUserDeleted, notifyUserUpdated } from '../../../../api/notification-factory'
 import { UserCog, UserPlus, Building, Download, BookOpen, UsersRound } from 'lucide-react'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
@@ -102,6 +104,17 @@ export function DepartmentUsersPage() {
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error'
+    title?: string
+    message: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   async function handleLoginAs(targetUser: DepartmentUser) {
     const email = targetUser.email?.trim()
@@ -465,6 +478,7 @@ export function DepartmentUsersPage() {
         isHead: false,
         headUser: currentUser?.email || '',
       })
+      notifyUserCreated(values.username || values.name || '', values.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -501,6 +515,7 @@ export function DepartmentUsersPage() {
         departmentType: deptType,
         isHead: false,
       })
+      notifyUserUpdated(values.username || values.name || user.name || '', values.email || user.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -521,6 +536,7 @@ export function DepartmentUsersPage() {
       await deleteDepartmentUser({
         id: user.id,
       })
+      notifyUserDeleted(user.name || '', user.email || '')
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
         await autowebTabCountsQuery.refetch()
@@ -528,10 +544,15 @@ export function DepartmentUsersPage() {
         await departmentUsersQuery.refetch()
       }
       closeModal()
+      setToast({
+        type: 'success',
+        title: 'User removed',
+        message: `${user.name || user.email || 'User'} was removed successfully.`,
+      })
     } catch (err: unknown) {
       console.error('Failed to delete department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to delete user'
-      alert(`Failed to delete user: ${msg}`)
+      setToast({ type: 'error', title: 'Failed to remove user', message: msg })
     }
   }
 
@@ -833,6 +854,22 @@ export function DepartmentUsersPage() {
           items={items}
           target={target}
         />
+      ) : null}
+
+      {toast ? (
+        <div
+          className={`cl-toast cl-toast--${toast.type}`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>
+            <strong className="cl-toast-title">{toast.title || (toast.type === 'success' ? 'Success' : 'Error')}</strong>
+            <small className="cl-toast-message">{toast.message}</small>
+          </span>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setToast(null)}>
+            ×
+          </button>
+        </div>
       ) : null}
     </>
   )

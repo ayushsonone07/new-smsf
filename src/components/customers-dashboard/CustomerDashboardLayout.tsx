@@ -1,10 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CustomerDashboardSidebar } from './CustomerDashboardSidebar'
 import { CustomerDashboardTopbar } from './CustomerDashboardTopbar'
 import { NotificationCenter } from '../head/layout/NotificationCenter'
 import { getCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import { apiRequest } from '../../api/client'
 import type { HeadNotification } from '../../features/departments/head/types/head.types'
+import {
+  getNotificationsForCustomerSync,
+  markAllNotificationsForCustomerRead,
+  subscribeSuperAdminNotifications,
+  type SuperAdminNotification,
+} from '../../api/superadmin-notifications.api'
 import './CustomerDashboard.css'
 
 interface CustomerDashboardLayoutProps {
@@ -22,7 +28,8 @@ export function CustomerDashboardLayout({
 
   const customerSession = getCustomerSession()
   const isCustomerAuthenticated = Boolean(customerSession)
-  const [notifications, setNotifications] = useState<HeadNotification[]>([])
+  const [backendNotifications, setBackendNotifications] = useState<HeadNotification[]>([])
+  const [localNotifications, setLocalNotifications] = useState<SuperAdminNotification[]>([])
 
   useEffect(() => {
     if (!customerSession?.customerId) return
@@ -39,7 +46,7 @@ export function CustomerDashboardLayout({
             ? response.data.content
             : []
         if (!active) return
-        setNotifications(items.map((item: any, index: number) => ({
+        setBackendNotifications(items.map((item: any, index: number) => ({
           id: String(item.id ?? `customer-notification-${index}`),
           text: item.title || item.message || 'Your account has been updated.',
           timeLabel: formatNotificationTime(item.timestamp),
@@ -47,7 +54,7 @@ export function CustomerDashboardLayout({
           link: typeof item.link === 'string' ? item.link : undefined,
         })))
       })
-      .catch(() => { if (active) setNotifications([]) })
+      .catch(() => { if (active) setBackendNotifications([]) })
     loadNotifications()
     const refreshTimer = window.setInterval(loadNotifications, 15_000)
     const refreshOnFocus = () => { if (document.visibilityState === 'visible') loadNotifications() }
@@ -58,6 +65,30 @@ export function CustomerDashboardLayout({
       document.removeEventListener('visibilitychange', refreshOnFocus)
     }
   }, [customerSession?.customerId, customerSession?.email, customerSession?.username, customerSession?.accessToken])
+
+  useEffect(() => {
+    const refresh = () => setLocalNotifications(
+      getNotificationsForCustomerSync(customerSession?.customerId),
+    )
+    refresh()
+    return subscribeSuperAdminNotifications(refresh)
+  }, [customerSession?.customerId])
+
+  const notifications = useMemo<HeadNotification[]>(() => [
+    ...localNotifications.map((item) => ({
+      id: item.id,
+      text: item.title ? `${item.title} — ${item.message}` : item.message,
+      timeLabel: formatNotificationTime(item.createdAt),
+      unread: !item.read,
+      link: item.link,
+    })),
+    ...backendNotifications,
+  ], [backendNotifications, localNotifications])
+
+  function markAllRead() {
+    setBackendNotifications((items) => items.map((item) => ({ ...item, unread: false })))
+    void markAllNotificationsForCustomerRead(customerSession?.customerId)
+  }
   const dashboard = (
     <div className="cdb-shell">
       <CustomerDashboardSidebar
@@ -76,7 +107,7 @@ export function CustomerDashboardLayout({
     </div>
   )
   return isCustomerAuthenticated ? (
-    <NotificationCenter items={notifications} roleLabel="Customer">{dashboard}</NotificationCenter>
+    <NotificationCenter items={notifications} roleLabel="Customer" onMarkAllRead={markAllRead}>{dashboard}</NotificationCenter>
   ) : dashboard
 }
 

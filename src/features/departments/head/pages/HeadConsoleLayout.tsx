@@ -13,7 +13,8 @@ import {
   restoreAdminSession,
 } from '../../../../app/auth/session'
 import { IconButton } from '../../../../components/head/shared/IconButton'
-import type { HeadNotification, HeadRole } from '../types/head.types'
+import { useNotifications } from '../../../../components/layout/useNotifications'
+import type { HeadRole } from '../types/head.types'
 
 import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 
@@ -64,7 +65,10 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
     }
   }, [deptFromUrl, location.pathname, navigate, session?.user.departmentType, session?.user.role, slug])
 
-  const [notifications, setNotifications] = useState<HeadNotification[]>([])
+  const {
+    items: notifications,
+    markAllRead: markAllNotificationsRead,
+  } = useNotifications()
 
   const isImpersonating = getAdminBackup() !== null
 
@@ -141,11 +145,7 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
         />
       }
       notifications={notifications}
-      onMarkAllRead={() =>
-        setNotifications((items) =>
-          items.map((item) => ({ ...item, unread: false })),
-        )
-      }
+      onMarkAllRead={markAllNotificationsRead}
       dashboardHeaderMode={feature?.screen === 'dashboard'}
     >
       {children ?? <Outlet />}

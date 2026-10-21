@@ -165,7 +165,7 @@ input[type="text"] {
   background: #fff;
   outline: none;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   color: #0f172a;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
