@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect, type ChangeEvent } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { MeetingSearchBar } from '../../../../components/head/15-days-meeting/MeetingSearchBar'
 import { MeetingFilters, type MeetingStatus } from '../../../../components/head/15-days-meeting/MeetingFilters'
-import { MeetingList, type Meeting, type MeetingCustomer, type MeetingDepartment } from '../../../../components/head/15-days-meeting/MeetingList'
+import { MeetingList, type Meeting, type MeetingDepartment } from '../../../../components/head/15-days-meeting/MeetingList'
 import { DepartmentFlowModal } from '../../../../components/head/15-days-meeting/DepartmentFlowModal'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
@@ -27,90 +27,6 @@ const panelVariants: Variants = {
   hidden: { opacity: 0, y: -5, scale: 0.97 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.14 } },
 }
-
-const mockCustomers: MeetingCustomer[] = [
-  {
-    name: 'Rohit Sharma',
-    company: 'Shree Ganesh Hardware',
-    phone: '9876501234',
-    email: 'rohit@ganeshhardware.com',
-  },
-  {
-    name: 'Priya Patel',
-    company: 'Blue Bell School',
-    phone: '9812345670',
-    email: 'priya@bluebellschool.edu',
-  },
-  {
-    name: 'Arjun Menon',
-    company: 'Spice Route Kitchen',
-    phone: '9899001122',
-    email: 'arjun@spiceroute.in',
-  },
-  {
-    name: 'Ritika Sen',
-    company: 'Glow Salon',
-    phone: '9123409876',
-    email: 'ritika@glowsalon.com',
-  },
-  {
-    name: 'Sandeep Yadav',
-    company: 'AutoFix Garage',
-    phone: '9001122334',
-    email: 'sandeep@autofix.com',
-  },
-]
-
-const mockDepartments: MeetingDepartment[] = [
-  { id: 'dept-1', name: 'Onboarding', status: 'completed' },
-  { id: 'dept-2', name: 'Website Creation', status: 'in-progress' },
-  { id: 'dept-3', name: 'Google Service', status: 'completed' },
-  { id: 'dept-4', name: 'SEO Service', status: 'pending' },
-  { id: 'dept-5', name: 'Automation', status: 'pending' },
-]
-
-const initialMeetings: Meeting[] = [
-  {
-    id: 'mtg-1',
-    createdAt: new Date('2026-09-18T16:28:00'),
-    customer: mockCustomers[0],
-    departments: [mockDepartments[0], mockDepartments[1], mockDepartments[2], mockDepartments[3]],
-    meetingDate: new Date('2026-09-20T10:00:00'),
-    isDone: true,
-  },
-  {
-    id: 'mtg-2',
-    createdAt: new Date('2026-09-17T14:15:00'),
-    customer: mockCustomers[1],
-    departments: [mockDepartments[0], mockDepartments[2], mockDepartments[4]],
-    meetingDate: new Date('2026-09-19T11:30:00'),
-    isDone: false,
-  },
-  {
-    id: 'mtg-3',
-    createdAt: new Date('2026-09-17T09:42:00'),
-    customer: mockCustomers[2],
-    departments: [mockDepartments[0], mockDepartments[3]],
-    meetingDate: new Date('2026-09-21T14:00:00'),
-    isDone: false,
-  },
-  {
-    id: 'mtg-4',
-    createdAt: new Date('2026-09-16T11:05:00'),
-    customer: mockCustomers[3],
-    departments: [mockDepartments[0], mockDepartments[1], mockDepartments[2]],
-    meetingDate: new Date('2026-09-18T09:00:00'),
-    isDone: true,
-  },
-  {
-    id: 'mtg-5',
-    createdAt: new Date('2026-09-15T16:47:00'),
-    customer: mockCustomers[4],
-    departments: [mockDepartments[0], mockDepartments[4]],
-    meetingDate: new Date('2026-09-22T10:30:00'),
-    isDone: false,
-  },
-]
 
 function toMeeting(item: CustomerFollowUpItem, isDone: boolean): Meeting {
   return {
@@ -221,8 +137,7 @@ export function MeetingPage() {
     return [...dueItems, ...recentItems]
   }, [recentQuery.data?.data, dueQuery.data?.data, statusFilter])
 
-  const meetings =
-    liveMeetings.length > 0 ? liveMeetings : initialMeetings
+  const meetings = liveMeetings
 
   const doneCount =
     counts.doneCount > 0

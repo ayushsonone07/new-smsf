@@ -144,15 +144,21 @@ export async function getDepartmentUsers(params: {
   )
 
   // Backend returns data as List<DepartmentUsersResponse> with one element
-  // The actual users are in data[0].users or directly in data
+  // The head/admin row sits at data[0] itself, sub-users in data[0].users
   let rawUsers: DepartmentUserApiItem[] = []
   if (Array.isArray(res?.data) && res.data.length > 0) {
     const first: any = res.data[0]
+    const headRow: DepartmentUserApiItem | null =
+      first?.email || first?.username
+        ? { ...first, isHead: first.isHead ?? true }
+        : null
     if (Array.isArray(first?.users)) {
-      rawUsers = first.users
+      rawUsers = headRow ? [headRow, ...first.users] : first.users
     } else if (Array.isArray(first?.departmentSubUsers)) {
-      rawUsers = first.departmentSubUsers
-    } else if (first?.email || first?.username) {
+      rawUsers = headRow
+        ? [headRow, ...first.departmentSubUsers]
+        : first.departmentSubUsers
+    } else if (headRow) {
       rawUsers = res.data as any
     }
   } else if (Array.isArray((res as any)?.users)) {

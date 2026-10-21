@@ -12,7 +12,6 @@ import {
   homeForRole,
   restoreAdminSession,
 } from '../../../../app/auth/session'
-import { sampleNotifications } from '../../../../api/mock/head.db'
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import type { HeadNotification, HeadRole } from '../types/head.types'
 
@@ -22,21 +21,6 @@ interface HeadConsoleLayoutProps {
   portalRole: HeadRole
   children?: ReactNode
 }
-
-const userNotifications: HeadNotification[] = [
-  {
-    id: 'user-1',
-    text: 'A new customer has been assigned to you.',
-    timeLabel: '10 min ago',
-    unread: true,
-  },
-  {
-    id: 'user-2',
-    text: 'A customer added a new remark.',
-    timeLabel: '1 h ago',
-    unread: true,
-  },
-]
 
 /**
  * Frame for every /head/* and /onboarding* route. Sidebar items come
@@ -80,9 +64,7 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
     }
   }, [deptFromUrl, location.pathname, navigate, session?.user.departmentType, session?.user.role, slug])
 
-  const [notifications, setNotifications] = useState<HeadNotification[]>(() =>
-    portalRole === 'USER' ? userNotifications : sampleNotifications,
-  )
+  const [notifications, setNotifications] = useState<HeadNotification[]>([])
 
   const isImpersonating = getAdminBackup() !== null
 
