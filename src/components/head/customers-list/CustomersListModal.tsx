@@ -28,6 +28,7 @@ import type {
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
+import { addClientRemark } from '../../../api/customer-drawer.api'
 import {
   CUSTOMER_ACTIVITY_EVENT,
   getCustomerActivities,
@@ -276,9 +277,13 @@ export function CustomersListModal({
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
   const [isAddingRemark, setIsAddingRemark] = useState(false)
+  const [isAddingClientRemark, setIsAddingClientRemark] = useState(false)
   const [editingRemark, setEditingRemark] = useState<string | null>(null)
   const [editingRemarkText, setEditingRemarkText] = useState('')
   const [isSavingRemark, setIsSavingRemark] = useState(false)
+  const [editingClientRemark, setEditingClientRemark] = useState<string | null>(null)
+  const [editingClientRemarkText, setEditingClientRemarkText] = useState('')
+  const [isSavingClientRemark, setIsSavingClientRemark] = useState(false)
   const [billFile, setBillFile] = useState<File | null>(null)
   const [billUploading, setBillUploading] = useState(false)
   const [billError, setBillError] = useState('')
@@ -369,6 +374,22 @@ export function CustomersListModal({
       console.error('Failed to update remark', error)
     } finally {
       setIsSavingRemark(false)
+    }
+  }
+
+  async function saveClientRemarkEdit() {
+    if (!current?.id || !editingClientRemarkText.trim() || isSavingClientRemark) return
+    setIsSavingClientRemark(true)
+    try {
+      await addClientRemark(current.id, editingClientRemarkText.trim(), departmentType)
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-review-replies'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
+      setEditingClientRemark(null)
+    } catch (error) {
+      console.error('Failed to update client remark', error)
+    } finally {
+      setIsSavingClientRemark(false)
     }
   }
 
@@ -1169,7 +1190,7 @@ export function CustomersListModal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Status summary pill header */}
                 <div className="cl-drawer__remarks-summary">
                   <div className="cl-drawer__remarks-pills">
@@ -1180,14 +1201,14 @@ export function CustomersListModal({
                       Client ({clientRemarkEntries.length})
                     </span>
                     <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--onboarding">
-                      Onboarding ({onboardingRemarkEntries.length})
+                      Customer ({onboardingRemarkEntries.length})
                     </span>
                   </div>
                 </div>
 
                 {/* Section 1: Internal Remarks */}
                 <div className="cl-drawer__remark-section">
-                  {getSession()?.user.role === 'USER' && (
+                  {getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1198,7 +1219,9 @@ export function CustomersListModal({
                         
                         setIsAddingRemark(true)
                         try {
-                          await updateCustomer(current.id, { remark: value })
+                          await updateCustomer(current.id, { remark: value, remarkType: 'INTERNAL' })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-internal-remarks'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
                           input.value = ''
                         } catch (err) {
@@ -1247,25 +1270,81 @@ export function CustomersListModal({
                     onCancelEdit={() => setEditingRemark(null)}
                     onSaveEdit={saveRemarkEdit}
                     isSavingRemark={isSavingRemark}
+                    pageSize={4}
                   />
                 </div>
 
                 {/* Section 2: Client Remarks */}
                 <div className="cl-drawer__remark-section">
+                  {getSession()?.user.role !== 'CUSTOMER' && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        const form = e.target as HTMLFormElement
+                        const input = form.elements.namedItem('newClientRemark') as HTMLInputElement
+                        const value = input.value.trim()
+                        if (!value || isAddingClientRemark || !current?.id) return
+
+                        setIsAddingClientRemark(true)
+                        try {
+                          await addClientRemark(current.id, value, departmentType)
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-review-replies'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
+                          input.value = ''
+                        } catch (err) {
+                          console.error('Failed to add client remark', err)
+                        } finally {
+                          setIsAddingClientRemark(false)
+                        }
+                      }}
+                      style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
+                    >
+                      <input
+                        name="newClientRemark"
+                        type="text"
+                        placeholder="Add client remark..."
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                        }}
+                        disabled={isAddingClientRemark}
+                      />
+                      <Button type="submit" disabled={isAddingClientRemark}>
+                        {isAddingClientRemark ? 'Adding...' : 'Add'}
+                      </Button>
+                    </form>
+                  )}
                   <RemarkGroup
                     title="Client Remarks"
+                    pageSize={4}
                     badge="Customer replies"
                     emptyMessage="No client remarks recorded."
                     entries={clientRemarkEntries}
+                    editable
+                    editingRemark={editingClientRemark}
+                    editingRemarkText={editingClientRemarkText}
+                    onEdit={(remark) => {
+                      setEditingClientRemark(remark.timestamp || remark.remark || 'remark')
+                      setEditingClientRemarkText(remark.remark || '')
+                    }}
+                    onEditTextChange={setEditingClientRemarkText}
+                    onCancelEdit={() => setEditingClientRemark(null)}
+                    onSaveEdit={saveClientRemarkEdit}
+                    isSavingRemark={isSavingClientRemark}
                   />
                 </div>
 
-                {/* Section 3: Onboarding Remarks */}
+                {/* Section 3: Customer Remarks */}
                 <div className="cl-drawer__remark-section">
                   <RemarkGroup
-                    title="Onboarding Remarks"
+                    title="Customer Remarks"
+                    pageSize={4}
                     badge="Department & meetings"
-                    emptyMessage="No onboarding remarks recorded."
+                    emptyMessage="No customer remarks recorded."
                     entries={onboardingRemarkEntries}
                   />
                 </div>
@@ -2584,6 +2663,7 @@ function RemarkGroup({
   onCancelEdit,
   onSaveEdit,
   isSavingRemark = false,
+  pageSize = 4,
 }: {
   title: string
   emptyMessage: string
@@ -2599,7 +2679,43 @@ function RemarkGroup({
   onCancelEdit?: () => void
   onSaveEdit?: () => void
   isSavingRemark?: boolean
+  pageSize?: number
 }) {
+  const [page, setPage] = useState(0)
+
+  const totalPages = Math.ceil(entries.length / pageSize)
+  const safePage = totalPages > 0 ? Math.min(Math.max(0, page), totalPages - 1) : 0
+
+  useEffect(() => {
+    setPage(0)
+  }, [entries.length, title])
+
+  const pagedEntries = useMemo(() => {
+    const start = safePage * pageSize
+    return entries.slice(start, start + pageSize)
+  }, [entries, safePage, pageSize])
+
+  const getVisiblePages = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i)
+    }
+    const pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = []
+    pages.push(0)
+    if (safePage > 2) {
+      pages.push('ellipsis-start')
+    }
+    const start = Math.max(1, safePage - 1)
+    const end = Math.min(totalPages - 2, safePage + 1)
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+    if (safePage < totalPages - 3) {
+      pages.push('ellipsis-end')
+    }
+    pages.push(totalPages - 1)
+    return pages
+  }
+
   return (
     <section className="cl-drawer__remark-group">
       <div className="cl-drawer__card-head">
@@ -2614,24 +2730,122 @@ function RemarkGroup({
         ) : null}
       </div>
       {entries.length > 0 ? (
-        <ul className="cl-drawer__remark-list">
-          {entries.map(({ remark }, index) => (
-            <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
-              {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
-                <div className="cl-remark-edit">
-                  <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
-                  <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
-                </div>
-              ) : <p>{remark.remark || '—'}</p>}
-              {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
+        <>
+          <ul className="cl-drawer__remark-list">
+            {pagedEntries.map(({ remark }, index) => (
+              <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
+                {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
+                  <div className="cl-remark-edit">
+                    <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
+                    <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
+                  </div>
+                ) : <p>{remark.remark || '—'}</p>}
+                {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
+                <span>
+                  {[remark.staffName, remark.type, remark.timestamp]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: '12px',
+                paddingTop: '10px',
+                borderTop: '1px solid #f1f5f9',
+                fontSize: '12px',
+                color: '#64748b',
+                flexWrap: 'wrap',
+                gap: '8px',
+              }}
+            >
               <span>
-                {[remark.staffName, remark.type, remark.timestamp]
-                  .filter(Boolean)
-                  .join(' · ')}
+                Showing {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, entries.length)} of {entries.length}
               </span>
-            </li>
-          ))}
-        </ul>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button
+                  type="button"
+                  disabled={safePage === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    background: safePage === 0 ? '#f8fafc' : '#ffffff',
+                    color: safePage === 0 ? '#94a3b8' : '#334155',
+                    cursor: safePage === 0 ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  Prev
+                </button>
+
+                {getVisiblePages().map((item, idx) => {
+                  if (typeof item === 'string') {
+                    return (
+                      <span key={`ellipsis-${idx}`} style={{ padding: '0 4px', color: '#94a3b8' }}>
+                        …
+                      </span>
+                    )
+                  }
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      style={{
+                        minWidth: '26px',
+                        height: '26px',
+                        padding: '0 6px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        borderColor: safePage === item ? '#2563eb' : '#e2e8f0',
+                        background: safePage === item ? '#2563eb' : '#ffffff',
+                        color: safePage === item ? '#ffffff' : '#475569',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: safePage === item ? 600 : 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {item + 1}
+                    </button>
+                  )
+                })}
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages - 1}
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    background: safePage >= totalPages - 1 ? '#f8fafc' : '#ffffff',
+                    color: safePage >= totalPages - 1 ? '#94a3b8' : '#334155',
+                    cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       ) : fallback ? (
         <div className="cl-drawer__remark-fallback">
           <p>{fallback}</p>

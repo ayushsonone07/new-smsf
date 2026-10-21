@@ -1171,20 +1171,26 @@ function CustomerRow({
                 {STATUS_OPTIONS.map((opt) => {
                   let isOptDisabled = false
                   if (opt === 'completed') {
-                    let allDone = false
-                    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-                      allDone = customer.subServiceInfo.every((sub: any) => {
-                        const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
-                        return String(st).toUpperCase() === 'COMPLETED'
-                      })
-                    } else if (Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0) {
-                      allDone = customer.flowSteps.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
-                    } else if (Array.isArray(customer.services) && customer.services.length > 0) {
-                      allDone = customer.services.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
-                    }
+                    const subServices = Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0 ? customer.subServiceInfo : null
+                    const flowSteps = Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0 ? customer.flowSteps : null
+                    const services = Array.isArray(customer.services) && customer.services.length > 0 ? customer.services : null
 
-                    if (!allDone && customer.status !== 'completed') {
-                      isOptDisabled = true
+                    if (subServices || flowSteps || services) {
+                      let allDone = false
+                      if (subServices) {
+                        allDone = subServices.every((sub: any) => {
+                          const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
+                          return String(st).toUpperCase() === 'COMPLETED'
+                        })
+                      } else if (flowSteps) {
+                        allDone = flowSteps.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                      } else if (services) {
+                        allDone = services.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
+                      }
+
+                      if (!allDone && customer.status !== 'completed') {
+                        isOptDisabled = true
+                      }
                     }
                   }
 

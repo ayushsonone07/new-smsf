@@ -22,6 +22,7 @@ export interface Customer {
   callStatus?: CustomerCallStatus
   assigneeId?: string | null
   remark?: string
+  remarkType?: string
   updatedLabel?: string
   contactDate?: string
   businessRelationType?: CustomerBusinessRelationType
@@ -47,6 +48,7 @@ export interface UpdateCustomerRequest {
   callStatus?: CustomerCallStatus
   assigneeId?: string | null
   remark?: string
+  remarkType?: string
   updatedLabel?: string
   contactDate?: string
   businessRelationType?: CustomerBusinessRelationType
