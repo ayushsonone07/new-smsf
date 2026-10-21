@@ -1,4 +1,5 @@
 import { authedApiRequest } from './client'
+import { getSession } from '../app/auth/session'
 
 export interface CustomerProfileDetails {
   planIds?: string[]
@@ -215,11 +216,34 @@ export async function getCustomerReviewReplies(
     `/api/auth/customer-service/review-reply/${customerId}/${encodeURIComponent(departmentType)}`,
   )
   
-  const data = response?.data ?? response
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.data)) return data.data
-  if (Array.isArray(data?.replies)) return data.replies
-  return []
+  let rawList: any[] = []
+  if (Array.isArray(response)) {
+    rawList = response
+  } else if (Array.isArray(response?.data?.replies)) {
+    rawList = response.data.replies
+  } else if (Array.isArray(response?.replies)) {
+    rawList = response.replies
+  } else if (Array.isArray(response?.data)) {
+    rawList = response.data
+  } else if (Array.isArray(response?.data?.data)) {
+    rawList = response.data.data
+  }
+
+  return rawList
+    .map((item) => {
+      const payload = item?.data ?? item
+      return {
+        reply: payload?.reply ?? payload?.remark ?? payload?.clientRemark ?? '',
+        timestamp: payload?.timestamp ?? payload?.dateTime ?? payload?.date ?? '',
+        staffName: payload?.staffName ?? payload?.name ?? payload?.username ?? '',
+      }
+    })
+    .filter((r) => Boolean(r.reply))
+
+
+
+
+
 }
 
 export async function getCustomerRemarks(
@@ -275,4 +299,25 @@ export async function getCustomerServiceRows(
     throw new Error(response.message || 'Customer service rows returned no data')
   }
   return rows
+}
+
+export async function addClientRemark(
+  customerId: number | string,
+  remark: string,
+  departmentType?: string,
+): Promise<any> {
+  const session = getSession()
+  const dept = departmentType || session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const username = session?.user?.email || session?.user?.username || ''
+
+  return await authedApiRequest<any>('/api/auth/customer-service/review-reply', {
+    method: 'POST',
+    body: JSON.stringify({
+      customerId: Number(customerId),
+      departmentype: dept,
+      departmentType: dept,
+      reply: remark.trim(),
+    }),
+    headers: username ? { username } : undefined,
+  })
 }

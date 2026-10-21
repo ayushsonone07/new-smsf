@@ -2042,9 +2042,9 @@
 
 .cl-drawer__remark-group {
   min-width: 0;
-  padding: 16px;
+  padding: 12px 14px;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 10px;
   background: #fff;
 }
 
@@ -2054,7 +2054,7 @@
 
 .cl-drawer__remark-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -2063,9 +2063,9 @@
 .cl-drawer__remark-list li,
 .cl-drawer__remark-empty {
   margin: 0;
-  padding: 18px 14px;
+  padding: 8px 12px;
   border: 1px dashed #e2e8f0;
-  border-radius: 11px;
+  border-radius: 8px;
   background: #f8fafc;
   color: #64748b;
   font-size: 13px;
@@ -2079,8 +2079,10 @@
 }
 
 .cl-drawer__remark-list p {
-  margin: 0 0 6px;
+  margin: 0 0 3px;
   color: #334155;
+  font-size: 12.5px;
+  line-height: 1.35;
   white-space: pre-wrap;
 }
 
@@ -2901,7 +2903,7 @@
   }
   .cl-drawer__card {
     padding: 10px;
-    border-radius: 11px;
+    border-radius: 8px;
   }
   .cl-drawer__card-head {
     gap: 6px;
