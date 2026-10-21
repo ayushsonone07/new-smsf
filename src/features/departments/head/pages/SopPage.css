@@ -52,7 +52,7 @@
 .sop-page__search.head-search input {
   padding: 8px 0;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .sop-page__search.head-search input::placeholder {
