@@ -622,6 +622,65 @@ export async function assignCustomerUser(params: AssignCustomerRequest): Promise
   })
 }
 
+export interface BulkTransferCustomersRequest {
+  fromUserEmail: string
+  toUserEmail: string
+  phaseName?: string
+}
+
+export interface BulkTransferCustomersResult {
+  message: string
+  data?: unknown
+}
+
+/**
+ * Transfers every customer-service assignment in the signed-in user's
+ * department from one department user to another.
+ *
+ * SMSB resolves the department from the authenticated/requesting user. The UI
+ * deliberately does not send a department override, so both dropdowns remain
+ * scoped by `GET /api/auth/department/users`.
+ */
+export async function bulkTransferCustomers(
+  params: BulkTransferCustomersRequest,
+): Promise<BulkTransferCustomersResult> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const fromUserEmail = params.fromUserEmail.trim()
+  const toUserEmail = params.toUserEmail.trim()
+
+  if (!fromUserEmail || !toUserEmail) {
+    throw new Error('Select both source and destination users.')
+  }
+  if (fromUserEmail.toLowerCase() === toUserEmail.toLowerCase()) {
+    throw new Error('Source and destination users must be different.')
+  }
+
+  const res = await authedApiRequest<CustomApiResponseRaw<unknown>>(
+    '/api/auth/customer-service/assign-user',
+    {
+      method: 'POST',
+      headers: { username },
+      body: JSON.stringify({
+        assignedFrom: fromUserEmail,
+        assignedUserEmail: toUserEmail,
+        isSelectAll: true,
+        isRoundRobin: false,
+        phaseName: params.phaseName?.trim() || 'Default',
+      }),
+    },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Bulk transfer failed.')
+  }
+
+  return {
+    message: res?.message || 'Customers transferred successfully.',
+    data: res?.data,
+  }
+}
+
 /**
  * `PUT /api/auth/onboarding/update/{customerId}?updatedStatus={updatedStatus}`
  * Updates customer onboarding status in backend DB.
