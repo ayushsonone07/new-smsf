@@ -28,22 +28,25 @@ export async function updateCustomer(
   data: UpdateCustomerRequest,
 ): Promise<any> {
   const session = getSession()
-  const departmentType = session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const departmentType = data.departmentType || session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
   const username = session?.user?.email || session?.user?.username || ''
 
   // Remark Update
   if (data.remark !== undefined) {
+    const numericCustomerId = Number(id)
     const remarkPayload = {
-      customerId: id,
+      customerId: !isNaN(numericCustomerId) && String(numericCustomerId) === String(id) ? numericCustomerId : id,
       action: 'EDIT',
       departmentType,
+      serviceType: data.serviceType || (departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined),
       username,
       remark: data.remark,
       remarkType: data.remarkType || 'INTERNAL',
     }
     await authedApiRequest<any>('/api/auth/customers/manage', {
       method: 'POST',
-      body: JSON.stringify(remarkPayload)
+      body: JSON.stringify(remarkPayload),
+      headers: username ? { username } : undefined,
     })
   }
 
