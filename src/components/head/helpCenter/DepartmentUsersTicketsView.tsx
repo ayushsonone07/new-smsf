@@ -25,6 +25,8 @@ interface DepartmentUsersTicketsViewProps {
 export function DepartmentUsersTicketsView({
   departmentType,
 }: DepartmentUsersTicketsViewProps) {
+  const canViewHistory = true
+
   const [members, setMembers] = useState<AssignableUser[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(true)
   const [membersError, setMembersError] = useState<string | null>(null)
@@ -128,6 +130,7 @@ export function DepartmentUsersTicketsView({
             isLoading={isLoadingMemberTickets}
             onRefresh={() => setRefreshMemberTicketsKey((k) => k + 1)}
             onTicketUpdated={() => setRefreshMemberTicketsKey((k) => k + 1)}
+            canViewHistory={canViewHistory}
           />
         )}
       </div>

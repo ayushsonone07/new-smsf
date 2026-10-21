@@ -7,6 +7,7 @@ import {
   X,
   Loader2,
   Ticket as TicketIcon,
+  History,
 } from 'lucide-react'
 import type {
   EmployeeTicketWithCreator,
@@ -19,6 +20,7 @@ import {
   assignTickets,
   fetchAssignableDepartmentUsers,
 } from '../../../api/help-center.api'
+import { TicketStatusHistoryModal } from './TicketStatusHistoryModal'
 
 interface AssignedTicketsViewProps {
   tickets: EmployeeTicketWithCreator[]
@@ -29,6 +31,7 @@ interface AssignedTicketsViewProps {
   onRefresh: () => void
   onTicketUpdated?: () => void
   statusCounts?: Record<string, number>
+  canViewHistory?: boolean
 }
 
 const STATUS_TABS: { key: string; label: string; status?: TicketStatus }[] = [
@@ -50,6 +53,7 @@ export function AssignedTicketsView({
   onRefresh,
   onTicketUpdated,
   statusCounts: externalStatusCounts,
+  canViewHistory = true,
 }: AssignedTicketsViewProps) {
   const [activeTab, setActiveTab] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -61,6 +65,17 @@ export function AssignedTicketsView({
   const [statusRemark, setStatusRemark] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
+
+  // History modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [historyTicketNumber, setHistoryTicketNumber] = useState<string>('')
+  const [historyCurrentStatus, setHistoryCurrentStatus] = useState<string | undefined>(undefined)
+
+  function handleOpenHistoryModal(ticketNumber: string, status?: string) {
+    setHistoryTicketNumber(ticketNumber)
+    setHistoryCurrentStatus(status)
+    setIsHistoryModalOpen(true)
+  }
 
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
   const [targetAssigneeEmail, setTargetAssigneeEmail] = useState('')
@@ -513,7 +528,23 @@ export function AssignedTicketsView({
                   {/* Card Footer: Ticket ID & Date */}
                   <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-400">
                     <span className="font-mono">{t.ticketNumber}</span>
-                    <span className="font-sans">{formatShortDate(t.ticketCreatedAt)}</span>
+                    <div className="flex items-center gap-2">
+                      {canViewHistory && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                          title="View ticket history"
+                        >
+                          <History className="h-3 w-3" />
+                          <span>History</span>
+                        </button>
+                      )}
+                      <span className="font-sans">{formatShortDate(t.ticketCreatedAt)}</span>
+                    </div>
                   </div>
                 </div>
               )
@@ -536,6 +567,23 @@ export function AssignedTicketsView({
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {canViewHistory && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenHistoryModal(
+                            selectedTicket.ticketNumber,
+                            selectedTicket.ticketStatus
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-xs font-semibold text-blue-700 shadow-2xs transition-colors"
+                        title="View status change history"
+                      >
+                        <History className="h-3.5 w-3.5 text-blue-600" />
+                        <span>History</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
@@ -914,6 +962,14 @@ export function AssignedTicketsView({
           </div>
         </div>
       )}
+
+      {/* ── Modal: Ticket Status History ── */}
+      <TicketStatusHistoryModal
+        isOpen={isHistoryModalOpen}
+        ticketNumber={historyTicketNumber}
+        currentStatus={historyCurrentStatus}
+        onClose={() => setIsHistoryModalOpen(false)}
+      />
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { apiClient } from './axios'
-import { delay, helpArticles } from './mock/db'
 import type {
   EmployeeTicketPageResponse,
   HelpCenterStatusSummary,
@@ -7,6 +6,8 @@ import type {
   AssignableUser,
   TicketStatus,
   HelpArticle,
+  TicketHistoryPageResponse,
+  TicketHistoryEntry,
 } from '../features/departments/types/help-center.types'
 
 interface CustomApiResponse<T> {
@@ -190,14 +191,79 @@ export async function fetchAssignableDepartmentUsers(
 }
 
 /**
+ * Fetch status change history for a specific ticket.
+ * Endpoint: GET /api/help-center/department_users/ticket_history?ticketNumber=...&page=...&size=...
+ * Fallback: GET /api/help-center/tickets/{ticketNumber}/status-history
+ */
+export async function fetchTicketHistory(
+  ticketNumber: string,
+  page = 0,
+  size = 10
+): Promise<TicketHistoryPageResponse> {
+  try {
+    const res = await apiClient.get<CustomApiResponse<TicketHistoryPageResponse>>(
+      '/api/help-center/department_users/ticket_history',
+      {
+        params: {
+          ticketNumber,
+          page,
+          size,
+        },
+      }
+    )
+
+    if (res.data?.data && Array.isArray(res.data.data.entries)) {
+      return res.data.data
+    }
+  } catch (err) {
+    console.warn('Proxy ticket_history failed, trying status-history fallback:', err)
+  }
+
+  // Fallback to /api/help-center/tickets/{ticketNumber}/status-history
+  try {
+    const fallbackRes = await apiClient.get<CustomApiResponse<Record<string, unknown>[]>>(
+      `/api/help-center/tickets/${encodeURIComponent(ticketNumber)}/status-history`
+    )
+
+    const list = fallbackRes.data?.data || []
+    const entries: TicketHistoryEntry[] = list.map((item) => ({
+      ticketNumber,
+      id: item.id as string | number,
+      status: (item.newStatus || item.status || 'UPDATED') as string,
+      previousStatus: (item.oldStatus || item.previousStatus) as string | undefined,
+      remark: (item.newStatusDescription || item.remark || '') as string,
+      updatedBy: (item.updatedBy || item.userId || '') as string,
+      updatedAt: (item.updatedAt || item.createdAt || new Date().toISOString()) as string,
+    }))
+
+    return {
+      entries,
+      currentPage: 0,
+      pageSize: size,
+      totalRecords: entries.length,
+      totalPages: Math.ceil(entries.length / size) || 1,
+      hasNext: false,
+      hasPrevious: false,
+    }
+  } catch (err) {
+    console.error('Both ticket history endpoints failed:', err)
+    return {
+      entries: [],
+      currentPage: 0,
+      pageSize: size,
+      totalRecords: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    }
+  }
+}
+
+/**
  * Legacy mock articles function kept for backward compatibility.
  */
 export async function getHelpArticles(
-  departmentId: string
+  _departmentId: string
 ): Promise<HelpArticle[]> {
-  await delay()
-
-  return structuredClone(
-    helpArticles.filter((article) => article.departmentId === departmentId)
-  )
+  return []
 }

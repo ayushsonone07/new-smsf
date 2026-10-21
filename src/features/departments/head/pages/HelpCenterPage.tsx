@@ -31,6 +31,7 @@ export function HelpCenterPage() {
 
   const userRole = user?.role || 'HEAD'
   const isHead = userRole === 'HEAD' || userRole === 'ADMIN'
+  const canViewHistory = true
   const departmentType = user?.departmentType || 'GOOGLE_DEPARTMENT'
 
   // Read initial tab from URL search params if present
@@ -177,6 +178,7 @@ export function HelpCenterPage() {
             onRefresh={() => loadTickets(true)}
             onTicketUpdated={() => loadTickets(true)}
             statusCounts={statusSummary?.statusCounts}
+            canViewHistory={canViewHistory}
           />
         )}
 

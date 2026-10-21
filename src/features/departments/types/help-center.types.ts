@@ -93,3 +93,26 @@ export interface HelpArticle {
   excerpt: string
   updatedAt: string
 }
+
+export interface TicketHistoryEntry {
+  ticketNumber?: string
+  id?: number | string
+  assignedTo?: string | null
+  status: string
+  previousStatus?: string | null
+  priority?: string | null
+  updatedAt: string
+  resolvedAt?: string | null
+  remark?: string | null
+  updatedBy?: string | null
+}
+
+export interface TicketHistoryPageResponse {
+  entries: TicketHistoryEntry[]
+  currentPage: number
+  pageSize: number
+  totalRecords: number
+  totalPages: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
