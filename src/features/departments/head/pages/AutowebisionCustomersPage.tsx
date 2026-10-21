@@ -1,5 +1,9 @@
-import { useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  InternalRemarkBadge,
+  formatRemarkTimestamp,
+} from '../../../../components/head/customers-list/InternalRemarkBadge'
 import {
   Globe,
   Bot,
@@ -17,12 +21,28 @@ import {
   Clock,
   X,
   Loader2,
+  ChevronsUpDown,
+  MessageSquare,
+  Plus,
 } from 'lucide-react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
 import { ServiceFlowModal } from '../../../../components/head/customers-list/ServiceFlowModal'
+import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
+import { SendDraftModal } from '../../../../components/head/customers-list/SendDraftModal'
+import { DraftHistoryModal } from '../../../../components/head/customers-list/DraftHistoryModal'
+import { extractServiceTags } from '../../../../api/service-flow.api'
+import {
+  sendWebsiteDraftMail,
+  fetchWebsiteDraftHistory,
+  type WebsiteDraftHistoryEntry,
+} from '../../../../api/website-draft.api'
+import {
+  getCustomerInternalRemarks,
+  type CustomerRemark,
+} from '../../../../api/customer-drawer.api'
 import {
   fetchLightAutowebisionCustomers,
   assignAutowebisionUser,
@@ -42,7 +62,10 @@ import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 import { recordCustomerActivity } from '../../../../utils/customerActivity'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
-import type { OnboardingCustomer, OnboardingStatus } from '../../../../components/head/customers-list/CustomersList'
+import {
+  type OnboardingCustomer,
+  type OnboardingStatus,
+} from '../../../../components/head/customers-list/CustomersList'
 import './AutowebisionCustomers.css'
 
 export type AutowebsionSubTab = 'ALL' | 'WEBSITE' | 'AUTOMATION'
@@ -58,11 +81,38 @@ export function AutowebisionCustomersPage({
   void feature
 
   const session = getSession()
-  const isDepartmentUser = session?.user.role === 'USER'
+  const queryClient = useQueryClient()
+  const userRole = (session?.user as any)?.role
+  const isDepartmentUser =
+    userRole === 'USER' ||
+    userRole === 'DEPARTMENT_USER' ||
+    Boolean(
+      typeof window !== 'undefined' &&
+        (window.location.pathname.includes('/user/') ||
+          window.location.pathname.includes('-user') ||
+          window.location.pathname.includes('/users')),
+    )
   const userEmail = session?.user.email || session?.user.username || ''
 
-  // Dynamic Column Permissions for Autowebsion Department
-  const { isColumnEnabled, canEditColumn } = useDepartmentColumnPermissions('AUTOWEBSION_DEPARTMENT')
+  // Permissions must come from the department that owns the current route.
+  // Using AUTOWEBSION_DEPARTMENT here bypassed the AUTOMATION_DEPARTMENT
+  // Head/User access configured by Admin.
+  const permissionDepartmentType = session?.user.departmentType || (
+    typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('automation')
+      ? 'AUTOMATION_DEPARTMENT'
+      : typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('website')
+        ? 'WEBSITE_DEPARTMENT'
+        : 'AUTOWEBSION_DEPARTMENT'
+  )
+  const permissionRouteName = permissionDepartmentType === 'AUTOMATION_DEPARTMENT'
+    ? 'automation_department/head/customer-list'
+    : permissionDepartmentType === 'WEBSITE_DEPARTMENT'
+      ? 'website_department/head/customer-list'
+      : undefined
+  const { isColumnEnabled, canEditColumn } = useDepartmentColumnPermissions(
+    permissionDepartmentType,
+    permissionRouteName,
+  )
 
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
@@ -75,12 +125,16 @@ export function AutowebisionCustomersPage({
   const isClientRemarkVisible = isColumnEnabled('Client Remark') || isColumnEnabled('Client Remarks')
   const isInternalRemarkVisible = isColumnEnabled('Internal Remark') || isColumnEnabled('Remark') || isColumnEnabled('Remarks')
   const isDraftSentVisible = isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent')
-  const isAssigneeVisible = isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee')
+  const isAssigneeVisible = !isDepartmentUser && (isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee'))
   const isActionsVisible = isColumnEnabled('Actions') || isColumnEnabled('Action')
 
-  const canEditWebsiteExists = canEditColumn('Website Exists') || canEditColumn('Website') || canEditColumn('isWebsiteExists')
-  const canEditStatus = canEditColumn('Status') || canEditColumn('Service Status')
-  const canEditAssignee = canEditColumn('Assigned To') && !isDepartmentUser
+  // Role permission rules: Head is read-only for draft, status, and website exists.
+  // Department User has read & write permissions for draft, status, and website exists.
+  const canEditWebsiteExists = isDepartmentUser
+  const canEditStatus = isDepartmentUser
+  const canEditDraft = isDepartmentUser
+  const canEditAssignee = !isDepartmentUser && canEditColumn('Assigned To')
+  const canEditServices = isDepartmentUser
 
   const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
@@ -102,13 +156,64 @@ export function AutowebisionCustomersPage({
 
   // Modals state
   const [selectedCustomer, setSelectedCustomer] = useState<OnboardingCustomer | null>(null)
-  const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
+  const [serviceFlowTarget, setServiceFlowTarget] = useState<{
+    customer: OnboardingCustomer
+    serviceType: 'WEBSITE' | 'AUTOMATION'
+  } | null>(null)
+  const [serviceTagsTarget, setServiceTagsTarget] = useState<{
+    customer: OnboardingCustomer
+    serviceType: string
+  } | null>(null)
   const [viewingClientRemark, setViewingClientRemark] = useState<{ name: string; remark: string } | null>(null)
   const [viewingDuplicate, setViewingDuplicate] = useState<{ name: string; customerId: number } | null>(null)
   const [updatingWebsiteExistsId, setUpdatingWebsiteExistsId] = useState<number | null>(null)
+  const [confirmWebsiteExistsTarget, setConfirmWebsiteExistsTarget] = useState<AutowebsionCustomerLightDTO | null>(null)
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // On-demand Internal Remarks state
+  const [activeRemarkPopoverKey, setActiveRemarkPopoverKey] = useState<string | null>(null)
+  const [viewingInternalRemarks, setViewingInternalRemarks] = useState<{
+    customerId: number
+    customerName: string
+    departmentType: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT'
+    remarks: CustomerRemark[] | null
+    loading: boolean
+    error: string | null
+  } | null>(null)
+
+  // Website Draft Modals state
+  const [selectedCustomerForDraft, setSelectedCustomerForDraft] = useState<AutowebsionCustomerLightDTO | null>(null)
+  const [sendDraftModalOpen, setSendDraftModalOpen] = useState(false)
+  const [draftHistoryModalOpen, setDraftHistoryModalOpen] = useState(false)
+  const [isSendingDraft, setIsSendingDraft] = useState(false)
+  const [draftHistory, setDraftHistory] = useState<WebsiteDraftHistoryEntry[]>([])
+  const [isLoadingDraftHistory, setIsLoadingDraftHistory] = useState(false)
+
+  // Assign dropdown & modal state matching screenshots
+  const [openAssignDropdownId, setOpenAssignDropdownId] = useState<number | null>(null)
+  const [assignSearchQuery, setAssignSearchQuery] = useState('')
+  const [assignModalTarget, setAssignModalTarget] = useState<{
+    customer: AutowebsionCustomerLightDTO
+    user: { email: string; name: string }
+  } | null>(null)
+  const [isAssigningUser, setIsAssigningUser] = useState(false)
+  const assignDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!openAssignDropdownId) return
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        assignDropdownRef.current &&
+        !assignDropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpenAssignDropdownId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openAssignDropdownId])
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -189,22 +294,29 @@ export function AutowebisionCustomersPage({
   })
 
   // 3. Exact Assignable Users: GET /api/autowebision/users?page=0&size=100
+  // Do NOT hit when logged in as department user (Assign is only for Head)
   const autowebUsersQuery = useQuery({
     queryKey: ['autowebisionUsers100'],
     queryFn: () => fetchAutowebsionUsers(0, 100),
+    enabled: !isDepartmentUser,
     staleTime: 60_000,
   })
 
   // 4. Exact Assignable List: GET /api/meetings/users/assigning-list?departmentType=AUTOWEBSION_DEPARTMENT
+  // Do NOT hit when logged in as department user (Assign is only for Head)
   const meetingsAssignQuery = useQuery({
     queryKey: ['meetingsAssigningListAutowebsion'],
     queryFn: () => fetchMeetingsAssigningList('AUTOWEBSION_DEPARTMENT'),
+    enabled: !isDepartmentUser,
     staleTime: 60_000,
   })
 
-  const assigningUsersQuery = useAssigningUsers('AUTOWEBSION_DEPARTMENT')
+  const assigningUsersQuery = useAssigningUsers('AUTOWEBSION_DEPARTMENT', {
+    enabled: !isDepartmentUser,
+  })
 
   const assignees = useMemo(() => {
+    if (isDepartmentUser) return []
     const list: Array<{ id: string; name: string }> = []
     const seen = new Set<string>()
 
@@ -247,7 +359,15 @@ export function AutowebisionCustomersPage({
     }
 
     return list
-  }, [autowebUsersQuery.data, meetingsAssignQuery.data, assigningUsersQuery.data])
+  }, [isDepartmentUser, autowebUsersQuery.data, meetingsAssignQuery.data, assigningUsersQuery.data])
+
+  const filteredAssignees = useMemo(() => {
+    if (!assignSearchQuery.trim()) return assignees
+    const q = assignSearchQuery.toLowerCase()
+    return assignees.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q),
+    )
+  }, [assignees, assignSearchQuery])
 
   // Compute status counts for active sub tab
   const statusCounts = useMemo(() => {
@@ -270,10 +390,219 @@ export function AutowebisionCustomersPage({
     return counts.all
   }, [countsQuery.data, activeSubTab, customersQuery.data?.totalElements])
 
+  // Helper to compute website status according to user specification:
+  // "is me Website ke do status aate hai to seniro maintain karna jab dono complete ho tabi complete show karna vana pending ya in progress ok"
+  function getWebsiteServiceStatus(c: AutowebsionCustomerLightDTO): string {
+    const services = Array.isArray(c.services) ? c.services : []
+    const websiteServices = services.filter((s: any) => {
+      const st = String(s?.serviceType || '').toUpperCase()
+      return st.includes('WEB')
+    })
+
+    if (websiteServices.length > 0) {
+      const statuses = websiteServices.map((s: any) =>
+        String(s?.status || 'PENDING').toUpperCase().replace(/-/g, '_'),
+      )
+      const allCompleted = statuses.every((st) => st.includes('COMPLETE'))
+      if (allCompleted) return 'COMPLETED'
+
+      const anyStarted = statuses.some((st) => st.includes('PROGRESS') || st.includes('COMPLETE'))
+      if (anyStarted) return 'IN_PROGRESS'
+
+      return 'PENDING'
+    }
+
+    const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
+    return fallback.includes('COMPLETE')
+      ? 'COMPLETED'
+      : fallback.includes('PROGRESS')
+        ? 'IN_PROGRESS'
+        : 'PENDING'
+  }
+
+  // Helper to compute automation status
+  function getAutomationServiceStatus(c: AutowebsionCustomerLightDTO): string {
+    const services = Array.isArray(c.services) ? c.services : []
+    const autoServices = services.filter((s: any) => {
+      const st = String(s?.serviceType || '').toUpperCase()
+      return st.includes('AUTO')
+    })
+
+    if (autoServices.length > 0) {
+      const statuses = autoServices.map((s: any) =>
+        String(s?.status || 'PENDING').toUpperCase().replace(/-/g, '_'),
+      )
+      const allCompleted = statuses.every((st) => st.includes('COMPLETE'))
+      if (allCompleted) return 'COMPLETED'
+
+      const anyStarted = statuses.some((st) => st.includes('PROGRESS') || st.includes('COMPLETE'))
+      if (anyStarted) return 'IN_PROGRESS'
+
+      return 'PENDING'
+    }
+
+    const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
+    return fallback.includes('COMPLETE')
+      ? 'COMPLETED'
+      : fallback.includes('PROGRESS')
+        ? 'IN_PROGRESS'
+        : 'PENDING'
+  }
+
+  // Status style helpers matching Screenshot 1 (Pending: #fff8eb, text: #b45309, border: border-amber-200/80)
+  function getStatusBadgeStyle(status: string): string {
+    const s = String(status || 'PENDING').toUpperCase()
+    if (s.includes('COMPLETE')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+    }
+    if (s.includes('PROGRESS')) {
+      return 'bg-blue-50 text-blue-700 border-blue-200/80'
+    }
+    return 'bg-[#fff8eb] text-[#b45309] border-amber-200/80'
+  }
+
+  function getStatusSelectStyle(status: string): string {
+    const s = String(status || 'PENDING').toUpperCase()
+    if (s.includes('COMPLETE')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-300 focus:border-emerald-500'
+    }
+    if (s.includes('PROGRESS')) {
+      return 'bg-blue-50 text-blue-700 border-blue-300 focus:border-blue-500'
+    }
+    return 'bg-[#fff8eb] text-[#b45309] border-amber-300 focus:border-amber-500'
+  }
+
+  function getStatusIconColor(status: string): string {
+    const s = String(status || 'PENDING').toUpperCase()
+    if (s.includes('COMPLETE')) return 'text-emerald-600'
+    if (s.includes('PROGRESS')) return 'text-blue-600'
+    return 'text-amber-700'
+  }
+
+  function formatStatusLabel(status: string): string {
+    const s = String(status || 'PENDING').toUpperCase()
+    if (s.includes('COMPLETE')) return 'Completed'
+    if (s.includes('PROGRESS')) return 'In Progress'
+    return 'Pending'
+  }
+
+  // Helper to extract sub-services for a customer and service type
+  function getSubServicesForCustomer(
+    customer: AutowebsionCustomerLightDTO,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ): Array<{ name: string; status: string }> {
+    const list: Array<{ name: string; status: string }> = []
+
+    // 1. Check services array if specific service has subServiceInfo
+    if (Array.isArray(customer.services)) {
+      for (const s of customer.services) {
+        const st = String(s?.serviceType || '').toUpperCase()
+        const matchesTarget =
+          !targetServiceType ||
+          (targetServiceType === 'WEBSITE' && (st.includes('WEB') || st.includes('SITE'))) ||
+          (targetServiceType === 'AUTOMATION' && (st.includes('AUTO') || st.includes('BOT')))
+
+        if (matchesTarget && Array.isArray((s as any)?.subServiceInfo)) {
+          for (const sub of (s as any).subServiceInfo) {
+            const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+            const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING')
+            list.push({ name: String(name), status: String(status).toUpperCase() })
+          }
+        }
+      }
+    }
+
+    // 2. If no subServices found in services array, check customer.subServiceInfo
+    if (list.length === 0 && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
+      for (const sub of customer.subServiceInfo) {
+        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+        const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING')
+        const normName = String(name).toUpperCase()
+
+        // Filter appropriately if targetServiceType is given
+        if (targetServiceType === 'AUTOMATION') {
+          if (normName.includes('WEBSITE') || normName.includes('SEO') || normName.includes('DRAFT')) {
+            continue
+          }
+        } else if (targetServiceType === 'WEBSITE') {
+          if (normName.includes('BOT') || (normName.includes('AUTOMATION') && !normName.includes('WEB'))) {
+            continue
+          }
+        }
+
+        list.push({ name: String(name), status: String(status).toUpperCase() })
+      }
+    }
+
+    // 3. Fallback: if no subServices found at all, check customer.services array itself
+    if (list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
+      for (const s of customer.services) {
+        const st = String(s?.serviceType || '').toUpperCase()
+        const matchesTarget =
+          !targetServiceType ||
+          (targetServiceType === 'WEBSITE' && (st.includes('WEB') || st.includes('SITE'))) ||
+          (targetServiceType === 'AUTOMATION' && (st.includes('AUTO') || st.includes('BOT')))
+        if (matchesTarget) {
+          list.push({
+            name: s.serviceType || 'Service',
+            status: String(s.status || 'PENDING').toUpperCase(),
+          })
+        }
+      }
+    }
+
+    return list
+  }
+
+  // Helper to validate sub-service completion status
+  function checkSubServicesCompletion(
+    customer: AutowebsionCustomerLightDTO,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ): {
+    subServices: Array<{ name: string; status: string }>
+    allCompleted: boolean
+    incompleteNames: string[]
+  } {
+    const subServices = getSubServicesForCustomer(customer, targetServiceType)
+
+    if (subServices.length === 0) {
+      return {
+        subServices: [],
+        allCompleted: true,
+        incompleteNames: [],
+      }
+    }
+
+    const incomplete = subServices.filter((s) => {
+      const st = s.status.toUpperCase()
+      return st !== 'COMPLETED' && st !== 'COMPLETE'
+    })
+
+    const allCompleted = incomplete.length === 0
+    const incompleteNames = incomplete.map((s) => s.name)
+
+    return {
+      subServices,
+      allCompleted,
+      incompleteNames,
+    }
+  }
+
   // Convert raw DTO to OnboardingCustomer for detail modal & subservice flow modal
-  function toOnboardingCustomer(c: AutowebsionCustomerLightDTO, index: number): OnboardingCustomer {
+  function toOnboardingCustomer(
+    c: AutowebsionCustomerLightDTO,
+    index: number,
+    serviceTypeOverride?: 'WEBSITE' | 'AUTOMATION',
+  ): OnboardingCustomer {
     const id = String(c.customerId ?? `c-${index}`)
-    const s = String(c.mainStatus || 'PENDING').toLowerCase()
+    const resolvedStatus =
+      serviceTypeOverride === 'AUTOMATION' || activeSubTab === 'AUTOMATION'
+        ? getAutomationServiceStatus(c)
+        : serviceTypeOverride === 'WEBSITE' || activeSubTab === 'WEBSITE'
+          ? getWebsiteServiceStatus(c)
+          : String(c.mainStatus || 'PENDING').toUpperCase()
+
+    const s = resolvedStatus.toLowerCase()
     const status: OnboardingStatus = s.includes('complete')
       ? 'completed'
       : s.includes('progress') || s === 'active'
@@ -281,9 +610,9 @@ export function AutowebisionCustomersPage({
         : 'pending'
 
     const assigned =
-      activeSubTab === 'WEBSITE'
+      activeSubTab === 'WEBSITE' || serviceTypeOverride === 'WEBSITE'
         ? c.websiteAssignedUserEmail || c.assignedUserEmail
-        : activeSubTab === 'AUTOMATION'
+        : activeSubTab === 'AUTOMATION' || serviceTypeOverride === 'AUTOMATION'
           ? c.automationAssignedUserEmail || c.assignedUserEmail
           : c.assignedUserEmail || c.websiteAssignedUserEmail || c.automationAssignedUserEmail
 
@@ -309,20 +638,22 @@ export function AutowebisionCustomersPage({
       serviceType: c.serviceTypes && c.serviceTypes.length > 0 ? c.serviceTypes.join(', ') : 'AUTOWEBSION SERVICE',
       services: c.services || [],
       subServiceInfo: c.subServiceInfo || [],
+      serviceTags: extractServiceTags(c),
       rawCustomer: c,
     }
   }
 
-  // Handle toggling "Website Exists"
-  async function handleToggleWebsiteExists(customer: AutowebsionCustomerLightDTO) {
-    const newStatus = !customer.isWebsiteExists
+  // Handle confirming "Website Exists" from confirmation modal
+  async function handleConfirmWebsiteExists(customer: AutowebsionCustomerLightDTO) {
+    if (!canEditWebsiteExists) return
     setUpdatingWebsiteExistsId(customer.customerId)
     try {
-      await updateWebsiteExistsStatus(customer.customerId, newStatus)
+      await updateWebsiteExistsStatus(customer.customerId, true)
       setToast({
         type: 'success',
-        message: `Website status updated to ${newStatus ? 'Exists' : 'Not Exists'}.`,
+        message: 'Website status updated to Exists.',
       })
+      setConfirmWebsiteExistsTarget(null)
       await customersQuery.refetch()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update website status'
@@ -332,33 +663,183 @@ export function AutowebisionCustomersPage({
     }
   }
 
-  // Handle assigning user
-  async function handleAssignUser(customerId: number, assigneeEmail: string) {
+  // Handle assigning user to department (Automation, Website, or Both)
+  async function handleExecuteAssignment(
+    customerId: number,
+    assigneeEmail: string,
+    targetDepartment?: string,
+  ) {
+    if (!canEditAssignee) return
     if (!assigneeEmail) return
+    setIsAssigningUser(true)
     try {
       await assignAutowebisionUser({
         customerIds: [customerId],
         assignedUserEmail: assigneeEmail,
-        departmentType: departmentTypeParam,
+        departmentType: targetDepartment,
       })
-      setToast({ type: 'success', message: 'User assigned successfully.' })
+      const deptLabel =
+        targetDepartment === 'AUTOMATION_DEPARTMENT'
+          ? 'Automation'
+          : targetDepartment === 'WEBSITE_DEPARTMENT'
+            ? 'Website'
+            : 'both Website & Automation'
+      setToast({
+        type: 'success',
+        message: `Customer assigned to ${deptLabel} successfully.`,
+      })
+      setAssignModalTarget(null)
       await customersQuery.refetch()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to assign user'
       setToast({ type: 'error', message: msg })
+    } finally {
+      setIsAssigningUser(false)
     }
   }
 
-  // Handle status update
-  async function handleStatusChange(customer: AutowebsionCustomerLightDTO, newStatus: string) {
+  // Handle on-demand fetching of internal remarks for Website or Automation
+  const handleOpenFullRemarkDialog = useCallback(
+    (
+      customer: AutowebsionCustomerLightDTO,
+      departmentType: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT',
+      preloadedRemarks?: CustomerRemark[],
+    ) => {
+      const hasPreloaded = Array.isArray(preloadedRemarks) && preloadedRemarks.length > 0
+      setViewingInternalRemarks({
+        customerId: customer.customerId,
+        customerName: customer.businessName || customer.ownerName || 'Customer',
+        departmentType,
+        remarks: hasPreloaded ? preloadedRemarks : null,
+        loading: !hasPreloaded,
+        error: null,
+      })
+
+      if (!hasPreloaded) {
+        getCustomerInternalRemarks(customer.customerId, departmentType, userEmail)
+          .then((data) => {
+            const list = Array.isArray(data) ? data : []
+            setViewingInternalRemarks((prev) =>
+              prev && prev.customerId === customer.customerId
+                ? { ...prev, remarks: list, loading: false }
+                : prev,
+            )
+          })
+          .catch((err) => {
+            setViewingInternalRemarks((prev) =>
+              prev && prev.customerId === customer.customerId
+                ? {
+                    ...prev,
+                    error: err instanceof Error ? err.message : 'Failed to fetch remarks',
+                    loading: false,
+                  }
+                : prev,
+            )
+          })
+      }
+    },
+    [userEmail],
+  )
+
+  // Website Draft Handlers
+  const handleOpenDraftModal = (customer: AutowebsionCustomerLightDTO) => {
+    setSelectedCustomerForDraft(customer)
+    setSendDraftModalOpen(true)
+  }
+
+  const handleCloseDraftModal = () => {
+    setSendDraftModalOpen(false)
+    setSelectedCustomerForDraft(null)
+  }
+
+  const handleSendDraft = async (draftLink: string, remark: string) => {
+    if (!selectedCustomerForDraft) return
+    const clientEmail = selectedCustomerForDraft.email || ''
+    const clientName =
+      selectedCustomerForDraft.businessName ||
+      selectedCustomerForDraft.ownerName ||
+      'Customer'
+
+    if (!clientEmail) {
+      setToast({ type: 'error', message: 'Customer does not have a valid email address.' })
+      return
+    }
+
+    setIsSendingDraft(true)
+    try {
+      const result = await sendWebsiteDraftMail({
+        clientEmail,
+        clientName,
+        draftLink,
+        remark,
+      })
+      setToast({
+        type: 'success',
+        message: result.message || 'Website draft email sent successfully',
+      })
+      handleCloseDraftModal()
+      await customersQuery.refetch()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send website draft email'
+      setToast({ type: 'error', message: msg })
+    } finally {
+      setIsSendingDraft(false)
+    }
+  }
+
+  const handleOpenDraftHistoryModal = (customer: AutowebsionCustomerLightDTO) => {
+    setSelectedCustomerForDraft(customer)
+    setDraftHistoryModalOpen(true)
+    const clientEmail = customer.email || ''
+    if (clientEmail) {
+      setIsLoadingDraftHistory(true)
+      fetchWebsiteDraftHistory(clientEmail)
+        .then((data) => {
+          setDraftHistory(data)
+        })
+        .catch(() => {
+          setDraftHistory([])
+        })
+        .finally(() => {
+          setIsLoadingDraftHistory(false)
+        })
+    } else {
+      setDraftHistory([])
+    }
+  }
+
+  const handleCloseDraftHistoryModal = () => {
+    setDraftHistoryModalOpen(false)
+    setSelectedCustomerForDraft(null)
+    setDraftHistory([])
+  }
+
+  // Low-level status update
+  async function executeStatusChange(
+    customer: AutowebsionCustomerLightDTO,
+    newStatus: string,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ) {
+    if (!canEditStatus) return
     setUpdatingStatusId(customer.customerId)
     try {
+      const targetDept =
+        targetServiceType === 'AUTOMATION'
+          ? 'AUTOMATION_DEPARTMENT'
+          : targetServiceType === 'WEBSITE'
+            ? 'WEBSITE_DEPARTMENT'
+            : departmentTypeParam
+
       await updateAutowebisionStatus({
         customerId: customer.customerId,
         updatedStatus: newStatus,
-        departmentType: departmentTypeParam,
+        departmentType: targetDept,
+        serviceType: targetServiceType,
       })
-      setToast({ type: 'success', message: `Status updated to ${newStatus}.` })
+      setToast({
+        type: 'success',
+        message: `${targetServiceType ? `${targetServiceType} status` : 'Status'} updated to ${newStatus}.`,
+      })
       await customersQuery.refetch()
       await countsQuery.refetch()
     } catch (err: unknown) {
@@ -369,6 +850,32 @@ export function AutowebisionCustomersPage({
     }
   }
 
+  // Handle status update with validation:
+  // Handle status update with validation:
+  // If status is in progress or pending and user tries to update to COMPLETED:
+  // Sub-services must be completed first, otherwise show "Firstly complete SubService first"
+  async function handleStatusChange(
+    customer: AutowebsionCustomerLightDTO,
+    newStatus: string,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ) {
+    if (!canEditStatus) return
+
+    if (newStatus === 'COMPLETED') {
+      const check = checkSubServicesCompletion(customer, targetServiceType)
+
+      if (!check.allCompleted) {
+        setToast({
+          type: 'error',
+          message: 'Firstly complete SubService first',
+        })
+        return
+      }
+    }
+
+    await executeStatusChange(customer, newStatus, targetServiceType)
+  }
+
   // Handle Airtel Click to Call
   async function handleCallCustomer(phone: string, customerName: string, customerId: number) {
     if (!phone) {
@@ -377,7 +884,10 @@ export function AutowebisionCustomersPage({
     }
     setCallingCustomerId(String(customerId))
     try {
-      await initiateAirtelClickToCall(phone)
+      const result = await initiateAirtelClickToCall(phone)
+      if (result?.success === false) {
+        throw new Error(result.message || 'Unable to initiate call')
+      }
       recordCustomerActivity({
         customerId: String(customerId),
         contact: phone,
@@ -392,6 +902,142 @@ export function AutowebisionCustomersPage({
     } finally {
       setCallingCustomerId(null)
     }
+  }
+
+  // Helper to determine exact service type for service tags API
+  function getExactServiceTypeForTags(
+    c: AutowebsionCustomerLightDTO,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ): string {
+    const services = Array.isArray(c.services) ? c.services : []
+    if (targetServiceType === 'WEBSITE' || activeSubTab === 'WEBSITE') {
+      const match = services.find((s: any) =>
+        String(s?.serviceType || '').toUpperCase().includes('WEB'),
+      )
+      if (match?.serviceType) return String(match.serviceType)
+      return 'WEBSITE'
+    }
+    if (targetServiceType === 'AUTOMATION' || activeSubTab === 'AUTOMATION') {
+      const match = services.find((s: any) =>
+        String(s?.serviceType || '').toUpperCase().includes('AUTO'),
+      )
+      if (match?.serviceType) return String(match.serviceType)
+      return 'AUTOMATION'
+    }
+    if (services.length > 0 && services[0]?.serviceType) {
+      return String(services[0].serviceType)
+    }
+    if (Array.isArray(c.serviceTypes) && c.serviceTypes.length > 0) {
+      return c.serviceTypes[0]
+    }
+    return 'WEBSITE'
+  }
+
+  // Extract all service tags assigned to customer or specific service
+  function getServiceTagsForCustomer(
+    customer: AutowebsionCustomerLightDTO,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ): Array<{ key: string; label: string }> {
+    const list: Array<{ key: string; label: string }> = []
+    const seen = new Set<string>()
+
+    const addTag = (k: string, v: string) => {
+      const norm = String(v || k).trim()
+      if (!norm || seen.has(norm.toUpperCase())) return
+      seen.add(norm.toUpperCase())
+      list.push({ key: k, label: norm })
+    }
+
+    if (Array.isArray(customer.services)) {
+      for (const s of customer.services) {
+        const st = String(s?.serviceType || '').toUpperCase()
+        const matches =
+          !targetServiceType ||
+          (targetServiceType === 'WEBSITE' && (st.includes('WEB') || st.includes('SITE'))) ||
+          (targetServiceType === 'AUTOMATION' && (st.includes('AUTO') || st.includes('BOT')))
+
+        if (matches && s?.serviceTags) {
+          let val = s.serviceTags
+          if (typeof val === 'string') {
+            try {
+              val = JSON.parse(val)
+            } catch {
+              addTag(val, val)
+            }
+          }
+          if (Array.isArray(val)) {
+            val.forEach((item, idx) => {
+              const name =
+                typeof item === 'string'
+                  ? item
+                  : item?.tagName || item?.name || Object.values(item)[0]
+              if (name) addTag(`s_tag_${idx}`, String(name))
+            })
+          } else if (val && typeof val === 'object') {
+            Object.entries(val).forEach(([k, v]) => {
+              const name =
+                typeof v === 'object'
+                  ? (v as any)?.tagName || (v as any)?.name || Object.values(v as any)[0]
+                  : v
+              if (name) addTag(k, String(name))
+            })
+          }
+        }
+      }
+    }
+
+    if (customer.serviceTags) {
+      let val = customer.serviceTags
+      if (typeof val === 'string') {
+        try {
+          val = JSON.parse(val)
+        } catch {
+          addTag(val, val)
+        }
+      }
+      if (Array.isArray(val)) {
+        val.forEach((item, idx) => {
+          const name =
+            typeof item === 'string'
+              ? item
+              : item?.tagName || item?.name || Object.values(item)[0]
+          if (name) addTag(`c_tag_${idx}`, String(name))
+        })
+      } else if (val && typeof val === 'object') {
+        Object.entries(val).forEach(([k, v]) => {
+          const name =
+            typeof v === 'object'
+              ? (v as any)?.tagName || (v as any)?.name || Object.values(v as any)[0]
+              : v
+          if (name) addTag(k, String(name))
+        })
+      }
+    }
+
+    if (list.length === 0) {
+      const fallback = extractServiceTags(customer)
+      if (fallback && typeof fallback === 'object') {
+        Object.entries(fallback).forEach(([k, v]) => {
+          if (v) addTag(k, String(v))
+        })
+      }
+    }
+
+    return list
+  }
+
+  // Open Service Tags modal (editable for Department User, read-only for Department Head)
+  function handleOpenServiceTags(
+    customer: AutowebsionCustomerLightDTO,
+    index: number,
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+  ) {
+    const exactType = getExactServiceTypeForTags(customer, targetServiceType)
+    const onboardingCust = toOnboardingCustomer(customer, index, targetServiceType)
+    setServiceTagsTarget({
+      customer: onboardingCust,
+      serviceType: exactType,
+    })
   }
 
   const rawRows = customersQuery.data?.data || []
@@ -669,7 +1315,6 @@ export function AutowebisionCustomersPage({
                   {isInternalRemarkVisible && <th style={{ minWidth: '180px' }}>INTERNAL REMARK</th>}
                   {isDraftSentVisible && <th style={{ minWidth: '130px' }}>DRAFT SENT</th>}
                   {isAssigneeVisible && <th style={{ minWidth: '180px' }}>ASSIGNED TO</th>}
-                  {isActionsVisible && <th style={{ width: '85px', textAlign: 'center' }}>ACTIONS</th>}
                 </tr>
               </thead>
               <tbody>
@@ -690,18 +1335,17 @@ export function AutowebisionCustomersPage({
                       })
                     : ''
 
-                  const currentAssignee =
-                    activeSubTab === 'WEBSITE'
-                      ? customer.websiteAssignedUserEmail || customer.assignedUserEmail
-                      : activeSubTab === 'AUTOMATION'
-                        ? customer.automationAssignedUserEmail || customer.assignedUserEmail
-                        : customer.assignedUserEmail || customer.websiteAssignedUserEmail || customer.automationAssignedUserEmail
-
-                  const currentStatus = String(customer.mainStatus || 'PENDING').toUpperCase()
+                  const websiteStatus = getWebsiteServiceStatus(customer)
+                  const automationStatus = getAutomationServiceStatus(customer)
 
                   const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
-                  const hasWebsite = serviceTypes.some((s) => s.toUpperCase().includes('WEB'))
-                  const hasAutomation = serviceTypes.some((s) => s.toUpperCase().includes('AUTO'))
+                  const services = Array.isArray(customer.services) ? customer.services : []
+                  const hasWebsite =
+                    serviceTypes.some((s) => s.toUpperCase().includes('WEB')) ||
+                    services.some((s) => String(s?.serviceType || '').toUpperCase().includes('WEB'))
+                  const hasAutomation =
+                    serviceTypes.some((s) => s.toUpperCase().includes('AUTO')) ||
+                    services.some((s) => String(s?.serviceType || '').toUpperCase().includes('AUTO'))
 
                   return (
                     <tr key={customerId || index}>
@@ -718,15 +1362,23 @@ export function AutowebisionCustomersPage({
                               type="button"
                               className={`inline-flex items-center justify-center h-7 w-7 rounded-md border transition-all ${
                                 customer.isWebsiteExists
-                                  ? 'border-blue-300 bg-blue-50 text-blue-600'
-                                  : 'border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600'
+                                  ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-not-allowed'
+                                  : canEditWebsiteExists
+                                    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
+                                    : 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
                               }`}
-                              disabled={!canEditWebsiteExists || updatingWebsiteExistsId === customerId}
-                              onClick={() => handleToggleWebsiteExists(customer)}
+                              disabled={customer.isWebsiteExists || !canEditWebsiteExists || updatingWebsiteExistsId === customerId}
+                              onClick={() => {
+                                if (!customer.isWebsiteExists && canEditWebsiteExists) {
+                                  setConfirmWebsiteExistsTarget(customer)
+                                }
+                              }}
                               title={
                                 customer.isWebsiteExists
-                                  ? 'Website Exists: Yes'
-                                  : 'Website Exists: No (Click to toggle)'
+                                  ? 'Website Exists: YES (Cannot be turned NO)'
+                                  : canEditWebsiteExists
+                                    ? 'Click to confirm Website Exists'
+                                    : 'Website does not exist (Read-only for Head)'
                               }
                             >
                               {updatingWebsiteExistsId === customerId ? (
@@ -743,9 +1395,22 @@ export function AutowebisionCustomersPage({
                       {isCustomerVisible && (
                         <td>
                           <div className="autoweb-business-cell">
-                            <strong className="autoweb-business-title" title={customer.businessName || 'Customer'}>
-                              {customer.businessName || customer.ownerName || 'Customer'}
-                            </strong>
+                            <div className="flex items-center gap-2">
+                              <strong className="autoweb-business-title" title={customer.businessName || 'Customer'}>
+                                {customer.businessName || customer.ownerName || 'Customer'}
+                              </strong>
+                              {isActionsVisible && (
+                                <button
+                                  type="button"
+                                  className="autoweb-detail-btn flex-shrink-0"
+                                  title="View complete customer details"
+                                  aria-label={`View details for ${customer.businessName || customer.ownerName || 'customer'}`}
+                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                >
+                                  <Eye size={14} />
+                                </button>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 truncate max-w-[180px]">
                               {customer.ownerName || '—'}
                             </p>
@@ -827,61 +1492,369 @@ export function AutowebisionCustomersPage({
                         </td>
                       )}
 
-                      {/* 6. Services */}
+                      {/* 6. Services matching Screenshot 1 */}
                       {isServicesVisible && (
                         <td>
                           <div className="flex flex-col gap-1 items-start">
-                            {serviceTypes.length > 0 ? (
-                              serviceTypes.map((sType, sIdx) => {
-                                const isAuto = sType.toUpperCase().includes('AUTO')
-                                return (
+                            {activeSubTab === 'WEBSITE' ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
+                                  onClick={() =>
+                                    setServiceFlowTarget({
+                                      customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                      serviceType: 'WEBSITE',
+                                    })
+                                  }
+                                  title="Click to view Website service flow"
+                                >
+                                  <Globe size={11} className="text-blue-600 flex-shrink-0" />
+                                  <span>Website</span>
+                                </button>
+                                {isDepartmentUser && (
                                   <button
-                                    key={sIdx}
                                     type="button"
-                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border transition-all ${
-                                      isAuto
-                                        ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
-                                        : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                    }`}
-                                    onClick={() =>
-                                      setServiceFlowCustomer(toOnboardingCustomer(customer, index))
-                                    }
-                                    title="Click to view/update service flow checklist"
+                                    onClick={() => handleOpenServiceTags(customer, index, 'WEBSITE')}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
+                                    title="Add service tag"
                                   >
-                                    {isAuto ? <Bot size={12} /> : <Globe size={12} />}
-                                    <span>{sType}</span>
+                                    <Plus size={10} strokeWidth={2.5} />
+                                    <span>Tag</span>
                                   </button>
-                                )
-                              })
+                                )}
+                              </div>
+                            ) : activeSubTab === 'AUTOMATION' ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
+                                  onClick={() =>
+                                    setServiceFlowTarget({
+                                      customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                      serviceType: 'AUTOMATION',
+                                    })
+                                  }
+                                  title="Click to view Automation service flow"
+                                >
+                                  <Bot size={11} className="text-purple-600 flex-shrink-0" />
+                                  <span>Automation</span>
+                                </button>
+                                {isDepartmentUser && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenServiceTags(customer, index, 'AUTOMATION')}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
+                                    title="Add service tag"
+                                  >
+                                    <Plus size={10} strokeWidth={2.5} />
+                                    <span>Tag</span>
+                                  </button>
+                                )}
+                              </div>
+                            ) : hasWebsite && hasAutomation ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
+                                    onClick={() =>
+                                      setServiceFlowTarget({
+                                        customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                        serviceType: 'WEBSITE',
+                                      })
+                                    }
+                                    title="Click to view Website service flow"
+                                  >
+                                    <Globe size={11} className="text-blue-600 flex-shrink-0" />
+                                    <span>Website</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
+                                    onClick={() =>
+                                      setServiceFlowTarget({
+                                        customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                        serviceType: 'AUTOMATION',
+                                      })
+                                    }
+                                    title="Click to view Automation service flow"
+                                  >
+                                    <Bot size={11} className="text-purple-600 flex-shrink-0" />
+                                    <span>Automation</span>
+                                  </button>
+                                  {isDepartmentUser && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenServiceTags(customer, index)}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
+                                      title="Add service tag"
+                                    >
+                                      <Plus size={10} strokeWidth={2.5} />
+                                      <span>Tag</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : hasAutomation ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200/60 hover:bg-purple-100 transition-all cursor-pointer"
+                                  onClick={() =>
+                                    setServiceFlowTarget({
+                                      customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                      serviceType: 'AUTOMATION',
+                                    })
+                                  }
+                                  title="Click to view Automation service flow"
+                                >
+                                  <Bot size={11} className="text-purple-600 flex-shrink-0" />
+                                  <span>Automation</span>
+                                </button>
+                                {isDepartmentUser && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenServiceTags(customer, index, 'AUTOMATION')}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
+                                    title="Add service tag"
+                                  >
+                                    <Plus size={10} strokeWidth={2.5} />
+                                    <span>Tag</span>
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
-                                onClick={() =>
-                                  setServiceFlowCustomer(toOnboardingCustomer(customer, index))
-                                }
-                              >
-                                <Globe size={12} />
-                                <span>Website</span>
-                              </button>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-all cursor-pointer"
+                                  onClick={() =>
+                                    setServiceFlowTarget({
+                                      customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                      serviceType: 'WEBSITE',
+                                    })
+                                  }
+                                  title="Click to view Website service flow"
+                                >
+                                  <Globe size={11} className="text-blue-600 flex-shrink-0" />
+                                  <span>Website</span>
+                                </button>
+                                {isDepartmentUser && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenServiceTags(customer, index, 'WEBSITE')}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 transition-all cursor-pointer shadow-xs"
+                                    title="Add service tag"
+                                  >
+                                    <Plus size={10} strokeWidth={2.5} />
+                                    <span>Tag</span>
+                                  </button>
+                                )}
+                              </div>
                             )}
+
+                            {/* Rendered Service Tags: visible to both Department User and Head */}
+                            {(() => {
+                              const targetTab =
+                                activeSubTab === 'WEBSITE'
+                                  ? 'WEBSITE'
+                                  : activeSubTab === 'AUTOMATION'
+                                    ? 'AUTOMATION'
+                                    : undefined
+                              const tags = getServiceTagsForCustomer(customer, targetTab)
+                              if (tags.length === 0) return null
+
+                              return (
+                                <div className="flex flex-wrap gap-1 mt-1 max-w-[210px]">
+                                  {tags.slice(0, 2).map(({ key, label }) => (
+                                    <span
+                                      key={key}
+                                      onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                      title={
+                                        isDepartmentUser
+                                          ? `Click to manage tags (${label})`
+                                          : `Service tag: ${label} (Click to view)`
+                                      }
+                                      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                                    >
+                                      {label.replace(/_/g, ' ')}
+                                    </span>
+                                  ))}
+                                  {tags.length > 2 && (
+                                    <span
+                                      onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                      title={
+                                        isDepartmentUser
+                                          ? 'View & manage all tags'
+                                          : 'View all tags (Read only)'
+                                      }
+                                      className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                                    >
+                                      +{tags.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </td>
                       )}
 
-                      {/* 7. Status */}
+                      {/* 7. Status matching Screenshot 1 (Head read-only pills, Department User editable) */}
                       {isStatusVisible && (
                         <td>
-                          <select
-                            className={`autoweb-status-select status-${currentStatus.toLowerCase()}`}
-                            value={currentStatus}
-                            disabled={!canEditStatus || updatingStatusId === customerId}
-                            onChange={(e) => handleStatusChange(customer, e.target.value)}
-                          >
-                            <option value="PENDING">Pending</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="COMPLETED">Completed</option>
-                          </select>
+                          {canEditStatus ? (
+                            /* Department User: Editable status dropdowns */
+                            <div className="flex flex-col gap-1.5 items-start">
+                              {activeSubTab === 'WEBSITE' ? (
+                                <div className="relative inline-flex items-center">
+                                  <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                  <select
+                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
+                                    value={websiteStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                              ) : activeSubTab === 'AUTOMATION' ? (
+                                <div className="relative inline-flex items-center">
+                                  <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                  <select
+                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
+                                    value={automationStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                              ) : hasWebsite && hasAutomation ? (
+                                <>
+                                  <div className="relative inline-flex items-center">
+                                    <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                    <select
+                                      className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
+                                      value={websiteStatus}
+                                      disabled={updatingStatusId === customerId}
+                                      onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                    >
+                                      <option value="PENDING">Pending</option>
+                                      <option value="IN_PROGRESS">In Progress</option>
+                                      <option value="COMPLETED">Completed</option>
+                                    </select>
+                                    <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                  </div>
+                                  <div className="relative inline-flex items-center">
+                                    <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                    <select
+                                      className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
+                                      value={automationStatus}
+                                      disabled={updatingStatusId === customerId}
+                                      onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                    >
+                                      <option value="PENDING">Pending</option>
+                                      <option value="IN_PROGRESS">In Progress</option>
+                                      <option value="COMPLETED">Completed</option>
+                                    </select>
+                                    <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                  </div>
+                                </>
+                              ) : hasAutomation ? (
+                                <div className="relative inline-flex items-center">
+                                  <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                  <select
+                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
+                                    value={automationStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                              ) : (
+                                <div className="relative inline-flex items-center">
+                                  <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                  <select
+                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
+                                    value={websiteStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            /* Head: Read-only status pills matching Screenshot 1 */
+                            <div className="flex flex-col gap-1 items-start">
+                              {activeSubTab === 'WEBSITE' ? (
+                                <div
+                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
+                                  title="Website Status (Read-only for Head)"
+                                >
+                                  <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                  <span>{formatStatusLabel(websiteStatus)}</span>
+                                </div>
+                              ) : activeSubTab === 'AUTOMATION' ? (
+                                <div
+                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
+                                  title="Automation Status (Read-only for Head)"
+                                >
+                                  <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                  <span>{formatStatusLabel(automationStatus)}</span>
+                                </div>
+                              ) : hasWebsite && hasAutomation ? (
+                                <>
+                                  <div
+                                    className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
+                                    title="Website Status (Read-only for Head)"
+                                  >
+                                    <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                    <span>{formatStatusLabel(websiteStatus)}</span>
+                                  </div>
+                                  <div
+                                    className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
+                                    title="Automation Status (Read-only for Head)"
+                                  >
+                                    <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                    <span>{formatStatusLabel(automationStatus)}</span>
+                                  </div>
+                                </>
+                              ) : hasAutomation ? (
+                                <div
+                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
+                                  title="Automation Status (Read-only for Head)"
+                                >
+                                  <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                  <span>{formatStatusLabel(automationStatus)}</span>
+                                </div>
+                              ) : (
+                                <div
+                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
+                                  title="Website Status (Read-only for Head)"
+                                >
+                                  <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                  <span>{formatStatusLabel(websiteStatus)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </td>
                       )}
 
@@ -923,87 +1896,277 @@ export function AutowebisionCustomersPage({
                         </td>
                       )}
 
-                      {/* 10. Internal Remark */}
+                      {/* 10. Internal Remark (Matching screenshot with View Remark / No Remarks and Popover) */}
                       {isInternalRemarkVisible && (
                         <td>
-                          <div className="flex flex-col gap-1">
-                            {hasWebsite && (
-                              <div className="text-[11px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                                <span className="font-semibold">Web:</span> {customer.internalRemark || 'No remark'}
-                              </div>
-                            )}
-                            {hasAutomation && (
-                              <div className="text-[11px] px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                                <span className="font-semibold">Auto:</span> {customer.internalRemark || 'No remark'}
-                              </div>
-                            )}
-                            {!hasWebsite && !hasAutomation && (
-                              <span className="text-xs text-slate-500">
-                                {customer.internalRemark || 'No remark'}
-                              </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            {activeSubTab === 'WEBSITE' ? (
+                              <InternalRemarkBadge
+                                customer={customer}
+                                customerId={customerId}
+                                customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                departmentType="WEBSITE_DEPARTMENT"
+                                userEmail={userEmail}
+                                activePopoverKey={activeRemarkPopoverKey}
+                                setActivePopoverKey={setActiveRemarkPopoverKey}
+                                onOpenFullDialog={handleOpenFullRemarkDialog}
+                              />
+                            ) : activeSubTab === 'AUTOMATION' ? (
+                              <InternalRemarkBadge
+                                customer={customer}
+                                customerId={customerId}
+                                customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                departmentType="AUTOMATION_DEPARTMENT"
+                                userEmail={userEmail}
+                                activePopoverKey={activeRemarkPopoverKey}
+                                setActivePopoverKey={setActiveRemarkPopoverKey}
+                                onOpenFullDialog={handleOpenFullRemarkDialog}
+                              />
+                            ) : (
+                              <>
+                                {hasWebsite && (
+                                  <InternalRemarkBadge
+                                    customer={customer}
+                                    customerId={customerId}
+                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                    departmentType="WEBSITE_DEPARTMENT"
+                                    userEmail={userEmail}
+                                    activePopoverKey={activeRemarkPopoverKey}
+                                    setActivePopoverKey={setActiveRemarkPopoverKey}
+                                    onOpenFullDialog={handleOpenFullRemarkDialog}
+                                  />
+                                )}
+                                {hasAutomation && (
+                                  <InternalRemarkBadge
+                                    customer={customer}
+                                    customerId={customerId}
+                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                    departmentType="AUTOMATION_DEPARTMENT"
+                                    userEmail={userEmail}
+                                    activePopoverKey={activeRemarkPopoverKey}
+                                    setActivePopoverKey={setActiveRemarkPopoverKey}
+                                    onOpenFullDialog={handleOpenFullRemarkDialog}
+                                  />
+                                )}
+                                {!hasWebsite && !hasAutomation && (
+                                  <InternalRemarkBadge
+                                    customer={customer}
+                                    customerId={customerId}
+                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                    departmentType="WEBSITE_DEPARTMENT"
+                                    userEmail={userEmail}
+                                    activePopoverKey={activeRemarkPopoverKey}
+                                    setActivePopoverKey={setActiveRemarkPopoverKey}
+                                    onOpenFullDialog={handleOpenFullRemarkDialog}
+                                  />
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
                       )}
 
-                      {/* 11. Draft Sent */}
+                      {/* 11. Draft Sent (Head is read-only, Department User can send draft) */}
                       {isDraftSentVisible && (
                         <td>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold ${
-                              customer.isMailSent
-                                ? 'bg-green-50 text-green-700 border border-green-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                            }`}
-                          >
-                            <FileText size={12} />
-                            {customer.isMailSent ? 'Draft Sent' : 'Not Sent'}
-                          </span>
-                        </td>
-                      )}
+                          <div className="flex items-center gap-1.5">
+                            {canEditDraft ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDraftModal(customer)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                                  customer.isMailSent
+                                    ? 'bg-green-50 hover:bg-green-100 text-green-700 border-green-200'
+                                    : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                                }`}
+                                title={customer.isMailSent ? 'Draft already sent. Click to send another' : 'Click to send draft'}
+                              >
+                                <FileText size={12} />
+                                <span>{customer.isMailSent ? 'Draft Sent' : 'Send Draft'}</span>
+                              </button>
+                            ) : (
+                              <div
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border select-none cursor-default ${
+                                  customer.isMailSent
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                }`}
+                                title={customer.isMailSent ? 'Draft already sent (Read-only for Head)' : 'Not Sent (Read-only for Head)'}
+                              >
+                                <FileText size={12} />
+                                <span>{customer.isMailSent ? 'Draft Sent' : 'Not Sent'}</span>
+                              </div>
+                            )}
 
-                      {/* 12. Assigned To */}
-                      {isAssigneeVisible && (
-                        <td>
-                          <select
-                            className="autoweb-assignee-select"
-                            value={currentAssignee || ''}
-                            disabled={!canEditAssignee}
-                            onChange={(e) => handleAssignUser(customerId, e.target.value)}
-                          >
-                            <option value="">Unassigned</option>
-                            {assignees.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      )}
-
-                      {/* 13. Actions */}
-                      {isActionsVisible && (
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <button
                               type="button"
-                              className="autoweb-detail-btn"
-                              title="View complete customer details"
-                              onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                              onClick={() => handleOpenDraftHistoryModal(customer)}
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-teal-50 border border-slate-200 hover:border-teal-200 transition-colors cursor-pointer"
+                              title="View Website Draft History"
                             >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className="autoweb-detail-btn"
-                              title="View customer service flow"
-                              onClick={() => setServiceFlowCustomer(toOnboardingCustomer(customer, index))}
-                            >
-                              <RefreshCw size={13} />
+                              <Clock size={12} />
                             </button>
                           </div>
                         </td>
                       )}
+
+                      {/* 12. Assigned To matching Screenshot 1 */}
+                      {isAssigneeVisible && (
+                        <td>
+                          <div className="relative flex flex-col gap-1 items-start">
+                            {/* Website Assigned User Pill */}
+                            {(customer.websiteAssignedUserName || customer.websiteAssignedUserEmail) && (
+                              <div
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"
+                                title={`Website Assigned to: ${customer.websiteAssignedUserEmail || customer.websiteAssignedUserName}`}
+                              >
+                                <Globe size={11} className="text-blue-600 flex-shrink-0" />
+                                <span className="truncate max-w-[130px]">
+                                  {customer.websiteAssignedUserName || customer.websiteAssignedUserEmail}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Automation Assigned User Pill */}
+                            {(customer.automationAssignedUserName || customer.automationAssignedUserEmail) && (
+                              <div
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200"
+                                title={`Automation Assigned to: ${customer.automationAssignedUserEmail || customer.automationAssignedUserName}`}
+                              >
+                                <Bot size={11} className="text-purple-600 flex-shrink-0" />
+                                <span className="truncate max-w-[130px]">
+                                  {customer.automationAssignedUserName || customer.automationAssignedUserEmail}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Fallback general assigned pill if neither specific is present */}
+                            {!customer.websiteAssignedUserEmail &&
+                              !customer.automationAssignedUserEmail &&
+                              (customer.assignedUserName || customer.assignedUserEmail) && (
+                                <div
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                                  title={`Assigned to: ${customer.assignedUserEmail || customer.assignedUserName}`}
+                                >
+                                  <Layers size={11} className="text-slate-500 flex-shrink-0" />
+                                  <span className="truncate max-w-[130px]">
+                                    {customer.assignedUserName || customer.assignedUserEmail}
+                                  </span>
+                                </div>
+                              )}
+
+                            {/* Assign Button matching Screenshot 1 */}
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setAssignSearchQuery('')
+                                setOpenAssignDropdownId((prev) =>
+                                  prev === customerId ? null : customerId,
+                                )
+                              }}
+                              disabled={!canEditAssignee}
+                              title={canEditAssignee ? 'Click to assign user' : 'Read only'}
+                            >
+                              <Layers size={12} className="text-indigo-600" />
+                              <span>Assign</span>
+                              <ChevronsUpDown size={12} className="text-indigo-400" />
+                            </button>
+
+                            {/* Dropdown Menu matching Screenshot 1 */}
+                            {openAssignDropdownId === customerId && (
+                              <div
+                                ref={assignDropdownRef}
+                                className="absolute left-0 top-full mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-30 py-1.5 animate-in fade-in duration-100"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {/* Search box */}
+                                <div className="p-2 border-b border-slate-100">
+                                  <div className="relative">
+                                    <Search
+                                      size={13}
+                                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                                    />
+                                    <input
+                                      type="text"
+                                      placeholder="Search users..."
+                                      value={assignSearchQuery}
+                                      onChange={(e) => setAssignSearchQuery(e.target.value)}
+                                      autoFocus
+                                      className="w-full pl-8 pr-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="max-h-60 overflow-y-auto py-1">
+                                  {/* Unassigned Option matching Screenshot 1 */}
+                                  <div className="px-2 py-1">
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100/70 hover:bg-amber-200/70 rounded-lg transition-colors"
+                                      onClick={() => {
+                                        setOpenAssignDropdownId(null)
+                                      }}
+                                    >
+                                      Unassigned
+                                    </button>
+                                  </div>
+
+                                  {/* Autowebision Users Header matching Screenshot 1 */}
+                                  <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400">
+                                    Autowebision Users
+                                  </div>
+
+                                  {/* User List matching Screenshot 1 */}
+                                  {filteredAssignees.length > 0 ? (
+                                    filteredAssignees.map((user) => {
+                                      const displayName = user.name.includes(' (')
+                                        ? user.name.split(' (')[0]
+                                        : user.name
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={user.id}
+                                          onClick={() => {
+                                            setOpenAssignDropdownId(null)
+                                            setAssignModalTarget({
+                                              customer,
+                                              user: {
+                                                email: user.id,
+                                                name: displayName,
+                                              },
+                                            })
+                                          }}
+                                          className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                                        >
+                                          <Layers
+                                            size={14}
+                                            className="text-indigo-600 mt-0.5 flex-shrink-0"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-semibold text-slate-800 truncate">
+                                              {displayName}
+                                            </div>
+                                            <div className="text-[11px] text-slate-400 truncate">
+                                              {user.id}
+                                            </div>
+                                          </div>
+                                        </button>
+                                      )
+                                    })
+                                  ) : (
+                                    <div className="px-3 py-2 text-xs text-slate-400 text-center">
+                                      No users found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
+
                     </tr>
                   )
                 })}
@@ -1032,24 +2195,91 @@ export function AutowebisionCustomersPage({
         customer={selectedCustomer}
         assignees={assignees}
         showStatus={true}
-        showAssignTo={true}
-        departmentType="AUTOWEBSION_DEPARTMENT"
+        showAssignTo={!isDepartmentUser}
+        departmentType={permissionDepartmentType}
         onClose={() => setSelectedCustomer(null)}
       />
 
       {/* Sub-Service Flow Modal */}
       <ServiceFlowModal
-        customer={serviceFlowCustomer}
-        isOpen={Boolean(serviceFlowCustomer)}
-        onClose={() => setServiceFlowCustomer(null)}
-        departmentType="AUTOWEBSION_DEPARTMENT"
+        customer={serviceFlowTarget?.customer ?? null}
+        isOpen={Boolean(serviceFlowTarget)}
+        onClose={() => setServiceFlowTarget(null)}
+        isEditable={canEditServices}
+        departmentType={
+          serviceFlowTarget?.serviceType === 'AUTOMATION'
+            ? 'AUTOMATION_DEPARTMENT'
+            : serviceFlowTarget?.serviceType === 'WEBSITE'
+              ? 'WEBSITE_DEPARTMENT'
+              : permissionDepartmentType
+        }
+        serviceType={serviceFlowTarget?.serviceType}
         onStepsUpdated={() => {
-          customersQuery.refetch()
-          countsQuery.refetch()
+          // No API refetch needed on flow step update
         }}
-        onSubServiceStatusUpdated={() => {
-          customersQuery.refetch()
-          countsQuery.refetch()
+        onSubServiceStatusUpdated={(newStatus, subServiceName) => {
+          // Do NOT refetch customersQuery or countsQuery!
+          // Update local cache in-memory so UI knows this sub-service status immediately
+          if (!serviceFlowTarget?.customer) return
+          const targetCustomerId = Number(serviceFlowTarget.customer.id)
+
+          queryClient.setQueriesData(
+            { queryKey: ['autowebisionCustomers'] },
+            (oldData: any) => {
+              if (!oldData || !Array.isArray(oldData.content)) return oldData
+              return {
+                ...oldData,
+                content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
+                  if (c.customerId !== targetCustomerId) return c
+
+                  const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
+                  const updatedSubList = prevSubList.map((sub: any) => {
+                    const name =
+                      sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+                    if (
+                      !subServiceName ||
+                      name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+                    ) {
+                      return typeof sub === 'object' && 'name' in sub
+                        ? { ...sub, status: newStatus }
+                        : { [name]: newStatus }
+                    }
+                    return sub
+                  })
+
+                  const updatedServices = Array.isArray(c.services)
+                    ? c.services.map((srv: any) => {
+                        if (Array.isArray(srv.subServiceInfo)) {
+                          return {
+                            ...srv,
+                            subServiceInfo: srv.subServiceInfo.map((sub: any) => {
+                              const name =
+                                sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+                              if (
+                                !subServiceName ||
+                                name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+                              ) {
+                                return typeof sub === 'object' && 'name' in sub
+                                  ? { ...sub, status: newStatus }
+                                  : { [name]: newStatus }
+                              }
+                              return sub
+                            }),
+                          }
+                        }
+                        return srv
+                      })
+                    : c.services
+
+                  return {
+                    ...c,
+                    subServiceInfo: updatedSubList,
+                    services: updatedServices,
+                  }
+                }),
+              }
+            },
+          )
         }}
       />
 
@@ -1116,6 +2346,351 @@ export function AutowebisionCustomersPage({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Internal Remarks On-Demand Dialog */}
+      {viewingInternalRemarks && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150"
+          onClick={() => setViewingInternalRemarks(null)}
+        >
+          <div
+            className="w-full max-w-xl bg-white rounded-2xl p-6 shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                {viewingInternalRemarks.departmentType === 'AUTOMATION_DEPARTMENT' ? (
+                  <div className="p-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
+                    <Bot size={18} />
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+                    <Globe size={18} />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <MessageSquare size={16} className="text-slate-600" />
+                    Internal Remark History - {viewingInternalRemarks.customerName}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    All internal remarks for this customer ({viewingInternalRemarks.departmentType === 'AUTOMATION_DEPARTMENT' ? 'Automation' : 'Website'})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                onClick={() => setViewingInternalRemarks(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="py-4 max-h-[60vh] overflow-y-auto space-y-3">
+              {viewingInternalRemarks.loading && (
+                <div className="py-10 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <Loader2 size={24} className="animate-spin text-blue-600" />
+                  <p className="text-xs font-medium">Fetching internal remarks...</p>
+                </div>
+              )}
+
+              {viewingInternalRemarks.error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+                  {viewingInternalRemarks.error}
+                </div>
+              )}
+
+              {!viewingInternalRemarks.loading &&
+                !viewingInternalRemarks.error &&
+                (!viewingInternalRemarks.remarks ||
+                  viewingInternalRemarks.remarks.length === 0) && (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    No internal remarks found for this department.
+                  </div>
+                )}
+
+              {!viewingInternalRemarks.loading &&
+                !viewingInternalRemarks.error &&
+                viewingInternalRemarks.remarks &&
+                viewingInternalRemarks.remarks.length > 0 &&
+                viewingInternalRemarks.remarks
+                  .slice()
+                  .sort((a, b) => {
+                    const tA = a.timestamp ? new Date(a.timestamp).getTime() : 0
+                    const tB = b.timestamp ? new Date(b.timestamp).getTime() : 0
+                    return tB - tA
+                  })
+                  .map((r, rIdx) => {
+                    const badgeColors = [
+                      'bg-blue-500',
+                      'bg-purple-500',
+                      'bg-emerald-500',
+                      'bg-indigo-500',
+                      'bg-amber-500',
+                    ]
+                    const colorClass = badgeColors[rIdx % badgeColors.length]
+                    return (
+                      <div
+                        key={rIdx}
+                        className="p-3.5 bg-white rounded-xl border border-slate-200 text-xs shadow-xs hover:shadow-md transition-shadow space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`h-6 w-6 rounded-full flex items-center justify-center ${colorClass} text-white font-bold text-xs flex-shrink-0`}
+                            >
+                              {rIdx + 1}
+                            </div>
+                            <span className="font-bold text-slate-900 text-sm">
+                              {r.staffName || 'Staff'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {formatRemarkTimestamp(r.timestamp)}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-slate-800 whitespace-pre-wrap font-normal leading-relaxed text-xs">
+                          {r.remark || (r as any).text || '—'}
+                        </div>
+                      </div>
+                    )
+                  })}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                onClick={() => setViewingInternalRemarks(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Customer Department Selection Modal matching Screenshot 2 */}
+      {assignModalTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-150"
+          onClick={() => !isAssigningUser && setAssignModalTarget(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2">
+              <h3 className="text-lg font-bold text-slate-900">Assign Customer</h3>
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                onClick={() => !isAssigningUser && setAssignModalTarget(null)}
+                disabled={isAssigningUser}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Subtitle */}
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">
+              Choose a department to assign{' '}
+              <strong className="text-slate-900">
+                {assignModalTarget.customer.businessName ||
+                  assignModalTarget.customer.ownerName ||
+                  'Customer'}
+              </strong>{' '}
+              to <strong className="text-slate-900">{assignModalTarget.user.name}</strong>
+            </p>
+
+            {/* Action Cards matching Screenshot 2 */}
+            <div className="flex items-center justify-center gap-4 mt-6">
+              {/* Automation Card */}
+              <button
+                type="button"
+                disabled={isAssigningUser}
+                onClick={() =>
+                  handleExecuteAssignment(
+                    assignModalTarget.customer.customerId,
+                    assignModalTarget.user.email,
+                    'AUTOMATION_DEPARTMENT',
+                  )
+                }
+                className="flex-1 min-w-[100px] h-28 flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/40 hover:shadow-sm transition-all text-slate-800 hover:text-purple-700 group disabled:opacity-50"
+              >
+                <Bot
+                  size={32}
+                  strokeWidth={1.75}
+                  className="text-slate-800 group-hover:text-purple-600 transition-colors"
+                />
+                <span className="text-sm font-semibold">Automation</span>
+              </button>
+
+              {/* Website Card */}
+              <button
+                type="button"
+                disabled={isAssigningUser}
+                onClick={() =>
+                  handleExecuteAssignment(
+                    assignModalTarget.customer.customerId,
+                    assignModalTarget.user.email,
+                    'WEBSITE_DEPARTMENT',
+                  )
+                }
+                className="flex-1 min-w-[100px] h-28 flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/40 hover:shadow-sm transition-all text-slate-800 hover:text-blue-700 group disabled:opacity-50"
+              >
+                <Globe
+                  size={32}
+                  strokeWidth={1.75}
+                  className="text-slate-800 group-hover:text-blue-600 transition-colors"
+                />
+                <span className="text-sm font-semibold">Website</span>
+              </button>
+
+              {/* Both Card */}
+              <button
+                type="button"
+                disabled={isAssigningUser}
+                onClick={() =>
+                  handleExecuteAssignment(
+                    assignModalTarget.customer.customerId,
+                    assignModalTarget.user.email,
+                    undefined,
+                  )
+                }
+                className="flex-1 min-w-[100px] h-28 flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 hover:shadow-sm transition-all text-slate-800 hover:text-indigo-700 group disabled:opacity-50"
+              >
+                <Layers
+                  size={32}
+                  strokeWidth={1.75}
+                  className="text-slate-800 group-hover:text-indigo-600 transition-colors"
+                />
+                <span className="text-sm font-semibold">Both</span>
+              </button>
+            </div>
+
+            {isAssigningUser && (
+              <div className="flex items-center justify-center gap-2 mt-4 text-xs text-indigo-600 font-semibold">
+                <Loader2 size={16} className="spin" />
+                <span>Assigning customer...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Send Website Draft Modal */}
+      {selectedCustomerForDraft && (
+        <SendDraftModal
+          isOpen={sendDraftModalOpen}
+          onClose={handleCloseDraftModal}
+          onSubmit={handleSendDraft}
+          customerName={
+            selectedCustomerForDraft.businessName ||
+            selectedCustomerForDraft.ownerName ||
+            'Customer'
+          }
+          customerEmail={selectedCustomerForDraft.email || ''}
+          isLoading={isSendingDraft}
+        />
+      )}
+
+      {/* Website Draft History Modal */}
+      {selectedCustomerForDraft && (
+        <DraftHistoryModal
+          isOpen={draftHistoryModalOpen}
+          onClose={handleCloseDraftHistoryModal}
+          history={draftHistory}
+          isLoading={isLoadingDraftHistory}
+          customerName={
+            selectedCustomerForDraft.businessName ||
+            selectedCustomerForDraft.ownerName ||
+            'Customer'
+          }
+          customerEmail={selectedCustomerForDraft.email || ''}
+        />
+      )}
+
+      {/* Confirm Website Exists Modal matching Screenshot 2 */}
+      {confirmWebsiteExistsTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-150"
+          onClick={() => !updatingWebsiteExistsId && setConfirmWebsiteExistsTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 relative animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                <h3 className="text-base font-bold text-slate-900">Confirm Website Exists</h3>
+              </div>
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                onClick={() => !updatingWebsiteExistsId && setConfirmWebsiteExistsTarget(null)}
+                disabled={Boolean(updatingWebsiteExistsId)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body matching Screenshot 2 */}
+            <div className="py-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+              Once turned <strong className="text-amber-600 font-bold">YES</strong> it cannot be turned{' '}
+              <strong className="text-slate-900 font-bold">NO</strong>. Are you sure?
+            </div>
+
+            {/* Footer Buttons matching Screenshot 2 */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={Boolean(updatingWebsiteExistsId)}
+                onClick={() => setConfirmWebsiteExistsTarget(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#f3ede2] hover:bg-[#eae0d0] text-slate-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(updatingWebsiteExistsId)}
+                onClick={() => handleConfirmWebsiteExists(confirmWebsiteExistsTarget)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#d97706] hover:bg-[#b45309] text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                {updatingWebsiteExistsId === confirmWebsiteExistsTarget.customerId ? (
+                  <>
+                    <Loader2 size={13} className="spin" />
+                    <span>Confirming...</span>
+                  </>
+                ) : (
+                  <span>Yes, Confirm</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service Tags Modal: editable for Department User, read-only for Department Head */}
+      {serviceTagsTarget && (
+        <ServiceTagsModal
+          isOpen={Boolean(serviceTagsTarget)}
+          customer={serviceTagsTarget.customer}
+          serviceType={serviceTagsTarget.serviceType}
+          readOnly={!isDepartmentUser}
+          onClose={() => setServiceTagsTarget(null)}
+          onTagsUpdated={() => {
+            customersQuery.refetch()
+          }}
+        />
       )}
     </div>
   )

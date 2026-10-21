@@ -69,6 +69,7 @@ export const ICON_PATHS = {
   creditCard: 'M2 5h20v14H2zM2 10h20',
   globe: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z',
   bot: 'M12 8V4H8M12 8v4M2 14h2M20 14h2M15 13v2M9 13v2M4 8h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z',
+  tag: 'M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2ZM7 7h.01',
 } as const
 
 export type IconName = keyof typeof ICON_PATHS

@@ -108,6 +108,7 @@ export function CustomerListPage() {
   const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
   const [serviceFlowCustomer, setServiceFlowCustomer] = useState<OnboardingCustomer | null>(null)
+  const [selectedSubServiceName, setSelectedSubServiceName] = useState<string | undefined>(undefined)
   const [serviceTagsCustomer, setServiceTagsCustomer] = useState<OnboardingCustomer | null>(null)
   const [googleInfoCustomer, setGoogleInfoCustomer] = useState<OnboardingCustomer | null>(null)
   const [toast, setToast] = useState<{
@@ -166,8 +167,11 @@ export function CustomerListPage() {
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
 
+  const permissionRouteName = typeof window !== 'undefined'
+    ? window.location.pathname.replace(/^\/+|\/+$/g, '')
+    : undefined
   const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions(currentDepartment)
+    useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
   const canEditStatus = isDeptUser || canEditColumn('Status')
 
@@ -197,6 +201,10 @@ export function CustomerListPage() {
     isColumnEnabled('Service Type', 'customer') ||
     isColumnEnabled('Service', 'customer') ||
     isColumnEnabled('Services', 'customer')
+  const canEditServiceType =
+    canEditColumn('Service Type') ||
+    canEditColumn('Service') ||
+    canEditColumn('Services')
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
@@ -384,6 +392,7 @@ export function CustomerListPage() {
           serviceTags: extractServiceTags(c),
           subServiceInfo: (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
           services: (c as any).services || [],
+          serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
           rawCustomer: c,
         }
       })
@@ -807,7 +816,11 @@ export function CustomerListPage() {
         showUpdated={false}
         showServiceType={useRowsEndpoint && isServiceTypeVisible}
         isGoogle={isGoogle}
-        onOpenServiceFlow={(cust) => setServiceFlowCustomer(cust)}
+        isDepartmentUser={isDeptUser}
+        onOpenServiceFlow={(cust, subName) => {
+          setServiceFlowCustomer(cust)
+          setSelectedSubServiceName(subName)
+        }}
         onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
         onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
         onOpenDetail={(cust, tab) => {
@@ -870,8 +883,13 @@ export function CustomerListPage() {
       <ServiceFlowModal
         customer={serviceFlowCustomer}
         isOpen={Boolean(serviceFlowCustomer)}
-        onClose={() => setServiceFlowCustomer(null)}
+        onClose={() => {
+          setServiceFlowCustomer(null)
+          setSelectedSubServiceName(undefined)
+        }}
+        isEditable={canEditServiceType}
         departmentType={currentDepartment}
+        initialSubServiceName={selectedSubServiceName}
         onStepsUpdated={() => {
           activeCustomerQuery.refetch()
         }}

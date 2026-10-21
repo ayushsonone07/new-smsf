@@ -9,6 +9,7 @@ import { ErrorState } from '../../../../components/ui/ErrorState'
 import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { AutowebisionCustomersPage } from './AutowebisionCustomersPage'
+import { DeliveredCustomersPage } from './DeliveredCustomersPage'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -83,6 +84,16 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
         message="The admin has not enabled any route for your department yet."
       />
     )
+  }
+
+  // The support "delivered" route may already exist as a generic `custom`
+  // feature created by the admin, so resolve it by slug as well as by screen.
+  const isSupportDepartment = Boolean(
+    effectiveDepartmentType &&
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'SUPPORT_DEPARTMENT',
+  )
+  if (isSupportDepartment && targetSlug === 'delivered') {
+    return <DeliveredCustomersPage feature={feature} />
   }
 
   if (!Screen) {

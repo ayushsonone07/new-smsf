@@ -28,6 +28,7 @@ export interface AutowebsionCustomerLightDTO {
   draftStatus?: string
   subServiceInfo?: any[]
   services?: any[]
+  serviceTags?: any
 }
 
 export interface AutowebsionPageResponse {
@@ -162,6 +163,16 @@ export interface AutowebsionSummaryCounts {
   automation: AutowebsionCategoryCounts
 }
 
+function normalizeCategoryCounts(value: any): AutowebsionCategoryCounts {
+  const source = value || {}
+  return {
+    total: Number(source.total ?? source.totalCustomers ?? 0),
+    pending: Number(source.pending ?? source.pendingCustomers ?? 0),
+    inProgress: Number(source.inProgress ?? source.inProgressCustomers ?? 0),
+    completed: Number(source.completed ?? source.completedCustomers ?? 0),
+  }
+}
+
 /**
  * Fetch combined statistics for Website & Automation in a single call,
  * aggregated across the department without individual user email bottlenecks.
@@ -170,18 +181,8 @@ export async function fetchAutowebsionSummaryCounts(): Promise<AutowebsionSummar
   try {
     const res = await authedApiRequest<any>('/api/autowebision/statistics/combined')
     const data = res?.data || res || {}
-    const web: AutowebsionCategoryCounts = {
-      total: Number(data.website?.total ?? 0),
-      pending: Number(data.website?.pending ?? 0),
-      inProgress: Number(data.website?.inProgress ?? 0),
-      completed: Number(data.website?.completed ?? 0),
-    }
-    const auto: AutowebsionCategoryCounts = {
-      total: Number(data.automation?.total ?? 0),
-      pending: Number(data.automation?.pending ?? 0),
-      inProgress: Number(data.automation?.inProgress ?? 0),
-      completed: Number(data.automation?.completed ?? 0),
-    }
+    const web = normalizeCategoryCounts(data.website)
+    const auto = normalizeCategoryCounts(data.automation)
     const all: AutowebsionCategoryCounts = {
       total: web.total + auto.total,
       pending: web.pending + auto.pending,
@@ -204,10 +205,11 @@ export async function fetchAutowebsionSummaryCounts(): Promise<AutowebsionSummar
  */
 export async function fetchCustomerServiceFlowDetail(
   customerId: number | string,
-  serviceType: string,
+  serviceType: string = 'WEBSITE',
 ): Promise<any> {
+  const normType = serviceType.toUpperCase().includes('AUTO') ? 'AUTOMATION' : 'WEBSITE'
   return authedApiRequest(
-    `/api/autowebision/customers/${encodeURIComponent(String(customerId))}/services/${encodeURIComponent(serviceType.toUpperCase())}/flow`,
+    `/api/autowebision/customers/${encodeURIComponent(String(customerId))}/services/${encodeURIComponent(normType)}/flow`,
   )
 }
 

@@ -1057,6 +1057,19 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.cl-assign-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cl-assign-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
 }
 
 .cl-assign-opt {
@@ -2429,6 +2442,16 @@
   position: relative;
 }
 
+.cl-range-picker--embedded {
+  width: 0;
+  height: 0;
+}
+
+.cl-range-picker--embedded .cl-date-picker {
+  top: 8px;
+  right: -4px;
+}
+
 .cl-range-picker__trigger {
   display: inline-flex;
   align-items: center;
@@ -3693,4 +3716,207 @@
 
 .autowebsion-dept-tab-icon {
   font-size: 15px;
+}
+
+/* ---------- Bill upload: input-box style dropzone ---------- */
+.cl-drawer__bill-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.cl-drawer__bill-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 12px 10px 14px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.cl-drawer__bill-drop:hover,
+.cl-drawer__bill-drop:focus-within {
+  border-color: #2459e0;
+  background: #f1f5ff;
+  box-shadow: 0 0 0 3px rgba(36, 89, 224, 0.12);
+}
+
+.cl-drawer__bill-drop.has-file {
+  border-style: solid;
+  border-color: #2459e0;
+  background: #fff;
+  color: #2459e0;
+}
+
+.cl-drawer__bill-drop.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cl-drawer__bill-drop svg {
+  flex-shrink: 0;
+}
+
+.cl-drawer__bill-drop-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.cl-drawer__bill-drop-text strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-drawer__bill-drop-text span {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.cl-drawer__bill-drop-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.cl-drawer__bill-drop:hover .cl-drawer__bill-drop-btn {
+  border-color: #2459e0;
+  color: #2459e0;
+}
+
+/* Native input covers the whole box: click + drag & drop both work */
+.cl-drawer__bill-drop input[type='file'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cl-drawer__bill-drop input[type='file']:disabled {
+  cursor: not-allowed;
+}
+
+.cl-drawer__bill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Notices / progress ---------- */
+.cl-drawer__bill-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.cl-drawer__bill-notice--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.cl-drawer__bill-notice--success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.cl-drawer__bill-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cl-drawer__bill-progress-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.cl-drawer__bill-progress-track > span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: #2459e0;
+  animation: cl-bill-progress 1.1s ease-in-out infinite;
+}
+@keyframes cl-bill-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* ---------- Invoice form ---------- */
+.cl-drawer__bill-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin: 16px 0;
+}
+
+.cl-drawer__bill-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.cl-drawer__bill-field--full {
+  grid-column: 1 / -1;
+}
+
+.cl-drawer__bill-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.cl-drawer__bill-field input,
+.cl-drawer__bill-field select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cl-drawer__bill-field input:focus,
+.cl-drawer__bill-field select:focus {
+  outline: none;
+  border-color: #2459e0;
+  box-shadow: 0 0 0 3px rgba(36, 89, 224, 0.12);
+}
+
+@media (max-width: 520px) {
+  .cl-drawer__bill-form {
+    grid-template-columns: 1fr;
+  }
+  .cl-drawer__bill-drop-btn {
+    display: none;
+  }
 }
