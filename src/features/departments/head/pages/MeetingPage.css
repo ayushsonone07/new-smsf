@@ -283,7 +283,7 @@
 .meeting-page__search.head-search input {
   padding: 4px 0;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .meeting-page__search.head-search input::placeholder {

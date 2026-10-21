@@ -43,6 +43,7 @@ import { getSession } from '../../../../app/auth/session'
 import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
 import { useRoundRobinStatus, useUpdateRoundRobinStatus } from '../../hooks/useRoundRobin'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
+import { notifyCustomerAssigned, notifyServiceCompleted } from '../../../../api/notification-factory'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { getLatestInternalRemark } from '../../../../utils/internalRemarkUtils'
 import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
@@ -617,6 +618,8 @@ export function CustomerListPage() {
         assignedUserEmail: assigneeId,
         departmentType: currentDepartment,
       })
+      const customer = onboardingCustomers.find((item) => item.id === customerId)
+      notifyCustomerAssigned(customer ?? { id: customerId }, assigneeId)
       await activeCustomerQuery.refetch()
     } catch (err: unknown) {
       console.error('Failed to assign user:', err)
@@ -720,6 +723,10 @@ export function CustomerListPage() {
 
       await activeCustomerQuery.refetch()
       if (isOnboardingDept) await authSummaryQuery.refetch()
+      if (status === 'completed') {
+        const customer = onboardingCustomers.find((item) => item.id === customerId)
+        notifyServiceCompleted(customer ?? { id: customerId })
+      }
     } catch (err: unknown) {
       console.error('Failed to update status:', err)
       const msg = err instanceof Error ? err.message : 'Unable to update status'

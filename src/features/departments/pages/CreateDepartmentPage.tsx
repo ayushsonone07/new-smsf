@@ -9,6 +9,7 @@ import { DepartmentFormModal } from '../../../components/departments/DepartmentF
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
+import { notifyHeadCreated } from '../../../api/notification-factory'
 
 export function CreateDepartmentPage() {
   const navigate = useNavigate()
@@ -28,6 +29,7 @@ export function CreateDepartmentPage() {
   function handleCreateHead(data: CreateDepartmentRequest) {
     createMutation.mutate(data, {
       onSuccess: () => {
+        notifyHeadCreated(data.name || data.username || '', data.email || '')
         setCreatedHeadName(data.name || data.username || data.departmentType || 'Department')
       },
     })

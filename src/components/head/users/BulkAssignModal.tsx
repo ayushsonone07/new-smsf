@@ -15,6 +15,7 @@ import {
   type DepartmentCustomerRowItem,
 } from '../../../api/department-users.api'
 import { getSession } from '../../../app/auth/session'
+import { notifyCustomerTransferred } from '../../../api/notification-factory'
 
 interface BulkAssignModalProps {
   open: boolean
@@ -103,6 +104,7 @@ export function BulkAssignModal({
         phaseName,
       }),
     onSuccess: async (result) => {
+      notifyCustomerTransferred(fromEmail, toEmail, totalCustomers)
       setSuccessMessage(result.message)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['bulk-assign-customers'] }),

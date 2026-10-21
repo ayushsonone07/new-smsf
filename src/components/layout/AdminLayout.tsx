@@ -3,6 +3,11 @@ import { useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { ProfileChip } from '../common/ProfileChip'
+import { useSuperAdminNotifications } from './useSuperAdminNotifications'
+import {
+  NotificationCenter,
+  NotificationsMenu,
+} from '../head/layout'
 
 interface AdminLayoutProps {
   children: ReactNode
@@ -22,6 +27,8 @@ export function AdminLayout({
     location.pathname,
   )
 
+  const { items, markAllRead } = useSuperAdminNotifications()
+
   if (location.pathname !== lastPath) {
     setLastPath(location.pathname)
 
@@ -31,46 +38,53 @@ export function AdminLayout({
   }
 
   return (
-    <div
-      className={`app-shell${
-        sidebarOpen ? ' sidebar-open' : ''
-      }`}
+    <NotificationCenter
+      items={items}
+      roleLabel="Super Admin"
+      onMarkAllRead={markAllRead}
     >
-      <AdminSidebar
-        onNavigate={() => setSidebarOpen(false)}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {sidebarOpen && (
-        <div
-          className="sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
+      <div
+        className={`app-shell${
+          sidebarOpen ? ' sidebar-open' : ''
+        }`}
+      >
+        <AdminSidebar
+          onNavigate={() => setSidebarOpen(false)}
+          onClose={() => setSidebarOpen(false)}
         />
-      )}
 
-      <div className="main-content">
-        <header className="shell-topbar">
-          <button
-            type="button"
-            className="menu-button"
-            aria-label="Open sidebar"
-            onClick={() => setSidebarOpen(true)}
-          >
-            ☰
-          </button>
+        {sidebarOpen && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-          <span className="shell-brand">
-            <img src="/mbg-card-logo.svg" alt="MBG Card" />
-            <span>Admin Portal</span>
-          </span>
+        <div className="main-content">
+          <header className="shell-topbar">
+            <button
+              type="button"
+              className="menu-button"
+              aria-label="Open sidebar"
+              onClick={() => setSidebarOpen(true)}
+            >
+              ☰
+            </button>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-            <ProfileChip />
-          </div>
-        </header>
+            <span className="shell-brand">
+              <img src="/mbg-card-logo.svg" alt="MBG Card" />
+              <span>Admin Portal</span>
+            </span>
 
-        {children}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <NotificationsMenu />
+              <ProfileChip />
+            </div>
+          </header>
+
+          {children}
+        </div>
       </div>
-    </div>
+    </NotificationCenter>
   )
 }
