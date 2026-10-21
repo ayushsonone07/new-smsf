@@ -39,6 +39,7 @@ export async function updateCustomer(
       departmentType,
       username,
       remark: data.remark,
+      remarkType: data.remarkType || 'INTERNAL',
     }
     await authedApiRequest<any>('/api/auth/customers/manage', {
       method: 'POST',

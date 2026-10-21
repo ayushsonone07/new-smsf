@@ -1,0 +1,975 @@
+import { useState, useMemo, useEffect } from 'react'
+import {
+  Search,
+  RefreshCw,
+  UserCheck,
+  AlertCircle,
+  X,
+  Loader2,
+  Ticket as TicketIcon,
+  History,
+} from 'lucide-react'
+import type {
+  EmployeeTicketWithCreator,
+  TicketStatus,
+  TicketPriority,
+  AssignableUser,
+} from '../../../features/departments/types/help-center.types'
+import {
+  updateTicketStatus,
+  assignTickets,
+  fetchAssignableDepartmentUsers,
+} from '../../../api/help-center.api'
+import { TicketStatusHistoryModal } from './TicketStatusHistoryModal'
+
+interface AssignedTicketsViewProps {
+  tickets: EmployeeTicketWithCreator[]
+  email: string
+  departmentType?: string
+  isLoading: boolean
+  isRefreshing?: boolean
+  onRefresh: () => void
+  onTicketUpdated?: () => void
+  statusCounts?: Record<string, number>
+  canViewHistory?: boolean
+}
+
+const STATUS_TABS: { key: string; label: string; status?: TicketStatus }[] = [
+  { key: 'ALL', label: 'All' },
+  { key: 'OPEN', label: 'Open', status: 'OPEN' },
+  { key: 'IN_PROGRESS', label: 'In Progress', status: 'IN_PROGRESS' },
+  { key: 'WAITING_ON_CUSTOMER', label: 'Waiting On Customer', status: 'WAITING_ON_CUSTOMER' },
+  { key: 'ESCALATED', label: 'Escalated', status: 'ESCALATED' },
+  { key: 'RESOLVED', label: 'Resolved', status: 'RESOLVED' },
+  { key: 'CLOSED', label: 'Closed', status: 'CLOSED' },
+]
+
+export function AssignedTicketsView({
+  tickets,
+  email,
+  departmentType,
+  isLoading,
+  isRefreshing,
+  onRefresh,
+  onTicketUpdated,
+  statusCounts: externalStatusCounts,
+  canViewHistory = true,
+}: AssignedTicketsViewProps) {
+  const [activeTab, setActiveTab] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedTicketNumber, setSelectedTicketNumber] = useState<string | null>(null)
+
+  // Modals state
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [newStatus, setNewStatus] = useState<TicketStatus>('OPEN')
+  const [statusRemark, setStatusRemark] = useState('')
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
+
+  // History modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [historyTicketNumber, setHistoryTicketNumber] = useState<string>('')
+  const [historyCurrentStatus, setHistoryCurrentStatus] = useState<string | undefined>(undefined)
+
+  function handleOpenHistoryModal(ticketNumber: string, status?: string) {
+    setHistoryTicketNumber(ticketNumber)
+    setHistoryCurrentStatus(status)
+    setIsHistoryModalOpen(true)
+  }
+
+  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
+  const [targetAssigneeEmail, setTargetAssigneeEmail] = useState('')
+  const [isReassigning, setIsReassigning] = useState(false)
+  const [reassignError, setReassignError] = useState<string | null>(null)
+
+  const [isAssignAllModalOpen, setIsAssignAllModalOpen] = useState(false)
+  const [isAssigningAll, setIsAssigningAll] = useState(false)
+  const [assignAllError, setAssignAllError] = useState<string | null>(null)
+
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+
+  // Fetch assignable users for re-assignment / round robin
+  useEffect(() => {
+    let cancelled = false
+    async function loadUsers() {
+      setIsLoadingUsers(true)
+      try {
+        const users = await fetchAssignableDepartmentUsers(departmentType)
+        if (!cancelled) {
+          setAssignableUsers(users)
+          if (users.length > 0 && !targetAssigneeEmail) {
+            setTargetAssigneeEmail(users[0].email)
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setIsLoadingUsers(false)
+      }
+    }
+    loadUsers()
+    return () => {
+      cancelled = true
+    }
+  }, [departmentType])
+
+  // Compute status counts
+  const computedStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: tickets.length,
+      OPEN: 0,
+      IN_PROGRESS: 0,
+      WAITING_ON_CUSTOMER: 0,
+      ESCALATED: 0,
+      RESOLVED: 0,
+      CLOSED: 0,
+    }
+    tickets.forEach((t) => {
+      const s = t.ticketStatus?.toUpperCase()
+      if (s && counts[s] !== undefined) {
+        counts[s] += 1
+      }
+    })
+    return counts
+  }, [tickets])
+
+  const statusCounts = externalStatusCounts
+    ? {
+        ALL: externalStatusCounts.ALL ?? tickets.length,
+        OPEN: externalStatusCounts.OPEN ?? computedStatusCounts.OPEN,
+        IN_PROGRESS: externalStatusCounts.IN_PROGRESS ?? computedStatusCounts.IN_PROGRESS,
+        WAITING_ON_CUSTOMER:
+          externalStatusCounts.WAITING_ON_CUSTOMER ?? computedStatusCounts.WAITING_ON_CUSTOMER,
+        ESCALATED: externalStatusCounts.ESCALATED ?? computedStatusCounts.ESCALATED,
+        RESOLVED: externalStatusCounts.RESOLVED ?? computedStatusCounts.RESOLVED,
+        CLOSED: externalStatusCounts.CLOSED ?? computedStatusCounts.CLOSED,
+      }
+    : computedStatusCounts
+
+  // Filter tickets by active tab and search query
+  const filteredTickets = useMemo(() => {
+    let result = tickets
+
+    if (activeTab !== 'ALL') {
+      result = result.filter(
+        (t) => (t.ticketStatus?.toUpperCase() || '') === activeTab
+      )
+    }
+
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      result = result.filter((t) => {
+        const num = t.ticketNumber?.toLowerCase() || ''
+        const subj = t.subject?.toLowerCase() || ''
+        const name = t.creatorName?.toLowerCase() || ''
+        const mail = t.creatorEmail?.toLowerCase() || ''
+        const phone = t.creatorPhone?.toLowerCase() || ''
+        return (
+          num.includes(q) ||
+          subj.includes(q) ||
+          name.includes(q) ||
+          mail.includes(q) ||
+          phone.includes(q)
+        )
+      })
+    }
+
+    return result
+  }, [tickets, activeTab, searchQuery])
+
+  // Keep a valid selected ticket
+  const selectedTicket = useMemo(() => {
+    if (!filteredTickets.length) return null
+    if (selectedTicketNumber) {
+      const found = filteredTickets.find((t) => t.ticketNumber === selectedTicketNumber)
+      if (found) return found
+    }
+    return filteredTickets[0]
+  }, [filteredTickets, selectedTicketNumber])
+
+  // Sync selectedTicketNumber when selectedTicket changes
+  useEffect(() => {
+    if (selectedTicket && selectedTicket.ticketNumber !== selectedTicketNumber) {
+      setSelectedTicketNumber(selectedTicket.ticketNumber)
+    }
+  }, [selectedTicket])
+
+  // Set initial status in modal
+  function handleOpenStatusModal() {
+    if (!selectedTicket) return
+    setNewStatus(selectedTicket.ticketStatus)
+    setStatusRemark('')
+    setStatusError(null)
+    setIsStatusModalOpen(true)
+  }
+
+  // Handle status update submission
+  async function handleUpdateStatusSubmit() {
+    if (!selectedTicket) return
+    if (!statusRemark.trim()) {
+      setStatusError('Remark is required by backend.')
+      return
+    }
+
+    setIsUpdatingStatus(true)
+    setStatusError(null)
+    try {
+      await updateTicketStatus(selectedTicket.ticketNumber, newStatus, statusRemark.trim())
+      setIsStatusModalOpen(false)
+      onTicketUpdated?.()
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Failed to update ticket status')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  // Handle single ticket re-assign
+  async function handleReassignSubmit() {
+    if (!selectedTicket || !targetAssigneeEmail) return
+    setIsReassigning(true)
+    setReassignError(null)
+    try {
+      await assignTickets([
+        {
+          ticketNumber: selectedTicket.ticketNumber,
+          email: targetAssigneeEmail,
+        },
+      ])
+      setIsReassignModalOpen(false)
+      onTicketUpdated?.()
+    } catch (err) {
+      setReassignError(err instanceof Error ? err.message : 'Failed to re-assign ticket')
+    } finally {
+      setIsReassigning(false)
+    }
+  }
+
+  // Handle Assign All (Round-Robin distribution across assignable users)
+  async function handleAssignAllSubmit() {
+    if (assignableUsers.length === 0) {
+      setAssignAllError('No department members available to assign.')
+      return
+    }
+
+    // Filter tickets that are not resolved or closed
+    const pendingTickets = tickets.filter(
+      (t) => t.ticketStatus !== 'RESOLVED' && t.ticketStatus !== 'CLOSED'
+    )
+
+    if (pendingTickets.length === 0) {
+      setAssignAllError('No pending tickets to assign.')
+      return
+    }
+
+    setIsAssigningAll(true)
+    setAssignAllError(null)
+
+    try {
+      const assignments = pendingTickets.map((t, idx) => ({
+        ticketNumber: t.ticketNumber,
+        email: assignableUsers[idx % assignableUsers.length].email,
+      }))
+
+      await assignTickets(assignments)
+      setIsAssignAllModalOpen(false)
+      onTicketUpdated?.()
+    } catch (err) {
+      setAssignAllError(err instanceof Error ? err.message : 'Failed to assign all tickets')
+    } finally {
+      setIsAssigningAll(false)
+    }
+  }
+
+  // Badge helpers
+  function getPriorityBadgeClass(priority?: TicketPriority) {
+    switch (priority) {
+      case 'CRITICAL':
+        return 'bg-pink-100 text-pink-700 border border-pink-200'
+      case 'HIGH':
+        return 'bg-orange-100 text-orange-700 border border-orange-200'
+      case 'MEDIUM':
+        return 'bg-amber-100 text-amber-800 border border-amber-200'
+      case 'LOW':
+      default:
+        return 'bg-blue-100 text-blue-700 border border-blue-200'
+    }
+  }
+
+  function formatPriority(priority?: TicketPriority) {
+    if (!priority) return 'Low'
+    return priority.charAt(0) + priority.slice(1).toLowerCase()
+  }
+
+  function getStatusBadgeClass(status?: TicketStatus) {
+    switch (status) {
+      case 'OPEN':
+        return 'bg-amber-100 text-amber-800 border border-amber-200'
+      case 'IN_PROGRESS':
+        return 'bg-blue-100 text-blue-700 border border-blue-200'
+      case 'WAITING_ON_CUSTOMER':
+        return 'bg-purple-100 text-purple-700 border border-purple-200'
+      case 'ESCALATED':
+        return 'bg-rose-100 text-rose-700 border border-rose-200'
+      case 'RESOLVED':
+        return 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+      case 'CLOSED':
+        return 'bg-slate-100 text-slate-700 border border-slate-200'
+      default:
+        return 'bg-slate-100 text-slate-700 border border-slate-200'
+    }
+  }
+
+  function formatStatus(status?: TicketStatus) {
+    if (!status) return 'Open'
+    return status
+      .split('_')
+      .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  function formatShortDate(dateStr?: string | null) {
+    if (!dateStr) return '—'
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return dateStr
+      return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(d)
+    } catch {
+      return dateStr
+    }
+  }
+
+  function formatFullDate(dateStr?: string | null) {
+    if (!dateStr) return '—'
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return dateStr
+      return new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+        .format(d)
+        .toLowerCase()
+    } catch {
+      return dateStr
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ── Top Header Bar (matches media_1792575222481_a7ce2dbc.png) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Assigned tickets</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Showing tickets for{' '}
+            <span className="font-medium text-slate-700">{email || 'your department'}</span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search ticket, name, email or phone"
+              className="w-64 sm:w-80 h-9 pl-3.5 pr-8 text-xs border border-slate-200 rounded-lg bg-white shadow-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            )}
+          </div>
+
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isLoading || isRefreshing}
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors disabled:opacity-60"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`}
+            />
+            <span>Refresh</span>
+          </button>
+
+          {/* Assign All Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setAssignAllError(null)
+              setIsAssignAllModalOpen(true)
+            }}
+            disabled={isLoading || tickets.length === 0}
+            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-60"
+          >
+            <span>Assign all</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Filter Tabs with Count Pills (matches media_1792575222481_a7ce2dbc.png) ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        {STATUS_TABS.map((tab) => {
+          const isActive = activeTab === tab.key
+          const count = statusCounts[tab.key] ?? 0
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[11px] font-bold ${
+                  isActive ? 'bg-blue-800 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Two-Column Split View (Left: Ticket Cards, Right: Ticket Details) ── */}
+      {isLoading && tickets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200">
+          <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-3" />
+          <p className="text-sm font-medium text-slate-700">Loading assigned tickets…</p>
+        </div>
+      ) : filteredTickets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200 text-center px-4">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+            <TicketIcon className="h-6 w-6 text-slate-400" />
+          </div>
+          <p className="text-sm font-semibold text-slate-900">No tickets found</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm">
+            {searchQuery
+              ? `No tickets matching "${searchQuery}".`
+              : 'There are no tickets matching this filter status.'}
+          </p>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="mt-3 text-xs text-blue-600 hover:underline font-medium"
+            >
+              Clear search query
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* ── Left Column: Scrollable Ticket List ── */}
+          <div className="lg:col-span-5 space-y-3 max-h-[calc(100vh-230px)] overflow-y-auto pr-1">
+            {filteredTickets.map((t) => {
+              const isSelected = selectedTicket?.ticketNumber === t.ticketNumber
+
+              return (
+                <div
+                  key={t.ticketNumber}
+                  onClick={() => setSelectedTicketNumber(t.ticketNumber)}
+                  className={`p-4 rounded-xl bg-white border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'border-2 border-blue-600 shadow-sm'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {/* Card Header: Priority & Status Badges */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span
+                      className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(
+                        t.priority
+                      )}`}
+                    >
+                      {formatPriority(t.priority)}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(
+                        t.ticketStatus
+                      )}`}
+                    >
+                      {formatStatus(t.ticketStatus)}
+                    </span>
+                  </div>
+
+                  {/* Card Title */}
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1 leading-snug line-clamp-1">
+                    {t.subject || 'No Subject'}
+                  </h3>
+
+                  {/* Creator Name */}
+                  <p className="text-xs text-slate-500 mb-3">
+                    {t.creatorName || t.creatorEmail || 'Customer'}
+                  </p>
+
+                  {/* Card Footer: Ticket ID & Date */}
+                  <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-400">
+                    <span className="font-mono">{t.ticketNumber}</span>
+                    <div className="flex items-center gap-2">
+                      {canViewHistory && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                          title="View ticket history"
+                        >
+                          <History className="h-3 w-3" />
+                          <span>History</span>
+                        </button>
+                      )}
+                      <span className="font-sans">{formatShortDate(t.ticketCreatedAt)}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── Right Column: Selected Ticket Details Card (1:1 with media_1792575222481_a7ce2dbc.png) ── */}
+          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            {selectedTicket ? (
+              <div>
+                {/* Header Row: Ticket ID, Subject & Action Buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold font-mono text-blue-600 block">
+                      {selectedTicket.ticketNumber}
+                    </span>
+                    <h2 className="text-lg font-bold text-slate-900 mt-1 leading-tight">
+                      {selectedTicket.subject}
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {canViewHistory && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenHistoryModal(
+                            selectedTicket.ticketNumber,
+                            selectedTicket.ticketStatus
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-xs font-semibold text-blue-700 shadow-2xs transition-colors"
+                        title="View status change history"
+                      >
+                        <History className="h-3.5 w-3.5 text-blue-600" />
+                        <span>History</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReassignError(null)
+                        setIsReassignModalOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors"
+                    >
+                      <UserCheck className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Re-assign</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenStatusModal}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                    >
+                      <span>Update status</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3-Column Metadata Grid (Exact layout from media_1792575222481_a7ce2dbc.png) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-5 gap-x-6 py-5 border-b border-slate-100">
+                  {/* Row 1: Priority | Status | Department */}
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Priority</p>
+                    <span
+                      className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(
+                        selectedTicket.priority
+                      )}`}
+                    >
+                      {formatPriority(selectedTicket.priority)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Status</p>
+                    <span
+                      className={`inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(
+                        selectedTicket.ticketStatus
+                      )}`}
+                    >
+                      {formatStatus(selectedTicket.ticketStatus)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Department</p>
+                    <p className="text-xs font-semibold text-slate-800 uppercase tracking-tight">
+                      {selectedTicket.departmentName || departmentType || 'GOOGLE_DEPARTMENT'}
+                    </p>
+                  </div>
+
+                  {/* Row 2: Creator status | Creator | Email */}
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Creator status</p>
+                    <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white">
+                      {selectedTicket.creatorStatus || 'Active'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Creator</p>
+                    <p className="text-xs font-medium text-slate-900">
+                      {selectedTicket.creatorName || '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Email</p>
+                    <p className="text-xs text-slate-700 truncate">
+                      {selectedTicket.creatorEmail || '—'}
+                    </p>
+                  </div>
+
+                  {/* Row 3: Phone | Created | Updated */}
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Phone</p>
+                    <p className="text-xs font-medium text-slate-900">
+                      {selectedTicket.creatorPhone || '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Created</p>
+                    <p className="text-xs text-slate-600">
+                      {formatFullDate(selectedTicket.ticketCreatedAt)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Updated</p>
+                    <p className="text-xs text-slate-600">
+                      {selectedTicket.ticketUpdatedAt
+                        ? formatFullDate(selectedTicket.ticketUpdatedAt)
+                        : '—'}
+                    </p>
+                  </div>
+
+                  {/* Row 4: Resolved */}
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1 font-normal">Resolved</p>
+                    <p className="text-xs text-slate-600">
+                      {selectedTicket.ticketResolvedAt
+                        ? formatFullDate(selectedTicket.ticketResolvedAt)
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Description Box */}
+                <div className="pt-5">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                    Description
+                  </h4>
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap min-h-[90px]">
+                    {selectedTicket.description || 'No description provided.'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
+                <TicketIcon className="h-10 w-10 text-slate-300 mb-2" />
+                <p className="text-sm font-medium">Select a ticket to view details</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Update Status ── */}
+      {isStatusModalOpen && selectedTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Update Ticket Status</h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  {selectedTicket.ticketNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStatusModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 py-4">
+              {statusError && (
+                <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{statusError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Select New Status
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value as TicketStatus)}
+                  className="w-full h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800"
+                >
+                  <option value="OPEN">Open</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="WAITING_ON_CUSTOMER">Waiting On Customer</option>
+                  <option value="ESCALATED">Escalated</option>
+                  <option value="RESOLVED">Resolved</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Remark <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={statusRemark}
+                  onChange={(e) => setStatusRemark(e.target.value)}
+                  placeholder="Enter a reason or update remark for customer & history log..."
+                  rows={3}
+                  className="w-full p-2.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsStatusModalOpen(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateStatusSubmit}
+                disabled={isUpdatingStatus}
+                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {isUpdatingStatus ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <span>Save Status</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Re-assign Ticket ── */}
+      {isReassignModalOpen && selectedTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Re-assign Ticket</h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  {selectedTicket.ticketNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReassignModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 py-4">
+              {reassignError && (
+                <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{reassignError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Select Assignee
+                </label>
+                {isLoadingUsers ? (
+                  <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Loading department team members…</span>
+                  </div>
+                ) : assignableUsers.length === 0 ? (
+                  <p className="text-xs text-amber-600">No assignable team members found.</p>
+                ) : (
+                  <select
+                    value={targetAssigneeEmail}
+                    onChange={(e) => setTargetAssigneeEmail(e.target.value)}
+                    className="w-full h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800"
+                  >
+                    {assignableUsers.map((u) => (
+                      <option key={u.email} value={u.email}>
+                        {u.username ? `${u.username} (${u.email})` : u.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsReassignModalOpen(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleReassignSubmit}
+                disabled={isReassigning || !targetAssigneeEmail}
+                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {isReassigning ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Re-assigning…</span>
+                  </>
+                ) : (
+                  <span>Confirm Re-assign</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Assign All (Round Robin) ── */}
+      {isAssignAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Assign All Tickets</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Round-robin distribution</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignAllModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 py-4">
+              {assignAllError && (
+                <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{assignAllError}</span>
+                </div>
+              )}
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                This will automatically distribute all active (unresolved) tickets evenly among your
+                active department members via round-robin.
+              </p>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span>Total active tickets:</span>
+                  <span className="font-bold text-slate-900">
+                    {
+                      tickets.filter(
+                        (t) => t.ticketStatus !== 'RESOLVED' && t.ticketStatus !== 'CLOSED'
+                      ).length
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Available team members:</span>
+                  <span className="font-bold text-slate-900">{assignableUsers.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAssignAllModalOpen(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAssignAllSubmit}
+                disabled={isAssigningAll || assignableUsers.length === 0}
+                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {isAssigningAll ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Assigning…</span>
+                  </>
+                ) : (
+                  <span>Confirm Assign All</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Ticket Status History ── */}
+      <TicketStatusHistoryModal
+        isOpen={isHistoryModalOpen}
+        ticketNumber={historyTicketNumber}
+        currentStatus={historyCurrentStatus}
+        onClose={() => setIsHistoryModalOpen(false)}
+      />
+    </div>
+  )
+}
