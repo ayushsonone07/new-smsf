@@ -62,6 +62,11 @@ type ModalState =
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
 
+function toLocalDateTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 /**
  * Head panel — Department Users. Wired to:
  * - GET /api/auth/department/users?page=0&size=10
@@ -233,24 +238,25 @@ export function DepartmentUsersPage() {
     isFetchingNextPage,
   ])
 
-  // Get today's date range in ISO format for the member details API
-  const todayStart = useMemo(() => {
+  // Load each member's customer activity for the latest seven calendar days.
+  const reportStart = useMemo(() => {
     const d = new Date()
+    d.setDate(d.getDate() - 6)
     d.setHours(0, 0, 0, 0)
-    return d.toISOString().slice(0, 19)
+    return toLocalDateTime(d)
   }, [])
-  const todayEnd = useMemo(() => {
+  const reportEnd = useMemo(() => {
     const d = new Date()
-    d.setHours(23, 59, 59, 0)
-    return d.toISOString().slice(0, 19)
+    d.setHours(23, 59, 59, 999)
+    return toLocalDateTime(d)
   }, [])
 
   // Member details query - triggered when modal.kind === 'report'
   const memberDetailsQuery = useMemberDetails({
     userId: modal.kind === 'report' ? Number(modal.user.id) : 0,
     department: session?.user?.departmentType || 'GOOGLE_DEPARTMENT',
-    startDate: todayStart,
-    endDate: todayEnd,
+    startDate: reportStart,
+    endDate: reportEnd,
     page: 0,
     size: 50,
   })
@@ -281,7 +287,7 @@ export function DepartmentUsersPage() {
       return {
         name: memberDetailsQuery.data.member.name,
         email: memberDetailsQuery.data.member.email,
-        dateLabel: 'Today',
+        dateLabel: 'Last 7 days',
         attendance: (memberDetailsQuery.data.statistics?.attendance === 'Present' ? 'PRESENT' : 'ABSENT') as Attendance,
         avatarText: memberDetailsQuery.data.member.name?.charAt(0).toUpperCase(),
         avatarSrc: memberDetailsQuery.data.member.avatar,
@@ -292,7 +298,7 @@ export function DepartmentUsersPage() {
       return {
         name: modal.user.name,
         email: modal.user.email,
-        dateLabel: 'Today',
+        dateLabel: 'Last 7 days',
         attendance: (modal.user.isPresentToday ? 'PRESENT' : 'ABSENT') as Attendance,
         avatarText: modal.user.name?.charAt(0).toUpperCase(),
       }
@@ -314,6 +320,22 @@ export function DepartmentUsersPage() {
       return memberDetailsQuery.data.statistics.target
     }
     return 0
+  }, [memberDetailsQuery.data])
+
+  const reportSummary = useMemo(() => {
+    const statistics = memberDetailsQuery.data?.statistics
+    if (!statistics) return undefined
+    return {
+      target: statistics.target ?? 0,
+      completed: statistics.completed ?? 0,
+      achievedPercent: statistics.achievedPercentage ?? 0,
+      delayed: statistics.delayed ?? 0,
+      present: statistics.presentDays ?? 0,
+      absent: statistics.absentDays ?? 0,
+      clientSide: statistics.delaySideCounts?.clientSide ?? 0,
+      ourSide: statistics.delaySideCounts?.ourSide ?? 0,
+      techSide: statistics.delaySideCounts?.techSide ?? 0,
+    }
   }, [memberDetailsQuery.data])
 
   // Map API users to DepartmentUser table structure across all infinite pages
@@ -853,6 +875,8 @@ export function DepartmentUsersPage() {
           person={person}
           items={items}
           target={target}
+          summary={reportSummary}
+          hint={memberDetailsQuery.isLoading ? 'Loading the last 7 days…' : 'Showing customer activity from the last 7 days'}
         />
       ) : null}
 

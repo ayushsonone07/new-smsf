@@ -20,7 +20,10 @@ import {
   TopPerformers,
   type TopPerformerItem,
 } from '../../../../components/head/dashboard/TopPerformers'
-import { MemberDetailsModal } from '../../../../components/head/dashboard/MemberDetailsModal'
+import {
+  MemberDetailsModal,
+  type MemberWorkItem,
+} from '../../../../components/head/dashboard/MemberDetailsModal'
 import '../../../../components/head/dashboard/Dashboard.css'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -30,6 +33,7 @@ import { resolveDeptFromPath } from '../utils/routeUtils'
 import { UserDashboardPage } from './UserDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
+import { useMemberDetails } from '../../hooks/useMemberDetails'
 import {
   type OnboardingSummaryParams,
 } from '../../../../api/onboarding-dashboard.api'
@@ -202,6 +206,59 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
   const [customRange, setCustomRange] = useState({ from: '', to: '' })
   const [refreshKey, setRefreshKey] = useState(0)
   const department = currentDepartment
+  const memberReportRange = useMemo(() => rangeFor('Last 7 days'), [])
+  const selectedMemberQuery = useMemberDetails({
+    userId: selectedMember?.id ?? 0,
+    department,
+    startDate: memberReportRange.startDate
+      ? `${memberReportRange.startDate}T00:00:00`
+      : undefined,
+    endDate: memberReportRange.endDate
+      ? `${memberReportRange.endDate}T23:59:59`
+      : undefined,
+    page: 0,
+    size: 500,
+  })
+
+  const selectedMemberWorkItems = useMemo<MemberWorkItem[]>(
+    () =>
+      (selectedMemberQuery.data?.customers ?? []).map((customer, index) => {
+        const rawStatus = String(customer.status ?? 'PENDING').toUpperCase()
+        const status: MemberWorkItem['status'] =
+          rawStatus === 'COMPLETED'
+            ? 'Completed'
+            : rawStatus === 'IN_PROGRESS' || rawStatus === 'IN PROGRESS'
+              ? 'In progress'
+              : 'Pending'
+        const rawDelaySide = String(customer.delaySide ?? '').toUpperCase()
+        const delaySide: MemberWorkItem['delaySide'] =
+          rawDelaySide === 'CLIENT' || rawDelaySide === 'OURS' || rawDelaySide === 'TECH'
+            ? rawDelaySide
+            : undefined
+
+        return {
+          id: String(customer.customerId ?? index),
+          customerName:
+            customer.customerName ||
+            customer.ownerName ||
+            `Customer #${customer.customerId ?? index + 1}`,
+          contactAndCity: [
+            customer.ownerName,
+            customer.email,
+            customer.phone,
+            customer.city,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          status,
+          delayDays: customer.delayDays ?? 0,
+          delaySide,
+          reason: customer.delayReason,
+          remark: customer.remark || 'No remark added',
+        }
+      }),
+    [selectedMemberQuery.data?.customers],
+  )
 
   const range = useMemo(
     () => rangeFor(datePeriod, customRange),
@@ -529,6 +586,8 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
       {/* 8. Member Details Modal */}
       <MemberDetailsModal
         member={selectedMember}
+        workItems={selectedMemberWorkItems}
+        isLoading={selectedMemberQuery.isLoading}
         onClose={() => setSelectedMember(null)}
       />
     </motion.div>
