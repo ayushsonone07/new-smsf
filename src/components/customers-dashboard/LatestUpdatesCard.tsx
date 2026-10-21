@@ -42,15 +42,21 @@ export function LatestUpdatesCard({ updates }: LatestUpdatesCardProps) {
       </div>
 
       <div className="cdb-updates-list">
-        {updates.map((u) => (
-          <div key={u.id} className="cdb-update-item">
-            {renderIcon(u.iconType)}
-            <div className="cdb-update-content">
-              <h4 className="cdb-update-title">{u.title}</h4>
-              <p className="cdb-update-sub">{u.category}</p>
+        {updates.length === 0 ? (
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px', padding: '10px 0' }}>
+            No updates at this time.
+          </p>
+        ) : (
+          updates.map((u) => (
+            <div key={u.id} className="cdb-update-item">
+              {renderIcon(u.iconType)}
+              <div className="cdb-update-content">
+                <h4 className="cdb-update-title">{u.title}</h4>
+                <p className="cdb-update-sub">{u.category}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   )
