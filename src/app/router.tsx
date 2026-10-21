@@ -78,6 +78,27 @@ const CustomerDashboardPage = lazy(() =>
 const CustomerDetailsPage = lazy(() =>
   import('../components/customers-dashboard/CustomerDetailsPage').then((module) => ({ default: module.CustomerDetailsPage })),
 )
+const CustomerServicesPage = lazy(() =>
+  import('../features/customers/pages/CustomerServicesPage').then((module) => ({ default: module.CustomerServicesPage })),
+)
+const CustomerBillingPage = lazy(() =>
+  import('../features/customers/pages/CustomerBillingPage').then((module) => ({ default: module.CustomerBillingPage })),
+)
+const CustomerAppsPage = lazy(() =>
+  import('../features/customers/pages/CustomerAppsPage').then((module) => ({ default: module.CustomerAppsPage })),
+)
+const CustomerAiServicePage = lazy(() =>
+  import('../features/customers/pages/CustomerAiServicePage').then((module) => ({ default: module.CustomerAiServicePage })),
+)
+const CustomerGenerateOfferPage = lazy(() =>
+  import('../features/customers/pages/CustomerGenerateOfferPage').then((module) => ({ default: module.CustomerGenerateOfferPage })),
+)
+const CustomerMetaAdsScriptPage = lazy(() =>
+  import('../features/customers/pages/CustomerMetaAdsScriptPage').then((module) => ({ default: module.CustomerMetaAdsScriptPage })),
+)
+const CustomerHelpSupportPage = lazy(() =>
+  import('../features/customers/pages/CustomerHelpSupportPage').then((module) => ({ default: module.CustomerHelpSupportPage })),
+)
 const AdminCustomersPage = lazy(() =>
   import('../features/customers/pages/AdminCustomersPage').then((module) => ({ default: module.AdminCustomersPage })),
 )
@@ -334,10 +355,94 @@ const customerDetailsRoute = createRoute({
   component: CustomerDetailsPage,
 })
 
+const customerServicesRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/services',
+  component: CustomerServicesPage,
+})
+
+const customerBillingRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/billing',
+  component: CustomerBillingPage,
+})
+
+const customerAppsRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/apps',
+  component: CustomerAppsPage,
+})
+
+const customerAiServiceRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/ai-service',
+  component: CustomerAiServicePage,
+})
+
+const customerGenerateOfferRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/ai-service/generate-offer',
+  component: CustomerGenerateOfferPage,
+})
+
+const customerMetaAdsScriptRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/ai-service/meta-ads-script',
+  component: CustomerMetaAdsScriptPage,
+})
+
+const customerHelpSupportRoute = createRoute({
+  getParentRoute: () => customerLayoutRoute,
+  path: '/customers/help-support',
+  component: CustomerHelpSupportPage,
+})
+
 const directCustomerDetailsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/customer-details',
   component: CustomerDetailsPage,
+})
+
+const directCustomerServicesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/customer-services',
+  component: CustomerServicesPage,
+})
+
+const directCustomerBillingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/customer-billing',
+  component: CustomerBillingPage,
+})
+
+const directCustomerAppsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/customer-apps',
+  component: CustomerAppsPage,
+})
+
+const directAiServiceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ai-service',
+  component: CustomerAiServicePage,
+})
+
+const directGenerateOfferRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ai-service/generate-offer',
+  component: CustomerGenerateOfferPage,
+})
+
+const directMetaAdsScriptRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ai-service/meta-ads-script',
+  component: CustomerMetaAdsScriptPage,
+})
+
+const directHelpSupportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/help-support',
+  component: CustomerHelpSupportPage,
 })
 
 const profileUpdateRoute = createRoute({
@@ -862,8 +967,22 @@ const routeTree = rootRoute.addChildren([
     customerLoginRoute,
     customerDashboardRoute,
     customerDetailsRoute,
+    customerServicesRoute,
+    customerBillingRoute,
+    customerAppsRoute,
+    customerAiServiceRoute,
+    customerGenerateOfferRoute,
+    customerMetaAdsScriptRoute,
+    customerHelpSupportRoute,
   ]),
   directCustomerDetailsRoute,
+  directCustomerServicesRoute,
+  directCustomerBillingRoute,
+  directCustomerAppsRoute,
+  directAiServiceRoute,
+  directGenerateOfferRoute,
+  directMetaAdsScriptRoute,
+  directHelpSupportRoute,
   onboardingConfirmationRoute,
   departmentConfirmationRoute,
   profileUpdateRoute,
