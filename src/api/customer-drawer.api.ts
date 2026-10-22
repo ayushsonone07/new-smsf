@@ -4,6 +4,8 @@ import { getSession } from '../app/auth/session'
 export interface CustomerProfileDetails {
   planIds?: string[]
   plan?: string
+  packageName?: string
+  planNames?: string[]
   businessName?: string
   ownerName?: string
   email?: string
@@ -146,6 +148,17 @@ export interface CustomerRemarks {
   fifteenDayMeetingRemark?: CustomerRemark[]
 }
 
+export interface SuperAdminDepartmentRemarks {
+  departmentType: string
+  serviceType: string
+  clientRemarks: CustomerRemark[]
+}
+
+export interface SuperAdminRemarks {
+  departments: SuperAdminDepartmentRemarks[]
+  customerRemarks: CustomerRemark[]
+}
+
 export interface CustomerReviewReply {
   reply: string
   timestamp: string
@@ -158,9 +171,19 @@ export interface CustomerDrawerApiDetails {
   serviceRowsLoading: boolean
   remarks?: CustomerRemarks
   internalRemarks: CustomerRemark[]
+  superAdminRemarks?: SuperAdminRemarks
   reviewReplies: CustomerReviewReply[]
   isLoading: boolean
   errors: string[]
+}
+
+export async function getSuperAdminCustomerRemarks(
+  customerId: number,
+): Promise<SuperAdminRemarks> {
+  const response = await authedApiRequest<ApiEnvelope<SuperAdminRemarks>>(
+    `/api/auth/customer-service/${customerId}/superadmin-remarks`,
+  )
+  return requireData(response, 'SuperAdmin remarks')
 }
 
 interface ApiEnvelope<T> {

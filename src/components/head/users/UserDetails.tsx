@@ -69,9 +69,9 @@ export function UserDetails({
       <motion.div
         variants={detailItemVariants}
         className="user-details__item user-details__item--control"
-        style={{ cursor: isUpdatingAttendance ? 'wait' : 'pointer' }}
+        style={{ cursor: isUpdatingAttendance ? 'wait' : canManage ? 'pointer' : 'not-allowed' }}
         onClick={() => {
-          if (!isUpdatingAttendance && onAttendanceToggle) {
+          if (!isUpdatingAttendance && canManage && onAttendanceToggle) {
             onAttendanceToggle(user, !isPresent)
           }
         }}
@@ -83,15 +83,15 @@ export function UserDetails({
             role="switch"
             aria-checked={isPresent}
             aria-label="Toggle present or absent"
-            disabled={isUpdatingAttendance}
+            disabled={isUpdatingAttendance || !canManage}
             className={`toggle-switch toggle-switch--present ${isPresent ? 'on' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
-              if (!isUpdatingAttendance && onAttendanceToggle) {
+              if (!isUpdatingAttendance && canManage && onAttendanceToggle) {
                 onAttendanceToggle(user, !isPresent)
               }
             }}
-            title={isPresent ? 'Click to mark Absent' : 'Click to mark Present'}
+            title={!canManage ? 'Permission required' : isPresent ? 'Click to mark Absent' : 'Click to mark Present'}
           >
             <span style={{ pointerEvents: 'none' }} />
           </button>
@@ -114,9 +114,9 @@ export function UserDetails({
       <motion.div
         variants={detailItemVariants}
         className="user-details__item user-details__item--control"
-        style={{ cursor: isUpdatingSenior ? 'wait' : 'pointer' }}
+        style={{ cursor: isUpdatingSenior ? 'wait' : canManage ? 'pointer' : 'not-allowed' }}
         onClick={() => {
-          if (!isUpdatingSenior && onSeniorUserToggle) {
+          if (!isUpdatingSenior && canManage && onSeniorUserToggle) {
             onSeniorUserToggle(user, !isSenior)
           }
         }}
@@ -128,15 +128,15 @@ export function UserDetails({
             role="switch"
             aria-checked={isSenior}
             aria-label="Toggle senior user status"
-            disabled={isUpdatingSenior}
+            disabled={isUpdatingSenior || !canManage}
             className={`toggle-switch toggle-switch--senior ${isSenior ? 'on' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
-              if (!isUpdatingSenior && onSeniorUserToggle) {
+              if (!isUpdatingSenior && canManage && onSeniorUserToggle) {
                 onSeniorUserToggle(user, !isSenior)
               }
             }}
-            title={isSenior ? 'Click to remove Senior User' : 'Click to set Senior User'}
+            title={!canManage ? 'Permission required' : isSenior ? 'Click to remove Senior User' : 'Click to set Senior User'}
           >
             <span style={{ pointerEvents: 'none' }} />
           </button>
@@ -159,9 +159,9 @@ export function UserDetails({
       <motion.div
         variants={detailItemVariants}
         className="user-details__item user-details__item--control"
-        style={{ cursor: isUpdatingHelpTickets ? 'wait' : 'pointer' }}
+        style={{ cursor: isUpdatingHelpTickets ? 'wait' : canManage ? 'pointer' : 'not-allowed' }}
         onClick={() => {
-          if (!isUpdatingHelpTickets && onHelpTicketsToggle) {
+          if (!isUpdatingHelpTickets && canManage && onHelpTicketsToggle) {
             onHelpTicketsToggle(user, !isHelpTickets)
           }
         }}
@@ -173,15 +173,15 @@ export function UserDetails({
             role="switch"
             aria-checked={isHelpTickets}
             aria-label="Toggle Help Tickets database access"
-            disabled={isUpdatingHelpTickets}
+            disabled={isUpdatingHelpTickets || !canManage}
             className={`toggle-switch toggle-switch--ticket ${isHelpTickets ? 'on' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
-              if (!isUpdatingHelpTickets && onHelpTicketsToggle) {
+              if (!isUpdatingHelpTickets && canManage && onHelpTicketsToggle) {
                 onHelpTicketsToggle(user, !isHelpTickets)
               }
             }}
-            title={isHelpTickets ? 'Click to remove from Ticket database' : 'Click to add to Ticket database'}
+            title={!canManage ? 'Permission required' : isHelpTickets ? 'Click to remove from Ticket database' : 'Click to add to Ticket database'}
           >
             <span style={{ pointerEvents: 'none' }} />
           </button>

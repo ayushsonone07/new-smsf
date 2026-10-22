@@ -258,7 +258,6 @@ export function AdminCustomersPage() {
           departmentType=""
           showStatus
           showAssignTo={false}
-          requestUsername="onboarding@mbg.com"
           onClose={() => setSelectedCustomer(null)}
         />
       </div>
