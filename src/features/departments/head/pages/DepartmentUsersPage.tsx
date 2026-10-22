@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -9,12 +9,10 @@ import { ImpersonationBanner } from '../../../../components/head/layout/Imperson
 import { DepartmentUsersTable } from '../../../../components/head/users/DepartmentUsersTable'
 import { UserDetails } from '../../../../components/head/users/UserDetails'
 import { UserFormModal } from '../../../../components/head/users/UserFormModal'
+import { BulkAssignModal } from '../../../../components/head/users/BulkAssignModal'
 import { StaffReportModal } from '../../../../components/reports/StaffReportModal'
 import { Icon } from '../../../../components/head/shared/Icon'
-import {
-  sampleDailyTargetByUser,
-  sampleWorkItemsByUser,
-} from '../../../../api/mock/head.db'
+import '../../../../components/head/customers-list/CustomersList.css'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
@@ -40,7 +38,8 @@ import { resolveDeptFromPath } from '../utils/routeUtils'
 import { useQuery } from '@tanstack/react-query'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
-import { UserCog, UserPlus, Building, Download, BookOpen } from 'lucide-react'
+import { notifyUserCreated, notifyUserDeleted, notifyUserUpdated } from '../../../../api/notification-factory'
+import { UserCog, UserPlus, Building, Download, BookOpen, UsersRound } from 'lucide-react'
 import type { DepartmentUserColumnKey } from '../../../../components/head/users/DepartmentUsersTable'
 import type { OnboardingDashboardCustomerDTO } from '../../../../api/onboarding-dashboard.api'
 import type {
@@ -58,9 +57,15 @@ import type {
 type ModalState =
   | { kind: 'none' }
   | { kind: 'create' }
+  | { kind: 'bulkAssign' }
   | { kind: 'edit'; user: DepartmentUser }
   | { kind: 'delete'; user: DepartmentUser }
   | { kind: 'report'; user: DepartmentUser }
+
+function toLocalDateTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 /**
  * Head panel — Department Users. Wired to:
@@ -104,6 +109,17 @@ export function DepartmentUsersPage() {
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error'
+    title?: string
+    message: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   async function handleLoginAs(targetUser: DepartmentUser) {
     const email = targetUser.email?.trim()
@@ -222,24 +238,25 @@ export function DepartmentUsersPage() {
     isFetchingNextPage,
   ])
 
-  // Get today's date range in ISO format for the member details API
-  const todayStart = useMemo(() => {
+  // Load each member's customer activity for the latest seven calendar days.
+  const reportStart = useMemo(() => {
     const d = new Date()
+    d.setDate(d.getDate() - 6)
     d.setHours(0, 0, 0, 0)
-    return d.toISOString().slice(0, 19)
+    return toLocalDateTime(d)
   }, [])
-  const todayEnd = useMemo(() => {
+  const reportEnd = useMemo(() => {
     const d = new Date()
-    d.setHours(23, 59, 59, 0)
-    return d.toISOString().slice(0, 19)
+    d.setHours(23, 59, 59, 999)
+    return toLocalDateTime(d)
   }, [])
 
   // Member details query - triggered when modal.kind === 'report'
   const memberDetailsQuery = useMemberDetails({
     userId: modal.kind === 'report' ? Number(modal.user.id) : 0,
     department: session?.user?.departmentType || 'GOOGLE_DEPARTMENT',
-    startDate: todayStart,
-    endDate: todayEnd,
+    startDate: reportStart,
+    endDate: reportEnd,
     page: 0,
     size: 50,
   })
@@ -270,7 +287,7 @@ export function DepartmentUsersPage() {
       return {
         name: memberDetailsQuery.data.member.name,
         email: memberDetailsQuery.data.member.email,
-        dateLabel: 'Today',
+        dateLabel: 'Last 7 days',
         attendance: (memberDetailsQuery.data.statistics?.attendance === 'Present' ? 'PRESENT' : 'ABSENT') as Attendance,
         avatarText: memberDetailsQuery.data.member.name?.charAt(0).toUpperCase(),
         avatarSrc: memberDetailsQuery.data.member.avatar,
@@ -281,7 +298,7 @@ export function DepartmentUsersPage() {
       return {
         name: modal.user.name,
         email: modal.user.email,
-        dateLabel: 'Today',
+        dateLabel: 'Last 7 days',
         attendance: (modal.user.isPresentToday ? 'PRESENT' : 'ABSENT') as Attendance,
         avatarText: modal.user.name?.charAt(0).toUpperCase(),
       }
@@ -289,28 +306,37 @@ export function DepartmentUsersPage() {
     return null
   }, [memberDetailsQuery.data, modal])
 
-  // Get items from member details or fallback to mock
+  // Get items from member details
   const items = useMemo(() => {
     if (memberDetailsQuery.data?.customers?.length) {
       return convertToWorkReportItems(memberDetailsQuery.data.customers)
     }
-    // Fallback to mock data
-    if (modal.kind === 'report' && modal.user) {
-      return sampleWorkItemsByUser[modal.user.id] ?? []
-    }
     return []
-  }, [memberDetailsQuery.data, modal])
+  }, [memberDetailsQuery.data])
 
-  // Get target from member details or fallback
+  // Get target from member details
   const target = useMemo(() => {
     if (memberDetailsQuery.data?.statistics?.target) {
       return memberDetailsQuery.data.statistics.target
     }
-    if (modal.kind === 'report' && modal.user) {
-      return sampleDailyTargetByUser[modal.user.id] ?? 0
-    }
     return 0
-  }, [memberDetailsQuery.data, modal])
+  }, [memberDetailsQuery.data])
+
+  const reportSummary = useMemo(() => {
+    const statistics = memberDetailsQuery.data?.statistics
+    if (!statistics) return undefined
+    return {
+      target: statistics.target ?? 0,
+      completed: statistics.completed ?? 0,
+      achievedPercent: statistics.achievedPercentage ?? 0,
+      delayed: statistics.delayed ?? 0,
+      present: statistics.presentDays ?? 0,
+      absent: statistics.absentDays ?? 0,
+      clientSide: statistics.delaySideCounts?.clientSide ?? 0,
+      ourSide: statistics.delaySideCounts?.ourSide ?? 0,
+      techSide: statistics.delaySideCounts?.techSide ?? 0,
+    }
+  }, [memberDetailsQuery.data])
 
   // Map API users to DepartmentUser table structure across all infinite pages
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
@@ -330,12 +356,27 @@ export function DepartmentUsersPage() {
 
     return allUsers.map((u, idx) => {
       const isPresent =
-        u.isPresentToday ??
-        (u.absentDays === undefined ? true : u.absentDays === 0)
+        u.isPresentToday !== undefined
+          ? u.isPresentToday
+          : (u as any).absent !== undefined
+            ? !(u as any).absent
+            : (u as any).isAbsent !== undefined
+              ? !(u as any).isAbsent
+              : u.absentDays !== undefined
+                ? u.absentDays === 0
+                : true
+
+      const isSeniorUser = Boolean(
+        u.isSeniorUser ?? (u as any).seniorUser ?? u.role === 'SENIOR_EXECUTIVE'
+      )
+      const isAddUserDb = Boolean(
+        u.isAddUserDb ?? (u as any).addUserDb
+      )
+
       const role = (
         u.role === 'HEAD' || u.isHead
           ? 'TEAM_LEAD'
-          : u.role === 'SENIOR_EXECUTIVE' || u.isSeniorUser
+          : isSeniorUser
             ? 'SENIOR_EXECUTIVE'
             : 'ONBOARDING_EXECUTIVE'
       ) as DepartmentUserRole
@@ -346,6 +387,10 @@ export function DepartmentUsersPage() {
         phone: u.contact || '—',
         email: u.email,
         role,
+        rawRole: (u.role as string) || (u as any).rawRole,
+        isSeniorUser,
+        isAddUserDb,
+        departmentType: u.departmentType,
         joinedLabel: u.createdAt
           ? new Date(u.createdAt).toLocaleDateString('en-IN', {
               month: 'short',
@@ -371,8 +416,22 @@ export function DepartmentUsersPage() {
     const rawData = autowebUsersQuery.data?.data || []
     return rawData.map((u: any, idx: number) => {
       const isPresent =
-        u.isPresentToday ??
-        (u.absentDays !== undefined ? u.absentDays === 0 : u.isAbsent !== undefined ? !u.isAbsent : true)
+        u.isPresentToday !== undefined
+          ? u.isPresentToday
+          : u.absent !== undefined
+            ? !u.absent
+            : u.isAbsent !== undefined
+              ? !u.isAbsent
+              : u.absentDays !== undefined
+                ? u.absentDays === 0
+                : true
+
+      const isSeniorUser = Boolean(
+        u.isSeniorUser ?? u.seniorUser ?? String(u.role || '').toUpperCase().includes('SENIOR')
+      )
+      const isAddUserDb = Boolean(
+        u.isAddUserDb ?? u.addUserDb
+      )
 
       const roleStr = String(u.role || '').toUpperCase()
       const role = (
@@ -380,7 +439,7 @@ export function DepartmentUsersPage() {
           ? 'TEAM_LEAD'
           : roleStr.includes('SUB') || roleStr.includes('USER_2')
             ? 'ONBOARDING_EXECUTIVE'
-            : roleStr.includes('SENIOR')
+            : isSeniorUser
               ? 'SENIOR_EXECUTIVE'
               : 'DEPARTMENT_USER'
       ) as DepartmentUserRole
@@ -391,6 +450,10 @@ export function DepartmentUsersPage() {
         phone: u.contact || u.phoneNumber || '—',
         email: u.email || '—',
         role,
+        rawRole: u.role,
+        isSeniorUser,
+        isAddUserDb,
+        departmentType: u.departmentType,
         joinedLabel: u.createdAt
           ? new Date(u.createdAt).toLocaleDateString('en-IN', {
               month: 'short',
@@ -474,6 +537,7 @@ export function DepartmentUsersPage() {
         isHead: false,
         headUser: currentUser?.email || '',
       })
+      notifyUserCreated(values.username || values.name || '', values.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -510,6 +574,7 @@ export function DepartmentUsersPage() {
         departmentType: deptType,
         isHead: false,
       })
+      notifyUserUpdated(values.username || values.name || user.name || '', values.email || user.email || '')
 
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
@@ -525,11 +590,175 @@ export function DepartmentUsersPage() {
     }
   }
 
+
+/*
+ * The expanded user details are currently read-only. Keep mutation handlers
+ * out of this page until the corresponding controls are exposed again.
+ */
+/* function resolveUserId(targetUser: DepartmentUser): number | undefined {
+    const candidates = [
+      targetUser.id,
+      targetUser.dynamicValues?.id,
+      targetUser.dynamicValues?.userId,
+      targetUser.dynamicValues?.departmentId,
+    ]
+    for (const c of candidates) {
+      if (c !== undefined && c !== null && c !== '') {
+        const n = Number(c)
+        if (Number.isFinite(n) && n > 0) return n
+      }
+    }
+    const currentSession = getSession()
+    if (
+      currentSession?.user?.id &&
+      (targetUser.email?.toLowerCase() === currentSession.user.email?.toLowerCase() ||
+       targetUser.name?.toLowerCase() === currentSession.user.username?.toLowerCase() ||
+       targetUser.name?.toLowerCase() === currentSession.user.name?.toLowerCase())
+    ) {
+      const n = Number(currentSession.user.id)
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    return undefined
+  }
+
+  async function handleAttendanceToggle(targetUser: DepartmentUser, isPresent: boolean) {
+    const numericId = resolveUserId(targetUser)
+    if (!numericId) {
+      console.error('[Attendance] Could not resolve numeric user ID for:', targetUser)
+      setToast({ type: 'error', title: 'Error', message: 'Valid user ID is required to update attendance.' })
+      return
+    }
+
+    setUpdatingAttendanceFor(targetUser.id)
+    try {
+      await updateUserAttendance(numericId, isPresent)
+      setToast({
+        type: 'success',
+        title: isPresent ? 'Marked Present' : 'Marked Absent',
+        message: `Attendance for ${targetUser.name} updated to ${isPresent ? 'Present' : 'Absent'} successfully!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update attendance:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update attendance'
+      setToast({ type: 'error', title: 'Attendance Error', message: msg })
+    } finally {
+      setUpdatingAttendanceFor(null)
+    }
+  }
+
+  async function handleSeniorUserToggle(targetUser: DepartmentUser, isSenior: boolean) {
+    const numericId = resolveUserId(targetUser)
+    const rawDept =
+      targetUser.departmentType ||
+      (targetUser.dynamicValues?.departmentType as string) ||
+      session?.user?.departmentType ||
+      'ONBOARDING_DEPARTMENT'
+
+    const rawRole = (targetUser.dynamicValues?.role as string) || targetUser.rawRole
+    const validBackendRole =
+      rawRole === 'DEPARTMENT_HEAD' ||
+      rawRole === 'DEPARTMENT_SUB_USER' ||
+      rawRole === 'SUPERADMIN' ||
+      rawRole === 'DEPARTMENT_SFP'
+        ? rawRole
+        : 'DEPARTMENT_USER'
+
+    setUpdatingSeniorFor(targetUser.id)
+    try {
+      await updateDepartmentUser({
+        id: numericId ?? targetUser.id,
+        username: targetUser.name,
+        email: targetUser.email,
+        isSeniorUser: isSenior,
+        departmentType: rawDept,
+        role: validBackendRole,
+      })
+      setToast({
+        type: 'success',
+        title: 'Senior Status Updated',
+        message: `Senior user status updated to ${isSenior ? 'Yes' : 'No'} for ${targetUser.name}!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update senior user status:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update senior user status'
+      setToast({ type: 'error', title: 'Senior Status Error', message: msg })
+    } finally {
+      setUpdatingSeniorFor(null)
+    }
+  }
+
+  async function handleHelpTicketsToggle(targetUser: DepartmentUser, enabled: boolean) {
+    const numericId = resolveUserId(targetUser)
+    const rawDept =
+      targetUser.departmentType ||
+      (targetUser.dynamicValues?.departmentType as string) ||
+      session?.user?.departmentType ||
+      'ONBOARDING_DEPARTMENT'
+
+    setUpdatingHelpTicketsFor(targetUser.id)
+    try {
+      const payload: UserActionPayload = enabled
+        ? {
+            action: 'ADD',
+            userId: numericId,
+            name: targetUser.name || '',
+            email: targetUser.email,
+            password: (targetUser.dynamicValues?.password as string) || 'SYNC_LOCKED',
+            phone: targetUser.phone !== '—' ? targetUser.phone : null,
+            role: (targetUser.dynamicValues?.role as string) || 'CUSTOMER',
+            status: 'ACTIVE',
+            timezone: (targetUser.dynamicValues?.timezone as string) || 'Asia/Kolkata',
+            departmentName: rawDept,
+            departmentType: rawDept,
+          }
+        : {
+            action: 'DELETE',
+            userId: numericId,
+            email: targetUser.email,
+          }
+
+      const res = await performUserAction(payload)
+      if (res && res.success === false) {
+        throw new Error(res.message || 'Action failed')
+      }
+
+      setToast({
+        type: 'success',
+        title: 'Ticket DB Updated',
+        message: `User ${targetUser.name} ${enabled ? 'added to' : 'removed from'} Help Tickets database successfully!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update Help Tickets database status:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update ticket database access'
+      setToast({ type: 'error', title: 'Ticket DB Error', message: msg })
+    } finally {
+      setUpdatingHelpTicketsFor(null)
+    }
+  }
+
+*/
+
   async function handleDelete(user: DepartmentUser) {
     try {
       await deleteDepartmentUser({
         id: user.id,
       })
+      notifyUserDeleted(user.name || '', user.email || '')
       if (isAutowebsionDept) {
         await autowebUsersQuery.refetch()
         await autowebTabCountsQuery.refetch()
@@ -537,10 +766,15 @@ export function DepartmentUsersPage() {
         await departmentUsersQuery.refetch()
       }
       closeModal()
+      setToast({
+        type: 'success',
+        title: 'User removed',
+        message: `${user.name || user.email || 'User'} was removed successfully.`,
+      })
     } catch (err: unknown) {
       console.error('Failed to delete department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to delete user'
-      alert(`Failed to delete user: ${msg}`)
+      setToast({ type: 'error', title: 'Failed to remove user', message: msg })
     }
   }
 
@@ -657,13 +891,24 @@ export function DepartmentUsersPage() {
               </Button>
 
               {canManageUsers ? (
-                <Button
-                  className="head-primary-button"
-                  onClick={() => setModal({ kind: 'create' })}
-                >
-                  <Icon name="userPlus" size={16} />
-                  Add User
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setModal({ kind: 'bulkAssign' })}
+                    className="h-10 rounded-xl border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-none hover:bg-slate-50"
+                  >
+                    <UsersRound className="mr-2 h-4 w-4 text-blue-600" />
+                    Bulk Assign
+                  </Button>
+                  <Button
+                    className="head-primary-button"
+                    onClick={() => setModal({ kind: 'create' })}
+                  >
+                    <Icon name="userPlus" size={16} />
+                    Add User
+                  </Button>
+                </>
               ) : null}
             </div>
           </div>
@@ -691,13 +936,23 @@ export function DepartmentUsersPage() {
           <LearningButton newCount={2} />
 
           {canManageUsers ? (
-            <Button
-              className="head-primary-button"
-              onClick={() => setModal({ kind: 'create' })}
-            >
-              <Icon name="userPlus" size={16} />
-              Add User
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setModal({ kind: 'bulkAssign' })}
+                className="inline-flex items-center gap-2"
+              >
+                <UsersRound className="h-4 w-4" />
+                Bulk Assign
+              </Button>
+              <Button
+                className="head-primary-button"
+                onClick={() => setModal({ kind: 'create' })}
+              >
+                <Icon name="userPlus" size={16} />
+                Add User
+              </Button>
+            </>
           ) : null}
         </div>
       )}
@@ -756,7 +1011,9 @@ export function DepartmentUsersPage() {
           }
           onLoginAs={handleLoginAs}
           renderExpanded={(user) => (
-            <UserDetails user={user} />
+            <UserDetails
+              user={user}
+            />
           )}
         />
       </SectionCard>
@@ -767,6 +1024,20 @@ export function DepartmentUsersPage() {
           mode="create"
           onClose={closeModal}
           onSubmit={handleCreate}
+        />
+      ) : null}
+
+      {canManageUsers ? (
+        <BulkAssignModal
+          open={modal.kind === 'bulkAssign'}
+          onClose={closeModal}
+          onTransferred={async () => {
+            if (isAutowebsionDept) {
+              await autowebUsersQuery.refetch()
+            } else {
+              await departmentUsersQuery.refetch()
+            }
+          }}
         />
       ) : null}
 
@@ -806,7 +1077,25 @@ export function DepartmentUsersPage() {
           person={person}
           items={items}
           target={target}
+          summary={reportSummary}
+          hint={memberDetailsQuery.isLoading ? 'Loading the last 7 days…' : 'Showing customer activity from the last 7 days'}
         />
+      ) : null}
+
+      {toast ? (
+        <div
+          className={`cl-toast cl-toast--${toast.type}`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>
+            <strong className="cl-toast-title">{toast.title || (toast.type === 'success' ? 'Success' : 'Error')}</strong>
+            <small className="cl-toast-message">{toast.message}</small>
+          </span>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setToast(null)}>
+            ×
+          </button>
+        </div>
       ) : null}
     </>
   )

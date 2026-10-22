@@ -12,5 +12,10 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     clearMocks: true,
     restoreMocks: true,
+    // Fork workers intermittently time out on the Windows CI/dev environment
+    // before test code starts. Reuse one thread worker for deterministic runs.
+    pool: 'threads',
+    maxWorkers: 1,
+    fileParallelism: false,
   },
 })

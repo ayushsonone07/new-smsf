@@ -1,8 +1,11 @@
-import { authedApiRequest } from './client'
+import { authedApiRequest, authedFileRequest } from './client'
+import { getSession } from '../app/auth/session'
 
 export interface CustomerProfileDetails {
   planIds?: string[]
   plan?: string
+  packageName?: string
+  planNames?: string[]
   businessName?: string
   ownerName?: string
   email?: string
@@ -145,6 +148,17 @@ export interface CustomerRemarks {
   fifteenDayMeetingRemark?: CustomerRemark[]
 }
 
+export interface SuperAdminDepartmentRemarks {
+  departmentType: string
+  serviceType: string
+  clientRemarks: CustomerRemark[]
+}
+
+export interface SuperAdminRemarks {
+  departments: SuperAdminDepartmentRemarks[]
+  customerRemarks: CustomerRemark[]
+}
+
 export interface CustomerReviewReply {
   reply: string
   timestamp: string
@@ -157,9 +171,43 @@ export interface CustomerDrawerApiDetails {
   serviceRowsLoading: boolean
   remarks?: CustomerRemarks
   internalRemarks: CustomerRemark[]
+  superAdminRemarks?: SuperAdminRemarks
   reviewReplies: CustomerReviewReply[]
   isLoading: boolean
   errors: string[]
+}
+
+export async function getSuperAdminCustomerRemarks(
+  customerId: number,
+): Promise<SuperAdminRemarks | undefined> {
+  try {
+    const response = await authedApiRequest<ApiEnvelope<SuperAdminRemarks>>(
+      `/api/auth/customer-service/${customerId}/superadmin-remarks`,
+    )
+    return response?.data
+  } catch {
+    return undefined
+  }
+}
+
+export type CustomerExportFormat = 'pdf' | 'xlsx' | 'json'
+
+export async function downloadCustomerExport(
+  customerId: number,
+  format: CustomerExportFormat,
+): Promise<void> {
+  const search = new URLSearchParams({ format })
+  const { blob, fileName } = await authedFileRequest(
+    `/api/customer/${customerId}/export?${search.toString()}`,
+  )
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName || `customer-${customerId}-export.${format}`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 interface ApiEnvelope<T> {
@@ -215,11 +263,34 @@ export async function getCustomerReviewReplies(
     `/api/auth/customer-service/review-reply/${customerId}/${encodeURIComponent(departmentType)}`,
   )
   
-  const data = response?.data ?? response
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.data)) return data.data
-  if (Array.isArray(data?.replies)) return data.replies
-  return []
+  let rawList: any[] = []
+  if (Array.isArray(response)) {
+    rawList = response
+  } else if (Array.isArray(response?.data?.replies)) {
+    rawList = response.data.replies
+  } else if (Array.isArray(response?.replies)) {
+    rawList = response.replies
+  } else if (Array.isArray(response?.data)) {
+    rawList = response.data
+  } else if (Array.isArray(response?.data?.data)) {
+    rawList = response.data.data
+  }
+
+  return rawList
+    .map((item) => {
+      const payload = item?.data ?? item
+      return {
+        reply: payload?.reply ?? payload?.remark ?? payload?.clientRemark ?? '',
+        timestamp: payload?.timestamp ?? payload?.dateTime ?? payload?.date ?? '',
+        staffName: payload?.staffName ?? payload?.name ?? payload?.username ?? '',
+      }
+    })
+    .filter((r) => Boolean(r.reply))
+
+
+
+
+
 }
 
 export async function getCustomerRemarks(
@@ -275,4 +346,25 @@ export async function getCustomerServiceRows(
     throw new Error(response.message || 'Customer service rows returned no data')
   }
   return rows
+}
+
+export async function addClientRemark(
+  customerId: number | string,
+  remark: string,
+  departmentType?: string,
+): Promise<any> {
+  const session = getSession()
+  const dept = departmentType || session?.user?.departmentType || 'ONBOARDING_DEPARTMENT'
+  const username = session?.user?.email || session?.user?.username || ''
+
+  return await authedApiRequest<any>('/api/auth/customer-service/review-reply', {
+    method: 'POST',
+    body: JSON.stringify({
+      customerId: Number(customerId),
+      departmentype: dept,
+      departmentType: dept,
+      reply: remark.trim(),
+    }),
+    headers: username ? { username } : undefined,
+  })
 }

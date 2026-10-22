@@ -80,6 +80,16 @@ function toOnboardingCustomer(customer: AdminCustomer): OnboardingCustomer {
     serviceMonths: valueOf(customer, 'serviceExpiration') || valueOf(customer, 'serviceExpiry'),
     salesPerson: valueOf(customer, 'salesPerson'),
     serviceType: valueOf(customer, 'serviceType'),
+    services: Array.isArray(customer.customerServices)
+      ? (customer.customerServices as any[]).map((cs) => ({
+          name: cs.serviceType || cs.name || 'Service',
+          status: (String(cs.status || '').toLowerCase() === 'completed'
+            ? 'completed'
+            : String(cs.status || '').toLowerCase() === 'in_progress' || String(cs.status || '').toLowerCase() === 'in-progress'
+              ? 'in-progress'
+              : 'pending') as OnboardingStatus,
+        }))
+      : undefined,
     duplicateCount: Number(customer.duplicateCount || 0),
     hasDuplicateCustomer: Boolean(customer.hasDuplicateCustomer),
     duplicateCustomers: Array.isArray(customer.duplicateCustomers)
@@ -258,7 +268,6 @@ export function AdminCustomersPage() {
           departmentType=""
           showStatus
           showAssignTo={false}
-          requestUsername="onboarding@mbg.com"
           onClose={() => setSelectedCustomer(null)}
         />
       </div>

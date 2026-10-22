@@ -6,7 +6,8 @@
 .cdb-shell {
   display: flex;
   min-height: 100vh;
-  font-family: Jost, Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--app-font-family);
+  font-weight: var(--app-font-weight-body);
   font-size: 14px;
   line-height: 1.4;
   color: #0f172a;
@@ -890,6 +891,30 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.cdb-updates-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cdb-updates-list::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 4px;
+}
+
+.cdb-updates-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.cdb-updates-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .cdb-update-item {
@@ -1066,6 +1091,30 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.cdb-ticket-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cdb-ticket-list::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 4px;
+}
+
+.cdb-ticket-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.cdb-ticket-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .cdb-ticket-item {

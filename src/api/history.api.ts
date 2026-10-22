@@ -106,6 +106,56 @@ interface CustomApiResponseRaw<T> {
   last?: boolean
 }
 
+export interface RecurringServiceSnapshot {
+  serviceType?: string
+  status?: string
+  assignedUser?: string
+  createdAt?: string
+  updatedAt?: string
+  expirationAt?: string
+  active?: boolean
+}
+
+export interface RecurringTimelineEvent {
+  id?: number | string
+  type: string
+  serviceType?: string
+  phaseName?: string
+  oldValue?: string
+  newValue?: string
+  fromUser?: string
+  toUser?: string
+  performedBy?: string
+  remarks?: string
+  occurredAt: string
+}
+
+export interface RecurringTimelineResponse {
+  customerId: number
+  customerName?: string
+  departmentType: string
+  createdAt?: string
+  updatedAt?: string
+  expirationAt?: string
+  currentStatus?: string
+  currentAssignedUser?: string
+  services: RecurringServiceSnapshot[]
+  events: RecurringTimelineEvent[]
+}
+
+export async function getRecurringTimeline(
+  customerId: number,
+  departmentType: string,
+): Promise<RecurringTimelineResponse> {
+  const search = new URLSearchParams({ departmentType })
+  const res = await authedApiRequest<CustomApiResponseRaw<RecurringTimelineResponse>>(
+    `/api/customer/${customerId}/recurring-timeline?${search.toString()}`,
+  )
+
+  if (!res?.data) throw new Error('Recurring timeline was not returned.')
+  return res.data
+}
+
 export async function getTaskHistory(
   params: TaskHistoryParams = {},
 ): Promise<TaskHistoryResponse> {

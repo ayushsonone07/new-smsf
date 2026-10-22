@@ -144,15 +144,21 @@ export async function getDepartmentUsers(params: {
   )
 
   // Backend returns data as List<DepartmentUsersResponse> with one element
-  // The actual users are in data[0].users or directly in data
+  // The head/admin row sits at data[0] itself, sub-users in data[0].users
   let rawUsers: DepartmentUserApiItem[] = []
   if (Array.isArray(res?.data) && res.data.length > 0) {
     const first: any = res.data[0]
+    const headRow: DepartmentUserApiItem | null =
+      first?.email || first?.username
+        ? { ...first, isHead: first.isHead ?? true }
+        : null
     if (Array.isArray(first?.users)) {
-      rawUsers = first.users
+      rawUsers = headRow ? [headRow, ...first.users] : first.users
     } else if (Array.isArray(first?.departmentSubUsers)) {
-      rawUsers = first.departmentSubUsers
-    } else if (first?.email || first?.username) {
+      rawUsers = headRow
+        ? [headRow, ...first.departmentSubUsers]
+        : first.departmentSubUsers
+    } else if (headRow) {
       rawUsers = res.data as any
     }
   } else if (Array.isArray((res as any)?.users)) {
@@ -573,6 +579,7 @@ export interface UpdateDepartmentUserRequest {
   departmentType?: string
   role?: string
   isHead?: boolean
+  isSeniorUser?: boolean
 }
 
 export interface UpdateDepartmentUserResponse {
@@ -752,6 +759,65 @@ export async function assignCustomerUser(params: AssignCustomerRequest): Promise
   })
 }
 
+export interface BulkTransferCustomersRequest {
+  fromUserEmail: string
+  toUserEmail: string
+  phaseName?: string
+}
+
+export interface BulkTransferCustomersResult {
+  message: string
+  data?: unknown
+}
+
+/**
+ * Transfers every customer-service assignment in the signed-in user's
+ * department from one department user to another.
+ *
+ * SMSB resolves the department from the authenticated/requesting user. The UI
+ * deliberately does not send a department override, so both dropdowns remain
+ * scoped by `GET /api/auth/department/users`.
+ */
+export async function bulkTransferCustomers(
+  params: BulkTransferCustomersRequest,
+): Promise<BulkTransferCustomersResult> {
+  const session = getSession()
+  const username = session?.user?.email || session?.user?.username || ''
+  const fromUserEmail = params.fromUserEmail.trim()
+  const toUserEmail = params.toUserEmail.trim()
+
+  if (!fromUserEmail || !toUserEmail) {
+    throw new Error('Select both source and destination users.')
+  }
+  if (fromUserEmail.toLowerCase() === toUserEmail.toLowerCase()) {
+    throw new Error('Source and destination users must be different.')
+  }
+
+  const res = await authedApiRequest<CustomApiResponseRaw<unknown>>(
+    '/api/auth/customer-service/assign-user',
+    {
+      method: 'POST',
+      headers: { username },
+      body: JSON.stringify({
+        assignedFrom: fromUserEmail,
+        assignedUserEmail: toUserEmail,
+        isSelectAll: true,
+        isRoundRobin: false,
+        phaseName: params.phaseName?.trim() || 'Default',
+      }),
+    },
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Bulk transfer failed.')
+  }
+
+  return {
+    message: res?.message || 'Customers transferred successfully.',
+    data: res?.data,
+  }
+}
+
 /**
  * `PUT /api/auth/onboarding/update/{customerId}?updatedStatus={updatedStatus}`
  * Updates customer onboarding status in backend DB.
@@ -876,4 +942,59 @@ export async function getDuplicateCustomerSummaries(
     console.warn('Could not fetch duplicate summaries:', err)
     return []
   }
+}
+
+
+export interface UserActionPayload {
+  action: 'ADD' | 'DELETE'
+  userId?: number
+  name?: string
+  email: string
+  password?: string
+  phone?: string | null
+  role?: string
+  status?: string
+  timezone?: string
+  departmentName?: string
+  departmentType?: string
+}
+
+/**
+ * `PUT /api/auth/department/users/user-action`
+ * Toggles a department user's account inside the Ticket / HelpCenter database.
+ */
+export async function performUserAction(
+  payload: UserActionPayload,
+): Promise<{ success?: boolean; message?: string }> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+
+  return authedApiRequest<{ success?: boolean; message?: string }>(
+    '/api/auth/department/users/user-action',
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        username: headEmail,
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+/**
+ * `POST /api/attendance/user/absent?userId=${userId}&updatingStatus=${updatingStatus}`
+ * Marks a user present (updatingStatus = true) or absent (updatingStatus = false).
+ */
+export async function updateUserAttendance(
+  userId: number,
+  updatingStatus: boolean,
+): Promise<{ success?: boolean; message?: string }> {
+  return authedApiRequest<{ success?: boolean; message?: string }>(
+    `/api/attendance/user/absent?userId=${userId}&updatingStatus=${updatingStatus}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+  )
 }

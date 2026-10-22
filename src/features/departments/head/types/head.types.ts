@@ -50,6 +50,10 @@ export interface DepartmentUser {
   avatarSrc?: string
   /** Unmodified backend row used by admin-created dynamic columns. */
   dynamicValues?: Record<string, unknown>
+  isSeniorUser?: boolean
+  isAddUserDb?: boolean
+  departmentType?: string
+  rawRole?: string
 }
 
 export interface DepartmentUserFormValues {

@@ -15,6 +15,7 @@ import { resolveDeptFromPath } from '../../../features/departments/head/utils/ro
 import { getSession } from '../../../app/auth/session'
 import type { OnboardingCustomer } from './CustomersList'
 import { recordCustomerActivity } from '../../../utils/customerActivity'
+import { notifyServiceCompleted } from '../../../api/notification-factory'
 import './ServiceFlowModal.css'
 
 export interface Phase1Step {
@@ -596,6 +597,7 @@ export function ServiceFlowModal({
         flowStepName: confirmingStep.stepName,
         status: 'COMPLETED',
       })
+      notifyServiceCompleted(customer, confirmingStep.stepName)
 
       // Optimistic update of the step
       const updatedSteps = steps.map((s) =>
@@ -656,6 +658,9 @@ export function ServiceFlowModal({
         subServiceName,
         newStatus,
       })
+      if (newStatus.toUpperCase() === 'COMPLETED') {
+        notifyServiceCompleted(customer, subServiceName)
+      }
 
       setSubServiceStatus(newStatus)
       onSubServiceStatusUpdated?.(newStatus, subServiceName)

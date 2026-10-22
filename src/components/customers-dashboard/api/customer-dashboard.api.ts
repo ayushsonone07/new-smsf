@@ -30,12 +30,16 @@ interface ApiService {
 
 interface ApiCustomer {
   plan?: string | { name?: string; planName?: string; title?: string } | null
+  packageName?: string | null
+  planNames?: string[] | null
   planIds?: string[]
   businessName?: string | null
   ownerName?: string | null
   email?: string | null
   phone?: string | null
   serviceExpiration?: string | null
+  amountPaid?: string | number | null
+  amountPending?: string | number | null
   generatedBillInfo?: string | Record<string, unknown> | null
 }
 
@@ -254,8 +258,14 @@ export async function fetchCustomerDashboardData(): Promise<CustomerDashboardDat
         : profileStatus === 'In progress'
           ? 'Active'
           : 'Pending',
-      packageName: toPlanName(customer.plan),
+      packageName: toPlanName(
+        customer.packageName ||
+          customer.plan ||
+          (customer.planNames && customer.planNames.length > 0 ? customer.planNames.join(', ') : undefined)
+      ),
       packageDuration: toExpirationText(customer.serviceExpiration),
+      amountPaid: customer.amountPaid ?? undefined,
+      amountPending: customer.amountPending ?? undefined,
       executive: {
         name: executiveName,
         roleTitle: 'Your onboarding executive',

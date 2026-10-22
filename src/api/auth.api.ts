@@ -1,17 +1,10 @@
 import { apiRequest, ApiError } from './client'
 import { getSession } from '../app/auth/session'
-import { delay } from './mock/db'
-import {
-  generateToken,
-  storedUsers,
-  toAuthUser,
-} from './mock/auth.db'
 import type {
   AuthSession,
   AuthUser,
   UserRole,
 } from '../features/auth/types/auth.types'
-import type { StoredUser } from './mock/auth.db'
 
 /** Raw payload inside the backend's `CustomApiResponse.data` envelope. */
 interface BackendLoginData {
@@ -129,39 +122,6 @@ function toSessionFromBackend(data: BackendLoginData): AuthSession {
   }
 }
 
-function loginWithMockCredentials(
-  email: string,
-  password: string,
-): AuthSession {
-  const user = storedUsers.find(
-    (item) =>
-      item.email.toLowerCase() === email.trim().toLowerCase(),
-  )
-
-  if (!user || user.password !== password) {
-    throw new Error('Invalid email or password')
-  }
-
-  return createSession(user)
-}
-
-function createSession(user: StoredUser): AuthSession {
-  return {
-    token: generateToken({
-      sub: user.id,
-      role: user.role,
-      type: 'session',
-    }),
-    user: toAuthUser(user),
-    issuedAt: new Date().toISOString(),
-  }
-}
-
-export async function getUsers(): Promise<AuthUser[]> {
-  await delay()
-  return storedUsers.map(toAuthUser)
-}
-
 export async function loginWithCredentials(
   email: string,
   password: string,
@@ -179,19 +139,17 @@ export async function loginWithCredentials(
       body: JSON.stringify(payload),
     })
   } catch (error) {
-    // Backend answered with a validation error (401/400/500) — surface it
-    // instead of silently falling back to the mock store.
+    // Backend answered with a validation error (401/400/500) — surface it.
     if (error instanceof ApiError) {
       throw new Error(error.message || 'Invalid email or password', {
         cause: error,
       })
     }
 
-    // Only when the backend is unreachable (network down / wrong
-    // VITE_API_BASE_URL) fall back to the local mock users so the
-    // demo accounts (admin@smsf.test, …) keep working offline.
-    await delay(400)
-    return loginWithMockCredentials(email, password)
+    // The backend is unreachable (network down / wrong VITE_API_BASE_URL).
+    throw new Error('Unable to reach the server. Please try again.', {
+      cause: error,
+    })
   }
 
   if (envelope && envelope.success === false) {

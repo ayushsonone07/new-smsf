@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
-import { motion, type Variants } from 'framer-motion'
+import { motion, AnimatePresence, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
@@ -24,15 +24,19 @@ import type {
   OnboardingStatus,
 } from './CustomersList'
 import type {
+  CustomerExportFormat,
   CustomerProfileDetails,
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
+import { addClientRemark, downloadCustomerExport } from '../../../api/customer-drawer.api'
 import {
   CUSTOMER_ACTIVITY_EVENT,
   getCustomerActivities,
   type CustomerActivityEvent,
 } from '../../../utils/customerActivity'
+import { getRecurringTimeline } from '../../../api/history.api'
+import { notifyBillGenerated } from '../../../api/notification-factory'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -57,6 +61,7 @@ type DrawerTab =
   | 'bill-upload'
   | 'remarks'
   | 'activity'
+  | 'recurring'
 
 const STATUS_LABEL: Record<OnboardingStatus, string> = {
   pending: 'Pending',
@@ -87,7 +92,6 @@ const PROFILE_FIELD_GROUPS: {
       'phone',
       'additionalNumber',
       'plan',
-      'planIds',
       'isWebinarClient',
       'source',
       'leadType',
@@ -257,7 +261,7 @@ function Field({
 export function CustomersListModal({
   customer,
   assignees,
-  showStatus = true,
+  showStatus: _showStatus = true,
   showAssignTo = true,
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
@@ -274,9 +278,18 @@ export function CustomersListModal({
   const [closing, setClosing] = useState(false)
   const [activeCustomer, setActiveCustomer] = useState<OnboardingCustomer | null>(customer)
   const [isAddingRemark, setIsAddingRemark] = useState(false)
+  const [isAddingClientRemark, setIsAddingClientRemark] = useState(false)
   const [editingRemark, setEditingRemark] = useState<string | null>(null)
   const [editingRemarkText, setEditingRemarkText] = useState('')
   const [isSavingRemark, setIsSavingRemark] = useState(false)
+  const [editingClientRemark, setEditingClientRemark] = useState<string | null>(null)
+  const [editingClientRemarkText, setEditingClientRemarkText] = useState('')
+  const [isSavingClientRemark, setIsSavingClientRemark] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<CustomerExportFormat | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [exportError, setExportError] = useState('')
   const [billFile, setBillFile] = useState<File | null>(null)
   const [billUploading, setBillUploading] = useState(false)
   const [billError, setBillError] = useState('')
@@ -294,6 +307,7 @@ export function CustomersListModal({
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+  const isSuperAdmin = (getSession()?.user.role as string) === 'ADMIN' || (getSession()?.user.role as string) === 'SUPERADMIN'
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
@@ -304,6 +318,17 @@ export function CustomersListModal({
     requestUsername,
   })
   const [localActivities, setLocalActivities] = useState<CustomerActivityEvent[]>([])
+  const recurringCustomerId = Number(current?.id)
+
+  const recurringQuery = useQuery({
+    queryKey: ['customer-recurring-timeline', current?.id, departmentType],
+    queryFn: () =>
+      getRecurringTimeline(recurringCustomerId, departmentType || ''),
+    enabled:
+      Boolean(customer && departmentType && Number.isFinite(recurringCustomerId)) &&
+      activeTab === 'recurring',
+    staleTime: 15_000,
+  })
 
   useEffect(() => {
     const refreshActivities = () => {
@@ -345,17 +370,66 @@ export function CustomersListModal({
     setClosing(true)
   }
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  async function handleExport(targetFormat: CustomerExportFormat) {
+    const customerId = Number(current?.id)
+    if (!Number.isInteger(customerId) || customerId <= 0 || isExporting) return
+    setExportError('')
+    setIsExporting(true)
+    setExportingFormat(targetFormat)
+    setShowExportMenu(false)
+    try {
+      await downloadCustomerExport(customerId, targetFormat)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Unable to export customer.')
+    } finally {
+      setIsExporting(false)
+      setExportingFormat(null)
+    }
+  }
+
   async function saveRemarkEdit() {
     if (!current?.id || !editingRemarkText.trim() || isSavingRemark) return
     setIsSavingRemark(true)
     try {
-      await updateCustomer(current.id, { remark: editingRemarkText.trim() })
+      await updateCustomer(current.id, { remark: editingRemarkText.trim(), remarkType: 'INTERNAL', departmentType, serviceType: departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-internal-remarks'] })
       await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
       setEditingRemark(null)
     } catch (error) {
       console.error('Failed to update remark', error)
     } finally {
       setIsSavingRemark(false)
+    }
+  }
+
+  async function saveClientRemarkEdit() {
+    if (!current?.id || !editingClientRemarkText.trim() || isSavingClientRemark) return
+    setIsSavingClientRemark(true)
+    try {
+      await addClientRemark(current.id, editingClientRemarkText.trim(), departmentType)
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-review-replies'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+      await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
+      setEditingClientRemark(null)
+    } catch (error) {
+      console.error('Failed to update client remark', error)
+    } finally {
+      setIsSavingClientRemark(false)
     }
   }
 
@@ -489,6 +563,7 @@ export function CustomersListModal({
     setBillSuccess('')
     try {
       await uploadCustomerBill(billingCustomer.id, billFile)
+      notifyBillGenerated(billingCustomer)
       const refreshed = await billingQuery.refetch()
       setBillFile(null)
       if (billInputRef.current) billInputRef.current.value = ''
@@ -537,6 +612,7 @@ export function CustomersListModal({
         status: invoice.status,
         billingLink: invoice.billingLink.trim(),
       })
+      if (invoice.status === 'GENERATED') notifyBillGenerated(billingCustomer)
       await billingQuery.refetch()
       setInvoiceSuccess("Invoice details saved in the customer's billing details.")
     } catch (error) {
@@ -594,12 +670,106 @@ export function CustomersListModal({
   const serviceRow = relevantServiceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
-  const hasDepartmentServiceSummary = serviceRow?.departmentStatuses != null
-  const services = getDepartmentServices(
-    serviceRow?.departmentStatuses,
-    serviceRow,
-    departmentType,
-  )
+  interface DrawerDepartmentServiceItem {
+    name: string
+    status?: OnboardingStatus
+    row?: CustomerServiceRow
+  }
+
+  const services: DrawerDepartmentServiceItem[] = useMemo(() => {
+    if (serviceRow?.departmentStatuses != null) {
+      return getDepartmentServices(
+        serviceRow.departmentStatuses,
+        serviceRow,
+        departmentType,
+      )
+    }
+
+    // Fallback 1: current.subServiceInfo (e.g. Automation / Website sub-services)
+    if (Array.isArray(current?.subServiceInfo) && current.subServiceInfo.length > 0) {
+      return current.subServiceInfo.map((sub: any): DrawerDepartmentServiceItem => {
+        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+        const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'pending')
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)),
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 2: current.services
+    if (Array.isArray(current?.services) && current.services.length > 0) {
+      return current.services.map((s: any): DrawerDepartmentServiceItem => {
+        const name = s?.serviceType || s?.name || 'Service'
+        const status = s?.status || 'pending'
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)),
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 3: rawCustomer customerServices or current.customerServices
+    const raw = current?.rawCustomer as any
+    const rawCustomerServices = raw?.customerServices || (current as any)?.customerServices
+    if (Array.isArray(rawCustomerServices) && rawCustomerServices.length > 0) {
+      return rawCustomerServices.map((cs: any): DrawerDepartmentServiceItem => {
+        const name = cs?.serviceType || cs?.name || 'Service'
+        const status = cs?.status || (cs?.isServiceActive ? 'completed' : 'pending')
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)) || current?.status,
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 4: rawCustomer serviceTypes
+    if (Array.isArray(raw?.serviceTypes) && raw.serviceTypes.length > 0) {
+      return raw.serviceTypes.map((st: string): DrawerDepartmentServiceItem => ({
+        name: formatServiceName(st),
+        status: current?.status,
+        row: undefined,
+      }))
+    }
+
+    // Fallback 5: superAdminRemarks departments
+    if (Array.isArray(apiDetails.superAdminRemarks?.departments) && apiDetails.superAdminRemarks!.departments.length > 0) {
+      return apiDetails.superAdminRemarks!.departments.map((dept): DrawerDepartmentServiceItem => ({
+        name: formatServiceName(dept.serviceType || dept.departmentType),
+        status: current?.status || 'pending',
+        row: undefined,
+      }))
+    }
+
+    // Fallback 6: Comma-separated packageName (e.g. "Only Google, Only WhatsApp, Google+Website")
+    const pkg = current?.packageName || raw?.packageName || apiDetails.profile?.packageName
+    if (pkg && typeof pkg === 'string' && pkg.includes(',')) {
+      const parts = pkg.split(',').map((p) => p.trim()).filter(Boolean)
+      if (parts.length > 0) {
+        return parts.map((part): DrawerDepartmentServiceItem => ({
+          name: formatServiceName(part),
+          status: current?.status || 'pending',
+          row: undefined,
+        }))
+      }
+    }
+
+    if (current?.serviceType && current.serviceType !== '—') {
+      return [{
+        name: formatServiceName(current.serviceType),
+        status: current?.status,
+        row: undefined,
+      }]
+    }
+
+    return []
+  }, [serviceRow, departmentType, current, apiDetails.superAdminRemarks, apiDetails.profile?.packageName])
+
+  const hasDepartmentServiceSummary =
+    serviceRow?.departmentStatuses != null || services.length > 0
   const doneCount = services.filter((s) => s.status === 'completed').length
   const internalRemarkEntries = useMemo(() => {
     const list =
@@ -610,6 +780,15 @@ export function CustomersListModal({
   }, [apiDetails.internalRemarks, apiDetails.remarks?.internalRemark])
 
   const clientRemarkEntries = useMemo(() => {
+    if (isSuperAdmin) {
+      return (apiDetails.superAdminRemarks?.departments ?? []).flatMap((department) =>
+        department.clientRemarks.map((remark) => ({
+          category: 'Client',
+          departmentType: department.departmentType,
+          remark,
+        })),
+      )
+    }
     const clientReplies = (apiDetails.reviewReplies ?? []).map((r) => ({
       remark: r.reply,
       timestamp: r.timestamp,
@@ -620,13 +799,15 @@ export function CustomersListModal({
         ? clientReplies
         : (apiDetails.remarks?.clientRemark ?? [])
     return list.map((remark) => ({ category: 'Client', remark }))
-  }, [apiDetails.reviewReplies, apiDetails.remarks?.clientRemark])
+  }, [isSuperAdmin, apiDetails.superAdminRemarks?.departments, apiDetails.reviewReplies, apiDetails.remarks?.clientRemark])
 
   const onboardingRemarkEntries = useMemo(() => {
-    const list: CustomerRemark[] = [
-      ...(apiDetails.remarks?.departmentRemark ?? []),
-      ...(apiDetails.remarks?.fifteenDayMeetingRemark ?? []),
-    ]
+    const list: CustomerRemark[] = isSuperAdmin
+      ? [...(apiDetails.superAdminRemarks?.customerRemarks ?? [])]
+      : [
+          ...(apiDetails.remarks?.departmentRemark ?? []),
+          ...(apiDetails.remarks?.fifteenDayMeetingRemark ?? []),
+        ]
     if (apiDetails.profile?.remarks && typeof apiDetails.profile.remarks === 'string') {
       list.push({
         remark: apiDetails.profile.remarks,
@@ -638,13 +819,15 @@ export function CustomersListModal({
   }, [
     apiDetails.remarks?.departmentRemark,
     apiDetails.remarks?.fifteenDayMeetingRemark,
+    apiDetails.superAdminRemarks?.customerRemarks,
     apiDetails.profile?.remarks,
     apiDetails.profile?.lastUpdatedAt,
+    isSuperAdmin,
   ])
 
   const remarkEntries = useMemo(() => {
     return [
-      ...internalRemarkEntries,
+      ...(isSuperAdmin ? [] : internalRemarkEntries),
       ...clientRemarkEntries,
       ...onboardingRemarkEntries,
     ].sort(
@@ -652,7 +835,7 @@ export function CustomersListModal({
         (Date.parse(b.remark.timestamp || '') || 0) -
         (Date.parse(a.remark.timestamp || '') || 0),
     )
-  }, [internalRemarkEntries, clientRemarkEntries, onboardingRemarkEntries])
+  }, [isSuperAdmin, internalRemarkEntries, clientRemarkEntries, onboardingRemarkEntries])
 
   const customerRemarks = clientRemarkEntries
   const internalRemarks = internalRemarkEntries
@@ -752,13 +935,19 @@ export function CustomersListModal({
     { id: 'business-form', label: 'Business form' },
     { id: 'remarks', label: 'Remarks', count: remarkEntries.length },
     { id: 'activity', label: 'Updates', count: updates.length },
+    {
+      id: 'recurring',
+      label: 'Recurring',
+      count: recurringQuery.data?.events.length,
+    },
   ]
   const tabs = profileOnly
-    ? allTabs.filter((tab) => tab.id === 'overview' || tab.id === 'business-form')
+    ? allTabs.filter((tab) =>
+        tab.id === 'overview' || tab.id === 'business-form' || tab.id === 'recurring')
     : allTabs
 
   useEffect(() => {
-    if (profileOnly && activeTab !== 'overview' && activeTab !== 'business-form') {
+    if (profileOnly && !['overview', 'business-form', 'recurring'].includes(activeTab)) {
       setActiveTab('overview')
     } else if (activeTab === 'bill-upload' && !showBillUploadTab) {
       setActiveTab('overview')
@@ -810,29 +999,116 @@ export function CustomersListModal({
           >
             <div className="cl-drawer__avatar">{initialLetter}</div>
             <div className="cl-drawer__name-text">
-              <h2>{contactName}</h2>
+              <div className="cl-drawer__name-header">
+                <h2>{contactName}</h2>
+                {current.contactDate && (
+                  <span className="cl-drawer__date-time">
+                    {current.contactDate}
+                  </span>
+                )}
+                {isSuperAdmin && (
+                  <div
+                    ref={exportMenuRef}
+                    className="cl-drawer__export-container"
+                  >
+                    <button
+                      type="button"
+                      className={`cl-drawer__export-btn ${showExportMenu ? 'cl-drawer__export-btn--active' : ''}`}
+                      onClick={() => setShowExportMenu((prev) => !prev)}
+                      disabled={isExporting || !Number.isInteger(Number(current?.id))}
+                      aria-expanded={showExportMenu}
+                      aria-haspopup="true"
+                      title={
+                        isExporting
+                          ? `Exporting ${exportingFormat ? exportingFormat.toUpperCase() : ''}…`
+                          : 'Export complete customer report'
+                      }
+                    >
+                      <Icon name="download" size={15} />
+                    </button>
+
+                    <AnimatePresence>
+                      {showExportMenu && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className="cl-drawer__export-menu"
+                          role="menu"
+                        >
+                          <div className="cl-drawer__export-menu-header">
+                            <span>CHOOSE EXPORT FORMAT</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('xlsx')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--excel">
+                              📊
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>Excel Spreadsheet (.xlsx)</strong>
+                              <span>Structured multi-sheet workbook with Financials & Services</span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('pdf')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--pdf">
+                              📄
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>PDF Document (.pdf)</strong>
+                              <span>Executive Dossier with customer summary & status tables</span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('json')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--json">
+                              📦
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>JSON Data (.json)</strong>
+                              <span>Clean structured developer payload</span>
+                            </div>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {exportError && (
+                      <span role="alert" className="cl-drawer__export-error">
+                        {exportError}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <span>{businessName}</span>
             </div>
           </motion.div>
 
-          <motion.div
-            className="cl-drawer__status-pills"
-            variants={fadeUpVariants}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.22 }}
-          >
-            {showStatus && (
-              <span
-                className={`cl-drawer__spill cl-drawer__spill--status cl-drawer__spill--${current.status}`}
-              >
-                {STATUS_LABEL[current.status]}
-              </span>
-            )}
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Dept: {departmentType.replace('_DEPARTMENT', '').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}
-            </span>
-            {showAssignTo && (
+          {showAssignTo && (
+            <motion.div
+              className="cl-drawer__status-pills"
+              variants={fadeUpVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.22 }}
+            >
               <span className="cl-drawer__spill cl-drawer__spill--info">
                 Service user:{' '}
                 {serviceRow?.assignedUserEmail ||
@@ -840,11 +1116,8 @@ export function CustomersListModal({
                   assignee?.name ||
                   'Unassigned'}
               </span>
-            )}
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Since {current.contactDate}
-            </span>
-          </motion.div>
+            </motion.div>
+          )}
         </div>
 
         {/* Body */}
@@ -977,7 +1250,9 @@ export function CustomersListModal({
               <div className="cl-drawer__stat-label">Remarks</div>
               <div className="cl-drawer__stat-value">{remarkCount}</div>
               <div className="cl-drawer__stat-sub">
-                {customerRemarks.length} customer · {internalRemarks.length} internal
+                {isSuperAdmin
+                  ? `${customerRemarks.length} client · ${onboardingRemarkEntries.length} customer`
+                  : `${customerRemarks.length} customer · ${internalRemarks.length} internal`}
               </div>
             </div>
           </div>}
@@ -1048,7 +1323,11 @@ export function CustomersListModal({
                   <Field label="Address" value={fullAddress} full />
                   <Field
                     label="Package"
-                    value={apiDetails.profile?.plan || customer.packageName}
+                    value={
+                      apiDetails.profile?.packageName ||
+                      apiDetails.profile?.plan ||
+                      customer.packageName
+                    }
                     full
                   />
                   <Field
@@ -1069,16 +1348,16 @@ export function CustomersListModal({
                   />
                   <Field
                     label="Amount paid"
-                    value={
+                    value={formatCurrency(
                       apiDetails.profile?.amountPaid || rowDetails?.amountPaid
-                    }
+                    )}
                   />
                   <Field
                     label="Amount pending"
-                    value={
+                    value={formatCurrency(
                       apiDetails.profile?.amountPending ||
                       rowDetails?.amountPending
-                    }
+                    )}
                   />
                   <Field
                     label="Sales person"
@@ -1150,25 +1429,27 @@ export function CustomersListModal({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Status summary pill header */}
                 <div className="cl-drawer__remarks-summary">
                   <div className="cl-drawer__remarks-pills">
-                    <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--internal">
-                      Internal ({internalRemarkEntries.length})
-                    </span>
+                    {!isSuperAdmin && (
+                      <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--internal">
+                        Internal ({internalRemarkEntries.length})
+                      </span>
+                    )}
                     <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--client">
                       Client ({clientRemarkEntries.length})
                     </span>
                     <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--onboarding">
-                      Onboarding ({onboardingRemarkEntries.length})
+                      Customer ({onboardingRemarkEntries.length})
                     </span>
                   </div>
                 </div>
 
                 {/* Section 1: Internal Remarks */}
-                <div className="cl-drawer__remark-section">
-                  {getSession()?.user.role === 'USER' && (
+                {!isSuperAdmin && <div className="cl-drawer__remark-section">
+                  {getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1179,7 +1460,9 @@ export function CustomersListModal({
                         
                         setIsAddingRemark(true)
                         try {
-                          await updateCustomer(current.id, { remark: value })
+                          await updateCustomer(current.id, { remark: value, remarkType: 'INTERNAL', departmentType, serviceType: departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-internal-remarks'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
                           input.value = ''
                         } catch (err) {
@@ -1228,25 +1511,98 @@ export function CustomersListModal({
                     onCancelEdit={() => setEditingRemark(null)}
                     onSaveEdit={saveRemarkEdit}
                     isSavingRemark={isSavingRemark}
+                    pageSize={4}
                   />
-                </div>
+                </div>}
 
                 {/* Section 2: Client Remarks */}
                 <div className="cl-drawer__remark-section">
-                  <RemarkGroup
-                    title="Client Remarks"
-                    badge="Customer replies"
-                    emptyMessage="No client remarks recorded."
-                    entries={clientRemarkEntries}
-                  />
+                  {!isSuperAdmin && getSession()?.user.role !== 'CUSTOMER' && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        const form = e.target as HTMLFormElement
+                        const input = form.elements.namedItem('newClientRemark') as HTMLInputElement
+                        const value = input.value.trim()
+                        if (!value || isAddingClientRemark || !current?.id) return
+
+                        setIsAddingClientRemark(true)
+                        try {
+                          await addClientRemark(current.id, value, departmentType)
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-review-replies'] })
+                          await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
+                          input.value = ''
+                        } catch (err) {
+                          console.error('Failed to add client remark', err)
+                        } finally {
+                          setIsAddingClientRemark(false)
+                        }
+                      }}
+                      style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
+                    >
+                      <input
+                        name="newClientRemark"
+                        type="text"
+                        placeholder="Add client remark..."
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                        }}
+                        disabled={isAddingClientRemark}
+                      />
+                      <Button type="submit" disabled={isAddingClientRemark}>
+                        {isAddingClientRemark ? 'Adding...' : 'Add'}
+                      </Button>
+                    </form>
+                  )}
+                  {isSuperAdmin ? (
+                    (apiDetails.superAdminRemarks?.departments.length ?? 0) > 0 ? (
+                      apiDetails.superAdminRemarks?.departments.map((department) => (
+                        <RemarkGroup
+                          key={`${department.departmentType}-${department.serviceType}`}
+                          title={formatFieldLabel(department.departmentType)}
+                          pageSize={4}
+                          badge={formatServiceName(department.serviceType)}
+                          emptyMessage="No client remarks recorded."
+                          entries={department.clientRemarks.map((remark) => ({ category: 'Client', remark }))}
+                        />
+                      ))
+                    ) : (
+                      <p className="cl-drawer__empty">No client remarks recorded.</p>
+                    )
+                  ) : (
+                    <RemarkGroup
+                      title="Client Remarks"
+                      pageSize={4}
+                      badge="Customer replies"
+                      emptyMessage="No client remarks recorded."
+                      entries={clientRemarkEntries}
+                      editable
+                      editingRemark={editingClientRemark}
+                      editingRemarkText={editingClientRemarkText}
+                      onEdit={(remark) => {
+                        setEditingClientRemark(remark.timestamp || remark.remark || 'remark')
+                        setEditingClientRemarkText(remark.remark || '')
+                      }}
+                      onEditTextChange={setEditingClientRemarkText}
+                      onCancelEdit={() => setEditingClientRemark(null)}
+                      onSaveEdit={saveClientRemarkEdit}
+                      isSavingRemark={isSavingClientRemark}
+                    />
+                  )}
                 </div>
 
-                {/* Section 3: Onboarding Remarks */}
+                {/* Section 3: Customer Remarks */}
                 <div className="cl-drawer__remark-section">
                   <RemarkGroup
-                    title="Onboarding Remarks"
+                    title="Customer Remarks"
+                    pageSize={4}
                     badge="Department & meetings"
-                    emptyMessage="No onboarding remarks recorded."
+                    emptyMessage="No customer remarks recorded."
                     entries={onboardingRemarkEntries}
                   />
                 </div>
@@ -1827,6 +2183,132 @@ export function CustomersListModal({
             </motion.div>
           )}
 
+          {activeTab === 'recurring' && (
+            <motion.div
+              className="cl-drawer__card"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="cl-drawer__card-head">
+                <div>
+                  <h3>Recurring lifecycle</h3>
+                  <p className="cl-drawer__card-meta">
+                    Complete department history from creation through expiration for {businessName}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="cl-drawer__outline-btn"
+                  onClick={() => recurringQuery.refetch()}
+                  disabled={recurringQuery.isFetching}
+                >
+                  {recurringQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+
+              {recurringQuery.isLoading ? (
+                <p className="cl-drawer__empty">Loading recurring updates…</p>
+              ) : recurringQuery.isError ? (
+                <div>
+                  <p className="cl-drawer__empty">
+                    {recurringQuery.error instanceof Error
+                      ? recurringQuery.error.message
+                      : 'Unable to load recurring updates.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="cl-drawer__outline-btn"
+                    onClick={() => recurringQuery.refetch()}
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : recurringQuery.data ? (
+                <>
+                  <DetailGrid
+                    title="Current recurring summary"
+                    data={{
+                      createdAt: recurringQuery.data.createdAt,
+                      updatedAt: recurringQuery.data.updatedAt,
+                      expirationAt: recurringQuery.data.expirationAt,
+                      currentStatus: recurringQuery.data.currentStatus,
+                      assignedTo: recurringQuery.data.currentAssignedUser,
+                      department: recurringQuery.data.departmentType,
+                    }}
+                  />
+                  {recurringQuery.data.services.length > 0 && (
+                    <DetailGrid
+                      title="Department services"
+                      data={Object.fromEntries(
+                        recurringQuery.data.services.map((service, index) => [
+                          service.serviceType || `Service ${index + 1}`,
+                          [service.status, service.assignedUser, service.expirationAt ? `Expires ${formatTimestamp(service.expirationAt)}` : '']
+                            .filter(Boolean)
+                            .join(' · '),
+                        ]),
+                      )}
+                    />
+                  )}
+                  {recurringQuery.data.events.length > 0 ? (
+                    <ol className="cl-drawer__timeline">
+                  {recurringQuery.data.events.map((entry, index) => {
+                    const eventLabel: Record<string, string> = {
+                      CUSTOMER_CREATED: 'Customer created',
+                      SERVICE_CREATED: 'Service created',
+                      USER_ASSIGNED: 'User assigned',
+                      USER_REASSIGNED: 'User reassigned',
+                      STATUS_CHANGED: 'Status changed',
+                      SERVICE_EXPIRATION: 'Service expiration',
+                    }
+                    return (
+                      <li
+                        key={`${entry.id ?? entry.occurredAt ?? index}-${index}`}
+                        className="cl-drawer__timeline-item"
+                      >
+                        <span className="cl-drawer__timeline-icon">
+                          <Icon name="history" size={16} strokeWidth={1.8} />
+                        </span>
+                        <div>
+                          <strong>
+                            {eventLabel[entry.type] || entry.type.replaceAll('_', ' ')}
+                          </strong>
+                          <p>
+                            {[
+                              entry.serviceType,
+                              entry.phaseName,
+                              entry.fromUser && entry.toUser
+                                ? `${entry.fromUser} → ${entry.toUser}`
+                                : entry.toUser,
+                              entry.oldValue && entry.newValue
+                                ? `${entry.oldValue} → ${entry.newValue}`
+                                : entry.newValue,
+                              entry.performedBy ? `By ${entry.performedBy}` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          {entry.remarks ? <p>{entry.remarks}</p> : null}
+                          <time dateTime={entry.occurredAt}>
+                            {formatTimestamp(entry.occurredAt)}
+                          </time>
+                        </div>
+                      </li>
+                    )
+                  })}
+                    </ol>
+                  ) : (
+                    <p className="cl-drawer__empty">No lifecycle events have been recorded.</p>
+                  )}
+                </>
+              ) : (
+                <p className="cl-drawer__empty">
+                  No recurring lifecycle has been recorded for this customer.
+                </p>
+              )}
+            </motion.div>
+          )}
+
           {/* Duplicate businesses */}
           {activeTab === 'duplicates' && (
             <motion.div
@@ -2303,7 +2785,9 @@ function getProfileSections(profile: CustomerProfileDetails) {
         keyof CustomerProfileDetails,
         CustomerProfileDetails[keyof CustomerProfileDetails],
       ]
-      const entries = Object.entries(profile) as ProfileEntry[]
+      const entries = (Object.entries(profile) as ProfileEntry[]).filter(
+        ([key]) => key !== 'planIds',
+      )
       const seen = new Set<keyof CustomerProfileDetails>()
       const sections: {
         title: string
@@ -2395,6 +2879,7 @@ function DetailGrid({
 }) {
       const entries = Object.entries(data).filter(
         ([key, value]) =>
+          key !== 'planIds' &&
           !exclude.includes(key) &&
           value !== undefined &&
           value !== null &&
@@ -2454,6 +2939,7 @@ function RemarkGroup({
   onCancelEdit?: () => void
   onSaveEdit?: () => void
   isSavingRemark?: boolean
+  pageSize?: number
 }) {
   return (
     <section className="cl-drawer__remark-group">

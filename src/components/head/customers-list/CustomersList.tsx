@@ -5,6 +5,10 @@ import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import type { IconName } from '../shared/iconPaths'
 import { getCustomerFormUrl } from '../../../utils/urlEncryption'
+import {
+  SubServiceValidationModal,
+  type SubServiceStatusItem,
+} from './SubServiceValidationModal'
 
 /* ── Public types ─────────────────────────────────────────── */
 
@@ -182,6 +186,14 @@ export function CustomersList({
   showBusiness = true,
   showUpdated = false,
 }: CustomersListProps) {
+  const [validationModal, setValidationModal] = useState<{
+    open: boolean
+    type: 'incomplete' | 'acknowledgment'
+    message: string
+    detail?: string
+    subServices?: SubServiceStatusItem[]
+    customer?: OnboardingCustomer
+  } | null>(null)
   if (customers.length === 0) {
     return (
       <motion.div
@@ -210,6 +222,7 @@ export function CustomersList({
           {showAssignTo && <col className="cl-col cl-col--assign" />}
           {showRemark && <col className="cl-col cl-col--remark" />}
           {showUpdated && <col className="cl-col cl-col--updated" />}
+          <col className="cl-col cl-col--view" />
         </colgroup>
         <thead>
           <tr>
@@ -221,6 +234,7 @@ export function CustomersList({
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
             {showUpdated && <th className="cl-th">Updated</th>}
+            <th className="cl-th cl-th--view" aria-label="View" />
           </tr>
         </thead>
         <motion.tbody
@@ -269,10 +283,26 @@ export function CustomersList({
               showRemark={showRemark}
               canEditRemark={canEditRemark}
               showUpdated={showUpdated}
+              onShowValidationModal={setValidationModal}
             />
           ))}
         </motion.tbody>
       </table>
+
+      {/* Sub-Service Validation / Acknowledgment Modal */}
+      <SubServiceValidationModal
+        open={Boolean(validationModal?.open)}
+        type={validationModal?.type || 'incomplete'}
+        message={validationModal?.message || 'Please complete subservice'}
+        detail={validationModal?.detail}
+        subServices={validationModal?.subServices}
+        onClose={() => setValidationModal(null)}
+        onOpenSubServices={
+          validationModal?.customer && onOpenServiceFlow
+            ? () => onOpenServiceFlow(validationModal.customer!)
+            : undefined
+        }
+      />
     </div>
   )
 }
@@ -654,6 +684,14 @@ interface CustomerRowProps {
   showRemark?: boolean
   canEditRemark?: boolean
   showUpdated?: boolean
+  onShowValidationModal?: (data: {
+    open: boolean
+    type: 'incomplete' | 'acknowledgment'
+    message: string
+    detail?: string
+    subServices?: SubServiceStatusItem[]
+    customer?: OnboardingCustomer
+  }) => void
 }
 
 function CustomerRow({
@@ -682,6 +720,7 @@ function CustomerRow({
   showRemark = true,
   canEditRemark,
   showUpdated = false,
+  onShowValidationModal,
 }: CustomerRowProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [statusMenuPosition, setStatusMenuPosition] = useState<{
@@ -928,16 +967,6 @@ function CustomerRow({
               {customer.businessName}
             </button>
 
-            <button
-              type="button"
-              className="cl-biz-eye"
-              title="View customer detail"
-              aria-label="View customer detail"
-              onClick={() => onOpenDetail()}
-            >
-              <Icon name="eye" size={14} strokeWidth={1.8} />
-            </button>
-
             {isGoogle ? (
               <>
                 <button
@@ -1170,21 +1199,96 @@ function CustomerRow({
               >
                 {STATUS_OPTIONS.map((opt) => {
                   let isOptDisabled = false
-                  if (opt === 'completed') {
-                    let allDone = false
-                    if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-                      allDone = customer.subServiceInfo.every((sub: any) => {
-                        const st = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : '')
-                        return String(st).toUpperCase() === 'COMPLETED'
-                      })
-                    } else if (Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0) {
-                      allDone = customer.flowSteps.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
-                    } else if (Array.isArray(customer.services) && customer.services.length > 0) {
-                      allDone = customer.services.every((s: any) => s?.status?.toUpperCase() === 'COMPLETED')
-                    }
+                  let blockMessage = ''
+                  const parsedSubList: SubServiceStatusItem[] = []
 
-                    if (!allDone && customer.status !== 'completed') {
-                      isOptDisabled = true
+                  if (opt === 'completed') {
+                    const subServices =
+                      Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0
+                        ? customer.subServiceInfo
+                        : Array.isArray((customer as any).rawCustomer?.subServiceInfo) &&
+                            (customer as any).rawCustomer.subServiceInfo.length > 0
+                          ? (customer as any).rawCustomer.subServiceInfo
+                          : null
+
+                    const flowSteps =
+                      Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0
+                        ? customer.flowSteps
+                        : null
+
+                    const services =
+                      Array.isArray(customer.services) && customer.services.length > 0
+                        ? customer.services
+                        : Array.isArray((customer as any).rawCustomer?.services) &&
+                            (customer as any).rawCustomer.services.length > 0
+                          ? (customer as any).rawCustomer.services
+                          : null
+
+                    if (subServices || flowSteps || services) {
+                      const allStatuses: string[] = []
+
+                      if (subServices) {
+                        for (const sub of subServices) {
+                          const name =
+                            sub?.name ||
+                            sub?.subServiceName ||
+                            (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : 'Sub-service')
+                          const st =
+                            sub?.status ||
+                            sub?.subServiceStatus ||
+                            (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+                          if (st) {
+                            allStatuses.push(String(st).trim().toUpperCase())
+                            parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
+                          }
+                        }
+                      } else if (flowSteps) {
+                        for (const s of flowSteps) {
+                          if (s?.status) {
+                            allStatuses.push(String(s.status).trim().toUpperCase())
+                            parsedSubList.push({ name: s.name || 'Step', status: String(s.status).trim().toUpperCase() })
+                          }
+                        }
+                      } else if (services) {
+                        for (const s of services) {
+                          if (Array.isArray(s?.subServices) && s.subServices.length > 0) {
+                            for (const sub of s.subServices) {
+                              const name = sub?.name || sub?.subServiceName || 'Sub-service'
+                              const st =
+                                sub?.status ||
+                                sub?.subServiceStatus ||
+                                (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+                              if (st) {
+                                allStatuses.push(String(st).trim().toUpperCase())
+                                parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
+                              }
+                            }
+                          } else if (s?.status) {
+                            allStatuses.push(String(s.status).trim().toUpperCase())
+                            parsedSubList.push({ name: s.serviceType || 'Service', status: String(s.status).trim().toUpperCase() })
+                          }
+                        }
+                      }
+
+                      if (allStatuses.length > 0) {
+                        const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
+                        const isAck = (st: string) =>
+                          st.includes('ACK') ||
+                          st === 'PENDING_CUSTOMER_ACK' ||
+                          st === 'ACKNOWLEDGEMENT_PENDING' ||
+                          st === 'PENDING_ACK'
+
+                        const allCompleted = allStatuses.every(isDone)
+                        if (!allCompleted && customer.status !== 'completed') {
+                          isOptDisabled = true
+                          const hasUnfinished = allStatuses.some((st) => !isDone(st) && !isAck(st))
+                          if (!hasUnfinished && allStatuses.some(isAck)) {
+                            blockMessage = 'Complete your acknowledgment'
+                          } else {
+                            blockMessage = 'Please complete subservice'
+                          }
+                        }
+                      }
                     }
                   }
 
@@ -1198,9 +1302,21 @@ function CustomerRow({
                       style={isOptDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                       onClick={() => {
                         if (isOptDisabled) {
-                          alert(
-                            'All sub-services must be completed and acknowledgement sent before marking the main service as completed.',
-                          )
+                          const isAck = blockMessage === 'Complete your acknowledgment'
+                          if (onShowValidationModal) {
+                            onShowValidationModal({
+                              open: true,
+                              type: isAck ? 'acknowledgment' : 'incomplete',
+                              message: blockMessage || (isAck ? 'Complete your acknowledgment' : 'Please complete subservice'),
+                              detail: isAck
+                                ? 'All sub-services are completed, but customer acknowledgment is pending confirmation.'
+                                : 'All sub-services must be marked as completed before this service can be finalized.',
+                              subServices: parsedSubList,
+                              customer,
+                            })
+                          } else {
+                            alert(blockMessage || 'Please complete subservice')
+                          }
                           setStatusOpen(false)
                           return
                         }
@@ -1373,6 +1489,19 @@ function CustomerRow({
           )}
         </td>
       )}
+
+      {/* View customer */}
+      <td className="cl-td cl-td--view" data-label="View">
+        <button
+          type="button"
+          className="cl-row-view"
+          title="View customer detail"
+          aria-label={`View ${customer.businessName}`}
+          onClick={() => onOpenDetail()}
+        >
+          <Icon name="eye" size={16} strokeWidth={1.8} />
+        </button>
+      </td>
 
       {/* Optional Updated */}
       {showUpdated && (
