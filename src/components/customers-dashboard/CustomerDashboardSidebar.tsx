@@ -13,6 +13,11 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid', to: '/customers' },
   { key: 'my-details', label: 'My Details', icon: 'userIn', to: '/customers/details' },
+  { key: 'services', label: 'My Services', icon: 'brief', to: '/customers/services' },
+  { key: 'billing', label: 'Billing & Bills', icon: 'receipt', to: '/customers/billing' },
+  { key: 'apps', label: 'Apps', icon: 'layers', to: '/customers/apps' },
+  { key: 'ai-service', label: 'AI Service', icon: 'bot', to: '/customers/ai-service' },
+  { key: 'help-support', label: 'Help & Support', icon: 'help', to: '/customers/help-support' },
 ]
 
 interface CustomerDashboardSidebarProps {
