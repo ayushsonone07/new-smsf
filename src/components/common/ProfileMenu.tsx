@@ -24,7 +24,7 @@ interface MenuEntry {
 
 /**
  * SMSF-style profile settings menu: Profile Update,
- * My Airtel Calls, Manage Services, Salary Management.
+ * Config, My Airtel Calls, Manage Services, Airtel Service, Salary Management.
  * Visibility mirrors SMSF's Sidebar settingsMenuItems.
  */
 export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps) {
@@ -67,6 +67,16 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     to: '/profile-update',
   })
 
+  // Config — ADMIN only (SMSF reference: SuperAdmin only)
+  if (role === 'ADMIN') {
+    entries.push({
+      icon: '⚙',
+      label: 'Config',
+      description: 'Manage system configuration',
+      to: '/admin/config',
+    })
+  }
+
   // My Airtel Calls — HEAD + USER only (SMSF hides for SUPERADMIN/CUSTOMER)
   if (role === 'HEAD' || role === 'USER') {
     entries.push({
@@ -83,7 +93,10 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
       icon: '⚙',
       label: 'Manage Services',
       description: 'Manage Services configuration',
-      to: buildDepartmentRoute('manage-services', departmentType, role === 'ADMIN' ? 'HEAD' : role),
+      to:
+        role === 'ADMIN'
+          ? '/admin/services'
+          : buildDepartmentRoute('manage-services', departmentType, role),
     })
   }
 
@@ -102,7 +115,10 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     icon: '₹',
     label: 'Salary Management',
     description: 'Manage employee salaries',
-    to: buildDepartmentRoute('salary-management', departmentType, role === 'ADMIN' ? 'HEAD' : role),
+    to:
+      role === 'ADMIN'
+        ? '/admin/salary-management'
+        : buildDepartmentRoute('salary-management', departmentType, role),
   })
 
   function handleSelect(to: string) {
