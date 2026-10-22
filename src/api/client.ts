@@ -166,3 +166,42 @@ export async function authedApiRequest<T>(
     },
   })
 }
+
+export async function authedFileRequest(
+  endpoint: string,
+): Promise<{ blob: Blob; fileName?: string }> {
+  const session = getSession()
+  if (!session) throw new ApiError('Not signed in', 401)
+
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `${API_BASE_URL}${normalizedEndpoint}`
+  publishApiActivity(1)
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/pdf, application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        Authorization: `Bearer ${session.token}`,
+        username: session.user.email || session.user.username || '',
+        'ngrok-skip-browser-warning': 'true',
+      },
+    })
+    if (!response.ok) {
+      let message = `Export failed with status ${response.status}`
+      try {
+        const errorData = (await response.json()) as ApiErrorResponse & Record<string, unknown>
+        message = getApiErrorMessage(errorData, message)
+      } catch {
+        // Non-JSON error response.
+      }
+      throw new ApiError(message, response.status)
+    }
+    const disposition = response.headers.get('content-disposition') || ''
+    const fileName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+    return { blob: await response.blob(), fileName }
+  } finally {
+    publishApiActivity(-1)
+  }
+}
