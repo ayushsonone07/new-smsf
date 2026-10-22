@@ -84,10 +84,10 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #334155;
+  color: #1e293b;
   font-family: inherit;
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
@@ -162,11 +162,13 @@
   font-family: inherit;
   font-size: 13.5px;
   color: #0f172a;
+  font-weight: 600;
   outline: none;
 }
 
 .cl-search input::placeholder {
-  color: #94a3b8;
+  color: #64748b;
+  opacity: 1;
 }
 
 /* hide browser search-clear button */
@@ -350,7 +352,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 7px;
   background: #fff;
-  color: #64748b;
+  color: #475569;
   font-family: inherit;
   font-size: 12.5px;
   cursor: pointer;
@@ -467,9 +469,9 @@
 
 .cl-td--num {
   padding-left: 18px;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   vertical-align: middle;
 }
 
@@ -627,7 +629,8 @@
 
 .cl-biz-meta {
   font-size: 12px;
-  color: #64748b;
+  color: #475569;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -637,7 +640,8 @@
 
 .cl-email {
   font-size: 13px;
-  color: #334155;
+  color: #1e293b;
+  font-weight: 600;
   margin-bottom: 5px;
   white-space: nowrap;
   overflow: hidden;
@@ -655,8 +659,8 @@
 
 .cl-phone-text {
   font-size: 13px;
-  color: #334155;
-  font-weight: 500;
+  color: #1e293b;
+  font-weight: 600;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -950,10 +954,10 @@
   background: #fff;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  color: #334155;
+  color: #1e293b;
   transition: border-color 0.12s, background 0.12s;
   max-width: 100%;
 }
@@ -1174,7 +1178,8 @@
 
 .cl-remark {
   font-size: 13px;
-  color: #334155;
+  color: #1e293b;
+  font-weight: 600;
   line-height: 1.45;
   cursor: pointer;
   display: block;
@@ -1190,7 +1195,7 @@
 }
 
 .cl-remark--placeholder {
-  color: #94a3b8;
+  color: #64748b;
   font-style: italic;
 }
 
@@ -1262,7 +1267,8 @@
 
 .cl-updated-text {
   font-size: 13px;
-  color: #64748b;
+  color: #475569;
+  font-weight: 600;
   flex: 1;
   min-width: 60px;
 }

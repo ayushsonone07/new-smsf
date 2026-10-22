@@ -35,6 +35,7 @@ import {
   type CustomerActivityEvent,
 } from '../../../utils/customerActivity'
 import { getRecurringTimeline } from '../../../api/history.api'
+import { notifyBillGenerated } from '../../../api/notification-factory'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -525,6 +526,7 @@ export function CustomersListModal({
     setBillSuccess('')
     try {
       await uploadCustomerBill(billingCustomer.id, billFile)
+      notifyBillGenerated(billingCustomer)
       const refreshed = await billingQuery.refetch()
       setBillFile(null)
       if (billInputRef.current) billInputRef.current.value = ''
@@ -573,6 +575,7 @@ export function CustomersListModal({
         status: invoice.status,
         billingLink: invoice.billingLink.trim(),
       })
+      if (invoice.status === 'GENERATED') notifyBillGenerated(billingCustomer)
       await billingQuery.refetch()
       setInvoiceSuccess("Invoice details saved in the customer's billing details.")
     } catch (error) {

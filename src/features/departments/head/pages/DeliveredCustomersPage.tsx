@@ -24,6 +24,7 @@ import {
   useUpdateRoundRobinStatus,
 } from '../../hooks/useRoundRobin'
 import './DeliveredCustomersPage.css'
+import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 
 const SUPPORT_DEPARTMENT = 'SUPPORT_DEPARTMENT'
 const ASSIGNEE_PAGE_SIZE = 5
@@ -377,6 +378,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
         assignedUserEmail: email,
         departmentType: SUPPORT_DEPARTMENT,
       })
+      notifyCustomerAssigned({ id, businessName: rowBusinessName(row) }, email, 'Support')
       void queryClient.invalidateQueries({
         queryKey: ['department-customer-rows'],
       })

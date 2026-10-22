@@ -19,6 +19,7 @@ import { useDepartmentCustomerRows } from '../../hooks/useDepartmentUsersList'
 import type { DepartmentCustomerRowItem } from '../../../../api/department-users.api'
 import { applyDynamicColumnOrder, readDynamicColumnOrder } from '../../../../utils/dynamicColumnOrder'
 import './CustomFeaturePage.css'
+import { notifyBillGenerated } from '../../../../api/notification-factory'
 
 function normalizedKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -214,6 +215,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
         status: invoice.status,
         billingLink: invoice.billingLink,
       })
+      if (invoice.status === 'GENERATED') notifyBillGenerated(detailsCustomer)
       const customers = await refreshBilling()
       setDetailsCustomer(updated ?? customers.find((item) => item.id === detailsCustomer.id) ?? detailsCustomer)
       setToast({ type: 'success', message: 'Bill details saved successfully' })
@@ -234,6 +236,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     setError('')
     try {
       await uploadCustomerBill(uploadCustomer.id, uploadFile)
+      notifyBillGenerated(uploadCustomer)
       await refreshBilling()
       setUploadCustomer(null)
       setUploadFile(null)

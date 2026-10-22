@@ -25,6 +25,7 @@ import {
   MessageSquare,
   } from 'lucide-react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
+import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { TablePagination } from '../../../../components/ui/TablePagination'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
@@ -825,6 +826,7 @@ export function AutowebisionCustomersPage({
           : targetDepartment === 'WEBSITE_DEPARTMENT'
             ? 'Website'
             : 'both Website & Automation'
+      notifyCustomerAssigned({ id: customerId }, assigneeEmail, deptLabel)
       setToast({
         type: 'success',
         message: `Customer assigned to ${deptLabel} successfully.`,

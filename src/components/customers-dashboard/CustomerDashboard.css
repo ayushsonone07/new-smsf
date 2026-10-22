@@ -6,7 +6,8 @@
 .cdb-shell {
   display: flex;
   min-height: 100vh;
-  font-family: Jost, Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--app-font-family);
+  font-weight: var(--app-font-weight-body);
   font-size: 14px;
   line-height: 1.4;
   color: #0f172a;
