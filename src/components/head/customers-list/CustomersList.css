@@ -437,14 +437,15 @@
 
 /* Keep all table columns explicitly sized so the fixed-layout table cannot
    collapse the Business column when the other columns are present. */
-.cl-col--num     { width: 5%; }
+.cl-col--num     { width: 3%; }
 .cl-col--biz     { width: 16%; }
 .cl-col--contact { width: 17%; }
 .cl-col--service { width: 14%; }
 .cl-col--status  { width: 13%; }
-.cl-col--assign  { width: 17%; }
+.cl-col--assign  { width: 16%; }
 .cl-col--remark  { width: 12%; }
-.cl-col--updated { width: 6%; }
+.cl-col--updated { width: 5%; }
+.cl-col--view    { width: 4%; }
 
 /* ── Table body ───────────────────────────────────────────── */
 
@@ -473,6 +474,32 @@
   font-size: 13px;
   font-weight: 600;
   vertical-align: middle;
+}
+
+.cl-th--view,
+.cl-td--view {
+  padding-left: 6px;
+  padding-right: 6px;
+  text-align: center;
+}
+
+.cl-row-view {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2459e0;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.cl-row-view:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
 }
 
 .cl-td--updated {
@@ -538,26 +565,6 @@
   max-width: 100%;
   min-width: 0;
   white-space: normal;
-}
-
-.cl-biz-eye {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.12s, color 0.12s;
-}
-
-.cl-biz-eye:hover {
-  background: #eff6ff;
-  color: #2459e0;
 }
 
 .cl-form-pill {
