@@ -531,6 +531,154 @@ export function DepartmentUsersPage() {
     }
   }
 
+
+function resolveUserId(targetUser: DepartmentUser): number | undefined {
+    const candidates = [
+      targetUser.id,
+      targetUser.dynamicValues?.id,
+      targetUser.dynamicValues?.userId,
+      targetUser.dynamicValues?.departmentId,
+    ]
+    for (const c of candidates) {
+      if (c !== undefined && c !== null && c !== '') {
+        const n = Number(c)
+        if (Number.isFinite(n) && n > 0) return n
+      }
+    }
+    const currentSession = getSession()
+    if (
+      currentSession?.user?.id &&
+      (targetUser.email?.toLowerCase() === currentSession.user.email?.toLowerCase() ||
+       targetUser.name?.toLowerCase() === currentSession.user.username?.toLowerCase() ||
+       targetUser.name?.toLowerCase() === currentSession.user.name?.toLowerCase())
+    ) {
+      const n = Number(currentSession.user.id)
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    return undefined
+  }
+
+  async function handleAttendanceToggle(targetUser: DepartmentUser, isPresent: boolean) {
+    const numericId = resolveUserId(targetUser)
+    if (!numericId) {
+      console.error('[Attendance] Could not resolve numeric user ID for:', targetUser)
+      setToast({ type: 'error', title: 'Error', message: 'Valid user ID is required to update attendance.' })
+      return
+    }
+
+    setUpdatingAttendanceFor(targetUser.id)
+    try {
+      await updateUserAttendance(numericId, isPresent)
+      setToast({
+        type: 'success',
+        title: isPresent ? 'Marked Present' : 'Marked Absent',
+        message: `Attendance for ${targetUser.name} updated to ${isPresent ? 'Present' : 'Absent'} successfully!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update attendance:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update attendance'
+      setToast({ type: 'error', title: 'Attendance Error', message: msg })
+    } finally {
+      setUpdatingAttendanceFor(null)
+    }
+  }
+
+  async function handleSeniorUserToggle(targetUser: DepartmentUser, isSenior: boolean) {
+    const numericId = resolveUserId(targetUser)
+    const rawDept =
+      targetUser.departmentType ||
+      (targetUser.dynamicValues?.departmentType as string) ||
+      session?.user?.departmentType ||
+      'ONBOARDING_DEPARTMENT'
+
+    setUpdatingSeniorFor(targetUser.id)
+    try {
+      await updateDepartmentUser({
+        id: numericId ?? targetUser.id,
+        username: targetUser.name,
+        email: targetUser.email,
+        isSeniorUser: isSenior,
+        departmentType: rawDept,
+        role: targetUser.rawRole || (targetUser.dynamicValues?.role as string) || targetUser.role,
+      })
+      setToast({
+        type: 'success',
+        title: 'Senior Status Updated',
+        message: `Senior user status updated to ${isSenior ? 'Yes' : 'No'} for ${targetUser.name}!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update senior user status:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update senior user status'
+      setToast({ type: 'error', title: 'Senior Status Error', message: msg })
+    } finally {
+      setUpdatingSeniorFor(null)
+    }
+  }
+
+  async function handleHelpTicketsToggle(targetUser: DepartmentUser, enabled: boolean) {
+    const numericId = resolveUserId(targetUser)
+    const rawDept =
+      targetUser.departmentType ||
+      (targetUser.dynamicValues?.departmentType as string) ||
+      session?.user?.departmentType ||
+      'ONBOARDING_DEPARTMENT'
+
+    setUpdatingHelpTicketsFor(targetUser.id)
+    try {
+      const payload: UserActionPayload = enabled
+        ? {
+            action: 'ADD',
+            userId: numericId,
+            name: targetUser.name || '',
+            email: targetUser.email,
+            password: (targetUser.dynamicValues?.password as string) || 'SYNC_LOCKED',
+            phone: targetUser.phone !== '—' ? targetUser.phone : null,
+            role: (targetUser.dynamicValues?.role as string) || 'CUSTOMER',
+            status: 'ACTIVE',
+            timezone: (targetUser.dynamicValues?.timezone as string) || 'Asia/Kolkata',
+            departmentName: rawDept,
+            departmentType: rawDept,
+          }
+        : {
+            action: 'DELETE',
+            userId: numericId,
+            email: targetUser.email,
+          }
+
+      const res = await performUserAction(payload)
+      if (res && res.success === false) {
+        throw new Error(res.message || 'Action failed')
+      }
+
+      setToast({
+        type: 'success',
+        title: 'Ticket DB Updated',
+        message: `User ${targetUser.name} ${enabled ? 'added to' : 'removed from'} Help Tickets database successfully!`,
+      })
+      if (isAutowebsionDept) {
+        await autowebUsersQuery.refetch()
+      } else {
+        await departmentUsersQuery.refetch()
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update Help Tickets database status:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to update ticket database access'
+      setToast({ type: 'error', title: 'Ticket DB Error', message: msg })
+    } finally {
+      setUpdatingHelpTicketsFor(null)
+    }
+  }
+
   async function handleDelete(user: DepartmentUser) {
     try {
       await deleteDepartmentUser({

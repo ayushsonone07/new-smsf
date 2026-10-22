@@ -579,6 +579,7 @@ export interface UpdateDepartmentUserRequest {
   departmentType?: string
   role?: string
   isHead?: boolean
+  isSeniorUser?: boolean
 }
 
 export interface UpdateDepartmentUserResponse {
@@ -941,4 +942,59 @@ export async function getDuplicateCustomerSummaries(
     console.warn('Could not fetch duplicate summaries:', err)
     return []
   }
+}
+
+
+export interface UserActionPayload {
+  action: 'ADD' | 'DELETE'
+  userId?: number
+  name?: string
+  email: string
+  password?: string
+  phone?: string | null
+  role?: string
+  status?: string
+  timezone?: string
+  departmentName?: string
+  departmentType?: string
+}
+
+/**
+ * `PUT /api/auth/department/users/user-action`
+ * Toggles a department user's account inside the Ticket / HelpCenter database.
+ */
+export async function performUserAction(
+  payload: UserActionPayload,
+): Promise<{ success?: boolean; message?: string }> {
+  const session = getSession()
+  const headEmail = session?.user?.email || session?.user?.username || ''
+
+  return authedApiRequest<{ success?: boolean; message?: string }>(
+    '/api/auth/department/users/user-action',
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        username: headEmail,
+      },
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+/**
+ * `POST /api/attendance/user/absent?userId=${userId}&updatingStatus=${updatingStatus}`
+ * Marks a user present (updatingStatus = true) or absent (updatingStatus = false).
+ */
+export async function updateUserAttendance(
+  userId: number,
+  updatingStatus: boolean,
+): Promise<{ success?: boolean; message?: string }> {
+  return authedApiRequest<{ success?: boolean; message?: string }>(
+    `/api/attendance/user/absent?userId=${userId}&updatingStatus=${updatingStatus}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+  )
 }
