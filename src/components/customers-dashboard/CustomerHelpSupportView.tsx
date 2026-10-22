@@ -17,6 +17,7 @@ import {
   Search,
   Check,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
   Lock,
   Hourglass,
@@ -193,6 +194,32 @@ function formatDate(dateStr?: string | null): string {
   }
 }
 
+// ─── Active Ticket Error Parser ───────────────────────────────────────────────
+export interface ActiveTicketError {
+  ticketNumber: string
+  status: string
+  rawMessage: string
+}
+
+export function parseActiveTicketError(msg?: string): ActiveTicketError | null {
+  if (!msg) return null
+  const ticketMatch = msg.match(/(TICKET\d+)/i)
+  if (
+    ticketMatch &&
+    (msg.toLowerCase().includes('active ticket') ||
+      msg.toLowerCase().includes('resolved or closed') ||
+      msg.toLowerCase().includes('wait for it'))
+  ) {
+    const statusMatch = msg.match(/status[:\s]+([A-Z_]+)/i)
+    return {
+      ticketNumber: ticketMatch[1],
+      status: statusMatch ? statusMatch[1].toUpperCase() : 'OPEN',
+      rawMessage: msg,
+    }
+  }
+  return null
+}
+
 // ─── SVG Donut Chart ──────────────────────────────────────────────────────────
 function DeptDonutChart({ data }: { data: { name: string; count: number; color: string }[] }) {
   const total = data.reduce((acc, curr) => acc + curr.count, 0)
@@ -282,6 +309,9 @@ export function CustomerHelpSupportView() {
   const [newDescription, setNewDescription] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [createGeneralError, setCreateGeneralError] = useState<string | null>(null)
+  const [activeTicketAlertBanner, setActiveTicketAlertBanner] = useState<ActiveTicketError | null>(null)
+  const [existingActiveTicket, setExistingActiveTicket] = useState<ActiveTicketError | null>(null)
 
   // Success Modal
   const [successTicketId, setSuccessTicketId] = useState<string | null>(null)
@@ -445,6 +475,8 @@ export function CustomerHelpSupportView() {
     if (!newSubject.trim() || !newDescription.trim()) return
 
     setIsSubmitting(true)
+    setCreateGeneralError(null)
+
     try {
       const selectedDept = departments.find((d) => String(d.id) === String(selectedDeptId))
       const deptName = selectedDept?.name || 'General Support'
@@ -461,6 +493,8 @@ export function CustomerHelpSupportView() {
       })
 
       setCreateOpen(false)
+      setCreateGeneralError(null)
+      setActiveTicketAlertBanner(null)
       setNewSubject('')
       setNewDescription('')
       setNewPhone('')
@@ -468,10 +502,49 @@ export function CustomerHelpSupportView() {
       showToast(`Ticket #${res.ticketNumber} created successfully!`)
       await loadData(0)
     } catch (err: any) {
-      showToast(err.message || 'Failed to create ticket', 'error')
+      const rawMsg = err?.message || 'Failed to create ticket'
+      const activeErr = parseActiveTicketError(rawMsg)
+      if (activeErr) {
+        setCreateOpen(false)
+        setCreateGeneralError(null)
+        setExistingActiveTicket(activeErr)
+        setActiveTicketAlertBanner(activeErr)
+      } else {
+        setCreateGeneralError(rawMsg)
+      }
+      showToast(rawMsg, 'error')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Handle viewing and jumping to an active ticket
+  const handleViewActiveTicket = async (ticketNumber: string) => {
+    setCreateOpen(false)
+    setExistingActiveTicket(null)
+    setCreateGeneralError(null)
+
+    // Clear filters if active so ticket is guaranteed visible
+    if (statusFilter || priorityFilter || search) {
+      setStatusFilter('')
+      setPriorityFilter('')
+      setSearch('')
+      await loadData(0)
+    }
+
+    // Expand this ticket
+    setExpandedTickets((prev) => new Set(prev).add(ticketNumber))
+    if (!ticketDetailsMap[ticketNumber]) {
+      fetchCustomerTicketDetails(ticketNumber, customerEmail).then((res) => {
+        if (res) setTicketDetailsMap((m) => ({ ...m, [ticketNumber]: res }))
+      })
+    }
+
+    setTimeout(() => {
+      ticketsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 200)
+
+    showToast(`Focused on active ticket #${ticketNumber}`)
   }
 
   // ─── Monthly Tickets Calculations ──────────────────────────────────────────
@@ -654,7 +727,10 @@ export function CustomerHelpSupportView() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <button
-              onClick={() => setCreateOpen(true)}
+              onClick={() => {
+                setCreateGeneralError(null)
+                setCreateOpen(true)
+              }}
               style={{
                 background: '#ffffff',
                 color: '#1d4ed8',
@@ -980,6 +1056,105 @@ export function CustomerHelpSupportView() {
         </div>
       </div>
 
+      {/* ── Active Ticket Alert Banner (Main Page) ── */}
+      {activeTicketAlertBanner && (
+        <div
+          style={{
+            marginBottom: '16px',
+            borderRadius: '14px',
+            border: '1.5px solid #fed7aa',
+            background: 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%)',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            boxShadow: '0 2px 10px -2px rgba(234, 88, 12, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '260px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                background: '#ffedd5',
+                color: '#ea580c',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#9a3412' }}>
+                  Active Support Ticket in Progress
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                    color: '#0f172a',
+                    background: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #fed7aa',
+                  }}
+                >
+                  #{activeTicketAlertBanner.ticketNumber}
+                </span>
+                <StatusPill status={activeTicketAlertBanner.status} />
+              </div>
+              <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#c2410c' }}>
+                You already have an active ticket being processed. Please wait for it to be resolved or closed before creating a new one.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => handleViewActiveTicket(activeTicketAlertBanner.ticketNumber)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#ea580c',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(234, 88, 12, 0.2)',
+              }}
+            >
+              <Eye size={13} /> View Active Ticket
+            </button>
+            <button
+              onClick={() => setActiveTicketAlertBanner(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9a3412',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                borderRadius: '4px',
+              }}
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ══════ MY TICKETS SECTION ══════ */}
       <div ref={ticketsRef} className="chart-card" style={{ overflow: 'hidden' }}>
         {/* Section Top Controls */}
@@ -1272,7 +1447,7 @@ export function CustomerHelpSupportView() {
                             ASSIGNED TO
                           </span>
                           <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                            {detail?.assignedTo || 'Unassigned'}
+                            {detail?.assignedToName || detail?.assignedTo || 'Unassigned'}
                           </div>
                         </div>
 
@@ -1644,6 +1819,37 @@ export function CustomerHelpSupportView() {
             </div>
 
             <form onSubmit={handleCreateSubmit} style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              {/* ── General Error Banner ── */}
+              {createGeneralError && (
+                <div
+                  style={{
+                    marginBottom: '16px',
+                    borderRadius: '10px',
+                    border: '1px solid #fecaca',
+                    background: '#fff1f2',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                      {createGeneralError}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCreateGeneralError(null)}
+                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#991b1b', padding: '2px' }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               {/* Information box */}
               <div style={{ background: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe', padding: '14px', marginBottom: '18px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
@@ -1825,6 +2031,176 @@ export function CustomerHelpSupportView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────── */}
+      {/* ACTIVE TICKET ALREADY EXISTS MODAL */}
+      {/* ────────────────────────────────────────────────────────────── */}
+      {existingActiveTicket && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={() => setExistingActiveTicket(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '32px 28px',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+              position: 'relative',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Close Icon */}
+            <button
+              onClick={() => setExistingActiveTicket(null)}
+              style={{
+                position: 'absolute',
+                top: '18px',
+                right: '18px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '4px',
+                borderRadius: '6px',
+                display: 'flex',
+              }}
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Circular Amber/Orange Icon Badge */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: '#fff7ed',
+                border: '2px solid #fed7aa',
+                color: '#ea580c',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 18px',
+                boxShadow: '0 10px 20px -4px rgba(234, 88, 12, 0.2)',
+              }}
+            >
+              <AlertTriangle size={32} />
+            </div>
+
+            {/* Title & Subtitle */}
+            <h3 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+              Active Ticket Already Exists
+            </h3>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 20px 0' }}>
+              Only one active support ticket can be processed at a time
+            </p>
+
+            {/* Structured Ticket Badge & Status Pill Card */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%)',
+                border: '1.5px solid #fed7aa',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Ticket size={16} color="#ea580c" />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Active Ticket:</span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    color: '#0f172a',
+                    background: '#ffffff',
+                    padding: '3px 9px',
+                    borderRadius: '6px',
+                    border: '1px solid #fed7aa',
+                  }}
+                >
+                  #{existingActiveTicket.ticketNumber}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Status:</span>
+                <StatusPill status={existingActiveTicket.status} />
+              </div>
+            </div>
+
+            {/* User-friendly message */}
+            <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#475569', margin: '0 0 26px 0', textAlign: 'center' }}>
+              You already have ticket <strong style={{ color: '#0f172a' }}>#{existingActiveTicket.ticketNumber}</strong> open with status <strong style={{ color: '#0f172a' }}>{existingActiveTicket.status}</strong>.
+              Our support team is actively assisting you. Please wait for this ticket to be <strong>resolved</strong> or <strong>closed</strong> before creating a new one.
+            </p>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => handleViewActiveTicket(existingActiveTicket.ticketNumber)}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px -2px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                <Eye size={16} /> View Active Ticket
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExistingActiveTicket(null)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

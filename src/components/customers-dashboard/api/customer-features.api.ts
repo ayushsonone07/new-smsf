@@ -528,7 +528,30 @@ async function requestHelpCenter<T>(
           return text as unknown as T
         }
       }
-    } catch {
+
+      if (localRes.status >= 400 && localRes.status < 500 && localRes.status !== 404) {
+        let errorMsg = `Request failed with status ${localRes.status}`
+        try {
+          const errJson = await localRes.json()
+          if (errJson?.message) {
+            errorMsg = errJson.message
+          } else if (typeof errJson?.data === 'string') {
+            errorMsg = errJson.data
+          }
+        } catch {
+          try {
+            const errText = await localRes.text()
+            if (errText) errorMsg = errText
+          } catch {}
+        }
+        const err: any = new Error(errorMsg)
+        err.status = localRes.status
+        throw err
+      }
+    } catch (err: any) {
+      if (err?.status && err.status >= 400 && err.status < 500 && err.status !== 404) {
+        throw err
+      }
       // Local proxy failed or not in dev server mode, proceed to fallback candidates
     }
   }
@@ -601,6 +624,23 @@ async function requestHelpCenter<T>(
   throw new Error(`Failed to reach Help Center at ${path}`)
 }
 
+/**
+ * Ticket reads must go through SMSB.  Calling `/help-center/...` in the
+ * browser relies on an optional Vite proxy and was producing 404/CORS errors
+ * on the customer dashboard. SMSB owns these three proxy endpoints and then
+ * securely forwards the call to Help Center.
+ */
+async function requestCustomerTicketProxy<T>(path: string, email = ''): Promise<T> {
+  const helpCenterToken = getHelpCenterToken(email)
+  return apiRequest<T>(`/api/help-center${path}`, {
+    headers: {
+      ...getAuthHeaders(email),
+      'X-OAuth-Key': HELP_CENTER_OAUTH_KEY,
+      ...(helpCenterToken ? { 'X-Help-Center-Token': `Bearer ${helpCenterToken}` } : {}),
+    },
+  })
+}
+
 export interface CustomerTicketItem {
   id?: string | number
   ticketNumber: string
@@ -611,6 +651,7 @@ export interface CustomerTicketItem {
   departmentName?: string
   department?: { id?: string | number; name?: string }
   userDto?: { name?: string; email?: string }
+  assignedToName?: string
   assignedTo?: string
   createdAt?: string
   updatedAt?: string
@@ -748,32 +789,17 @@ export async function connectCustomerHelpCenter(customer: {
 }
 
 export async function fetchCustomerStatusSummary(email: string): Promise<HelpCenterStatusSummary | null> {
-  // Try underscore endpoint first (/tickets/status_summary) which matches Help Center's TicketController @GetMapping
   try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: HelpCenterStatusSummary }>(
-      `/tickets/status_summary?email=${encodeURIComponent(email)}`,
-      {},
-      email
+    const res = await requestCustomerTicketProxy<{ success?: boolean; data?: HelpCenterStatusSummary }>(
+      `/tickets/status-summary?email=${encodeURIComponent(email)}`,
+      email,
     )
     const data = res?.data || (res as any)
     if (data && typeof data === 'object' && ('totalCount' in data || 'statusCounts' in data)) {
       return data as HelpCenterStatusSummary
     }
   } catch (err) {
-    // Fallback: hyphenated variant (/tickets/status-summary) in case routed via SMSB proxy
-    try {
-      const res = await requestHelpCenter<{ success?: boolean; data?: HelpCenterStatusSummary }>(
-        `/tickets/status-summary?email=${encodeURIComponent(email)}`,
-        {},
-        email
-      )
-      const data = res?.data || (res as any)
-      if (data && typeof data === 'object' && ('totalCount' in data || 'statusCounts' in data)) {
-        return data as HelpCenterStatusSummary
-      }
-    } catch {
-      console.warn('Failed to fetch status summary:', err)
-    }
+    console.warn('Failed to fetch ticket status summary through SMSB:', err)
   }
   return null
 }
@@ -796,32 +822,16 @@ export async function fetchCustomerTicketsPage(params: {
   if (params.search) qs.append('search', params.search)
 
   try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: CustomerTicketPage }>(
+    const res = await requestCustomerTicketProxy<{ success?: boolean; data?: CustomerTicketPage }>(
       `/tickets/fetch_tnas?${qs.toString()}`,
-      {},
-      params.email
+      params.email,
     )
     const data = res?.data || (res as any)
     if (data && typeof data === 'object') {
       return data as CustomerTicketPage
     }
   } catch (err) {
-    console.warn('fetch_tnas failed, trying alternative:', err)
-  }
-
-  // Fallback to fetch-tnas or department_users/fetch_tickets_assigned_to_employee
-  try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: any }>(
-      `/tickets/fetch-tnas?${qs.toString()}`,
-      {},
-      params.email
-    )
-    const data = res?.data || (res as any)
-    if (data && typeof data === 'object') {
-      return data as CustomerTicketPage
-    }
-  } catch {
-    // fallback
+    console.warn('Failed to fetch customer tickets through SMSB:', err)
   }
 
   return {
@@ -839,10 +849,9 @@ export async function fetchCustomerTicketDetails(
   email?: string
 ): Promise<CustomerTicketItem | null> {
   try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: CustomerTicketItem }>(
+    const res = await requestCustomerTicketProxy<{ success?: boolean; data?: CustomerTicketItem }>(
       `/tickets/fetchTicket?ticketNumber=${encodeURIComponent(ticketNumber)}`,
-      {},
-      email
+      email || '',
     )
     return res?.data || (res as any) || null
   } catch {
@@ -889,6 +898,10 @@ export async function createCustomerTicket(payload: {
     emailVal
   )
 
+  if (res && (res as any).success === false && (res as any).message) {
+    throw new Error((res as any).message)
+  }
+
   const data = res?.data || (res as any)
   const ticketNumber = typeof data === 'string'
     ? data
@@ -901,9 +914,7 @@ export async function createCustomerTicket(payload: {
 
 export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepartment[]> {
   try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: any[] }>(
-      `/departments`
-    )
+    const res = await requestCustomerTicketProxy<{ success?: boolean; data?: any[] }>(`/departments`)
     const list = res?.data || (res as any)
     if (Array.isArray(list)) {
       return list.map((d) => ({
@@ -911,23 +922,8 @@ export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepart
         name: d.name ?? d.departmentName ?? String(d),
       }))
     }
-  } catch {
-    // fallback
-  }
-
-  try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: any[] }>(
-      `/departments/fetch_departments`
-    )
-    const list = res?.data || (res as any)
-    if (Array.isArray(list)) {
-      return list.map((d) => ({
-        id: d.id ?? d.departmentId ?? d.name,
-        name: d.name ?? d.departmentName ?? String(d),
-      }))
-    }
-  } catch {
-    // fallback
+  } catch (err) {
+    console.warn('Failed to fetch Help Center departments through SMSB:', err)
   }
 
   return [
@@ -946,7 +942,7 @@ export async function fetchCustomerTicketHistory(
   size = 20
 ): Promise<TicketHistoryEntry[]> {
   try {
-    const res = await requestHelpCenter<{
+    const res = await requestCustomerTicketProxy<{
       success?: boolean
       data?: { entries: TicketHistoryEntry[] } | TicketHistoryEntry[]
     }>(
@@ -955,29 +951,8 @@ export async function fetchCustomerTicketHistory(
     const data = res?.data || (res as any)
     if (Array.isArray(data?.entries)) return data.entries
     if (Array.isArray(data)) return data
-  } catch {
-    // fallback
-  }
-
-  try {
-    const res = await requestHelpCenter<{ success?: boolean; data?: any[] }>(
-      `/tickets/${encodeURIComponent(ticketNumber)}/status-history`
-    )
-    const list = res?.data || (res as any)
-    if (Array.isArray(list)) {
-      return list.map((item) => ({
-        id: item.id || Math.random(),
-        ticketNumber,
-        status: item.newStatus || item.status || 'UPDATED',
-        previousStatus: item.oldStatus || item.previousStatus,
-        remark: item.newStatusDescription || item.remark || '',
-        updatedBy: item.updatedBy || item.userId || 'System',
-        assignedTo: item.assignedTo || item.employeeEmail || '',
-        updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
-      }))
-    }
-  } catch {
-    // fallback
+  } catch (err) {
+    console.warn('Failed to fetch ticket history through SMSB:', err)
   }
 
   return []

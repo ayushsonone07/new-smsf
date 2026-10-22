@@ -32,6 +32,10 @@ interface AssignedTicketsViewProps {
   onTicketUpdated?: () => void
   statusCounts?: Record<string, number>
   canViewHistory?: boolean
+  /** Department Heads may view/reassign tickets but cannot change their status. */
+  canUpdateStatus?: boolean
+  /** Department Users may update their assigned tickets but cannot reassign them. */
+  canReassignTickets?: boolean
 }
 
 const STATUS_TABS: { key: string; label: string; status?: TicketStatus }[] = [
@@ -72,6 +76,8 @@ export function AssignedTicketsView({
   onTicketUpdated,
   statusCounts: externalStatusCounts,
   canViewHistory = true,
+  canUpdateStatus = true,
+  canReassignTickets = true,
 }: AssignedTicketsViewProps) {
   const [activeTab, setActiveTab] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -215,7 +221,7 @@ export function AssignedTicketsView({
 
   // Set initial status in modal
   function handleOpenStatusModal() {
-    if (!selectedTicket) return
+    if (!selectedTicket || !canUpdateStatus) return
     const curStatus = (selectedTicket.ticketStatus || 'OPEN') as TicketStatus
     const curIndex = ALL_STATUS_OPTIONS.indexOf(curStatus)
     const nextOptions = curIndex < 0 ? ALL_STATUS_OPTIONS : ALL_STATUS_OPTIONS.slice(curIndex + 1)
@@ -228,7 +234,7 @@ export function AssignedTicketsView({
 
   // Handle status update submission
   async function handleUpdateStatusSubmit() {
-    if (!selectedTicket) return
+    if (!selectedTicket || !canUpdateStatus) return
     if (!statusRemark.trim()) {
       setStatusError('Remark is required by backend.')
       return
@@ -260,7 +266,7 @@ export function AssignedTicketsView({
 
   // Handle single ticket re-assign
   async function handleReassignSubmit() {
-    if (!selectedTicket || !targetAssigneeEmail) return
+    if (!canReassignTickets || !selectedTicket || !targetAssigneeEmail) return
     setIsReassigning(true)
     setReassignError(null)
     try {
@@ -281,6 +287,7 @@ export function AssignedTicketsView({
 
   // Handle Assign All (Round-Robin distribution across assignable users)
   async function handleAssignAllSubmit() {
+    if (!canReassignTickets) return
     if (assignableUsers.length === 0) {
       setAssignAllError('No department members available to assign.')
       return
@@ -441,18 +448,19 @@ export function AssignedTicketsView({
             <span>Refresh</span>
           </button>
 
-          {/* Assign All Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setAssignAllError(null)
-              setIsAssignAllModalOpen(true)
-            }}
-            disabled={isLoading || tickets.length === 0}
-            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-60"
-          >
-            <span>Assign all</span>
-          </button>
+          {canReassignTickets && (
+            <button
+              type="button"
+              onClick={() => {
+                setAssignAllError(null)
+                setIsAssignAllModalOpen(true)
+              }}
+              disabled={isLoading || tickets.length === 0}
+              className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-60"
+            >
+              <span>Assign all</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -617,25 +625,29 @@ export function AssignedTicketsView({
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReassignError(null)
-                        setIsReassignModalOpen(true)
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors"
-                    >
-                      <UserCheck className="h-3.5 w-3.5 text-slate-500" />
-                      <span>Re-assign</span>
-                    </button>
+                    {canReassignTickets && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReassignError(null)
+                          setIsReassignModalOpen(true)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors"
+                      >
+                        <UserCheck className="h-3.5 w-3.5 text-slate-500" />
+                        <span>Re-assign</span>
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={handleOpenStatusModal}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors"
-                    >
-                      <span>Update status</span>
-                    </button>
+                    {canUpdateStatus && (
+                      <button
+                        type="button"
+                        onClick={handleOpenStatusModal}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                      >
+                        <span>Update status</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

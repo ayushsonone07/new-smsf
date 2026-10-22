@@ -31,6 +31,12 @@ export function HelpCenterPage() {
 
   const userRole = user?.role || 'HEAD'
   const isHead = userRole === 'HEAD' || userRole === 'ADMIN'
+  const normalizedUserRole = String(userRole).toUpperCase()
+  const isDepartmentHead =
+    normalizedUserRole === 'HEAD' ||
+    normalizedUserRole === 'DEPARTMENT_HEAD' ||
+    (user as { isHead?: boolean } | undefined)?.isHead === true
+  const canReassignTickets = isDepartmentHead || normalizedUserRole === 'ADMIN'
   const canViewHistory = true
   const departmentType = user?.departmentType || 'GOOGLE_DEPARTMENT'
 
@@ -179,6 +185,8 @@ export function HelpCenterPage() {
             onTicketUpdated={() => loadTickets(true)}
             statusCounts={statusSummary?.statusCounts}
             canViewHistory={canViewHistory}
+            canUpdateStatus={!isDepartmentHead}
+            canReassignTickets={canReassignTickets}
           />
         )}
 
