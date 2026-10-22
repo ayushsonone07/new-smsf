@@ -222,7 +222,9 @@
   flex-direction: column;
   gap: 6px;
   margin: 6px;
-  padding: 8px;
+  min-height: 124px;
+  padding: 14px 12px;
+  gap: 10px;
   border-radius: 10px;
   background: var(--c-bg);
 }
@@ -240,14 +242,16 @@
 
 .haccount__name {
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .haccount__role {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--c-muted);
@@ -876,7 +880,7 @@
 /* --- Sidebar (overrides for wider head panel) ---------------- */
 
 .hside {
-  width: clamp(200px, 20vw, 320px);
+  width: clamp(190px, 18vw, 280px);
   border-right: 1px solid var(--head-border);
 }
 
@@ -978,6 +982,19 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.haccount__row--clickable .haccount__name {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .haccount__chevron {
@@ -1418,7 +1435,14 @@
 /* --- Users table --------------------------------------------- */
 
 .users-table table {
-  table-layout: auto;
+  table-layout: fixed;
+}
+
+.users-table.table-wrapper {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .users-table th {
@@ -1433,6 +1457,44 @@
 .users-table td {
   padding: 6px 7px;
   font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.users-table__expand-column {
+  width: 4%;
+}
+
+.users-table__name-column {
+  width: 22%;
+}
+
+.users-table__phone-column {
+  width: 10%;
+}
+
+.users-table__email-column {
+  width: 18%;
+}
+
+.users-table__role-column {
+  width: 17%;
+}
+
+.users-table__target-column {
+  width: 6%;
+}
+
+.users-table__achieved-column {
+  width: 7%;
+}
+
+.users-table__attendance-column {
+  width: 9%;
+}
+
+.users-table__actions-column {
+  width: 7%;
 }
 
 .users-table .is-right {
@@ -1474,6 +1536,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  width: 100%;
 }
 
 .head-avatar {
@@ -1486,13 +1550,18 @@
 }
 
 .user-cell__text {
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .user-cell__text strong {
   display: block;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 14px;
   font-weight: 700;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1514,6 +1583,7 @@
   background: var(--head-blue-soft);
   color: var(--head-blue);
   cursor: pointer;
+  flex: 0 0 32px;
 }
 
 .login-as-button:hover {
@@ -1550,8 +1620,12 @@
 }
 
 .role-pill {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1848,7 +1922,7 @@
   }
 
   .users-table {
-    min-width: 700px;
+    min-width: 0;
   }
 }
 
@@ -1947,6 +2021,12 @@
     max-width: 100%;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .users-table .user-cell__text strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .users-table .is-right,

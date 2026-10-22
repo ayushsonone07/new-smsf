@@ -2208,3 +2208,9 @@
     font-size: 12px;
   }
 }
+.hdb-modal__empty {
+  padding: 32px 16px !important;
+  color: #475569;
+  font-weight: 600;
+  text-align: center !important;
+}
