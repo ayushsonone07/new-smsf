@@ -51,8 +51,12 @@ export interface CustomerBillingDetails {
   businessName?: string
   ownerName?: string
   serviceExpiration?: string
-  amountPaid?: number
-  amountPending?: number
+  amountPaid?: number | string
+  amountPending?: number | string
+  plan?: string
+  packageName?: string
+  planNames?: string[]
+  planIds?: string[]
   totalPaid?: number
   outstandingAmount?: number
   outstandingNote?: string
