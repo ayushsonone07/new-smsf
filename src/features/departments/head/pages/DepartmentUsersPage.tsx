@@ -554,7 +554,11 @@ export function DepartmentUsersPage() {
   }
 
 
-function resolveUserId(targetUser: DepartmentUser): number | undefined {
+/*
+ * The expanded user details are currently read-only. Keep mutation handlers
+ * out of this page until the corresponding controls are exposed again.
+ */
+/* function resolveUserId(targetUser: DepartmentUser): number | undefined {
     const candidates = [
       targetUser.id,
       targetUser.dynamicValues?.id,
@@ -700,6 +704,8 @@ function resolveUserId(targetUser: DepartmentUser): number | undefined {
       setUpdatingHelpTicketsFor(null)
     }
   }
+
+*/
 
   async function handleDelete(user: DepartmentUser) {
     try {
