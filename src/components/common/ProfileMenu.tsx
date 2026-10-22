@@ -83,7 +83,10 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
       icon: '⚙',
       label: 'Manage Services',
       description: 'Manage Services configuration',
-      to: buildDepartmentRoute('manage-services', departmentType, role === 'ADMIN' ? 'HEAD' : role),
+      to:
+        role === 'ADMIN'
+          ? '/admin/services'
+          : buildDepartmentRoute('manage-services', departmentType, role),
     })
   }
 
@@ -102,7 +105,10 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     icon: '₹',
     label: 'Salary Management',
     description: 'Manage employee salaries',
-    to: buildDepartmentRoute('salary-management', departmentType, role === 'ADMIN' ? 'HEAD' : role),
+    to:
+      role === 'ADMIN'
+        ? '/admin/salary-management'
+        : buildDepartmentRoute('salary-management', departmentType, role),
   })
 
   function handleSelect(to: string) {

@@ -106,10 +106,10 @@ const departmentLabel = (departmentType: string) =>
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  feature: FeaturePermission
+  feature?: FeaturePermission
 }
 
-export function SalaryManagementPage({ feature: _feature }: Props) {
+export function SalaryManagementPage({ feature: _feature }: Props = {}) {
   void _feature
   const session = getSession()
   const user = session?.user
