@@ -711,14 +711,50 @@ export function CustomersListModal({
       })
     }
 
-    // Fallback 3: rawCustomer serviceTypes
+    // Fallback 3: rawCustomer customerServices or current.customerServices
     const raw = current?.rawCustomer as any
+    const rawCustomerServices = raw?.customerServices || (current as any)?.customerServices
+    if (Array.isArray(rawCustomerServices) && rawCustomerServices.length > 0) {
+      return rawCustomerServices.map((cs: any): DrawerDepartmentServiceItem => {
+        const name = cs?.serviceType || cs?.name || 'Service'
+        const status = cs?.status || (cs?.isServiceActive ? 'completed' : 'pending')
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)) || current?.status,
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 4: rawCustomer serviceTypes
     if (Array.isArray(raw?.serviceTypes) && raw.serviceTypes.length > 0) {
       return raw.serviceTypes.map((st: string): DrawerDepartmentServiceItem => ({
         name: formatServiceName(st),
         status: current?.status,
         row: undefined,
       }))
+    }
+
+    // Fallback 5: superAdminRemarks departments
+    if (Array.isArray(apiDetails.superAdminRemarks?.departments) && apiDetails.superAdminRemarks!.departments.length > 0) {
+      return apiDetails.superAdminRemarks!.departments.map((dept): DrawerDepartmentServiceItem => ({
+        name: formatServiceName(dept.serviceType || dept.departmentType),
+        status: current?.status || 'pending',
+        row: undefined,
+      }))
+    }
+
+    // Fallback 6: Comma-separated packageName (e.g. "Only Google, Only WhatsApp, Google+Website")
+    const pkg = current?.packageName || raw?.packageName || apiDetails.profile?.packageName
+    if (pkg && typeof pkg === 'string' && pkg.includes(',')) {
+      const parts = pkg.split(',').map((p) => p.trim()).filter(Boolean)
+      if (parts.length > 0) {
+        return parts.map((part): DrawerDepartmentServiceItem => ({
+          name: formatServiceName(part),
+          status: current?.status || 'pending',
+          row: undefined,
+        }))
+      }
     }
 
     if (current?.serviceType && current.serviceType !== '—') {
@@ -730,7 +766,7 @@ export function CustomersListModal({
     }
 
     return []
-  }, [serviceRow, departmentType, current])
+  }, [serviceRow, departmentType, current, apiDetails.superAdminRemarks, apiDetails.profile?.packageName])
 
   const hasDepartmentServiceSummary =
     serviceRow?.departmentStatuses != null || services.length > 0
@@ -982,15 +1018,13 @@ export function CustomersListModal({
                       disabled={isExporting || !Number.isInteger(Number(current?.id))}
                       aria-expanded={showExportMenu}
                       aria-haspopup="true"
-                      title="Export complete customer report"
-                    >
-                      <Icon name="download" size={14} />
-                      <span>
-                        {isExporting
+                      title={
+                        isExporting
                           ? `Exporting ${exportingFormat ? exportingFormat.toUpperCase() : ''}…`
-                          : 'Export'}
-                      </span>
-                      <span className="cl-drawer__export-chevron">{showExportMenu ? '▲' : '▼'}</span>
+                          : 'Export complete customer report'
+                      }
+                    >
+                      <Icon name="download" size={15} />
                     </button>
 
                     <AnimatePresence>

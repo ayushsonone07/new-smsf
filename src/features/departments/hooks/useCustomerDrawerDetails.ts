@@ -80,8 +80,8 @@ export function useCustomerDrawerDetails(
 
   const rowsQuery = useQuery({
     queryKey: ['customer-drawer-rows', contact, options.requestUsername],
-    queryFn: () => getCustomerServiceRows(contact, options.requestUsername),
-    enabled: isOpen && contact.length > 0 && !profileOnly && !isSuperAdmin,
+    queryFn: () => getCustomerServiceRows(contact, options.requestUsername).catch(() => []),
+    enabled: isOpen && contact.length > 0 && !profileOnly,
     staleTime: 0,
   })
 

@@ -4004,18 +4004,18 @@
 .cl-drawer__export-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   backdrop-filter: blur(8px);
+  flex-shrink: 0;
 }
 
 .cl-drawer__export-btn:hover:not(:disabled) {
