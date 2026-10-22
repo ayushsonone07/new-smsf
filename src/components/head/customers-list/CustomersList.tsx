@@ -222,6 +222,7 @@ export function CustomersList({
           {showAssignTo && <col className="cl-col cl-col--assign" />}
           {showRemark && <col className="cl-col cl-col--remark" />}
           {showUpdated && <col className="cl-col cl-col--updated" />}
+          <col className="cl-col cl-col--view" />
         </colgroup>
         <thead>
           <tr>
@@ -233,6 +234,7 @@ export function CustomersList({
             {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
             {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
             {showUpdated && <th className="cl-th">Updated</th>}
+            <th className="cl-th cl-th--view" aria-label="View" />
           </tr>
         </thead>
         <motion.tbody
@@ -965,16 +967,6 @@ function CustomerRow({
               {customer.businessName}
             </button>
 
-            <button
-              type="button"
-              className="cl-biz-eye"
-              title="View customer detail"
-              aria-label="View customer detail"
-              onClick={() => onOpenDetail()}
-            >
-              <Icon name="eye" size={14} strokeWidth={1.8} />
-            </button>
-
             {isGoogle ? (
               <>
                 <button
@@ -1497,6 +1489,19 @@ function CustomerRow({
           )}
         </td>
       )}
+
+      {/* View customer */}
+      <td className="cl-td cl-td--view" data-label="View">
+        <button
+          type="button"
+          className="cl-row-view"
+          title="View customer detail"
+          aria-label={`View ${customer.businessName}`}
+          onClick={() => onOpenDetail()}
+        >
+          <Icon name="eye" size={16} strokeWidth={1.8} />
+        </button>
+      </td>
 
       {/* Optional Updated */}
       {showUpdated && (

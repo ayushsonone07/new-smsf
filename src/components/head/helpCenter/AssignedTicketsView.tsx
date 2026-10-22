@@ -44,6 +44,24 @@ const STATUS_TABS: { key: string; label: string; status?: TicketStatus }[] = [
   { key: 'CLOSED', label: 'Closed', status: 'CLOSED' },
 ]
 
+const ALL_STATUS_OPTIONS: TicketStatus[] = [
+  'OPEN',
+  'IN_PROGRESS',
+  'WAITING_ON_CUSTOMER',
+  'ESCALATED',
+  'RESOLVED',
+  'CLOSED',
+]
+
+const STATUS_DISPLAY_LABELS: Record<TicketStatus, string> = {
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+  WAITING_ON_CUSTOMER: 'Waiting On Customer',
+  ESCALATED: 'Escalated',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
+}
+
 export function AssignedTicketsView({
   tickets,
   email,
@@ -198,7 +216,11 @@ export function AssignedTicketsView({
   // Set initial status in modal
   function handleOpenStatusModal() {
     if (!selectedTicket) return
-    setNewStatus(selectedTicket.ticketStatus)
+    const curStatus = (selectedTicket.ticketStatus || 'OPEN') as TicketStatus
+    const curIndex = ALL_STATUS_OPTIONS.indexOf(curStatus)
+    const nextOptions = curIndex < 0 ? ALL_STATUS_OPTIONS : ALL_STATUS_OPTIONS.slice(curIndex + 1)
+
+    setNewStatus(nextOptions.length > 0 ? nextOptions[0] : curStatus)
     setStatusRemark('')
     setStatusError(null)
     setIsStatusModalOpen(true)
@@ -218,8 +240,19 @@ export function AssignedTicketsView({
       await updateTicketStatus(selectedTicket.ticketNumber, newStatus, statusRemark.trim())
       setIsStatusModalOpen(false)
       onTicketUpdated?.()
-    } catch (err) {
-      setStatusError(err instanceof Error ? err.message : 'Failed to update ticket status')
+    } catch (err: any) {
+      let msg = 'Failed to update ticket status'
+      if (err?.message) {
+        msg = err.message
+        // If error message is JSON string, extract message field
+        try {
+          const parsed = JSON.parse(msg)
+          if (parsed?.message) msg = parsed.message
+        } catch {
+          // not JSON
+        }
+      }
+      setStatusError(msg)
     } finally {
       setIsUpdatingStatus(false)
     }
@@ -716,137 +749,167 @@ export function AssignedTicketsView({
       )}
 
       {/* ── Modal: Update Status ── */}
-      {isStatusModalOpen && selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Update Ticket Status</h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  {selectedTicket.ticketNumber}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsStatusModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {isStatusModalOpen && selectedTicket && (() => {
+        const curStatus = (selectedTicket.ticketStatus || 'OPEN') as TicketStatus
+        const curIndex = ALL_STATUS_OPTIONS.indexOf(curStatus)
+        const availableNextStatuses = curIndex < 0 ? ALL_STATUS_OPTIONS : ALL_STATUS_OPTIONS.slice(curIndex + 1)
+        const isTicketClosed = curStatus === 'CLOSED' || availableNextStatuses.length === 0
 
-            <div className="space-y-4 py-4">
-              {statusError && (
-                <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  <span>{statusError}</span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Update Ticket Status</h3>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-sm font-semibold font-mono text-slate-600">
+                      {selectedTicket.ticketNumber}
+                    </span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                      Current: {STATUS_DISPLAY_LABELS[curStatus] || curStatus}
+                    </span>
+                  </div>
                 </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Select New Status
-                </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value as TicketStatus)}
-                  className="w-full h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800"
+                <button
+                  type="button"
+                  onClick={() => setIsStatusModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
-                  <option value="OPEN">Open</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="WAITING_ON_CUSTOMER">Waiting On Customer</option>
-                  <option value="ESCALATED">Escalated</option>
-                  <option value="RESOLVED">Resolved</option>
-                  <option value="CLOSED">Closed</option>
-                </select>
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Remark <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={statusRemark}
-                  onChange={(e) => setStatusRemark(e.target.value)}
-                  placeholder="Enter a reason or update remark for customer & history log..."
-                  rows={3}
-                  className="w-full p-2.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none text-slate-800"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUpdateStatusSubmit}
-                disabled={isUpdatingStatus}
-                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs inline-flex items-center gap-1.5 disabled:opacity-60"
-              >
-                {isUpdatingStatus ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Saving…</span>
-                  </>
-                ) : (
-                  <span>Save Status</span>
+              <div className="space-y-5 py-5">
+                {statusError && (
+                  <div className="flex items-start gap-2.5 p-3.5 text-sm bg-red-50 text-red-700 rounded-xl border border-red-200 leading-normal">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" />
+                    <span>{statusError}</span>
+                  </div>
                 )}
-              </button>
+
+                {isTicketClosed ? (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <span>This ticket is already Closed</span>
+                    </div>
+                    <p className="text-sm text-amber-700 mt-1 leading-relaxed">
+                      Backend workflow rules do not allow moving a ticket backwards from <strong>CLOSED</strong> to an earlier status.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-800 mb-2">
+                      Select New Status <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value as TicketStatus)}
+                      className="w-full h-11 px-3.5 text-sm sm:text-base border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800 shadow-xs"
+                    >
+                      {availableNextStatuses.map((st) => (
+                        <option key={st} value={st}>
+                          {STATUS_DISPLAY_LABELS[st] || st}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      Tickets follow a one-way workflow: earlier statuses cannot be re-selected.
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    Remark <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={statusRemark}
+                    onChange={(e) => setStatusRemark(e.target.value)}
+                    placeholder="Enter reason or update remark for customer & history log..."
+                    rows={4}
+                    disabled={isTicketClosed || isUpdatingStatus}
+                    className="w-full p-3.5 text-sm sm:text-base border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none text-slate-800 placeholder:text-slate-400 min-h-[100px] leading-relaxed shadow-xs disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Remark is mandatory for status update.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsStatusModalOpen(false)}
+                  className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateStatusSubmit}
+                  disabled={isUpdatingStatus || isTicketClosed || !statusRemark.trim()}
+                  className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUpdatingStatus ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <span>Save Status</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Modal: Re-assign Ticket ── */}
       {isReassignModalOpen && selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Re-assign Ticket</h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                <h3 className="text-lg font-bold text-slate-900">Re-assign Ticket</h3>
+                <p className="text-sm font-semibold font-mono text-slate-600 mt-1">
                   {selectedTicket.ticketNumber}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsReassignModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-4 py-4">
+            <div className="space-y-5 py-5">
               {reassignError && (
-                <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 rounded-lg border border-red-200">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <div className="flex items-start gap-2.5 p-3.5 text-sm bg-red-50 text-red-700 rounded-xl border border-red-200 leading-normal">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600 mt-0.5" />
                   <span>{reassignError}</span>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Select Assignee
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Select Assignee <span className="text-red-500">*</span>
                 </label>
                 {isLoadingUsers ? (
-                  <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <div className="flex items-center gap-2.5 py-3 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
                     <span>Loading department team members…</span>
                   </div>
                 ) : assignableUsers.length === 0 ? (
-                  <p className="text-xs text-amber-600">No assignable team members found.</p>
+                  <p className="text-sm text-amber-600 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                    No assignable team members found in this department.
+                  </p>
                 ) : (
                   <select
                     value={targetAssigneeEmail}
                     onChange={(e) => setTargetAssigneeEmail(e.target.value)}
-                    className="w-full h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800"
+                    className="w-full h-11 px-3.5 text-sm sm:text-base border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800 shadow-xs"
                   >
                     {assignableUsers.map((u) => (
                       <option key={u.email} value={u.email}>
@@ -858,11 +921,11 @@ export function AssignedTicketsView({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsReassignModalOpen(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+                className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 Cancel
               </button>
@@ -870,11 +933,11 @@ export function AssignedTicketsView({
                 type="button"
                 onClick={handleReassignSubmit}
                 disabled={isReassigning || !targetAssigneeEmail}
-                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs inline-flex items-center gap-1.5 disabled:opacity-60"
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isReassigning ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Re-assigning…</span>
                   </>
                 ) : (

@@ -445,7 +445,36 @@ export async function getMemberDetails(
 
   const res = await authedApiRequest<
     { data?: OnboardingMemberDetailsDTO } & OnboardingMemberDetailsDTO
-  >(`/api/onboarding/dashboard/member/${userId}?${search.toString()}`)
+  >(`/api/onboarding/dashboard/member/${encodeURIComponent(String(userId))}?${search.toString()}`)
 
-  return (res?.data ?? res) as OnboardingMemberDetailsDTO
+  const payload = (res?.data ?? res) as unknown as Omit<
+    OnboardingMemberDetailsDTO,
+    'customers'
+  > & {
+    customers?:
+      | OnboardingDashboardCustomerDTO[]
+      | {
+          content?: OnboardingDashboardCustomerDTO[]
+          data?: OnboardingDashboardCustomerDTO[]
+          customers?: OnboardingDashboardCustomerDTO[]
+          totalElements?: number
+          totalPages?: number
+        }
+  }
+  const customerPage = payload.customers
+  const customers = Array.isArray(customerPage)
+    ? customerPage
+    : customerPage?.content ?? customerPage?.data ?? customerPage?.customers ?? []
+
+  return {
+    ...payload,
+    customers,
+    totalCustomers:
+      payload.totalCustomers ??
+      (!Array.isArray(customerPage) ? customerPage?.totalElements : undefined) ??
+      customers.length,
+    totalPages:
+      payload.totalPages ??
+      (!Array.isArray(customerPage) ? customerPage?.totalPages : undefined),
+  }
 }
