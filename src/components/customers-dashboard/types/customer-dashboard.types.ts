@@ -36,6 +36,8 @@ export interface CustomerProfile {
   onboardingStepText?: string
   onboardingProgressPercent?: number
   executive: ExecutiveInfo
+  amountPaid?: string | number
+  amountPending?: string | number
 }
 
 export interface UpcomingMeeting {

@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const helpCenterUrl = (
     env.HELP_CENTER_URL ||
     env.VITE_HELP_CENTER_URL ||
-    'https://ducking-shore-remedial.ngrok-free.dev'
+    'https://displace-cupcake-aqueduct.ngrok-free.dev'
   ).trim().replace(/\/$/, '')
 
   return {

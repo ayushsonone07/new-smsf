@@ -21,6 +21,9 @@ import {
   createDepartmentUser,
   updateDepartmentUser,
   deleteDepartmentUser,
+  updateUserAttendance,
+  performUserAction,
+  type UserActionPayload,
   type DepartmentUserApiItem,
 } from '../../../../api/department-users.api'
 import { useMemberDetails } from '../../hooks/useMemberDetails'
@@ -114,6 +117,9 @@ export function DepartmentUsersPage() {
     title?: string
     message: string
   } | null>(null)
+  const [updatingAttendanceFor, setUpdatingAttendanceFor] = useState<string | null>(null)
+  const [updatingSeniorFor, setUpdatingSeniorFor] = useState<string | null>(null)
+  const [updatingHelpTicketsFor, setUpdatingHelpTicketsFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!toast) return
@@ -356,12 +362,27 @@ export function DepartmentUsersPage() {
 
     return allUsers.map((u, idx) => {
       const isPresent =
-        u.isPresentToday ??
-        (u.absentDays === undefined ? true : u.absentDays === 0)
+        u.isPresentToday !== undefined
+          ? u.isPresentToday
+          : (u as any).absent !== undefined
+            ? !(u as any).absent
+            : (u as any).isAbsent !== undefined
+              ? !(u as any).isAbsent
+              : u.absentDays !== undefined
+                ? u.absentDays === 0
+                : true
+
+      const isSeniorUser = Boolean(
+        u.isSeniorUser ?? (u as any).seniorUser ?? u.role === 'SENIOR_EXECUTIVE'
+      )
+      const isAddUserDb = Boolean(
+        u.isAddUserDb ?? (u as any).addUserDb
+      )
+
       const role = (
         u.role === 'HEAD' || u.isHead
           ? 'TEAM_LEAD'
-          : u.role === 'SENIOR_EXECUTIVE' || u.isSeniorUser
+          : isSeniorUser
             ? 'SENIOR_EXECUTIVE'
             : 'ONBOARDING_EXECUTIVE'
       ) as DepartmentUserRole
@@ -372,6 +393,10 @@ export function DepartmentUsersPage() {
         phone: u.contact || '—',
         email: u.email,
         role,
+        rawRole: (u.role as string) || (u as any).rawRole,
+        isSeniorUser,
+        isAddUserDb,
+        departmentType: u.departmentType,
         joinedLabel: u.createdAt
           ? new Date(u.createdAt).toLocaleDateString('en-IN', {
               month: 'short',
@@ -397,8 +422,22 @@ export function DepartmentUsersPage() {
     const rawData = autowebUsersQuery.data?.data || []
     return rawData.map((u: any, idx: number) => {
       const isPresent =
-        u.isPresentToday ??
-        (u.absentDays !== undefined ? u.absentDays === 0 : u.isAbsent !== undefined ? !u.isAbsent : true)
+        u.isPresentToday !== undefined
+          ? u.isPresentToday
+          : u.absent !== undefined
+            ? !u.absent
+            : u.isAbsent !== undefined
+              ? !u.isAbsent
+              : u.absentDays !== undefined
+                ? u.absentDays === 0
+                : true
+
+      const isSeniorUser = Boolean(
+        u.isSeniorUser ?? u.seniorUser ?? String(u.role || '').toUpperCase().includes('SENIOR')
+      )
+      const isAddUserDb = Boolean(
+        u.isAddUserDb ?? u.addUserDb
+      )
 
       const roleStr = String(u.role || '').toUpperCase()
       const role = (
@@ -406,7 +445,7 @@ export function DepartmentUsersPage() {
           ? 'TEAM_LEAD'
           : roleStr.includes('SUB') || roleStr.includes('USER_2')
             ? 'ONBOARDING_EXECUTIVE'
-            : roleStr.includes('SENIOR')
+            : isSeniorUser
               ? 'SENIOR_EXECUTIVE'
               : 'DEPARTMENT_USER'
       ) as DepartmentUserRole
@@ -417,6 +456,10 @@ export function DepartmentUsersPage() {
         phone: u.contact || u.phoneNumber || '—',
         email: u.email || '—',
         role,
+        rawRole: u.role,
+        isSeniorUser,
+        isAddUserDb,
+        departmentType: u.departmentType,
         joinedLabel: u.createdAt
           ? new Date(u.createdAt).toLocaleDateString('en-IN', {
               month: 'short',
@@ -622,6 +665,15 @@ export function DepartmentUsersPage() {
       session?.user?.departmentType ||
       'ONBOARDING_DEPARTMENT'
 
+    const rawRole = (targetUser.dynamicValues?.role as string) || targetUser.rawRole
+    const validBackendRole =
+      rawRole === 'DEPARTMENT_HEAD' ||
+      rawRole === 'DEPARTMENT_SUB_USER' ||
+      rawRole === 'SUPERADMIN' ||
+      rawRole === 'DEPARTMENT_SFP'
+        ? rawRole
+        : 'DEPARTMENT_USER'
+
     setUpdatingSeniorFor(targetUser.id)
     try {
       await updateDepartmentUser({
@@ -630,7 +682,7 @@ export function DepartmentUsersPage() {
         email: targetUser.email,
         isSeniorUser: isSenior,
         departmentType: rawDept,
-        role: targetUser.rawRole || (targetUser.dynamicValues?.role as string) || targetUser.role,
+        role: validBackendRole,
       })
       setToast({
         type: 'success',
@@ -965,7 +1017,16 @@ export function DepartmentUsersPage() {
           }
           onLoginAs={handleLoginAs}
           renderExpanded={(user) => (
-            <UserDetails user={user} />
+            <UserDetails
+              user={user}
+              onAttendanceToggle={handleAttendanceToggle}
+              onSeniorUserToggle={handleSeniorUserToggle}
+              onHelpTicketsToggle={handleHelpTicketsToggle}
+              isUpdatingAttendance={updatingAttendanceFor === user.id}
+              isUpdatingSenior={updatingSeniorFor === user.id}
+              isUpdatingHelpTickets={updatingHelpTicketsFor === user.id}
+              canManage={canManageUsers}
+            />
           )}
         />
       </SectionCard>

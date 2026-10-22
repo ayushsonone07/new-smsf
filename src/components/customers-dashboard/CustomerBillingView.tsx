@@ -21,13 +21,15 @@ import {
   Receipt,
 } from 'lucide-react'
 
-function formatMoney(amount?: number | null): string {
-  if (amount === undefined || amount === null || isNaN(amount)) return '₹0'
+function formatMoney(amount?: number | string | null): string {
+  if (amount === undefined || amount === null || amount === '') return '₹0'
+  const num = typeof amount === 'number' ? amount : parseFloat(String(amount).replace(/[^0-9.-]+/g, ''))
+  if (isNaN(num)) return '₹0'
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0,
-  }).format(amount)
+  }).format(num)
 }
 
 function formatDate(dateStr?: string): string {
@@ -162,6 +164,18 @@ export function CustomerBillingView() {
     }
   }
 
+  const parseAmountNumber = (val?: number | string | null): number => {
+    if (val === undefined || val === null || val === '') return 0
+    if (typeof val === 'number') return isNaN(val) ? 0 : val
+    const parsed = parseFloat(String(val).replace(/[^0-9.-]+/g, ''))
+    return isNaN(parsed) ? 0 : parsed
+  }
+
+  const totalPaid = details?.totalPaid ?? parseAmountNumber(details?.amountPaid)
+  const outstanding = details?.outstandingAmount ?? parseAmountNumber(details?.amountPending)
+  const activeSubs = details?.activeSubscriptions ?? (details?.serviceExpiration ? 1 : 0)
+  const paymentDue = details?.paymentDue ?? parseAmountNumber(details?.amountPending)
+
   const invoices = Array.isArray(details?.invoices) && details?.invoices.length > 0
     ? details.invoices
     : billUrl
@@ -170,17 +184,13 @@ export function CustomerBillingView() {
           id: 'INV-' + (session?.customerId || '101'),
           date: new Date().toISOString(),
           description: 'Package Subscription & Services',
-          amount: details?.amountPaid || details?.totalPaid || 0,
+          amount: typeof totalPaid === 'number' ? totalPaid : 0,
           status: 'Paid',
           billUrl,
+          billingLink: billUrl,
         },
       ]
     : []
-
-  const totalPaid = details?.totalPaid ?? details?.amountPaid ?? 0
-  const outstanding = details?.outstandingAmount ?? details?.amountPending ?? 0
-  const activeSubs = details?.activeSubscriptions ?? (details?.serviceExpiration ? 1 : 0)
-  const paymentDue = details?.paymentDue ?? details?.amountPending ?? 0
 
   return (
     <div style={{ padding: '24px 32px', minHeight: 'calc(100vh - 64px)', background: '#f8fafc' }}>
@@ -230,6 +240,23 @@ export function CustomerBillingView() {
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
               Billing & Invoices
             </h1>
+            {(details?.packageName || details?.plan) && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: '#e0e7ff',
+                  color: '#4338ca',
+                  marginLeft: '8px',
+                }}
+              >
+                Package: {details.packageName || details.plan}
+              </span>
+            )}
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
             Manage your billing profile, download invoices and monitor payments
@@ -415,7 +442,7 @@ export function CustomerBillingView() {
                 <tbody>
                   {invoices.map((inv, idx) => {
                     const badge = getInvoiceStatusBadge(inv.status)
-                    const targetBillUrl = inv.billUrl || inv.billingLink || billUrl
+                    const targetBillUrl = inv.billUrl || (inv as any).billingLink || billUrl
 
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
