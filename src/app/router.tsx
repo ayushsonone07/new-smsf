@@ -33,6 +33,9 @@ const AdminTimelinesPage = lazy(() =>
 const AdminApprovalsPage = lazy(() =>
   import('../features/departments/pages/AdminApprovalsPage').then((module) => ({ default: module.AdminApprovalsPage })),
 )
+const AdminAirtelServicePage = lazy(() =>
+  import('../features/departments/pages/AdminAirtelServicePage').then((module) => ({ default: module.AdminAirtelServicePage })),
+)
 const CreateDepartmentPage = lazy(() =>
   import('../features/departments/pages/CreateDepartmentPage').then((module) => ({ default: module.CreateDepartmentPage })),
 )
@@ -243,6 +246,20 @@ const adminServiceFlowRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/service-flow',
   component: AdminTimelinesPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminAirtelServiceRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/airtel-service',
+  component: AdminAirtelServicePage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const airtelServiceAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/airtel-service',
+  component: AdminAirtelServicePage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -957,6 +974,8 @@ const routeTree = rootRoute.addChildren([
     adminTimelinesRoute,
     adminServiceFlowRoute,
     adminApprovalsRoute,
+    adminAirtelServiceRoute,
+    airtelServiceAliasRoute,
     servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,

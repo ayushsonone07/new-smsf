@@ -47,6 +47,7 @@ export interface AirtelCallSummary {
   airtelCallerId?: string
   destinationNumber?: string
   destinationName?: string
+  destinationCircleName?: string
   overallCallDuration?: string
   durationMs?: number
   conversationDurationMs?: number
@@ -127,6 +128,20 @@ export async function getDepartmentAirtelAnalytics(
   const search = queryString({ ...query, departmentType } as AirtelCallsQuery)
   const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
     `${AIRTEL_API_BASE}/department/calls/analytics?${search}`,
+  )
+  return 'data' in response ? response.data : response
+}
+
+export async function getAirtelCalls(query: AirtelCallsQuery): Promise<AirtelCallsPage> {
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `${AIRTEL_API_BASE}/calls?${queryString(query)}`,
+  )
+  return 'pageNumber' in response ? response : response.data
+}
+
+export async function getAirtelAnalytics(query: AirtelCallsQuery): Promise<AirtelAnalytics> {
+  const response = await authedApiRequest<AirtelAnalytics | { data: AirtelAnalytics }>(
+    `${AIRTEL_API_BASE}/calls/analytics?${queryString(query)}`,
   )
   return 'data' in response ? response.data : response
 }
