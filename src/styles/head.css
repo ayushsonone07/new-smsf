@@ -1418,7 +1418,14 @@
 /* --- Users table --------------------------------------------- */
 
 .users-table table {
-  table-layout: auto;
+  table-layout: fixed;
+}
+
+.users-table.table-wrapper {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .users-table th {
@@ -1433,6 +1440,44 @@
 .users-table td {
   padding: 6px 7px;
   font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.users-table__expand-column {
+  width: 4%;
+}
+
+.users-table__name-column {
+  width: 22%;
+}
+
+.users-table__phone-column {
+  width: 10%;
+}
+
+.users-table__email-column {
+  width: 18%;
+}
+
+.users-table__role-column {
+  width: 17%;
+}
+
+.users-table__target-column {
+  width: 6%;
+}
+
+.users-table__achieved-column {
+  width: 7%;
+}
+
+.users-table__attendance-column {
+  width: 9%;
+}
+
+.users-table__actions-column {
+  width: 7%;
 }
 
 .users-table .is-right {
@@ -1474,6 +1519,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  width: 100%;
 }
 
 .head-avatar {
@@ -1486,13 +1533,18 @@
 }
 
 .user-cell__text {
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .user-cell__text strong {
   display: block;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 14px;
   font-weight: 700;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1514,6 +1566,7 @@
   background: var(--head-blue-soft);
   color: var(--head-blue);
   cursor: pointer;
+  flex: 0 0 32px;
 }
 
 .login-as-button:hover {
@@ -1550,8 +1603,12 @@
 }
 
 .role-pill {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1848,7 +1905,7 @@
   }
 
   .users-table {
-    min-width: 700px;
+    min-width: 0;
   }
 }
 
@@ -1947,6 +2004,12 @@
     max-width: 100%;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .users-table .user-cell__text strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .users-table .is-right,
