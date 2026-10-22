@@ -33,6 +33,7 @@ export function UserDetails({
   isUpdatingAttendance = false,
   isUpdatingSenior = false,
   isUpdatingHelpTickets = false,
+  canManage = true,
 }: UserDetailsProps) {
   const rows: { label: string; value: string }[] = [
     { label: 'Role', value: ROLE_META[user.role]?.label || user.role },

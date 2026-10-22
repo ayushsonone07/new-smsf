@@ -21,9 +21,6 @@ import {
   createDepartmentUser,
   updateDepartmentUser,
   deleteDepartmentUser,
-  updateUserAttendance,
-  performUserAction,
-  type UserActionPayload,
   type DepartmentUserApiItem,
 } from '../../../../api/department-users.api'
 import { useMemberDetails } from '../../hooks/useMemberDetails'
@@ -117,9 +114,6 @@ export function DepartmentUsersPage() {
     title?: string
     message: string
   } | null>(null)
-  const [updatingAttendanceFor, setUpdatingAttendanceFor] = useState<string | null>(null)
-  const [updatingSeniorFor, setUpdatingSeniorFor] = useState<string | null>(null)
-  const [updatingHelpTicketsFor, setUpdatingHelpTicketsFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!toast) return
@@ -1019,13 +1013,6 @@ export function DepartmentUsersPage() {
           renderExpanded={(user) => (
             <UserDetails
               user={user}
-              onAttendanceToggle={handleAttendanceToggle}
-              onSeniorUserToggle={handleSeniorUserToggle}
-              onHelpTicketsToggle={handleHelpTicketsToggle}
-              isUpdatingAttendance={updatingAttendanceFor === user.id}
-              isUpdatingSenior={updatingSeniorFor === user.id}
-              isUpdatingHelpTickets={updatingHelpTicketsFor === user.id}
-              canManage={canManageUsers}
             />
           )}
         />
