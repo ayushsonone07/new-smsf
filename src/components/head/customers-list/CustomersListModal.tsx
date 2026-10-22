@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
-import { motion, type Variants } from 'framer-motion'
+import { motion, AnimatePresence, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
@@ -24,11 +24,12 @@ import type {
   OnboardingStatus,
 } from './CustomersList'
 import type {
+  CustomerExportFormat,
   CustomerProfileDetails,
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
-import { addClientRemark } from '../../../api/customer-drawer.api'
+import { addClientRemark, downloadCustomerExport } from '../../../api/customer-drawer.api'
 import {
   CUSTOMER_ACTIVITY_EVENT,
   getCustomerActivities,
@@ -284,6 +285,11 @@ export function CustomersListModal({
   const [editingClientRemark, setEditingClientRemark] = useState<string | null>(null)
   const [editingClientRemarkText, setEditingClientRemarkText] = useState('')
   const [isSavingClientRemark, setIsSavingClientRemark] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<CustomerExportFormat | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [exportError, setExportError] = useState('')
   const [billFile, setBillFile] = useState<File | null>(null)
   const [billUploading, setBillUploading] = useState(false)
   const [billError, setBillError] = useState('')
@@ -301,7 +307,7 @@ export function CustomersListModal({
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
-  const isSuperAdmin = getSession()?.user.role === 'ADMIN'
+  const isSuperAdmin = (getSession()?.user.role as string) === 'ADMIN' || (getSession()?.user.role as string) === 'SUPERADMIN'
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
@@ -362,6 +368,37 @@ export function CustomersListModal({
 
   function startClose() {
     setClosing(true)
+  }
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  async function handleExport(targetFormat: CustomerExportFormat) {
+    const customerId = Number(current?.id)
+    if (!Number.isInteger(customerId) || customerId <= 0 || isExporting) return
+    setExportError('')
+    setIsExporting(true)
+    setExportingFormat(targetFormat)
+    setShowExportMenu(false)
+    try {
+      await downloadCustomerExport(customerId, targetFormat)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Unable to export customer.')
+    } finally {
+      setIsExporting(false)
+      setExportingFormat(null)
+    }
   }
 
   async function saveRemarkEdit() {
@@ -961,6 +998,103 @@ export function CustomersListModal({
               Since {current.contactDate}
             </span>
           </motion.div>
+
+          {isSuperAdmin && (
+            <motion.div
+              ref={exportMenuRef}
+              variants={fadeUpVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.26 }}
+              className="cl-drawer__export-container"
+            >
+              <button
+                type="button"
+                className={`cl-drawer__export-btn ${showExportMenu ? 'cl-drawer__export-btn--active' : ''}`}
+                onClick={() => setShowExportMenu((prev) => !prev)}
+                disabled={isExporting || !Number.isInteger(Number(current?.id))}
+                aria-expanded={showExportMenu}
+                aria-haspopup="true"
+                title="Export complete customer report"
+              >
+                <Icon name="download" size={15} />
+                <span>
+                  {isExporting
+                    ? `Exporting ${exportingFormat ? exportingFormat.toUpperCase() : ''}…`
+                    : 'Export'}
+                </span>
+                <span className="cl-drawer__export-chevron">{showExportMenu ? '▲' : '▼'}</span>
+              </button>
+
+              <AnimatePresence>
+                {showExportMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="cl-drawer__export-menu"
+                    role="menu"
+                  >
+                    <div className="cl-drawer__export-menu-header">
+                      <span>CHOOSE EXPORT FORMAT</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="cl-drawer__export-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport('xlsx')}
+                    >
+                      <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--excel">
+                        📊
+                      </div>
+                      <div className="cl-drawer__export-menu-text">
+                        <strong>Excel Spreadsheet (.xlsx)</strong>
+                        <span>Structured multi-sheet workbook with Financials & Services</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cl-drawer__export-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport('pdf')}
+                    >
+                      <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--pdf">
+                        📄
+                      </div>
+                      <div className="cl-drawer__export-menu-text">
+                        <strong>PDF Document (.pdf)</strong>
+                        <span>Executive Dossier with customer summary & status tables</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cl-drawer__export-menu-item"
+                      role="menuitem"
+                      onClick={() => void handleExport('json')}
+                    >
+                      <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--json">
+                        📦
+                      </div>
+                      <div className="cl-drawer__export-menu-text">
+                        <strong>JSON Data (.json)</strong>
+                        <span>Clean structured developer payload</span>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {exportError && (
+                <span role="alert" className="cl-drawer__export-error">
+                  {exportError}
+                </span>
+              )}
+            </motion.div>
+          )}
         </div>
 
         {/* Body */}

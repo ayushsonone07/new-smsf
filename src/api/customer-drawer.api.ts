@@ -1,4 +1,4 @@
-import { authedApiRequest } from './client'
+import { authedApiRequest, authedFileRequest } from './client'
 import { getSession } from '../app/auth/session'
 
 export interface CustomerProfileDetails {
@@ -184,6 +184,26 @@ export async function getSuperAdminCustomerRemarks(
     `/api/auth/customer-service/${customerId}/superadmin-remarks`,
   )
   return requireData(response, 'SuperAdmin remarks')
+}
+
+export type CustomerExportFormat = 'pdf' | 'xlsx' | 'json'
+
+export async function downloadCustomerExport(
+  customerId: number,
+  format: CustomerExportFormat,
+): Promise<void> {
+  const search = new URLSearchParams({ format })
+  const { blob, fileName } = await authedFileRequest(
+    `/api/customer/${customerId}/export?${search.toString()}`,
+  )
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName || `customer-${customerId}-export.${format}`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 interface ApiEnvelope<T> {
