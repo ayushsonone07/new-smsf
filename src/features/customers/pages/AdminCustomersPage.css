@@ -1,6 +1,19 @@
 .admin-customers-page {
   display: grid;
-  gap: 24px;
+  gap: 8px;
+}
+
+.admin-customers-page .topbar {
+  margin-bottom: 0;
+  gap: 10px;
+}
+
+.admin-customers-page .topbar h1 {
+  margin: 2px 0 4px;
+}
+
+.admin-customers-page .breadcrumb {
+  margin-bottom: 2px;
 }
 
 .admin-customers-card {
@@ -13,7 +26,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px;
+  padding: 14px 20px 10px;
 }
 
 .admin-customers-card__heading h2,

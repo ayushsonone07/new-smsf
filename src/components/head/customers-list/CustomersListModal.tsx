@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
-import { motion, type Variants } from 'framer-motion'
+import { motion, AnimatePresence, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
@@ -24,11 +24,12 @@ import type {
   OnboardingStatus,
 } from './CustomersList'
 import type {
+  CustomerExportFormat,
   CustomerProfileDetails,
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
-import { addClientRemark } from '../../../api/customer-drawer.api'
+import { addClientRemark, downloadCustomerExport } from '../../../api/customer-drawer.api'
 import {
   CUSTOMER_ACTIVITY_EVENT,
   getCustomerActivities,
@@ -260,7 +261,7 @@ function Field({
 export function CustomersListModal({
   customer,
   assignees,
-  showStatus = true,
+  showStatus: _showStatus = true,
   showAssignTo = true,
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
@@ -284,6 +285,11 @@ export function CustomersListModal({
   const [editingClientRemark, setEditingClientRemark] = useState<string | null>(null)
   const [editingClientRemarkText, setEditingClientRemarkText] = useState('')
   const [isSavingClientRemark, setIsSavingClientRemark] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportingFormat, setExportingFormat] = useState<CustomerExportFormat | null>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const [exportError, setExportError] = useState('')
   const [billFile, setBillFile] = useState<File | null>(null)
   const [billUploading, setBillUploading] = useState(false)
   const [billError, setBillError] = useState('')
@@ -301,7 +307,7 @@ export function CustomersListModal({
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
-  const isSuperAdmin = getSession()?.user.role === 'ADMIN'
+  const isSuperAdmin = (getSession()?.user.role as string) === 'ADMIN' || (getSession()?.user.role as string) === 'SUPERADMIN'
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
@@ -362,6 +368,37 @@ export function CustomersListModal({
 
   function startClose() {
     setClosing(true)
+  }
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
+
+  async function handleExport(targetFormat: CustomerExportFormat) {
+    const customerId = Number(current?.id)
+    if (!Number.isInteger(customerId) || customerId <= 0 || isExporting) return
+    setExportError('')
+    setIsExporting(true)
+    setExportingFormat(targetFormat)
+    setShowExportMenu(false)
+    try {
+      await downloadCustomerExport(customerId, targetFormat)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Unable to export customer.')
+    } finally {
+      setIsExporting(false)
+      setExportingFormat(null)
+    }
   }
 
   async function saveRemarkEdit() {
@@ -674,14 +711,50 @@ export function CustomersListModal({
       })
     }
 
-    // Fallback 3: rawCustomer serviceTypes
+    // Fallback 3: rawCustomer customerServices or current.customerServices
     const raw = current?.rawCustomer as any
+    const rawCustomerServices = raw?.customerServices || (current as any)?.customerServices
+    if (Array.isArray(rawCustomerServices) && rawCustomerServices.length > 0) {
+      return rawCustomerServices.map((cs: any): DrawerDepartmentServiceItem => {
+        const name = cs?.serviceType || cs?.name || 'Service'
+        const status = cs?.status || (cs?.isServiceActive ? 'completed' : 'pending')
+        return {
+          name: formatServiceName(String(name)),
+          status: toOnboardingStatus(String(status)) || current?.status,
+          row: undefined,
+        }
+      })
+    }
+
+    // Fallback 4: rawCustomer serviceTypes
     if (Array.isArray(raw?.serviceTypes) && raw.serviceTypes.length > 0) {
       return raw.serviceTypes.map((st: string): DrawerDepartmentServiceItem => ({
         name: formatServiceName(st),
         status: current?.status,
         row: undefined,
       }))
+    }
+
+    // Fallback 5: superAdminRemarks departments
+    if (Array.isArray(apiDetails.superAdminRemarks?.departments) && apiDetails.superAdminRemarks!.departments.length > 0) {
+      return apiDetails.superAdminRemarks!.departments.map((dept): DrawerDepartmentServiceItem => ({
+        name: formatServiceName(dept.serviceType || dept.departmentType),
+        status: current?.status || 'pending',
+        row: undefined,
+      }))
+    }
+
+    // Fallback 6: Comma-separated packageName (e.g. "Only Google, Only WhatsApp, Google+Website")
+    const pkg = current?.packageName || raw?.packageName || apiDetails.profile?.packageName
+    if (pkg && typeof pkg === 'string' && pkg.includes(',')) {
+      const parts = pkg.split(',').map((p) => p.trim()).filter(Boolean)
+      if (parts.length > 0) {
+        return parts.map((part): DrawerDepartmentServiceItem => ({
+          name: formatServiceName(part),
+          status: current?.status || 'pending',
+          row: undefined,
+        }))
+      }
     }
 
     if (current?.serviceType && current.serviceType !== '—') {
@@ -693,7 +766,7 @@ export function CustomersListModal({
     }
 
     return []
-  }, [serviceRow, departmentType, current])
+  }, [serviceRow, departmentType, current, apiDetails.superAdminRemarks, apiDetails.profile?.packageName])
 
   const hasDepartmentServiceSummary =
     serviceRow?.departmentStatuses != null || services.length > 0
@@ -926,29 +999,116 @@ export function CustomersListModal({
           >
             <div className="cl-drawer__avatar">{initialLetter}</div>
             <div className="cl-drawer__name-text">
-              <h2>{contactName}</h2>
+              <div className="cl-drawer__name-header">
+                <h2>{contactName}</h2>
+                {current.contactDate && (
+                  <span className="cl-drawer__date-time">
+                    {current.contactDate}
+                  </span>
+                )}
+                {isSuperAdmin && (
+                  <div
+                    ref={exportMenuRef}
+                    className="cl-drawer__export-container"
+                  >
+                    <button
+                      type="button"
+                      className={`cl-drawer__export-btn ${showExportMenu ? 'cl-drawer__export-btn--active' : ''}`}
+                      onClick={() => setShowExportMenu((prev) => !prev)}
+                      disabled={isExporting || !Number.isInteger(Number(current?.id))}
+                      aria-expanded={showExportMenu}
+                      aria-haspopup="true"
+                      title={
+                        isExporting
+                          ? `Exporting ${exportingFormat ? exportingFormat.toUpperCase() : ''}…`
+                          : 'Export complete customer report'
+                      }
+                    >
+                      <Icon name="download" size={15} />
+                    </button>
+
+                    <AnimatePresence>
+                      {showExportMenu && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className="cl-drawer__export-menu"
+                          role="menu"
+                        >
+                          <div className="cl-drawer__export-menu-header">
+                            <span>CHOOSE EXPORT FORMAT</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('xlsx')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--excel">
+                              📊
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>Excel Spreadsheet (.xlsx)</strong>
+                              <span>Structured multi-sheet workbook with Financials & Services</span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('pdf')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--pdf">
+                              📄
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>PDF Document (.pdf)</strong>
+                              <span>Executive Dossier with customer summary & status tables</span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cl-drawer__export-menu-item"
+                            role="menuitem"
+                            onClick={() => void handleExport('json')}
+                          >
+                            <div className="cl-drawer__export-menu-icon cl-drawer__export-menu-icon--json">
+                              📦
+                            </div>
+                            <div className="cl-drawer__export-menu-text">
+                              <strong>JSON Data (.json)</strong>
+                              <span>Clean structured developer payload</span>
+                            </div>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {exportError && (
+                      <span role="alert" className="cl-drawer__export-error">
+                        {exportError}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <span>{businessName}</span>
             </div>
           </motion.div>
 
-          <motion.div
-            className="cl-drawer__status-pills"
-            variants={fadeUpVariants}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.22 }}
-          >
-            {showStatus && (
-              <span
-                className={`cl-drawer__spill cl-drawer__spill--status cl-drawer__spill--${current.status}`}
-              >
-                {STATUS_LABEL[current.status]}
-              </span>
-            )}
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Dept: {departmentType.replace('_DEPARTMENT', '').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}
-            </span>
-            {showAssignTo && (
+          {showAssignTo && (
+            <motion.div
+              className="cl-drawer__status-pills"
+              variants={fadeUpVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.22 }}
+            >
               <span className="cl-drawer__spill cl-drawer__spill--info">
                 Service user:{' '}
                 {serviceRow?.assignedUserEmail ||
@@ -956,11 +1116,8 @@ export function CustomersListModal({
                   assignee?.name ||
                   'Unassigned'}
               </span>
-            )}
-            <span className="cl-drawer__spill cl-drawer__spill--info">
-              Since {current.contactDate}
-            </span>
-          </motion.div>
+            </motion.div>
+          )}
         </div>
 
         {/* Body */}
@@ -2767,7 +2924,6 @@ function RemarkGroup({
   onCancelEdit,
   onSaveEdit,
   isSavingRemark = false,
-  pageSize = 4,
 }: {
   title: string
   emptyMessage: string
@@ -2785,41 +2941,6 @@ function RemarkGroup({
   isSavingRemark?: boolean
   pageSize?: number
 }) {
-  const [page, setPage] = useState(0)
-
-  const totalPages = Math.ceil(entries.length / pageSize)
-  const safePage = totalPages > 0 ? Math.min(Math.max(0, page), totalPages - 1) : 0
-
-  useEffect(() => {
-    setPage(0)
-  }, [entries.length, title])
-
-  const pagedEntries = useMemo(() => {
-    const start = safePage * pageSize
-    return entries.slice(start, start + pageSize)
-  }, [entries, safePage, pageSize])
-
-  const getVisiblePages = () => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i)
-    }
-    const pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = []
-    pages.push(0)
-    if (safePage > 2) {
-      pages.push('ellipsis-start')
-    }
-    const start = Math.max(1, safePage - 1)
-    const end = Math.min(totalPages - 2, safePage + 1)
-    for (let i = start; i <= end; i++) {
-      pages.push(i)
-    }
-    if (safePage < totalPages - 3) {
-      pages.push('ellipsis-end')
-    }
-    pages.push(totalPages - 1)
-    return pages
-  }
-
   return (
     <section className="cl-drawer__remark-group">
       <div className="cl-drawer__card-head">
@@ -2834,122 +2955,24 @@ function RemarkGroup({
         ) : null}
       </div>
       {entries.length > 0 ? (
-        <>
-          <ul className="cl-drawer__remark-list">
-            {pagedEntries.map(({ remark }, index) => (
-              <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
-                {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
-                  <div className="cl-remark-edit">
-                    <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
-                    <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
-                  </div>
-                ) : <p>{remark.remark || '—'}</p>}
-                {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
-                <span>
-                  {[remark.staffName, remark.type, remark.timestamp]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {totalPages > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginTop: '12px',
-                paddingTop: '10px',
-                borderTop: '1px solid #f1f5f9',
-                fontSize: '12px',
-                color: '#64748b',
-                flexWrap: 'wrap',
-                gap: '8px',
-              }}
-            >
+        <ul className="cl-drawer__remark-list">
+          {entries.map(({ remark }, index) => (
+            <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
+              {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
+                <div className="cl-remark-edit">
+                  <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
+                  <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
+                </div>
+              ) : <p>{remark.remark || '—'}</p>}
+              {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
               <span>
-                Showing {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, entries.length)} of {entries.length}
+                {[remark.staffName, remark.type, remark.timestamp]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <button
-                  type="button"
-                  disabled={safePage === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    background: safePage === 0 ? '#f8fafc' : '#ffffff',
-                    color: safePage === 0 ? '#94a3b8' : '#334155',
-                    cursor: safePage === 0 ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Prev
-                </button>
-
-                {getVisiblePages().map((item, idx) => {
-                  if (typeof item === 'string') {
-                    return (
-                      <span key={`ellipsis-${idx}`} style={{ padding: '0 4px', color: '#94a3b8' }}>
-                        …
-                      </span>
-                    )
-                  }
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setPage(item)}
-                      style={{
-                        minWidth: '26px',
-                        height: '26px',
-                        padding: '0 6px',
-                        borderRadius: '6px',
-                        border: '1px solid',
-                        borderColor: safePage === item ? '#2563eb' : '#e2e8f0',
-                        background: safePage === item ? '#2563eb' : '#ffffff',
-                        color: safePage === item ? '#ffffff' : '#475569',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: safePage === item ? 600 : 500,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {item + 1}
-                    </button>
-                  )
-                })}
-
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages - 1}
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    background: safePage >= totalPages - 1 ? '#f8fafc' : '#ffffff',
-                    color: safePage >= totalPages - 1 ? '#94a3b8' : '#334155',
-                    cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+            </li>
+          ))}
+        </ul>
       ) : fallback ? (
         <div className="cl-drawer__remark-fallback">
           <p>{fallback}</p>

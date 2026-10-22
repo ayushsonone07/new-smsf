@@ -131,6 +131,7 @@ export function DepartmentUsersTicketsView({
             onRefresh={() => setRefreshMemberTicketsKey((k) => k + 1)}
             onTicketUpdated={() => setRefreshMemberTicketsKey((k) => k + 1)}
             canViewHistory={canViewHistory}
+            canUpdateStatus={false}
           />
         )}
       </div>
