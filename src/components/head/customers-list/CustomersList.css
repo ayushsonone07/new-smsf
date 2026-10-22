@@ -1398,6 +1398,37 @@
   letter-spacing: 0;
 }
 
+
+.cl-drawer__name-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.cl-drawer__name-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.cl-drawer__date-time {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .cl-drawer__name-text {
   flex: 1;
   min-width: 0;
@@ -2066,11 +2097,34 @@
 }
 
 .cl-drawer__remark-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.cl-drawer__remark-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cl-drawer__remark-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cl-drawer__remark-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.cl-drawer__remark-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .cl-drawer__remark-list li,
@@ -3944,24 +3998,24 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .cl-drawer__export-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   backdrop-filter: blur(8px);
+  flex-shrink: 0;
 }
 
 .cl-drawer__export-btn:hover:not(:disabled) {

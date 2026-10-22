@@ -179,11 +179,15 @@ export interface CustomerDrawerApiDetails {
 
 export async function getSuperAdminCustomerRemarks(
   customerId: number,
-): Promise<SuperAdminRemarks> {
-  const response = await authedApiRequest<ApiEnvelope<SuperAdminRemarks>>(
-    `/api/auth/customer-service/${customerId}/superadmin-remarks`,
-  )
-  return requireData(response, 'SuperAdmin remarks')
+): Promise<SuperAdminRemarks | undefined> {
+  try {
+    const response = await authedApiRequest<ApiEnvelope<SuperAdminRemarks>>(
+      `/api/auth/customer-service/${customerId}/superadmin-remarks`,
+    )
+    return response?.data
+  } catch {
+    return undefined
+  }
 }
 
 export type CustomerExportFormat = 'pdf' | 'xlsx' | 'json'
