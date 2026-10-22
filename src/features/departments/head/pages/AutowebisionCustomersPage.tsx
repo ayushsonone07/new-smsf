@@ -2000,8 +2000,8 @@ export function AutowebisionCustomersPage({
                             onClick={() => handleOpenClientRemarkDialog(customer)}
                             className="inline-flex items-center justify-center bg-pink-50 hover:bg-pink-100 rounded-md px-3 py-1.5 transition-colors border border-pink-100 cursor-pointer"
                           >
-                            <span className="text-xs font-medium text-pink-700 truncate max-w-[140px]">
-                              {customer.clientRemark || 'Click to View'}
+                            <span className="text-xs font-medium text-pink-700">
+                              Click to View
                             </span>
                           </button>
                         </td>
