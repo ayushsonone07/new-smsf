@@ -15,6 +15,7 @@ export interface MemberWorkItem {
 export interface MemberDetailsModalProps {
   member: TeamMemberPerformance | null
   workItems?: MemberWorkItem[]
+  isLoading?: boolean
   onClose: () => void
 }
 
@@ -27,6 +28,7 @@ type ModalTab = 'all' | 'delayed' | 'in-progress' | 'pending' | 'completed'
 export function MemberDetailsModal({
   member,
   workItems = [],
+  isLoading = false,
   onClose,
 }: MemberDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<ModalTab>('all')
@@ -93,7 +95,7 @@ export function MemberDetailsModal({
             <div className="hdb-modal__avatar">{initialLetter}</div>
             <div className="hdb-modal__header-text">
               <h2>{member.name}</h2>
-              <p>{member.email} · Today</p>
+              <p>{member.email} · Last 7 days</p>
             </div>
           </div>
 
@@ -251,6 +253,15 @@ export function MemberDetailsModal({
               </tr>
             </thead>
             <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className="hdb-modal__empty">Loading customer activity…</td>
+                </tr>
+              ) : displayedItems.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="hdb-modal__empty">No customer activity found in the last 7 days.</td>
+                </tr>
+              ) : null}
               {displayedItems.map((item) => (
                 <tr key={item.id}>
                   {/* Customer */}

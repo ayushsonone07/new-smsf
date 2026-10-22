@@ -5,6 +5,7 @@ import {
   getCustomerInternalRemarks,
   getCustomerReviewReplies,
   getCustomerServiceRows,
+  getSuperAdminCustomerRemarks,
 } from '../../../api/customer-drawer.api'
 import type { CustomerDrawerApiDetails } from '../../../api/customer-drawer.api'
 import type { OnboardingCustomer } from '../../../components/head/customers-list/CustomersList'
@@ -20,6 +21,7 @@ export function useCustomerDrawerDetails(
 ): CustomerDrawerApiDetails {
   const profileOnly = options.profileOnly ?? false
   const session = getSession()
+  const isSuperAdmin = session?.user.role === 'ADMIN'
   const rawDept = session?.user.departmentType || ''
   const isGoogle =
     rawDept.toUpperCase().includes('GOOGLE') ||
@@ -50,6 +52,7 @@ export function useCustomerDrawerDetails(
       isOpen &&
       hasCustomerId &&
       !profileOnly &&
+      !isSuperAdmin &&
       customerDepartment.length > 0,
     staleTime: 0,
   })
@@ -57,21 +60,28 @@ export function useCustomerDrawerDetails(
   const remarksQuery = useQuery({
     queryKey: ['customer-drawer-remarks', customerId, customerDepartment, options.requestUsername],
     queryFn: () => getCustomerRemarks(customerId, customerDepartment, options.requestUsername),
-    enabled: isOpen && hasCustomerId && !profileOnly,
+    enabled: isOpen && hasCustomerId && !profileOnly && !isSuperAdmin,
     staleTime: 0,
   })
 
   const internalRemarksQuery = useQuery({
     queryKey: ['customer-drawer-internal-remarks', customerId, customerDepartment, options.requestUsername],
     queryFn: () => getCustomerInternalRemarks(customerId, customerDepartment, options.requestUsername),
-    enabled: isOpen && hasCustomerId && !profileOnly,
+    enabled: isOpen && hasCustomerId && !profileOnly && !isSuperAdmin,
+    staleTime: 0,
+  })
+
+  const superAdminRemarksQuery = useQuery({
+    queryKey: ['customer-drawer-superadmin-remarks', customerId],
+    queryFn: () => getSuperAdminCustomerRemarks(customerId),
+    enabled: isOpen && hasCustomerId && !profileOnly && isSuperAdmin,
     staleTime: 0,
   })
 
   const rowsQuery = useQuery({
     queryKey: ['customer-drawer-rows', contact, options.requestUsername],
     queryFn: () => getCustomerServiceRows(contact, options.requestUsername),
-    enabled: isOpen && contact.length > 0 && !profileOnly,
+    enabled: isOpen && contact.length > 0 && !profileOnly && !isSuperAdmin,
     staleTime: 0,
   })
 
@@ -81,18 +91,21 @@ export function useCustomerDrawerDetails(
     serviceRowsLoading: rowsQuery.isLoading,
     remarks: remarksQuery.data,
     internalRemarks: internalRemarksQuery.data ?? [],
+    superAdminRemarks: superAdminRemarksQuery.data,
     reviewReplies: reviewRepliesQuery.data ?? [],
     isLoading:
       profileQuery.isLoading ||
       reviewRepliesQuery.isLoading ||
       remarksQuery.isLoading ||
       internalRemarksQuery.isLoading ||
+      superAdminRemarksQuery.isLoading ||
       rowsQuery.isLoading,
     errors: [
       profileQuery.error,
       reviewRepliesQuery.error,
       remarksQuery.error,
       internalRemarksQuery.error,
+      superAdminRemarksQuery.error,
       rowsQuery.error,
     ]
       .filter((error): error is Error => error instanceof Error)

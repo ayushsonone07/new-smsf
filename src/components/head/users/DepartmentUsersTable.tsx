@@ -164,25 +164,25 @@ export function DepartmentUsersTable({
       <table>
         <thead>
           <tr>
-            {renderExpanded ? <th aria-label="Expand" /> : null}
-            {visible('name') ? <th>Name</th> : null}
-            {visible('phone') ? <th>Number</th> : null}
-            {visible('email') ? <th>Email</th> : null}
-            {visible('role') ? <th>Role</th> : null}
+            {renderExpanded ? <th className="users-table__expand-column" aria-label="Expand" /> : null}
+            {visible('name') ? <th className="users-table__name-column">Name</th> : null}
+            {visible('phone') ? <th className="users-table__phone-column">Number</th> : null}
+            {visible('email') ? <th className="users-table__email-column">Email</th> : null}
+            {visible('role') ? <th className="users-table__role-column">Role</th> : null}
             {visible('target') ? (
-              <th className="is-right">Target</th>
+              <th className="is-right users-table__target-column">Target</th>
             ) : null}
             {visible('achieved') ? (
-              <th className="is-center">Achieved</th>
+              <th className="is-center users-table__achieved-column">Achieved</th>
             ) : null}
             {visible('attendance') ? (
-              <th className="is-center">P / A days</th>
+              <th className="is-center users-table__attendance-column">P / A days</th>
             ) : null}
             {dynamicColumns.map((column) => (
               <th key={column.key}>{column.label}</th>
             ))}
             {showActions ? (
-              <th className="is-right users-table__actions-head">
+              <th className="is-right users-table__actions-head users-table__actions-column">
                 Actions
               </th>
             ) : null}
@@ -369,7 +369,7 @@ function UserRow({
         className={expanded ? 'is-expanded' : undefined}
       >
         {onToggle ? (
-          <td className="users-table__chevron" data-label="Details">
+          <td className="users-table__chevron users-table__expand-column" data-label="Details">
             <button
               type="button"
               className={`chevron-button${
@@ -387,12 +387,12 @@ function UserRow({
         ) : null}
 
         {visible('name') ? (
-          <td data-label="User">
+          <td className="users-table__name-column" data-label="User">
             <div className="user-cell">
               <Avatar name={user.name} src={user.avatarSrc} />
 
               <div className="user-cell__text">
-                <strong>{user.name}</strong>
+                <strong title={user.name}>{user.name}</strong>
                 <span>Joined {user.joinedLabel}</span>
               </div>
 
@@ -414,35 +414,35 @@ function UserRow({
         ) : null}
 
         {visible('phone') ? (
-          <td className="users-table__mono" data-label="Number">{user.phone}</td>
+          <td className="users-table__mono users-table__phone-column" data-label="Number">{user.phone}</td>
         ) : null}
 
         {visible('email') ? (
-          <td className="users-table__email" data-label="Email" title={user.email}>
+          <td className="users-table__email users-table__email-column" data-label="Email" title={user.email}>
             {user.email}
           </td>
         ) : null}
 
         {visible('role') ? (
-          <td data-label="Role">
+          <td className="users-table__role-column" data-label="Role">
             <RolePill role={user.role} />
           </td>
         ) : null}
 
         {visible('target') ? (
-          <td className="is-right users-table__target" data-label="Target">
+          <td className="is-right users-table__target users-table__target-column" data-label="Target">
             {user.target}
           </td>
         ) : null}
 
         {visible('achieved') ? (
-          <td className="is-center" data-label="Achieved">
+          <td className="is-center users-table__achieved-column" data-label="Achieved">
             <AchievedPill percent={user.achievedPercent} />
           </td>
         ) : null}
 
         {visible('attendance') ? (
-          <td className="is-center" data-label="P / A days">
+          <td className="is-center users-table__attendance-column" data-label="P / A days">
             <AttendancePills
               present={user.presentDays}
               absent={user.absentDays}
@@ -463,7 +463,7 @@ function UserRow({
         })}
 
         {showActions ? (
-          <td className="is-right" data-label="Actions">
+          <td className="is-right users-table__actions-column" data-label="Actions">
             <div className="users-table__actions">
               {onView ? (
                 <button

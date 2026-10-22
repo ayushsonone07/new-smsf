@@ -91,7 +91,6 @@ const PROFILE_FIELD_GROUPS: {
       'phone',
       'additionalNumber',
       'plan',
-      'planIds',
       'isWebinarClient',
       'source',
       'leadType',
@@ -302,6 +301,7 @@ export function CustomersListModal({
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
+  const isSuperAdmin = getSession()?.user.role === 'ADMIN'
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
@@ -707,6 +707,15 @@ export function CustomersListModal({
   }, [apiDetails.internalRemarks, apiDetails.remarks?.internalRemark])
 
   const clientRemarkEntries = useMemo(() => {
+    if (isSuperAdmin) {
+      return (apiDetails.superAdminRemarks?.departments ?? []).flatMap((department) =>
+        department.clientRemarks.map((remark) => ({
+          category: 'Client',
+          departmentType: department.departmentType,
+          remark,
+        })),
+      )
+    }
     const clientReplies = (apiDetails.reviewReplies ?? []).map((r) => ({
       remark: r.reply,
       timestamp: r.timestamp,
@@ -717,13 +726,15 @@ export function CustomersListModal({
         ? clientReplies
         : (apiDetails.remarks?.clientRemark ?? [])
     return list.map((remark) => ({ category: 'Client', remark }))
-  }, [apiDetails.reviewReplies, apiDetails.remarks?.clientRemark])
+  }, [isSuperAdmin, apiDetails.superAdminRemarks?.departments, apiDetails.reviewReplies, apiDetails.remarks?.clientRemark])
 
   const onboardingRemarkEntries = useMemo(() => {
-    const list: CustomerRemark[] = [
-      ...(apiDetails.remarks?.departmentRemark ?? []),
-      ...(apiDetails.remarks?.fifteenDayMeetingRemark ?? []),
-    ]
+    const list: CustomerRemark[] = isSuperAdmin
+      ? [...(apiDetails.superAdminRemarks?.customerRemarks ?? [])]
+      : [
+          ...(apiDetails.remarks?.departmentRemark ?? []),
+          ...(apiDetails.remarks?.fifteenDayMeetingRemark ?? []),
+        ]
     if (apiDetails.profile?.remarks && typeof apiDetails.profile.remarks === 'string') {
       list.push({
         remark: apiDetails.profile.remarks,
@@ -735,13 +746,15 @@ export function CustomersListModal({
   }, [
     apiDetails.remarks?.departmentRemark,
     apiDetails.remarks?.fifteenDayMeetingRemark,
+    apiDetails.superAdminRemarks?.customerRemarks,
     apiDetails.profile?.remarks,
     apiDetails.profile?.lastUpdatedAt,
+    isSuperAdmin,
   ])
 
   const remarkEntries = useMemo(() => {
     return [
-      ...internalRemarkEntries,
+      ...(isSuperAdmin ? [] : internalRemarkEntries),
       ...clientRemarkEntries,
       ...onboardingRemarkEntries,
     ].sort(
@@ -749,7 +762,7 @@ export function CustomersListModal({
         (Date.parse(b.remark.timestamp || '') || 0) -
         (Date.parse(a.remark.timestamp || '') || 0),
     )
-  }, [internalRemarkEntries, clientRemarkEntries, onboardingRemarkEntries])
+  }, [isSuperAdmin, internalRemarkEntries, clientRemarkEntries, onboardingRemarkEntries])
 
   const customerRemarks = clientRemarkEntries
   const internalRemarks = internalRemarkEntries
@@ -1080,7 +1093,9 @@ export function CustomersListModal({
               <div className="cl-drawer__stat-label">Remarks</div>
               <div className="cl-drawer__stat-value">{remarkCount}</div>
               <div className="cl-drawer__stat-sub">
-                {customerRemarks.length} customer · {internalRemarks.length} internal
+                {isSuperAdmin
+                  ? `${customerRemarks.length} client · ${onboardingRemarkEntries.length} customer`
+                  : `${customerRemarks.length} customer · ${internalRemarks.length} internal`}
               </div>
             </div>
           </div>}
@@ -1151,7 +1166,11 @@ export function CustomersListModal({
                   <Field label="Address" value={fullAddress} full />
                   <Field
                     label="Package"
-                    value={apiDetails.profile?.plan || customer.packageName}
+                    value={
+                      apiDetails.profile?.packageName ||
+                      apiDetails.profile?.plan ||
+                      customer.packageName
+                    }
                     full
                   />
                   <Field
@@ -1172,16 +1191,16 @@ export function CustomersListModal({
                   />
                   <Field
                     label="Amount paid"
-                    value={
+                    value={formatCurrency(
                       apiDetails.profile?.amountPaid || rowDetails?.amountPaid
-                    }
+                    )}
                   />
                   <Field
                     label="Amount pending"
-                    value={
+                    value={formatCurrency(
                       apiDetails.profile?.amountPending ||
                       rowDetails?.amountPending
-                    }
+                    )}
                   />
                   <Field
                     label="Sales person"
@@ -1257,9 +1276,11 @@ export function CustomersListModal({
                 {/* Status summary pill header */}
                 <div className="cl-drawer__remarks-summary">
                   <div className="cl-drawer__remarks-pills">
-                    <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--internal">
-                      Internal ({internalRemarkEntries.length})
-                    </span>
+                    {!isSuperAdmin && (
+                      <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--internal">
+                        Internal ({internalRemarkEntries.length})
+                      </span>
+                    )}
                     <span className="cl-drawer__remarks-summary-pill cl-drawer__remarks-summary-pill--client">
                       Client ({clientRemarkEntries.length})
                     </span>
@@ -1270,7 +1291,7 @@ export function CustomersListModal({
                 </div>
 
                 {/* Section 1: Internal Remarks */}
-                <div className="cl-drawer__remark-section">
+                {!isSuperAdmin && <div className="cl-drawer__remark-section">
                   {getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
@@ -1335,11 +1356,11 @@ export function CustomersListModal({
                     isSavingRemark={isSavingRemark}
                     pageSize={4}
                   />
-                </div>
+                </div>}
 
                 {/* Section 2: Client Remarks */}
                 <div className="cl-drawer__remark-section">
-                  {getSession()?.user.role !== 'CUSTOMER' && (
+                  {!isSuperAdmin && getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1381,24 +1402,41 @@ export function CustomersListModal({
                       </Button>
                     </form>
                   )}
-                  <RemarkGroup
-                    title="Client Remarks"
-                    pageSize={4}
-                    badge="Customer replies"
-                    emptyMessage="No client remarks recorded."
-                    entries={clientRemarkEntries}
-                    editable
-                    editingRemark={editingClientRemark}
-                    editingRemarkText={editingClientRemarkText}
-                    onEdit={(remark) => {
-                      setEditingClientRemark(remark.timestamp || remark.remark || 'remark')
-                      setEditingClientRemarkText(remark.remark || '')
-                    }}
-                    onEditTextChange={setEditingClientRemarkText}
-                    onCancelEdit={() => setEditingClientRemark(null)}
-                    onSaveEdit={saveClientRemarkEdit}
-                    isSavingRemark={isSavingClientRemark}
-                  />
+                  {isSuperAdmin ? (
+                    (apiDetails.superAdminRemarks?.departments.length ?? 0) > 0 ? (
+                      apiDetails.superAdminRemarks?.departments.map((department) => (
+                        <RemarkGroup
+                          key={`${department.departmentType}-${department.serviceType}`}
+                          title={formatFieldLabel(department.departmentType)}
+                          pageSize={4}
+                          badge={formatServiceName(department.serviceType)}
+                          emptyMessage="No client remarks recorded."
+                          entries={department.clientRemarks.map((remark) => ({ category: 'Client', remark }))}
+                        />
+                      ))
+                    ) : (
+                      <p className="cl-drawer__empty">No client remarks recorded.</p>
+                    )
+                  ) : (
+                    <RemarkGroup
+                      title="Client Remarks"
+                      pageSize={4}
+                      badge="Customer replies"
+                      emptyMessage="No client remarks recorded."
+                      entries={clientRemarkEntries}
+                      editable
+                      editingRemark={editingClientRemark}
+                      editingRemarkText={editingClientRemarkText}
+                      onEdit={(remark) => {
+                        setEditingClientRemark(remark.timestamp || remark.remark || 'remark')
+                        setEditingClientRemarkText(remark.remark || '')
+                      }}
+                      onEditTextChange={setEditingClientRemarkText}
+                      onCancelEdit={() => setEditingClientRemark(null)}
+                      onSaveEdit={saveClientRemarkEdit}
+                      isSavingRemark={isSavingClientRemark}
+                    />
+                  )}
                 </div>
 
                 {/* Section 3: Customer Remarks */}
@@ -2590,7 +2628,9 @@ function getProfileSections(profile: CustomerProfileDetails) {
         keyof CustomerProfileDetails,
         CustomerProfileDetails[keyof CustomerProfileDetails],
       ]
-      const entries = Object.entries(profile) as ProfileEntry[]
+      const entries = (Object.entries(profile) as ProfileEntry[]).filter(
+        ([key]) => key !== 'planIds',
+      )
       const seen = new Set<keyof CustomerProfileDetails>()
       const sections: {
         title: string
@@ -2682,6 +2722,7 @@ function DetailGrid({
 }) {
       const entries = Object.entries(data).filter(
         ([key, value]) =>
+          key !== 'planIds' &&
           !exclude.includes(key) &&
           value !== undefined &&
           value !== null &&
