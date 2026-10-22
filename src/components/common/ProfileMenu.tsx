@@ -87,6 +87,16 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     })
   }
 
+  // Airtel Service — ADMIN only (SMSF reference: SuperAdmin only)
+  if (role === 'ADMIN') {
+    entries.push({
+      icon: '☎',
+      label: 'Airtel Service',
+      description: 'Inbound call records, durations & call outcomes',
+      to: '/admin/airtel-service',
+    })
+  }
+
   // Salary Management — everyone except CUSTOMER (SMSF reference)
   entries.push({
     icon: '₹',
