@@ -24,7 +24,7 @@ interface MenuEntry {
 
 /**
  * SMSF-style profile settings menu: Profile Update,
- * My Airtel Calls, Manage Services, Salary Management.
+ * Config, My Airtel Calls, Manage Services, Airtel Service, Salary Management.
  * Visibility mirrors SMSF's Sidebar settingsMenuItems.
  */
 export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps) {
@@ -66,6 +66,16 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     description: 'Update your phone and contact details',
     to: '/profile-update',
   })
+
+  // Config — ADMIN only (SMSF reference: SuperAdmin only)
+  if (role === 'ADMIN') {
+    entries.push({
+      icon: '⚙',
+      label: 'Config',
+      description: 'Manage system configuration',
+      to: '/admin/config',
+    })
+  }
 
   // My Airtel Calls — HEAD + USER only (SMSF hides for SUPERADMIN/CUSTOMER)
   if (role === 'HEAD' || role === 'USER') {

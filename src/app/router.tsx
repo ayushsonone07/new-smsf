@@ -51,6 +51,9 @@ const DepartmentHelpCenterPage = lazy(() =>
 const SalaryManagementPage = lazy(() =>
   import('../features/departments/head/pages/SalaryManagementPage').then((module) => ({ default: module.SalaryManagementPage })),
 )
+const ConfigPage = lazy(() =>
+  import('../features/config/ConfigPage').then((module) => ({ default: module.ConfigPage })),
+)
 const DepartmentServicesPage = lazy(() =>
   import('../features/departments/pages/DepartmentServicesPage').then((module) => ({ default: module.DepartmentServicesPage })),
 )
@@ -277,6 +280,20 @@ const salaryManagementAliasRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/salary-management',
   component: SalaryManagementPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminConfigRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/config',
+  component: ConfigPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const configAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/config',
+  component: ConfigPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -995,6 +1012,8 @@ const routeTree = rootRoute.addChildren([
     airtelServiceAliasRoute,
     adminSalaryManagementRoute,
     salaryManagementAliasRoute,
+    adminConfigRoute,
+    configAliasRoute,
     servicesAliasRoute,
     departmentFeaturesRoute,
     departmentFinanceRoute,
