@@ -63,6 +63,7 @@ export interface VerifyPaymentResult {
   success: boolean
   message?: string
   data?: {
+    /** Rupees, already converted by SMSB from Razorpay/payment_info paise. */
     amount?: number | null
     paidAt?: string | null
   }
