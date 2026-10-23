@@ -107,12 +107,15 @@ export async function sendFaceEnrollLink(recipientUsername: string, link: string
 }
 
 // ── HRM SMTP ────────────────────────────────────────────────────────────────────
+// SMSB proxies HRM SMTP settings to HRM-System-backend via /api/hrm/integration/smtp-settings
 export async function getHrmSmtpConfig(): Promise<HrmSmtpConfig | null> {
   try {
-    const res = await apiClient.get<CustomApiResponse<HrmSmtpConfig> | HrmSmtpConfig>('/api/v1/hrm/smtp')
+    const res = await apiClient.get<CustomApiResponse<any>>('/api/hrm/integration/smtp-settings')
     const payload = res.data
-    if (payload && 'data' in payload && payload.data) return payload.data
-    if (payload && 'host' in payload) return payload as HrmSmtpConfig
+    // SMSB wraps response as: { status, message, data: { data: HrmSmtpSettingsDto, ... } }
+    const inner = payload?.data
+    if (inner && 'data' in inner && inner.data) return inner.data as HrmSmtpConfig
+    if (inner && 'host' in inner) return inner as HrmSmtpConfig
     return null
   } catch {
     return null
@@ -120,11 +123,11 @@ export async function getHrmSmtpConfig(): Promise<HrmSmtpConfig | null> {
 }
 
 export async function saveHrmSmtpConfig(dto: HrmSmtpConfig): Promise<void> {
-  await apiClient.post('/api/v1/hrm/smtp', dto)
+  await apiClient.put('/api/hrm/integration/smtp-settings', dto)
 }
 
 export async function testHrmSmtpEmail(toEmail: string): Promise<void> {
-  await apiClient.post('/api/v1/hrm/smtp/test', { toEmail })
+  await apiClient.post('/api/hrm/smtp/test', { toEmail })
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────────

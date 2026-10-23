@@ -169,6 +169,22 @@ export function AdminSidebar({
             </a>
           )
         })}
+
+        {/* HRM System — cross-router navigation (react-router-dom boundary) */}
+        {role === 'ADMIN' && (
+          <a
+            href="/hrm/dashboard"
+            className={`nav-item ${location.pathname.startsWith('/hrm') ? 'active' : ''}`}
+            onClick={(event) => {
+              event.preventDefault()
+              onNavigate?.()
+              window.location.href = '/hrm/dashboard'
+            }}
+          >
+            <span>👥</span>
+            <span>HRM System</span>
+          </a>
+        )}
       </nav>
 
       {panelOpen ? (
