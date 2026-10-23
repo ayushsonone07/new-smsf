@@ -428,6 +428,16 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Route-only animated loading skeleton** — old `GlobalPreloader` API-client activity
+      subscription remove kiya, isliye polling/background refetch/manual API calls ab full-screen
+      `Loading data...` overlay trigger nahi karte. Loader ab TanStack Router navigation state aur
+      lazy `Suspense` component loading par hi show hota hai. Desktop/tablet/mobile responsive
+      sidebar + cards + table skeleton me shimmer aur 220ms fade-out transition add kiya;
+      reduced-motion preference supported. Full production build successful (3668 modules).
+- [x] **HRM production build dependency restored** — HRM embed imports
+      `react-router-dom`, jo `package.json`/`package-lock.json` me declared tha lekin local
+      `node_modules` me missing tha. Lockfile-aligned `npm install` se
+      `react-router-dom@7.18.4` install hua; full `npm run build` successful (3668 modules).
 - [x] **Final Assigned To permission resolver fix** — admin-configured `Assigned To` name
       pehle frontend ke `Assign To` alias group se match nahi hota tha, isliye Head ke
       `Read + Write` ke bawajood assignee read-only pill render hota tha. Ab `Assigned To`,
