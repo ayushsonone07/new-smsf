@@ -505,7 +505,7 @@ export function RegisterBusinessPage() {
         if (pkgPrice > verifiedPaymentAmount) {
           showToast({
             title: 'Package Exceeds Verified Amount',
-            description: `${pkg.name} price (₹${pkgPrice.toLocaleString('en-IN')}) exceeds verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+            description: `${pkg.name} price (₹${pkgPrice.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
             variant: 'destructive',
           })
           return
@@ -528,7 +528,7 @@ export function RegisterBusinessPage() {
         if (otherSelectedCost + pkgPrice > verifiedPaymentAmount) {
           showToast({
             title: 'Total Exceeds Verified Amount',
-            description: `Total amount (₹${(otherSelectedCost + pkgPrice).toLocaleString('en-IN')}) cannot exceed verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+            description: `Total amount (₹${(otherSelectedCost + pkgPrice).toLocaleString('en-IN')}) cannot exceed verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
             variant: 'destructive',
           })
           return
@@ -771,7 +771,7 @@ export function RegisterBusinessPage() {
       if (currentTotal > verifiedPaymentAmount) {
         showToast({
           title: 'Amount Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) cannot exceed your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) cannot exceed your verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
@@ -1367,7 +1367,7 @@ export function RegisterBusinessPage() {
                   <span>
                     Payment Verified:{' '}
                     <strong>
-                      ₹{verifiedPaymentAmount?.toLocaleString('en-IN')}
+                      ₹{verifiedPaymentAmount != null && formatVerifiedRupees(verifiedPaymentAmount)}
                     </strong>{' '}
                     paid
                     {paidOn &&
@@ -1416,7 +1416,7 @@ export function RegisterBusinessPage() {
                     <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                     Verified Payment:{' '}
                     <strong>
-                      ₹{verifiedPaymentAmount.toLocaleString('en-IN')}
+                      ₹{formatVerifiedRupees(verifiedPaymentAmount)}
                     </strong>
                     . Only packages within this amount can be selected.
                   </span>
@@ -1459,7 +1459,7 @@ export function RegisterBusinessPage() {
                         if (isExceedingPayment) {
                           showToast({
                             title: 'Package Exceeds Verified Amount',
-                            description: `${pkg.name} price (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')}`,
+                            description: `${pkg.name} price (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
                             variant: 'destructive',
                           })
                           return
@@ -2279,3 +2279,11 @@ function ChoiceCard({
     </label>
   )
 }
+
+// Payment verification returns rupees. Razorpay and payment_info store the same
+// value in paise, so never render that database value directly in this form.
+const formatVerifiedRupees = (amount: number): string =>
+  amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
