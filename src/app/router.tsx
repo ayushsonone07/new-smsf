@@ -5,7 +5,9 @@ import {
   createRouter,
   Outlet,
 } from '@tanstack/react-router'
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
+
+const HrmEmbed = lazy(() => import('../modules/hrm/HrmEmbed'))
 import {
   requireAuth,
   requireRole,
@@ -80,6 +82,9 @@ const CustomerLoginPage = lazy(() =>
 )
 const RegisterBusinessPage = lazy(() =>
   import('../features/customers/pages/RegisterBusinessPage').then((module) => ({ default: module.RegisterBusinessPage })),
+)
+const SalesProposalPage = lazy(() =>
+  import('../features/sales/pages/SalesProposalPage').then((module) => ({ default: module.SalesProposalPage })),
 )
 const CustomerDashboardPage = lazy(() =>
   import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
@@ -171,6 +176,16 @@ const rootRoute = createRootRoute({
   notFoundComponent: NotFoundPage,
 })
 
+const hrmRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/hrm/$',
+  component: () => (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>Loading HRM...</div>}>
+      <HrmEmbed />
+    </Suspense>
+  ),
+})
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
@@ -181,6 +196,12 @@ const registerBusinessRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register-business',
   component: RegisterBusinessPage,
+})
+
+const salesProposalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sales',
+  component: SalesProposalPage,
 })
 
 const loginRoute = createRoute({
@@ -199,6 +220,12 @@ const onboardingConfirmationRoute = createRoute({
 const departmentConfirmationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/confirmation/department',
+  component: OnboardingConfirmationPage,
+})
+
+const websiteConfirmationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/confirmation/website',
   component: OnboardingConfirmationPage,
 })
 
@@ -930,6 +957,7 @@ const dynamicDepartmentScreenRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   registerBusinessRoute,
+  salesProposalRoute,
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,
@@ -1042,11 +1070,13 @@ const routeTree = rootRoute.addChildren([
   directHelpSupportRoute,
   onboardingConfirmationRoute,
   departmentConfirmationRoute,
+  websiteConfirmationRoute,
   profileUpdateRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,
   departmentHelpCenterRoute,
   departmentServicesRoute,
+  hrmRoute,
   dynamicDepartmentLayoutRoute.addChildren([
     dynamicDepartmentRoleScreenRoute,
     dynamicDepartmentRoleIndexRoute,

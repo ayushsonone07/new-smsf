@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+﻿import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -33,7 +33,7 @@ import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import { resolveDeptFromPath } from '../utils/routeUtils'
+import { resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
@@ -173,30 +173,37 @@ export function CustomerListPage() {
         window.location.pathname.includes('/users')))
 
   const permissionRouteName = typeof window !== 'undefined'
-    ? window.location.pathname.replace(/^\/+|\/+$/g, '')
-    : undefined
+    ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
+    : 'customers'
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = isDeptUser || canEditColumn('Status')
+  const canEditStatus = canEditColumn('Status')
 
   const isAssignToVisible =
     !isDeptUser &&
-    (isColumnEnabled('Assign To', 'customer') ||
+    (isColumnEnabled('Assigned To', 'customer') ||
+      isColumnEnabled('Assign To', 'customer') ||
       isColumnEnabled('Assign', 'customer') ||
       isColumnEnabled('Assignee', 'customer'))
   const canEditAssignTo =
     !isDeptUser &&
-    (canEditColumn('Assign To') ||
+    (canEditColumn('Assigned To') ||
+      canEditColumn('Assign To') ||
       canEditColumn('Assign') ||
       canEditColumn('Assignee'))
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark = session?.user.role === 'USER'
+  const canEditRemark =
+    canEditColumn('Internal Remark') || canEditColumn('Remark')
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
+  const canEditContact =
+    canEditColumn('Contact') ||
+    canEditColumn('Phone') ||
+    canEditColumn('Contact Number')
 
   const isBusinessVisible =
     isColumnEnabled('Business', 'customer') ||
@@ -622,6 +629,10 @@ export function CustomerListPage() {
   }
 
   async function handleAssignUser(customerId: string, assigneeId: string | null) {
+    if (!canEditAssignTo) {
+      alert("You don't have permission to update the assignee.")
+      return
+    }
     if (!assigneeId) return
     setLocalAssigneeMap((prev) => ({ ...prev, [customerId]: assigneeId }))
     try {
@@ -673,7 +684,7 @@ export function CustomerListPage() {
   }
 
   async function handleStatusChange(customerId: string, status: OnboardingStatus) {
-    if (!isDeptUser && !canEditStatus) {
+    if (!canEditStatus) {
       alert("You don't have permission to update status.")
       return
     }
@@ -819,7 +830,7 @@ export function CustomerListPage() {
       if (isOnboardingDept) await authSummaryQuery.refetch()
       if (status === 'completed') {
         const customer = onboardingCustomers.find((item) => item.id === customerId)
-        notifyServiceCompleted(customer ?? { id: customerId })
+        notifyServiceCompleted(customer ?? { id: customerId }, sType, currentDepartment)
       }
     } catch (err: unknown) {
       console.error('Failed to update status:', err)
@@ -905,6 +916,7 @@ export function CustomerListPage() {
         showRemark={isRemarkVisible}
         canEditRemark={canEditRemark}
         showContact={isContactVisible}
+        canEditContact={canEditContact}
         showBusiness={isBusinessVisible}
         showUpdated={false}
         showServiceType={useRowsEndpoint && isServiceTypeVisible}
@@ -929,9 +941,13 @@ export function CustomerListPage() {
         callingCustomerId={callingCustomerId}
         onSendAcknowledgement={setConfirmingCustomer}
         onAssigneeChange={handleAssignUser}
-        onRemarkChange={(id, remark) =>
+        onRemarkChange={(id, remark) => {
+          if (!canEditRemark) {
+            alert("You don't have permission to update internal remarks.")
+            return
+          }
           patchCustomer(id, { remark })
-        }
+        }}
       />
 
       {/* Table Pagination */}
@@ -965,6 +981,7 @@ export function CustomerListPage() {
         assignees={assignees}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
+        canEditRemark={canEditRemark}
         departmentType={currentDepartment}
         initialTab={modalTab}
         onClose={() => {

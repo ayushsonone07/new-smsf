@@ -29,8 +29,10 @@ interface ConfirmationResponse {
 const booleanValue = (value: boolean | string | undefined) =>
   typeof value === 'string' ? value === 'true' : Boolean(value)
 
-function decodePayload(encoded: string, isDepartment: boolean): ConfirmationPayload {
-  const secret = isDepartment
+function decodePayload(encoded: string, routeType: 'department' | 'website' | 'onboarding'): ConfirmationPayload {
+  const secret = routeType === 'website'
+    ? import.meta.env.VITE_WEBSITE_CONFIRMATION_SECRET || 'mbg_website_confirmation'
+    : routeType === 'department'
     ? import.meta.env.VITE_DEPARTMENT_CONFIRMATION_SECRET || 'mbg_department_confirmation'
     : import.meta.env.VITE_ONBOARDING_CONFIRMATION_SECRET || 'mbg_onboarding_confirmation'
   const decoded = atob(encoded.replace(/ /g, '+'))
@@ -41,7 +43,9 @@ function decodePayload(encoded: string, isDepartment: boolean): ConfirmationPayl
 }
 
 export function OnboardingConfirmationPage() {
-  const isDepartment = window.location.pathname.endsWith('/department')
+  const isWebsite = window.location.pathname.endsWith('/website')
+  const isDepartment = isWebsite || window.location.pathname.endsWith('/department')
+  const routeType: 'department' | 'website' | 'onboarding' = isWebsite ? 'website' : window.location.pathname.endsWith('/department') ? 'department' : 'onboarding'
   const startedRef = useRef(false)
   const [state, setState] = useState<ConfirmationState>('loading')
   const [message, setMessage] = useState('')
@@ -120,7 +124,7 @@ export function OnboardingConfirmationPage() {
     const encrypted = params.get('data')
     try {
       const details = encrypted
-        ? decodePayload(encrypted, isDepartment)
+        ? decodePayload(encrypted, routeType)
         : {
             token: params.get('token') || undefined,
             email: params.get('email') || undefined,

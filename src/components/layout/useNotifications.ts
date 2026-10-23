@@ -1,13 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { getSession } from '../../app/auth/session'
+import { useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HeadNotification } from '../../features/departments/head/types/head.types'
-import {
-  getNotificationsForUser,
-  markAllNotificationsForUserRead,
-  markSuperAdminNotificationRead,
-  subscribeSuperAdminNotifications,
-  type SuperAdminNotification,
-} from '../../api/superadmin-notifications.api'
+import type { SuperAdminNotification } from '../../api/superadmin-notifications.api'
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications.api'
 
 function toHeadNotification(item: SuperAdminNotification): HeadNotification {
   return {
@@ -16,6 +11,7 @@ function toHeadNotification(item: SuperAdminNotification): HeadNotification {
     timeLabel: formatTime(item.createdAt),
     unread: !item.read,
     link: item.link,
+    kind: item.kind,
   }
 }
 
@@ -30,33 +26,26 @@ function formatTime(iso: string): string {
  * signed-in user (role- and department-scoped). Super admins see everything.
  */
 export function useNotifications() {
-  const [raw, setRaw] = useState<SuperAdminNotification[]>([])
-
-  useEffect(() => {
-    const session = getSession()
-    let active = true
-    getNotificationsForUser(session?.user).then((data) => {
-      if (active) setRaw(data)
-    })
-    const unsubscribe = subscribeSuperAdminNotifications(() => {
-      void getNotificationsForUser(getSession()?.user).then((data) => {
-        if (active) setRaw(data)
-      })
-    })
-    return () => {
-      active = false
-      unsubscribe()
-    }
-  }, [])
+  const queryClient = useQueryClient()
+  const { data: raw = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: true,
+  })
 
   const items = useMemo(() => raw.map(toHeadNotification), [raw])
 
   function markAllRead() {
-    void markAllNotificationsForUserRead(getSession()?.user)
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+      items.map((item) => ({ ...item, read: true })))
+    void markAllNotificationsRead().then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
   }
 
   function markRead(id: string) {
-    void markSuperAdminNotificationRead(id)
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+      items.map((item) => item.id === id ? { ...item, read: true } : item))
+    void markNotificationRead(id).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
   }
 
   return { items, markAllRead, markRead }

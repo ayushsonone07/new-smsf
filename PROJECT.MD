@@ -426,6 +426,37 @@ se persist; `CustomerOnboardingPage.tsx` local-only overrides wala aata hai, reg
 Dhyan rahe: Customer Columns config (admin card) ab customers-list table ka layout control
 nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
+### Latest completed (23 Oct 2026)
+
+- [x] **Admin login password visibility toggle** — sign-in password field me professional
+      Eye/EyeOff button add kiya; show/hide state, keyboard focus ring, hover feedback,
+      `aria-label`/`aria-pressed`, tooltip aur input text ke liye safe right padding included.
+- [x] **Route-only animated loading skeleton** — old `GlobalPreloader` API-client activity
+      subscription remove kiya, isliye polling/background refetch/manual API calls ab full-screen
+      `Loading data...` overlay trigger nahi karte. Loader ab TanStack Router navigation state aur
+      lazy `Suspense` component loading par hi show hota hai. Desktop/tablet/mobile responsive
+      sidebar + cards + table skeleton me shimmer aur 220ms fade-out transition add kiya;
+      reduced-motion preference supported. Full production build successful (3668 modules).
+- [x] **HRM production build dependency restored** — HRM embed imports
+      `react-router-dom`, jo `package.json`/`package-lock.json` me declared tha lekin local
+      `node_modules` me missing tha. Lockfile-aligned `npm install` se
+      `react-router-dom@7.18.4` install hua; full `npm run build` successful (3668 modules).
+- [x] **Final Assigned To permission resolver fix** — admin-configured `Assigned To` name
+      pehle frontend ke `Assign To` alias group se match nahi hota tha, isliye Head ke
+      `Read + Write` ke bawajood assignee read-only pill render hota tha. Ab `Assigned To`,
+      `Assign To`, `Assign`, `Assignee` ek permission key hain; route UUID comparison
+      case-insensitive hai aur comma-separated `routesType` IDs bhi resolve hote hain.
+      `READ_WRITE`/`CAN_EDIT`/`12` backend permission formats normalize hote hain.
+- [x] **Customer List dynamic column permissions fixed** — `/onboarding/head/customers`
+      par `Status`, `Assigned To`, `Contact` aur `Internal Remark` ab current role ke
+      route-scoped Head/User permission ko enforce karte hain. `Read Only` par controls
+      disabled/read-only hain aur mutation handlers bhi direct/programmatic update ko reject
+      karte hain. `USER`/`DEPARTMENT_USER` aliases normalize kiye; missing route-column mapping
+      writes ke liye fail-closed hai. Drawer ke internal remark add/edit controls bhi same
+      permission follow karte hain. `npm run build` successful.
+- [x] **Completion-log rule** — ab har completed implementation ka result aur verification
+      isi `PROJECT.MD` ke latest-completed section me date ke saath record kiya jayega.
+
 ### Done
 - [x] Router tree fix (`/login`, `_authed` layout, sab routes registered) — "Page not found" bug
 - [x] Auth pages ka missing CSS (`auth-*`, `forbidden-*`, `role-badge`, `status-badge`, tokens page)
