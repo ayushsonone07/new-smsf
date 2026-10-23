@@ -75,6 +75,9 @@ const CustomerLoginPage = lazy(() =>
 const RegisterBusinessPage = lazy(() =>
   import('../features/customers/pages/RegisterBusinessPage').then((module) => ({ default: module.RegisterBusinessPage })),
 )
+const SalesProposalPage = lazy(() =>
+  import('../features/sales/pages/SalesProposalPage').then((module) => ({ default: module.SalesProposalPage })),
+)
 const CustomerDashboardPage = lazy(() =>
   import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
 )
@@ -175,6 +178,12 @@ const registerBusinessRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register-business',
   component: RegisterBusinessPage,
+})
+
+const salesProposalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sales',
+  component: SalesProposalPage,
 })
 
 const loginRoute = createRoute({
@@ -896,6 +905,7 @@ const dynamicDepartmentScreenRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   registerBusinessRoute,
+  salesProposalRoute,
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,
