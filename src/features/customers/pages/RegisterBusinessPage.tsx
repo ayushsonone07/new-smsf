@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Building2,
   Check,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Eye,
   EyeOff,
@@ -26,6 +28,7 @@ import type {
   PlanAmount,
   PlanWithDepartments,
 } from '../types/register-business.types'
+import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
 
 /* ─────────────────────────────────────────────────────────────────
    Single-page version of the "Register Your Business" form from SMSF
@@ -122,8 +125,73 @@ const validateGSTNumber = (gst: string): boolean =>
 const isValidServiceMonths = (value: string) =>
   /^\d+$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= 60
 
-const monthsLabel = (months: number) =>
+export const monthsLabel = (months: number) =>
   `${months} month${months === 1 ? '' : 's'}`
+
+/**
+ * Standard duration filter chips always available on the registration page:
+ * 1 Month, 3 Months, 6 Months, 12 Months.
+ */
+export const DEFAULT_DURATION_OPTIONS = [1, 3, 6, 12]
+
+/**
+ * Extracts a plan's duration in months.
+ * Prefers explicit `durationMonths` from backend planAmounts if > 0.
+ * Otherwise parses plan name & description for month/year keywords and numbers
+ * (e.g. "1 Month", "3 Months", "6 Month", "12 Months", "12 moth", "1 Year", "quarterly", "annual", etc.).
+ */
+export function extractPlanDurationMonths(
+  name?: string | null,
+  description?: string | null,
+  backendMonths?: number | null,
+): number {
+  if (backendMonths != null && Number(backendMonths) > 0) {
+    return Number(backendMonths)
+  }
+
+  const text = `${name || ''} ${description || ''}`.trim()
+  if (!text) return 0
+
+  // 1. Half-yearly / semi-annual (check before yearly to avoid substring match)
+  if (/\b(?:half[- ]yearly|semi[- ]annual)\b/i.test(text)) {
+    return 6
+  }
+
+  // 2. Quarterly (3 months)
+  if (/\b(?:quarterly|quarter)\b/i.test(text)) {
+    return 3
+  }
+
+  // 3. Year matching (e.g., "1 year", "2 years", "1 yr", "1yr", "1-year")
+  const yearMatch = text.match(/\b(\d+)\s*(?:years?|yrs?)\b/i)
+  if (yearMatch) {
+    return parseInt(yearMatch[1], 10) * 12
+  }
+
+  // 4. Named annual / yearly
+  if (/\b(?:annual|yearly|per year)\b/i.test(text)) {
+    return 12
+  }
+
+  // 5. Month matching (e.g. "1 month", "3 months", "6 month", "12 month", "12 moth", "3mo", etc.)
+  const monthMatch = text.match(/\b(\d+)\s*(?:months?|moths?|mths?|mo)\b/i)
+  if (monthMatch) {
+    return parseInt(monthMatch[1], 10)
+  }
+
+  // Shorthand with 'm' (e.g. "1m", "3m", "6m", "12m", case-insensitive)
+  const shortMatch = text.match(/\b(1|3|6|12)\s*m\b/i)
+  if (shortMatch) {
+    return parseInt(shortMatch[1], 10)
+  }
+
+  // 6. Named monthly
+  if (/\b(?:monthly|per month)\b/i.test(text)) {
+    return 1
+  }
+
+  return 0
+}
 
 /* Plans of this duration are shown first in the plan filter. */
 const DEFAULT_PLAN_MONTHS = 15
@@ -200,13 +268,17 @@ export function RegisterBusinessPage() {
   /* Toggle 18% GST addition on packages */
   const [includeGst, setIncludeGst] = useState(true)
 
-  /* Currently viewed plan's features in modal */
+  /* Currently viewed plan's features in side drawer */
   const [viewingFeaturesPlan, setViewingFeaturesPlan] = useState<{
     name: string
     features: string[]
+    departments?: string[]
+    cost?: number
+    isExceedingPayment?: boolean
   } | null>(null)
 
   const featuresDrawerRef = useRef<HTMLDivElement>(null)
+  const featuresListRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!viewingFeaturesPlan) return
@@ -416,7 +488,7 @@ export function RegisterBusinessPage() {
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
   const verifiedPaymentAmount =
     paymentVerified && currentPaymentCheck?.amount != null
-      ? Number(currentPaymentCheck.amount)
+      ? normalizeAmountToRupees(currentPaymentCheck.amount)
       : null
 
   const handleVerifyPayment = useCallback(async () => {
@@ -449,7 +521,7 @@ export function RegisterBusinessPage() {
       })
 
       if (res.success && res.data?.amount != null) {
-        const verifiedAmt = Number(res.data.amount)
+        const verifiedAmt = normalizeAmountToRupees(res.data.amount)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
           const remaining = total - verifiedAmt
@@ -478,17 +550,23 @@ export function RegisterBusinessPage() {
   const priceOf = useCallback(
     (planName: string) => {
       const row = planAmounts.find((a) => a.planName === planName)
+      const pkg = plans.find((p) => p.name === planName)
       const amount =
         (Number(row?.amount) || 0) + (Number(row?.additionalAmount) || 0)
+      const months = extractPlanDurationMonths(
+        planName,
+        pkg?.description,
+        row?.durationMonths,
+      )
       return {
         amount,
         withGst: Math.round(amount * (1 + GST_RATE)),
         hasPrice: row?.amount != null || row?.additionalAmount != null,
-        months: Number(row?.durationMonths) || 0,
+        months,
         featureList: row?.featureList ?? [],
       }
     },
-    [planAmounts],
+    [planAmounts, plans],
   )
 
   /* What the selected plans add up to. */
@@ -618,10 +696,13 @@ export function RegisterBusinessPage() {
     )
   }, [autoMonths])
 
-  /* Duration filter for the plan cards */
+  /* Duration filter for the plan cards: includes 1, 3, 6, 12 and any durations from loaded plans */
   const durationOptions = useMemo(() => {
+    const fromPlans = plans
+      .map((p) => priceOf(p.name).months)
+      .filter((m) => m > 0)
     return Array.from(
-      new Set(plans.map((p) => priceOf(p.name).months).filter((m) => m > 0)),
+      new Set([...DEFAULT_DURATION_OPTIONS, ...fromPlans]),
     ).sort((x, y) => x - y)
   }, [plans, priceOf])
 
@@ -630,11 +711,7 @@ export function RegisterBusinessPage() {
     (durationFilter !== null && durationOptions.includes(durationFilter))
       ? durationFilter
       : null
-  const activeDuration: number | 'all' =
-    chosenDuration ??
-    (durationOptions.includes(DEFAULT_PLAN_MONTHS)
-      ? DEFAULT_PLAN_MONTHS
-      : 'all')
+  const activeDuration: number | 'all' = chosenDuration ?? 'all'
   const visiblePlans =
     activeDuration === 'all'
       ? plans
@@ -1464,7 +1541,18 @@ export function RegisterBusinessPage() {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {visiblePlans.map((pkg) => {
+                {visiblePlans.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center text-sm text-slate-500 sm:col-span-2">
+                    No packages found for{' '}
+                    <span className="font-semibold text-slate-700">
+                      {typeof activeDuration === 'number'
+                        ? monthsLabel(activeDuration)
+                        : 'this selection'}
+                    </span>
+                    .
+                  </div>
+                ) : (
+                  visiblePlans.map((pkg) => {
                   const isSelected = !!formData.selectedPackages?.includes(
                     pkg.id,
                   )
@@ -1473,18 +1561,30 @@ export function RegisterBusinessPage() {
                   const isExceedingPayment =
                     verifiedPaymentAmount != null &&
                     pkgCost > verifiedPaymentAmount
+                  const isViewingFeatures = viewingFeaturesPlan?.name === pkg.name
                   return (
                     <div
                       key={pkg.id}
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => {
+                        // Always open the feature list for review
+                        setViewingFeaturesPlan({
+                          name: pkg.name,
+                          features: price.featureList || [],
+                          departments: pkg.departments || [],
+                          cost: pkgCost,
+                          isExceedingPayment,
+                        })
+
                         if (isExceedingPayment) {
                           showToast({
-                            title: 'Package Exceeds Verified Amount',
-                            description: `${pkg.name} price (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
-                            variant: 'destructive',
+                            title: 'Reviewing Package Features',
+                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
+                            variant: 'default',
                           })
                           return
                         }
+
                         handlePackageToggle(pkg.id)
                       }}
                       className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
@@ -1492,7 +1592,9 @@ export function RegisterBusinessPage() {
                           ? 'cursor-not-allowed border-slate-200 bg-slate-100/70 opacity-60'
                           : isSelected
                             ? 'cursor-pointer border-blue-500 bg-blue-50/50 ring-1 ring-blue-500'
-                            : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
+                            : isViewingFeatures
+                              ? 'cursor-pointer border-emerald-400 bg-emerald-50/40 ring-1 ring-emerald-400'
+                              : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
                       }`}
                     >
                       <button
@@ -1502,7 +1604,16 @@ export function RegisterBusinessPage() {
                         disabled={isExceedingPayment}
                         onClick={(e) => {
                           e.stopPropagation()
-                          handlePackageToggle(pkg.id)
+                          setViewingFeaturesPlan({
+                            name: pkg.name,
+                            features: price.featureList || [],
+                            departments: pkg.departments || [],
+                            cost: pkgCost,
+                            isExceedingPayment,
+                          })
+                          if (!isExceedingPayment) {
+                            handlePackageToggle(pkg.id)
+                          }
                         }}
                         className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                           isSelected
@@ -1563,6 +1674,7 @@ export function RegisterBusinessPage() {
                           <div
                             className="mt-2.5 border-t border-slate-200/60 pt-2"
                             onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
                           >
                             <button
                               type="button"
@@ -1582,7 +1694,8 @@ export function RegisterBusinessPage() {
                       </div>
                     </div>
                   )
-                })}
+                })
+              )}
               </div>
             </>
           )}
@@ -2048,27 +2161,29 @@ export function RegisterBusinessPage() {
         </div>
       )}
 
-      {/* ─── Features Compact Right-Side Popup (No Background Hide) ─── */}
+      {/* ─── Features Floating Side Panel (Shows 10 Features in Single Page, Scroll for More) ─── */}
       {viewingFeaturesPlan && (
         <div
           ref={featuresDrawerRef}
           role="dialog"
           aria-modal="false"
           aria-label="Included Features"
-          className="drawer-right-enter fixed right-4 top-20 z-50 flex max-h-[72vh] w-[320px] sm:w-[350px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md"
+          className="fixed right-4 sm:right-6 top-20 z-50 w-[calc(100vw-32px)] sm:w-[410px] max-h-[calc(100vh-100px)] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 p-3.5 px-4 bg-slate-50/60">
+          <div className="flex items-center justify-between border-b border-slate-100 p-3.5 px-4 bg-slate-50/80 flex-shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 shadow-xs">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0 shadow-xs">
                 <Check className="h-4 w-4 stroke-[2.5]" />
               </span>
               <div className="min-w-0">
-                <h3 className="truncate text-xs font-bold text-slate-900">
+                <h3 className="truncate text-sm font-bold text-slate-900">
                   {viewingFeaturesPlan.name}
                 </h3>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  {viewingFeaturesPlan.features.length} Features Included
+                <p className="text-xs text-slate-500 font-medium">
+                  {viewingFeaturesPlan.features.length > 0
+                    ? `Included Features (${viewingFeaturesPlan.features.length})`
+                    : `${viewingFeaturesPlan.departments?.length || 0} Departments Included`}
                 </p>
               </div>
             </div>
@@ -2082,32 +2197,102 @@ export function RegisterBusinessPage() {
             </button>
           </div>
 
-          {/* Features List */}
-          <div className="flex-1 space-y-1.5 overflow-y-auto p-3.5">
-            {viewingFeaturesPlan.features.map((feature, idx) => (
-              <div
-                key={idx}
-                className="flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2 text-[11px] text-slate-700 transition-colors hover:bg-slate-100/80"
-              >
-                <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
-                  <Check className="h-2 w-2 stroke-[3]" />
-                </span>
-                <span className="break-words font-medium leading-relaxed">
-                  {feature}
-                </span>
+          {/* Informational Notice if package exceeds payment */}
+          {viewingFeaturesPlan.isExceedingPayment && verifiedPaymentAmount != null && (
+            <div className="mx-3.5 mt-2.5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 shadow-xs flex-shrink-0">
+              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-amber-950">Package exceeds verified payment</p>
+                <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+                  Price: ₹{viewingFeaturesPlan.cost?.toLocaleString('en-IN')} (verified: ₹{formatVerifiedRupees(verifiedPaymentAmount)}). Review only.
+                </p>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Features List: Shows 10 features in a single page, scrolls for additional items */}
+          <div
+            ref={featuresListRef}
+            className="max-h-[500px] overflow-y-auto p-3.5 space-y-2 overscroll-contain select-text [scrollbar-width:thin] [scrollbar-color:#94a3b8_#f1f5f9] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400"
+          >
+            {viewingFeaturesPlan.features.length > 0 ? (
+              viewingFeaturesPlan.features.map((feature, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 p-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-100/60"
+                >
+                  <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                    <Check className="h-2.5 w-2.5 stroke-[3]" />
+                  </span>
+                  <span className="break-words font-medium leading-relaxed">
+                    {feature}
+                  </span>
+                </div>
+              ))
+            ) : viewingFeaturesPlan.departments && viewingFeaturesPlan.departments.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-slate-600">
+                  Included Departments with full service access:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {viewingFeaturesPlan.departments.map((dept) => {
+                    const label = departmentLabel(dept)
+                    return (
+                      <span
+                        key={dept}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800"
+                      >
+                        <span className={`h-2 w-2 rounded-full ${departmentDot(label)}`} />
+                        {label}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs text-slate-500">
+                No specific features listed for this package.
+              </div>
+            )}
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 p-2.5 px-4">
-            <span className="text-[10px] text-slate-400 font-medium">
-              Click anywhere outside to close
-            </span>
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/90 p-2.5 px-4 flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[11px] text-slate-500 font-medium truncate">
+                {viewingFeaturesPlan.features.length > 10
+                  ? `Showing 10 of ${viewingFeaturesPlan.features.length} · Scroll for more`
+                  : viewingFeaturesPlan.features.length > 0
+                  ? `Showing all ${viewingFeaturesPlan.features.length} features`
+                  : viewingFeaturesPlan.departments && viewingFeaturesPlan.departments.length > 0
+                  ? `${viewingFeaturesPlan.departments.length} departments included`
+                  : 'Click outside or press ESC to close'}
+              </span>
+              {viewingFeaturesPlan.features.length > 10 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    title="Scroll up"
+                    onClick={() => featuresListRef.current?.scrollBy({ top: -220, behavior: 'smooth' })}
+                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Scroll down"
+                    onClick={() => featuresListRef.current?.scrollBy({ top: 220, behavior: 'smooth' })}
+                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setViewingFeaturesPlan(null)}
-              className="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+              className="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 flex-shrink-0 ml-2"
             >
               Close
             </button>
