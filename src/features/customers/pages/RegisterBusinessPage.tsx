@@ -1142,17 +1142,24 @@ export function RegisterBusinessPage() {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            <span className="hidden sm:inline-block whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500">
+              {completedCount}/{SECTIONS.length} done
+            </span>
+            <button
+              type="button"
+              onClick={() => { window.location.href = '/hrm/login' }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all hover:bg-blue-700 cursor-pointer"
+            >
+              HRM Login
+            </button>
             <button
               type="button"
               onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-5 py-2 text-white hover:bg-white hover:text-black hover:border-1 duration-250"
-            > 
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all hover:bg-blue-700 cursor-pointer"
+            >
               Login
             </button>
-            <span className="whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500">
-              {completedCount}/{SECTIONS.length} done
-            </span>
           </div>
         </div>
         <div className="h-0.5 bg-slate-100">

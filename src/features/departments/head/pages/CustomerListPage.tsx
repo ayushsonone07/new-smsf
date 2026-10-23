@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+﻿import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -33,7 +33,7 @@ import { useDepartmentCustomers } from '../../hooks/useDepartmentCustomers'
 import { useUpdateCustomer } from '../../hooks/useUpdateCustomer'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import { resolveDeptFromPath } from '../utils/routeUtils'
+import { resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
@@ -173,8 +173,8 @@ export function CustomerListPage() {
         window.location.pathname.includes('/users')))
 
   const permissionRouteName = typeof window !== 'undefined'
-    ? window.location.pathname.replace(/^\/+|\/+$/g, '')
-    : undefined
+    ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
+    : 'customers'
   const { isColumnEnabled, canEditColumn } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
@@ -830,7 +830,7 @@ export function CustomerListPage() {
       if (isOnboardingDept) await authSummaryQuery.refetch()
       if (status === 'completed') {
         const customer = onboardingCustomers.find((item) => item.id === customerId)
-        notifyServiceCompleted(customer ?? { id: customerId })
+        notifyServiceCompleted(customer ?? { id: customerId }, sType, currentDepartment)
       }
     } catch (err: unknown) {
       console.error('Failed to update status:', err)

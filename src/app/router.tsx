@@ -223,6 +223,12 @@ const departmentConfirmationRoute = createRoute({
   component: OnboardingConfirmationPage,
 })
 
+const websiteConfirmationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/confirmation/website',
+  component: OnboardingConfirmationPage,
+})
+
 const authedLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_authed',
@@ -1064,6 +1070,7 @@ const routeTree = rootRoute.addChildren([
   directHelpSupportRoute,
   onboardingConfirmationRoute,
   departmentConfirmationRoute,
+  websiteConfirmationRoute,
   profileUpdateRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,
