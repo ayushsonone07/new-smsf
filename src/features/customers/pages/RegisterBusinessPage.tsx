@@ -14,6 +14,7 @@ import {
   MapPin,
   Package,
   Wallet,
+  X,
 } from 'lucide-react'
 import {
   fetchPlanAmounts,
@@ -204,6 +205,26 @@ export function RegisterBusinessPage() {
     name: string
     features: string[]
   } | null>(null)
+
+  const featuresDrawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!viewingFeaturesPlan) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (featuresDrawerRef.current && !featuresDrawerRef.current.contains(e.target as Node)) {
+        setViewingFeaturesPlan(null)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setViewingFeaturesPlan(null)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [viewingFeaturesPlan])
 
   // Internal toast notification
   const [toast, setToast] = useState<ToastMessage | null>(null)
@@ -2027,49 +2048,69 @@ export function RegisterBusinessPage() {
         </div>
       )}
 
-      {/* ─── Features Modal ─── */}
+      {/* ─── Features Compact Right-Side Popup (No Background Hide) ─── */}
       {viewingFeaturesPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center gap-2.5 border-b border-slate-100 p-5 pb-3">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+        <div
+          ref={featuresDrawerRef}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Included Features"
+          className="drawer-right-enter fixed right-4 top-20 z-50 flex max-h-[72vh] w-[320px] sm:w-[350px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 p-3.5 px-4 bg-slate-50/60">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 shadow-xs">
                 <Check className="h-4 w-4 stroke-[2.5]" />
               </span>
               <div className="min-w-0">
-                <h3 className="truncate text-base font-bold text-slate-900">
+                <h3 className="truncate text-xs font-bold text-slate-900">
                   {viewingFeaturesPlan.name}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Included Features ({viewingFeaturesPlan.features.length})
+                <p className="text-[11px] text-slate-500 font-medium">
+                  {viewingFeaturesPlan.features.length} Features Included
                 </p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setViewingFeaturesPlan(null)}
+              aria-label="Close features"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-            <div className="max-h-[60vh] flex-1 space-y-2 overflow-y-auto p-5">
-              {viewingFeaturesPlan.features.map((feature, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-2.5 rounded-lg border border-slate-200/80 bg-slate-50/60 p-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-100/60"
-                >
-                  <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                    <Check className="h-2.5 w-2.5 stroke-[3]" />
-                  </span>
-                  <span className="break-words font-medium leading-relaxed">
-                    {feature}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-3">
-              <button
-                type="button"
-                onClick={() => setViewingFeaturesPlan(null)}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          {/* Features List */}
+          <div className="flex-1 space-y-1.5 overflow-y-auto p-3.5">
+            {viewingFeaturesPlan.features.map((feature, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2 text-[11px] text-slate-700 transition-colors hover:bg-slate-100/80"
               >
-                Close
-              </button>
-            </div>
+                <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                  <Check className="h-2 w-2 stroke-[3]" />
+                </span>
+                <span className="break-words font-medium leading-relaxed">
+                  {feature}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 p-2.5 px-4">
+            <span className="text-[10px] text-slate-400 font-medium">
+              Click anywhere outside to close
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewingFeaturesPlan(null)}
+              className="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

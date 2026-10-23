@@ -2828,3 +2828,26 @@ button.profile-chip--clickable:focus-visible {
   font-size: 13px;
 }
 
+
+
+@keyframes drawer-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.drawer-right-enter {
+  animation: drawer-slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.drawer-backdrop-enter {
+  animation: drawer-fade-in 0.22s ease-out both;
+}
