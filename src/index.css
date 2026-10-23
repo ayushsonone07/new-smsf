@@ -1706,6 +1706,44 @@ tr.is-selected-row td {
   color: #94a3b8;
 }
 
+.auth-password-field {
+  position: relative;
+  display: block;
+}
+
+.auth-password-field input {
+  padding-right: 46px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: calc(50% + 3px);
+  right: 10px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.auth-password-toggle:hover {
+  background: #f1f5f9;
+  color: #2459e0;
+}
+
+.auth-password-toggle:focus-visible {
+  outline: none;
+  color: #2459e0;
+  box-shadow: 0 0 0 3px rgb(36 89 224 / 16%);
+}
+
 .quick-action-card:hover {
   background: #eef2ff;
   border-color: #c7d2fe;

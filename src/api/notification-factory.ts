@@ -171,25 +171,47 @@ export function notifyBillGenerated(customer: CustomerRef): void {
   }
 }
 
+function formatDepartmentLabel(dept?: string): string {
+  if (!dept) return ''
+  return dept
+    .replace(/_DEPARTMENT$/i, '')
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export function notifyServiceCompleted(
   customer: CustomerRef,
   serviceName?: string,
+  departmentType?: string,
 ): void {
   const id = customer.id != null ? String(customer.id) : undefined
-  const suffix = serviceName ? ` (${serviceName})` : ''
+  const deptLabel = formatDepartmentLabel(departmentType)
+  const serviceDetail = serviceName ? (deptLabel ? `${serviceName} • ${deptLabel}` : serviceName) : deptLabel
+  const suffix = serviceDetail ? ` (${serviceDetail})` : ''
+  const displayTitle = deptLabel && serviceName
+    ? `${deptLabel}: ${serviceName} Completed`
+    : deptLabel
+    ? `${deptLabel} Service Completed`
+    : serviceName
+    ? `${serviceName} Completed`
+    : 'Service completed'
+
   emitScoped({
     kind: 'service-completed',
-    title: 'Service completed',
+    title: displayTitle,
     message: `Service completed for ${customerLabel(customer)}${suffix}.`,
     customerId: id,
+    departmentType,
   })
   if (id) {
     emitScoped({
       kind: 'service-completed',
-      title: 'Service completed',
-      message: `${serviceName || 'Your service'} for ${customerLabel(customer)} has been completed.`,
+      title: displayTitle,
+      message: `${serviceName ? `Your ${serviceName} (${deptLabel || 'Service'})` : deptLabel ? `Your ${deptLabel} service` : 'Your service'} for ${customerLabel(customer)} has been completed.`,
       audience: 'CUSTOMER',
       customerId: id,
+      departmentType,
     })
   }
 }

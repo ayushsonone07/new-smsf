@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+﻿import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import {
@@ -597,7 +597,7 @@ export function ServiceFlowModal({
         flowStepName: confirmingStep.stepName,
         status: 'COMPLETED',
       })
-      notifyServiceCompleted(customer, confirmingStep.stepName)
+      notifyServiceCompleted(customer, confirmingStep.stepName, effectiveDept)
 
       // Optimistic update of the step
       const updatedSteps = steps.map((s) =>
@@ -659,7 +659,7 @@ export function ServiceFlowModal({
         newStatus,
       })
       if (newStatus.toUpperCase() === 'COMPLETED') {
-        notifyServiceCompleted(customer, subServiceName)
+        notifyServiceCompleted(customer, subServiceName, effectiveDept)
       }
 
       setSubServiceStatus(newStatus)

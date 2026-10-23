@@ -428,6 +428,9 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Admin login password visibility toggle** — sign-in password field me professional
+      Eye/EyeOff button add kiya; show/hide state, keyboard focus ring, hover feedback,
+      `aria-label`/`aria-pressed`, tooltip aur input text ke liye safe right padding included.
 - [x] **Route-only animated loading skeleton** — old `GlobalPreloader` API-client activity
       subscription remove kiya, isliye polling/background refetch/manual API calls ab full-screen
       `Loading data...` overlay trigger nahi karte. Loader ab TanStack Router navigation state aur
