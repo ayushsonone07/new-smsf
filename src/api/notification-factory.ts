@@ -8,12 +8,10 @@
  */
 
 import { getSession } from '../app/auth/session'
+import { queryClient } from '../app/queryClient'
 import type { AuthUser } from '../features/auth/types/auth.types'
-import {
-  notify,
-  type NotificationKind,
-  type SuperAdminNotification,
-} from './superadmin-notifications.api'
+import { createNotificationEvent } from './notifications.api'
+import type { NotificationKind, SuperAdminNotification } from './superadmin-notifications.api'
 
 function actor(): AuthUser | null {
   return getSession()?.user ?? null
@@ -38,19 +36,26 @@ interface EmitOptions {
   audience?: SuperAdminNotification['audience']
 }
 
-function emitScoped(options: EmitOptions): SuperAdminNotification {
+function emitScoped(options: EmitOptions): void {
   const user = actor()
   const audience = options.audience ?? 'DEPARTMENT'
-  return notify({
+  const scope = {
+    departmentId: options.departmentId ?? user?.departmentId,
+    departmentType: options.departmentType ?? user?.departmentType,
+    customerId: options.customerId,
+  }
+  const eventId = `${options.kind}:${crypto.randomUUID()}`
+  void createNotificationEvent({
+    eventId,
     kind: options.kind,
     title: options.title,
     message: options.message,
     link: options.link,
     audience,
-    departmentId: options.departmentId ?? user?.departmentId,
-    departmentType: options.departmentType ?? user?.departmentType,
-    customerId: options.customerId,
-  })
+    scope,
+    channels: ['IN_APP'],
+  }).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+    .catch((error) => console.error('Failed to persist notification event', error))
 }
 
 interface CustomerRef {
@@ -71,7 +76,7 @@ export function notifyCustomerAssigned(
   customer: CustomerRef,
   assignee: string,
   departmentLabel?: string,
-): SuperAdminNotification {
+): void {
   return emitScoped({
     kind: 'customer-assigned',
     title: 'Customer assigned',
@@ -86,7 +91,7 @@ export function notifyCustomerTransferred(
   fromUserEmail: string,
   toUserEmail: string,
   count?: number,
-): SuperAdminNotification {
+): void {
   const scope = count != null ? ` (${count} customer${count === 1 ? '' : 's'})` : ''
   return emitScoped({
     kind: 'customer-transferred',
@@ -95,7 +100,7 @@ export function notifyCustomerTransferred(
   })
 }
 
-export function notifyUserCreated(name: string, email: string): SuperAdminNotification {
+export function notifyUserCreated(name: string, email: string): void {
   return emitScoped({
     kind: 'user-created',
     title: 'Team member added',
@@ -103,7 +108,7 @@ export function notifyUserCreated(name: string, email: string): SuperAdminNotifi
   })
 }
 
-export function notifyUserUpdated(name: string, email: string): SuperAdminNotification {
+export function notifyUserUpdated(name: string, email: string): void {
   return emitScoped({
     kind: 'user-updated',
     title: 'Team member updated',
@@ -111,7 +116,7 @@ export function notifyUserUpdated(name: string, email: string): SuperAdminNotifi
   })
 }
 
-export function notifyUserDeleted(name: string, email: string): SuperAdminNotification {
+export function notifyUserDeleted(name: string, email: string): void {
   return emitScoped({
     kind: 'user-deleted',
     title: 'Team member removed',
@@ -119,7 +124,7 @@ export function notifyUserDeleted(name: string, email: string): SuperAdminNotifi
   })
 }
 
-export function notifyHeadCreated(name: string, email: string): SuperAdminNotification {
+export function notifyHeadCreated(name: string, email: string): void {
   return emitScoped({
     kind: 'head-created',
     title: 'Department created',
@@ -128,7 +133,7 @@ export function notifyHeadCreated(name: string, email: string): SuperAdminNotifi
   })
 }
 
-export function notifyHeadDeleted(name: string, email: string): SuperAdminNotification {
+export function notifyHeadDeleted(name: string, email: string): void {
   return emitScoped({
     kind: 'head-deleted',
     title: 'Department removed',
@@ -137,7 +142,7 @@ export function notifyHeadDeleted(name: string, email: string): SuperAdminNotifi
   })
 }
 
-export function notifyCustomerDeleted(customer: CustomerRef): SuperAdminNotification {
+export function notifyCustomerDeleted(customer: CustomerRef): void {
   return emitScoped({
     kind: 'customer-deleted',
     title: 'Customer deleted',
@@ -146,17 +151,17 @@ export function notifyCustomerDeleted(customer: CustomerRef): SuperAdminNotifica
   })
 }
 
-export function notifyBillGenerated(customer: CustomerRef): SuperAdminNotification {
+export function notifyBillGenerated(customer: CustomerRef): void {
   const id = customer.id != null ? String(customer.id) : undefined
   // Visible to the department and (when scoped) to the customer.
-  const record = emitScoped({
+  emitScoped({
     kind: 'bill-generated',
     title: 'Bill generated',
     message: `Bill generated for ${customerLabel(customer)}.`,
     customerId: id,
   })
   if (id) {
-    notify({
+    emitScoped({
       kind: 'bill-generated',
       title: 'Bill generated',
       message: `Your bill for ${customerLabel(customer)} is ready.`,
@@ -164,23 +169,22 @@ export function notifyBillGenerated(customer: CustomerRef): SuperAdminNotificati
       customerId: id,
     })
   }
-  return record
 }
 
 export function notifyServiceCompleted(
   customer: CustomerRef,
   serviceName?: string,
-): SuperAdminNotification {
+): void {
   const id = customer.id != null ? String(customer.id) : undefined
   const suffix = serviceName ? ` (${serviceName})` : ''
-  const record = emitScoped({
+  emitScoped({
     kind: 'service-completed',
     title: 'Service completed',
     message: `Service completed for ${customerLabel(customer)}${suffix}.`,
     customerId: id,
   })
   if (id) {
-    notify({
+    emitScoped({
       kind: 'service-completed',
       title: 'Service completed',
       message: `${serviceName || 'Your service'} for ${customerLabel(customer)} has been completed.`,
@@ -188,5 +192,4 @@ export function notifyServiceCompleted(
       customerId: id,
     })
   }
-  return record
 }

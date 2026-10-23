@@ -43,6 +43,7 @@ export interface CustomersListModalProps {
   assignees: OnboardingAssignee[]
   showStatus?: boolean
   showAssignTo?: boolean
+  canEditRemark?: boolean
   departmentType?: string
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
@@ -263,6 +264,7 @@ export function CustomersListModal({
   assignees,
   showStatus: _showStatus = true,
   showAssignTo = true,
+  canEditRemark = true,
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
   onOpenFullPage,
@@ -402,7 +404,7 @@ export function CustomersListModal({
   }
 
   async function saveRemarkEdit() {
-    if (!current?.id || !editingRemarkText.trim() || isSavingRemark) return
+    if (!canEditRemark || !current?.id || !editingRemarkText.trim() || isSavingRemark) return
     setIsSavingRemark(true)
     try {
       await updateCustomer(current.id, { remark: editingRemarkText.trim(), remarkType: 'INTERNAL', departmentType, serviceType: departmentType === 'AUTOMATION_DEPARTMENT' ? 'AUTOMATION' : departmentType === 'WEBSITE_DEPARTMENT' ? 'WEBSITE' : undefined })
@@ -1449,7 +1451,7 @@ export function CustomersListModal({
 
                 {/* Section 1: Internal Remarks */}
                 {!isSuperAdmin && <div className="cl-drawer__remark-section">
-                  {getSession()?.user.role !== 'CUSTOMER' && (
+                  {canEditRemark && getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1503,7 +1505,7 @@ export function CustomersListModal({
                       serviceRow?.internalRemark
                     }
                     internal
-                    editable
+                    editable={canEditRemark}
                     editingRemark={editingRemark}
                     editingRemarkText={editingRemarkText}
                     onEdit={(remark) => { setEditingRemark(remark.timestamp || remark.remark || 'remark'); setEditingRemarkText(remark.remark || '') }}
