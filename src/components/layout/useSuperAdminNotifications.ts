@@ -13,6 +13,7 @@ function toHeadNotification(
     timeLabel: formatTime(item.createdAt),
     unread: !item.read,
     link: item.link,
+    kind: item.kind,
   }
 }
 

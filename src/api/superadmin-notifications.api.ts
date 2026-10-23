@@ -27,6 +27,7 @@ export type NotificationKind =
   | 'customer-deleted'
   | 'bill-generated'
   | 'service-completed'
+  | 'call-initiated'
 
 export type NotificationAudience = 'ALL' | 'DEPARTMENT' | 'CUSTOMER'
 

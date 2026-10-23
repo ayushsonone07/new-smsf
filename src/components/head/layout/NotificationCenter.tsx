@@ -93,14 +93,16 @@ export function NotificationCenter({
               <button
                 key={item.id}
                 type="button"
-                className={`hnotify-item${item.unread ? ' is-unread' : ''} ${notificationTone(item.text, item.link)}`}
+                className={`hnotify-item${item.unread ? ' is-unread' : ''} ${item.kind === 'call-initiated' ? 'is-call' : notificationTone(item.text, item.link)}`}
                 onClick={() => {
                   if (item.link) openNotificationLink(item.link)
                 }}
                 disabled={!item.link}
                 aria-label={item.link ? `Open notification: ${item.text}` : item.text}
               >
-                <span className="hnotify-item__icon"><Icon name="bell" size={15} /></span>
+                <span className="hnotify-item__icon">
+                  <Icon name={item.kind === 'call-initiated' ? 'phone' : 'bell'} size={15} />
+                </span>
                 <div>
                   <p>{item.text}</p>
                   <time>{item.timeLabel}</time>
