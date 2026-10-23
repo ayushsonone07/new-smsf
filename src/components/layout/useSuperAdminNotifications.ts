@@ -1,12 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HeadNotification } from '../../features/departments/head/types/head.types'
-import {
-  getSuperAdminNotifications,
-  markAllSuperAdminNotificationsRead,
-  markSuperAdminNotificationRead,
-  subscribeSuperAdminNotifications,
-  type SuperAdminNotification,
-} from '../../api/superadmin-notifications.api'
+import type { SuperAdminNotification } from '../../api/superadmin-notifications.api'
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications.api'
 
 function toHeadNotification(
   item: SuperAdminNotification,
@@ -31,30 +27,26 @@ function formatTime(iso: string): string {
  * marks them read once the drawer is opened (mirrors the head/user flow).
  */
 export function useSuperAdminNotifications() {
-  const [raw, setRaw] = useState<SuperAdminNotification[]>([])
-
-  useEffect(() => {
-    let active = true
-    getSuperAdminNotifications().then((data) => {
-      if (active) setRaw(data)
-    })
-    const unsubscribe = subscribeSuperAdminNotifications((data) => {
-      setRaw(data)
-    })
-    return () => {
-      active = false
-      unsubscribe()
-    }
-  }, [])
+  const queryClient = useQueryClient()
+  const { data: raw = [] } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: true,
+  })
 
   const items = useMemo(() => raw.map(toHeadNotification), [raw])
 
   function markAllRead() {
-    void markAllSuperAdminNotificationsRead()
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+      items.map((item) => ({ ...item, read: true })))
+    void markAllNotificationsRead().then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
   }
 
   function markRead(id: string) {
-    void markSuperAdminNotificationRead(id)
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+      items.map((item) => item.id === id ? { ...item, read: true } : item))
+    void markNotificationRead(id).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
   }
 
   return { items, markAllRead, markRead }
