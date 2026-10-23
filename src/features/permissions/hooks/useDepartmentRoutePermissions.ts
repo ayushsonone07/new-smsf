@@ -24,7 +24,7 @@ function normalizeRouteSegment(str: string): string {
     .replace(/\/+$/, '')
 }
 
-function extractScreenSlug(str: string): string {
+export function extractScreenSlug(str: string): string {
   if (!str) return ''
   const trimmed = str
     .toLowerCase()
