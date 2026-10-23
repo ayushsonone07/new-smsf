@@ -5,7 +5,9 @@ import {
   createRouter,
   Outlet,
 } from '@tanstack/react-router'
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
+
+const HrmEmbed = lazy(() => import('../modules/hrm/HrmEmbed'))
 import {
   requireAuth,
   requireRole,
@@ -172,6 +174,16 @@ function ProfileUpdateWithShell() {
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
   notFoundComponent: NotFoundPage,
+})
+
+const hrmRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/hrm/$',
+  component: () => (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>Loading HRM...</div>}>
+      <HrmEmbed />
+    </Suspense>
+  ),
 })
 
 const indexRoute = createRoute({
@@ -1057,6 +1069,7 @@ const routeTree = rootRoute.addChildren([
   departmentCustomersRoute,
   departmentHelpCenterRoute,
   departmentServicesRoute,
+  hrmRoute,
   dynamicDepartmentLayoutRoute.addChildren([
     dynamicDepartmentRoleScreenRoute,
     dynamicDepartmentRoleIndexRoute,
