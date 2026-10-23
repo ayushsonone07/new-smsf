@@ -19,6 +19,28 @@ function normalizeColumnName(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]/g, '')
 }
 
+function normalizeRouteValue(value?: string): string {
+  return (value ?? '').trim().toLowerCase().replace(/^\/+|\/+$/g, '')
+}
+
+function routeIds(value?: string): string[] {
+  return (value ?? '')
+    .split(',')
+    .map(normalizeRouteValue)
+    .filter(Boolean)
+}
+
+function hasWritePermission(permission?: string): boolean {
+  const normalized = (permission ?? '').trim().toUpperCase().replace(/[\s_-]/g, '')
+  return (
+    normalized === '12' ||
+    normalized === '2' ||
+    normalized === 'CANEDIT' ||
+    normalized === 'READWRITE' ||
+    normalized === 'WRITE'
+  )
+}
+
 function matchesRoute(col: DynamicColumnResponse, routeFilter: string): boolean {
   if (!col || !routeFilter) return true
   const normFilter = routeFilter.toLowerCase().trim().replace(/^(\/|#)+/, '').replace(/\/+$/, '')
@@ -52,9 +74,17 @@ export function isColumnMatch(col: DynamicColumnResponse, nameOrId: string): boo
   if (targetClean && colNameClean && targetClean === colNameClean) return true
 
   // 3. Common column aliases:
-  // 'Assign To' <-> 'Assign' <-> 'Assignee'
-  const isAssignTarget = targetClean === 'assignto' || targetClean === 'assign' || targetClean === 'assignee'
-  const isAssignCol = colNameClean === 'assignto' || colNameClean === 'assign' || colNameClean === 'assignee'
+  // 'Assign To' <-> 'Assigned To' <-> 'Assign' <-> 'Assignee'
+  const isAssignTarget =
+    targetClean === 'assignto' ||
+    targetClean === 'assignedto' ||
+    targetClean === 'assign' ||
+    targetClean === 'assignee'
+  const isAssignCol =
+    colNameClean === 'assignto' ||
+    colNameClean === 'assignedto' ||
+    colNameClean === 'assign' ||
+    colNameClean === 'assignee'
   if (isAssignTarget && isAssignCol) return true
 
   // 'Customer' <-> 'Customer Name' <-> 'Customer / Lead' <-> 'Lead' <-> 'Client'
@@ -245,20 +275,23 @@ export function useDepartmentColumnPermissions(
   const dept = isGoogle
     ? 'GOOGLE_DEPARTMENT'
     : (departmentType || session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
-  const isHead = session?.user.role !== 'USER'
+  const normalizedRole = (session?.user.role ?? '')
+    .toUpperCase()
+    .replace(/^ROLE_/, '')
+  const isDepartmentUser =
+    normalizedRole === 'USER' || normalizedRole === 'DEPARTMENT_USER'
+  const isHead = !isDepartmentUser
 
   const query = useDynamicColumns(dept)
   const routesQuery = useDynamicRoutes(dept, Boolean(routeName))
   const allColumns = query.data ?? []
-  const normalizedRouteName = (routeName ?? '').replace(/^\/+|\/+$/g, '').toLowerCase()
+  const normalizedRouteName = normalizeRouteValue(routeName)
   const requestedRouteSegment = normalizedRouteName.split('/').pop() ?? ''
   const customerRouteAliases = new Set(['customers', 'customer-list', 'all-customers'])
   const matchedRoute = routeName
     ? (routesQuery.data ?? []).find(
         (route) => {
-          const candidate = (route.routeName ?? '')
-            .replace(/^\/+|\/+$/g, '')
-            .toLowerCase()
+          const candidate = normalizeRouteValue(route.routeName)
           const candidateSegment = candidate.split('/').pop() ?? ''
           return (
             candidate === normalizedRouteName ||
@@ -270,14 +303,15 @@ export function useDepartmentColumnPermissions(
     : undefined
   const columns = routeName
     ? allColumns.filter((column) => {
-        const columnRouteName = (column.routeName ?? '')
-          .replace(/^\/+|\/+$/g, '')
-          .toLowerCase()
+        const columnRouteName = normalizeRouteValue(column.routeName)
+        const matchedRouteId = normalizeRouteValue(matchedRoute?.routeId)
+        const columnRouteIds = [
+          ...routeIds(column.routeId),
+          ...routeIds(column.routesType),
+        ]
         return (
           columnRouteName === normalizedRouteName ||
-          (matchedRoute != null &&
-            (column.routeId === matchedRoute.routeId ||
-              column.routesType === matchedRoute.routeId))
+          (matchedRouteId !== '' && columnRouteIds.includes(matchedRouteId))
         )
       })
     : allColumns
@@ -287,7 +321,7 @@ export function useDepartmentColumnPermissions(
     (nameOrId: string, routeFilter?: string): boolean => {
       if (!nameOrId) return false
       if (permissionDataPending) return false
-      // If no columns are in DB yet, allow standard columns
+      // If no columns are in DB yet, allow standard columns to remain visible.
       if (columns.length === 0) return true
 
       // If routeFilter provided, try to find a column matching both name and route first
@@ -320,7 +354,9 @@ export function useDepartmentColumnPermissions(
       if (!nameOrId) return false
       if (permissionDataPending) return false
       if (!isColumnEnabled(nameOrId)) return false
-      if (columns.length === 0) return true
+      // Route-scoped permissions must fail closed for writes. Otherwise a
+      // missing/mismatched route mapping silently turns Read Only into edit.
+      if (columns.length === 0) return !routeName && allColumns.length === 0
 
       const col = columns.find((c) => isColumnMatch(c, nameOrId))
       // Once a department has an explicit column permission set, editing is
@@ -329,9 +365,9 @@ export function useDepartmentColumnPermissions(
       if (!col) return false
 
       const perm = isHead ? col.roleAPermission : col.roleBPermission
-      return perm === '12' || perm === '2' || perm === 'CAN_EDIT'
+      return hasWritePermission(perm)
     },
-    [columns, isHead, isColumnEnabled, permissionDataPending],
+    [allColumns.length, columns, isHead, isColumnEnabled, permissionDataPending, routeName],
   )
 
   return {

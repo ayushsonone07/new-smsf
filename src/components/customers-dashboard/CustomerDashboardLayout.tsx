@@ -1,16 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { CustomerDashboardSidebar } from './CustomerDashboardSidebar'
 import { CustomerDashboardTopbar } from './CustomerDashboardTopbar'
 import { NotificationCenter } from '../head/layout/NotificationCenter'
 import { getCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import { apiRequest } from '../../api/client'
 import type { HeadNotification } from '../../features/departments/head/types/head.types'
-import {
-  getNotificationsForCustomerSync,
-  markAllNotificationsForCustomerRead,
-  subscribeSuperAdminNotifications,
-  type SuperAdminNotification,
-} from '../../api/superadmin-notifications.api'
 import './CustomerDashboard.css'
 
 interface CustomerDashboardLayoutProps {
@@ -29,7 +23,6 @@ export function CustomerDashboardLayout({
   const customerSession = getCustomerSession()
   const isCustomerAuthenticated = Boolean(customerSession)
   const [backendNotifications, setBackendNotifications] = useState<HeadNotification[]>([])
-  const [localNotifications, setLocalNotifications] = useState<SuperAdminNotification[]>([])
 
   useEffect(() => {
     if (!customerSession?.customerId) return
@@ -38,25 +31,23 @@ export function CustomerDashboardLayout({
       username: customerSession.username || customerSession.email,
       ...(customerSession.accessToken ? { Authorization: `Bearer ${customerSession.accessToken}` } : {}),
     }
-    const loadNotifications = () => apiRequest<any>(`/api/notifications/customer?customerId=${encodeURIComponent(customerSession.customerId)}`, { headers })
+    const loadNotifications = () => apiRequest<any>('/api/notifications?page=0&size=100&sortDir=desc', { headers })
       .then((response) => {
         const items = Array.isArray(response?.data)
           ? response.data
-          : Array.isArray(response?.data?.content)
-            ? response.data.content
-            : []
+          : []
         if (!active) return
         setBackendNotifications(items.map((item: any, index: number) => ({
           id: String(item.id ?? `customer-notification-${index}`),
           text: item.title || item.message || 'Your account has been updated.',
-          timeLabel: formatNotificationTime(item.timestamp),
+          timeLabel: formatNotificationTime(item.createdAt ?? item.timestamp),
           unread: item.read !== true,
           link: typeof item.link === 'string' ? item.link : undefined,
         })))
       })
       .catch(() => { if (active) setBackendNotifications([]) })
     loadNotifications()
-    const refreshTimer = window.setInterval(loadNotifications, 15_000)
+    const refreshTimer = window.setInterval(loadNotifications, 45_000)
     const refreshOnFocus = () => { if (document.visibilityState === 'visible') loadNotifications() }
     document.addEventListener('visibilitychange', refreshOnFocus)
     return () => {
@@ -66,28 +57,16 @@ export function CustomerDashboardLayout({
     }
   }, [customerSession?.customerId, customerSession?.email, customerSession?.username, customerSession?.accessToken])
 
-  useEffect(() => {
-    const refresh = () => setLocalNotifications(
-      getNotificationsForCustomerSync(customerSession?.customerId),
-    )
-    refresh()
-    return subscribeSuperAdminNotifications(refresh)
-  }, [customerSession?.customerId])
-
-  const notifications = useMemo<HeadNotification[]>(() => [
-    ...localNotifications.map((item) => ({
-      id: item.id,
-      text: item.title ? `${item.title} — ${item.message}` : item.message,
-      timeLabel: formatNotificationTime(item.createdAt),
-      unread: !item.read,
-      link: item.link,
-    })),
-    ...backendNotifications,
-  ], [backendNotifications, localNotifications])
+  const notifications: HeadNotification[] = backendNotifications
 
   function markAllRead() {
     setBackendNotifications((items) => items.map((item) => ({ ...item, unread: false })))
-    void markAllNotificationsForCustomerRead(customerSession?.customerId)
+    if (!customerSession) return
+    const headers = {
+      username: customerSession.username || customerSession.email,
+      ...(customerSession.accessToken ? { Authorization: `Bearer ${customerSession.accessToken}` } : {}),
+    }
+    void apiRequest('/api/notifications/read-all', { method: 'POST', headers })
   }
   const dashboard = (
     <div className="cdb-shell">

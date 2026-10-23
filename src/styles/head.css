@@ -546,6 +546,8 @@
 .hnotify-item.is-unread { background: #f3f7ff; }
 .hnotify-item.is-completed { background: #ecfdf3; border-color: #d1fae5; }
 .hnotify-item.is-completed .hnotify-item__icon { background: #d9fbe8; color: #16803c; }
+.hnotify-item.is-call { background: #ecfdf3; border-color: #bbf7d0; }
+.hnotify-item.is-call .hnotify-item__icon { background: #d9fbe8; color: #16a34a; }
 .hnotify-item.is-pending { background: #fff8e7; border-color: #fde7b0; }
 .hnotify-item.is-pending .hnotify-item__icon { background: #ffefc2; color: #b45309; }
 .hnotify-item__icon {
