@@ -72,12 +72,12 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
-        '@hrm': path.resolve(__dirname, './src/modules/hrm'),
-        '@app': path.resolve(__dirname, './src/modules/hrm/app'),
-        '@features': path.resolve(__dirname, './src/modules/hrm/features'),
-        '@shared': path.resolve(__dirname, './src/modules/hrm/shared'),
-        '@config': path.resolve(__dirname, './src/modules/hrm/config'),
+        '@': path.resolve(import.meta.dirname, './src'),
+        '@hrm': path.resolve(import.meta.dirname, './src/modules/hrm'),
+        '@app': path.resolve(import.meta.dirname, './src/modules/hrm/app'),
+        '@features': path.resolve(import.meta.dirname, './src/modules/hrm/features'),
+        '@shared': path.resolve(import.meta.dirname, './src/modules/hrm/shared'),
+        '@config': path.resolve(import.meta.dirname, './src/modules/hrm/config'),
       },
     },
     optimizeDeps: {
