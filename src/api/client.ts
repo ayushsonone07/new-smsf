@@ -96,7 +96,6 @@ export async function apiRequest<T>(
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         Accept: 'application/json',
-        'ngrok-skip-browser-warning': 'true',
         ...options.headers,
       },
     })
@@ -185,7 +184,6 @@ export async function authedFileRequest(
         Accept: 'application/pdf, application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         Authorization: `Bearer ${session.token}`,
         username: session.user.email || session.user.username || '',
-        'ngrok-skip-browser-warning': 'true',
       },
     })
     if (!response.ok) {
