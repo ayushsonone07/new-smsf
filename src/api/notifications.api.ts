@@ -52,26 +52,36 @@ function mapNotification(item: BackendNotification): SuperAdminNotification {
 }
 
 export async function fetchNotifications(): Promise<SuperAdminNotification[]> {
-  const response = await authedApiRequest<NotificationPage>('/api/notifications?page=0&size=100&sortDir=desc')
-  return (response.data ?? []).map(mapNotification)
+  try {
+    const response = await authedApiRequest<NotificationPage>('/api/notifications?page=0&size=100&sortDir=desc')
+    return (response?.data ?? []).map(mapNotification)
+  } catch (err) {
+    console.warn('Backend notification feed unavailable, returning empty list:', err)
+    return []
+  }
 }
 
 export async function fetchAllNotifications(): Promise<SuperAdminNotification[]> {
-  const pageSize = 100
-  const first = await authedApiRequest<NotificationPage>(
-    `/api/notifications?page=0&size=${pageSize}&sortDir=desc`,
-  )
-  const all = [...(first.data ?? [])]
-  const totalPages = Math.max(1, first.totalPage ?? 1)
-
-  for (let page = 1; page < totalPages; page += 1) {
-    const response = await authedApiRequest<NotificationPage>(
-      `/api/notifications?page=${page}&size=${pageSize}&sortDir=desc`,
+  try {
+    const pageSize = 100
+    const first = await authedApiRequest<NotificationPage>(
+      `/api/notifications?page=0&size=${pageSize}&sortDir=desc`,
     )
-    all.push(...(response.data ?? []))
-  }
+    const all = [...(first?.data ?? [])]
+    const totalPages = Math.max(1, first?.totalPage ?? 1)
 
-  return all.map(mapNotification)
+    for (let page = 1; page < totalPages; page += 1) {
+      const response = await authedApiRequest<NotificationPage>(
+        `/api/notifications?page=${page}&size=${pageSize}&sortDir=desc`,
+      )
+      all.push(...(response?.data ?? []))
+    }
+
+    return all.map(mapNotification)
+  } catch (err) {
+    console.warn('Backend notification feed unavailable, returning empty list:', err)
+    return []
+  }
 }
 
 export function markNotificationRead(id: string): Promise<unknown> {

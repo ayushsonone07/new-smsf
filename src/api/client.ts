@@ -1,4 +1,4 @@
-import { getSession } from '../app/auth/session'
+import { getSession, clearSession } from '../app/auth/session'
 import { ACTIVE_API_BASE_URL } from '../config/api.config'
 
 const API_BASE_URL = (
@@ -108,6 +108,11 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      clearSession()
+      window.location.href = '/login?expired=true'
+    }
+
     let message = `Request failed with status ${response.status}`
 
     try {

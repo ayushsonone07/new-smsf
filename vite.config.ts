@@ -103,5 +103,21 @@ export default defineConfig(({ mode }) => {
     define: {
       global: 'globalThis',
     },
+    build: {
+      target: 'esnext',
+      minify: 'esbuild',
+      cssMinify: true,
+      sourcemap: false,
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'tanstack-vendor': ['@tanstack/react-query', '@tanstack/react-router'],
+            'icons-vendor': ['lucide-react'],
+          },
+        },
+      },
+    },
   }
 })
