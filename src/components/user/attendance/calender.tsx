@@ -15,15 +15,17 @@ interface AttendanceCalendarProps {
   month?: number; // 0-11 (0 = January)
   year?: number;
   absentDays?: number[]; // Array of dates (e.g., [3, 17, 24])
+  presentDays?: number[]; // Array of dates where employee was present
   currentDay?: number; // The day to highlight as "Today"
   className?: string;
 }
 
 export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
-  month = 8, // 8 = September
-  year = 2026,
-  absentDays = [3, 17, 24],
-  currentDay = 30,
+  month = new Date().getMonth(),
+  year = new Date().getFullYear(),
+  absentDays = [],
+  presentDays = [],
+  currentDay = new Date().getDate(),
   className,
 }) => {
   // Get month name
@@ -49,11 +51,13 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     // 0 = Sunday
     if (dayOfWeek === 0) return 'off';
     if (absentDays.includes(day)) return 'absent';
-    return 'present';
+    if (presentDays.includes(day)) return 'present';
+    if (day > currentDay) return 'default';
+    return 'default';
   };
 
   return (
-    <div className={cn("w-full max-w-[560px] bg-white rounded-2xl p-4 border border-gray-100 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)]", className)}>
+    <div className={cn("w-full max-w-[560px] bg-white rounded-2xl p-4 border border-gray-100 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)] font-sans", className)}>
       
       {/* --- Header --- */}
       <div className="flex justify-between items-center mb-4">
@@ -93,13 +97,14 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
             <div
               key={day}
               className={cn(
-                "h-9 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all cursor-pointer",
+                "h-9 flex items-center justify-center rounded-lg text-[13px] font-medium transition-all select-none",
                 // Status Styles
-                status === 'present' && "bg-[#e8f5e9] text-[#2e7d32]",
-                status === 'absent' && "bg-[#fde8e8] text-[#c62828]",
+                status === 'present' && "bg-[#e8f5e9] text-[#2e7d32] font-semibold",
+                status === 'absent' && "bg-[#fde8e8] text-[#c62828] font-semibold",
                 status === 'off' && "bg-[#f8f9fa] text-gray-400",
+                status === 'default' && "text-gray-600 bg-transparent hover:bg-slate-50",
                 // Today Override
-                isToday && "border-2 border-[#2563eb] bg-transparent text-gray-900 font-bold"
+                isToday && "border-2 border-[#2563eb] text-gray-900 font-bold"
               )}
             >
               {day}
