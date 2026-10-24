@@ -50,6 +50,7 @@ export type HeadScreenKey =
   | 'website-customers'
   | 'automation-customers'
   | 'delivered'
+  | 'leads'
   | 'custom'
 
 /**
