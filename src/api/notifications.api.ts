@@ -1,13 +1,17 @@
 import { authedApiRequest } from './client'
 import type { NotificationAudience, SuperAdminNotification } from './superadmin-notifications.api'
 
-interface NotificationPage {
+export interface NotificationPage {
   data?: BackendNotification[]
+  pageNumber?: number
+  totalElements?: number
+  totalPage?: number
+  isLast?: boolean
 }
 
 interface ApiEnvelope<T> { data?: T }
 
-interface BackendNotification {
+export interface BackendNotification {
   id: string
   eventId?: string
   kind?: SuperAdminNotification['kind']
@@ -48,8 +52,36 @@ function mapNotification(item: BackendNotification): SuperAdminNotification {
 }
 
 export async function fetchNotifications(): Promise<SuperAdminNotification[]> {
-  const response = await authedApiRequest<NotificationPage>('/api/notifications?page=0&size=100&sortDir=desc')
-  return (response.data ?? []).map(mapNotification)
+  try {
+    const response = await authedApiRequest<NotificationPage>('/api/notifications?page=0&size=100&sortDir=desc')
+    return (response?.data ?? []).map(mapNotification)
+  } catch (err) {
+    console.warn('Backend notification feed unavailable, returning empty list:', err)
+    return []
+  }
+}
+
+export async function fetchAllNotifications(): Promise<SuperAdminNotification[]> {
+  try {
+    const pageSize = 100
+    const first = await authedApiRequest<NotificationPage>(
+      `/api/notifications?page=0&size=${pageSize}&sortDir=desc`,
+    )
+    const all = [...(first?.data ?? [])]
+    const totalPages = Math.max(1, first?.totalPage ?? 1)
+
+    for (let page = 1; page < totalPages; page += 1) {
+      const response = await authedApiRequest<NotificationPage>(
+        `/api/notifications?page=${page}&size=${pageSize}&sortDir=desc`,
+      )
+      all.push(...(response?.data ?? []))
+    }
+
+    return all.map(mapNotification)
+  } catch (err) {
+    console.warn('Backend notification feed unavailable, returning empty list:', err)
+    return []
+  }
 }
 
 export function markNotificationRead(id: string): Promise<unknown> {
