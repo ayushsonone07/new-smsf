@@ -14,6 +14,7 @@ type NavPath =
   | '/admin/services'
   | '/admin/timelines'
   | '/admin/service-flow'
+  | '/manage-leads'
   | '/head'
   | '/users'
 
@@ -68,6 +69,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: '♙',
     roles: ['ADMIN'],
     isActive: (pathname) => pathname.startsWith('/admin/customers'),
+  },
+  {
+    to: '/manage-leads',
+    label: 'Leads',
+    icon: '🏠',
+    roles: ['ADMIN'],
+    isActive: (pathname) => pathname.startsWith('/manage-leads') || pathname.startsWith('/leads'),
   },
   {
     to: '/head',
