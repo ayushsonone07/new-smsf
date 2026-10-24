@@ -29,11 +29,32 @@ export function NotificationCenter({
   children,
   items,
   roleLabel = 'Account',
-  onMarkAllRead,
 }: NotificationCenterProps) {
   const [open, setOpen] = useState(false)
-  const unreadCount = items.filter((item) => item.unread).length
+  const [search, setSearch] = useState('')
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set())
+  const visibleItems = useMemo(
+    () => items.filter((item) => !dismissedIds.has(item.id)),
+    [dismissedIds, items],
+  )
+  const filteredItems = useMemo(() => {
+    const value = search.trim().toLowerCase()
+    if (!value) return visibleItems
+    return visibleItems.filter((item) =>
+      `${item.text} ${item.timeLabel}`.toLowerCase().includes(value),
+    )
+  }, [search, visibleItems])
+  const unreadCount = visibleItems.filter((item) => item.unread).length
   const close = useCallback(() => setOpen(false), [])
+
+  const dismissAll = useCallback(() => {
+    setDismissedIds((current) => {
+      const next = new Set(current)
+      items.forEach((item) => next.add(item.id))
+      return next
+    })
+    setSearch('')
+  }, [items])
 
   useEffect(() => {
     if (!open) return
@@ -76,20 +97,31 @@ export function NotificationCenter({
 
         <div className="hnotify-drawer__toolbar">
           <span>{unreadCount} unread</span>
-          {onMarkAllRead && unreadCount > 0 ? (
-            <button type="button" onClick={onMarkAllRead}>Mark all as read</button>
+          {visibleItems.length > 0 ? (
+            <button type="button" onClick={dismissAll}>Mark all as read</button>
           ) : null}
         </div>
 
+        <div className="hnotify-drawer__search">
+          <Icon name="search" size={16} />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search notifications..."
+            aria-label="Search notifications"
+          />
+        </div>
+
         <div className="hnotify-drawer__list">
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="hnotify-drawer__empty">
               <Icon name="bell" size={28} />
-              <strong>You're all caught up</strong>
-              <span>New notifications will appear here.</span>
+              <strong>{search ? 'No notifications found' : "You're all caught up"}</strong>
+              <span>{search ? 'Try a different search term.' : 'New notifications will appear here.'}</span>
             </div>
           ) : (
-            items.map((item) => (
+            filteredItems.map((item) => (
               <button
                 key={item.id}
                 type="button"

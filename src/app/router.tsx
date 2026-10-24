@@ -32,6 +32,9 @@ const ServicesListPage = lazy(() =>
 const AdminTimelinesPage = lazy(() =>
   import('../features/departments/pages/AdminTimelinesPage').then((module) => ({ default: module.AdminTimelinesPage })),
 )
+const NotificationHistoryPage = lazy(() =>
+  import('../features/notifications/pages/NotificationHistoryPage').then((module) => ({ default: module.NotificationHistoryPage })),
+)
 const AdminApprovalsPage = lazy(() =>
   import('../features/departments/pages/AdminApprovalsPage').then((module) => ({ default: module.AdminApprovalsPage })),
 )
@@ -338,6 +341,13 @@ const adminCustomersRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/customers',
   component: AdminCustomersPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminNotificationHistoryRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/notification-history',
+  component: NotificationHistoryPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -1063,6 +1073,7 @@ const routeTree = rootRoute.addChildren([
     adminCreateDepartmentRoute,
     adminCreateDepartmentNestedRoute,
     adminCustomersRoute,
+    adminNotificationHistoryRoute,
     manageLeadsRoute,
     adminLeadsRoute,
     adminServicesRoute,
