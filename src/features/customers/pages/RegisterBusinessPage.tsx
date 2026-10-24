@@ -668,6 +668,20 @@ export function RegisterBusinessPage() {
     if (autoTotal <= 0 && !hadAutoTotal) return
     const value = autoTotal > 0 ? String(autoTotal) : ''
     setFormData((prev) => {
+      if (verifiedPaymentAmount != null) {
+        const currentPaid =
+          prev.paymentType === 'part-time' && prev.amountPaid
+            ? parseInt(prev.amountPaid) || 0
+            : verifiedPaymentAmount
+        const remaining = autoTotal - currentPaid
+        return {
+          ...prev,
+          totalAmount: value,
+          amountPaid: String(currentPaid),
+          amountRemaining: remaining > 0 ? String(remaining) : '',
+          paymentType: remaining > 0 ? 'part-time' : prev.paymentType,
+        }
+      }
       if (prev.paymentType === 'full-time') {
         return {
           ...prev,
@@ -683,7 +697,7 @@ export function RegisterBusinessPage() {
         amountRemaining: remaining > 0 ? String(remaining) : '',
       }
     })
-  }, [autoTotal])
+  }, [autoTotal, verifiedPaymentAmount])
 
   /* Service Months follows the longest selected plan */
   useEffect(() => {
@@ -1059,7 +1073,12 @@ export function RegisterBusinessPage() {
         packageNames,
         serviceMonth: formData.expirationInMonths,
         salesPersonName: formData.salesPersonName,
-        amountPaid: formData.amountPaid || '0',
+        amountPaid:
+          formData.paymentType === 'part-time'
+            ? formData.amountPaid || '0'
+            : verifiedPaymentAmount != null
+              ? String(verifiedPaymentAmount)
+              : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
         remark: formData.remark,
@@ -1101,6 +1120,7 @@ export function RegisterBusinessPage() {
     showToast,
     resetForm,
     paymentVerified,
+    verifiedPaymentAmount,
     scrollToSection,
   ])
 
@@ -1801,13 +1821,19 @@ export function RegisterBusinessPage() {
                   ) {
                     handleInputChange('totalAmount', value)
                     const total = parseInt(value) || 0
-                    const paid = parseInt(formData.amountPaid) || 0
+                    const paid =
+                      verifiedPaymentAmount != null
+                        ? verifiedPaymentAmount
+                        : parseInt(formData.amountPaid) || 0
                     const remaining = total - paid
                     handleInputChange(
                       'amountRemaining',
                       remaining > 0 ? remaining.toString() : '',
                     )
-                    if (formData.paymentType === 'full-time')
+                    if (
+                      formData.paymentType === 'full-time' &&
+                      verifiedPaymentAmount == null
+                    )
                       handleInputChange('amountPaid', value)
                   } else if (value.length > 12) {
                     showToast({
@@ -1849,7 +1875,11 @@ export function RegisterBusinessPage() {
                   label="Full Time"
                   onSelect={(value) => {
                     handleInputChange('paymentType', value)
-                    handleInputChange('amountPaid', formData.totalAmount || '')
+                    const fullPaid =
+                      verifiedPaymentAmount != null
+                        ? String(verifiedPaymentAmount)
+                        : formData.totalAmount || ''
+                    handleInputChange('amountPaid', fullPaid)
                     handleInputChange('amountRemaining', '')
                     handleInputChange('remainingAmountDueDate', '')
                   }}
@@ -1861,21 +1891,43 @@ export function RegisterBusinessPage() {
                   label="Part Time"
                   onSelect={(value) => {
                     handleInputChange('paymentType', value)
-                    handleInputChange('amountPaid', '')
+                    const initialPaid =
+                      formData.amountPaid ||
+                      (verifiedPaymentAmount != null
+                        ? String(verifiedPaymentAmount)
+                        : '')
+                    handleInputChange('amountPaid', initialPaid)
+                    const total = parseInt(formData.totalAmount) || 0
+                    const remaining = total - (parseInt(initialPaid) || 0)
+                    handleInputChange(
+                      'amountRemaining',
+                      remaining > 0 ? remaining.toString() : '',
+                    )
                   }}
                 />
               </div>
             </div>
 
             {(() => {
-              const paidNum = parseInt(formData.amountPaid) || 0
+              const isPartTime = formData.paymentType === 'part-time'
+              const paidNum = isPartTime
+                ? parseInt(formData.amountPaid) || 0
+                : verifiedPaymentAmount != null
+                  ? verifiedPaymentAmount
+                  : parseInt(formData.amountPaid) || 0
               const remainingNum =
                 (parseInt(formData.totalAmount) || 0) - paidNum
               const isPartTimeInvalid =
-                formData.paymentType === 'part-time' &&
+                isPartTime &&
                 paidNum > 0 &&
                 remainingNum >= 0 &&
                 paidNum > remainingNum
+              const displayPaidValue = isPartTime
+                ? formData.amountPaid
+                : verifiedPaymentAmount != null
+                  ? String(verifiedPaymentAmount)
+                  : formData.totalAmount || ''
+              const isPaidDisabled = !isPartTime
               return (
                 <Field
                   label="Amount Paid (₹)"
@@ -1887,21 +1939,21 @@ export function RegisterBusinessPage() {
                       : undefined
                   }
                   hint={
-                    formData.paymentType === 'full-time'
-                      ? 'Same as total for full payment'
-                      : undefined
+                    isPartTime
+                      ? verifiedPaymentAmount != null
+                        ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
+                        : undefined
+                      : verifiedPaymentAmount != null
+                        ? 'Auto-filled from verified Payment ID'
+                        : 'Same as total for full payment'
                   }
                 >
                   <input
                     id="amountPaid"
                     type="number"
                     min="0"
-                    value={
-                      formData.paymentType === 'full-time'
-                        ? formData.totalAmount || ''
-                        : formData.amountPaid
-                    }
-                    disabled={formData.paymentType === 'full-time'}
+                    value={displayPaidValue}
+                    disabled={isPaidDisabled}
                     onChange={(e) => {
                       const value = e.target.value
                       if (value === '' || /^\d+$/.test(value)) {
@@ -1917,7 +1969,7 @@ export function RegisterBusinessPage() {
                     }}
                     placeholder="Enter paid amount"
                     className={`${inputClass(isPartTimeInvalid)} ${
-                      formData.paymentType === 'full-time'
+                      isPaidDisabled
                         ? 'cursor-not-allowed bg-slate-100'
                         : ''
                     }`}
