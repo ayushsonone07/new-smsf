@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDebounce } from '../../../../hooks/useDebounce'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
@@ -106,6 +107,7 @@ export function DepartmentUsersPage() {
   }, [dynamicColumnsQuery.data, isUser])
 
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
@@ -207,7 +209,7 @@ export function DepartmentUsersPage() {
   // Infinite query for Department Users: page 0, size 10 initial, next 10 on scroll
   const departmentUsersQuery = useInfiniteDepartmentUsersList({
     size: 10,
-    search: search.trim() || undefined,
+    search: debouncedSearch.trim() || undefined,
   })
   const {
     fetchNextPage,

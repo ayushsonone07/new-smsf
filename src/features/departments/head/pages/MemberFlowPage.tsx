@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { useDebounce } from '../../../../hooks/useDebounce'
 import { getSession } from '../../../../app/auth/session'
 import { resolveDeptFromPath } from '../utils/routeUtils'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
@@ -34,18 +35,19 @@ export function MemberFlowPage(_props?: { feature?: FeaturePermission }) {
     (session?.user.departmentType ? normalizeDepartmentTypeName(session.user.departmentType) : 'GOOGLE_DEPARTMENT')
 
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [page, setPage] = useState(0)
   const pageSize = 10
 
   // 1. Members performance API: /api/auth/department/members/performance?page=0&size=10&departmentType=GOOGLE_DEPARTMENT
   const membersQuery = useQuery({
-    queryKey: ['members-performance', { page, size: pageSize, departmentType: currentDepartment, search }],
+    queryKey: ['members-performance', { page, size: pageSize, departmentType: currentDepartment, search: debouncedSearch }],
     queryFn: () =>
       getDepartmentMembersPerformance({
         page,
         size: pageSize,
         departmentType: currentDepartment,
-        searchTerm: search || undefined,
+        searchTerm: debouncedSearch || undefined,
       }),
     staleTime: 30_000,
   })

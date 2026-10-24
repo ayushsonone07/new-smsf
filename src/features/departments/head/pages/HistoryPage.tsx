@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { useDebounce } from '../../../../hooks/useDebounce'
 import { getSession } from '../../../../app/auth/session'
 import { useTaskHistory } from '../../hooks/useTaskHistory'
 import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
@@ -124,6 +125,7 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const [activeView, setActiveView] = useState<HistoryView>('task-history')
   const [selectedUser, setSelectedUser] = useState<string>('')
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [statusFilter, setStatusFilter] = useState<StatusTab>('all')
   const [page, setPage] = useState(0)
   const pageSize = 10
@@ -191,20 +193,20 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
   const historyQuery = useTaskHistory({
     departmentUserFilter,
     taskState: backendTaskStatus,
-    customerName: search || undefined,
+    customerName: debouncedSearch || undefined,
     pageNumber: page,
     pageSize,
   })
 
   // 3. Status History Query: /api/status-history/get-all?page=0&size=10
   const statusHistoryQuery = useQuery({
-    queryKey: ['status-history', { page, size: pageSize, search }],
+    queryKey: ['status-history', { page, size: pageSize, search: debouncedSearch }],
     queryFn: () =>
       getStatusHistory({
         page,
         size: pageSize,
-        customerName: search || undefined,
-        leadName: search || undefined,
+        customerName: debouncedSearch || undefined,
+        leadName: debouncedSearch || undefined,
       }),
     enabled: activeView === 'status-history',
     staleTime: 30_000,

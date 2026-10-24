@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useDebounce } from '../../../../hooks/useDebounce'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -91,6 +92,7 @@ export function CustomerListPage() {
   const columnFeatures = useColumnFeatures(departmentId, 'customers')
 
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [activeTab, setActiveTab] = useState<CustomerTab>('all')
   const [selectedAssigneeId, setSelectedAssigneeId] =
     useState<string | null | 'all'>('all')
@@ -576,7 +578,7 @@ export function CustomerListPage() {
   }, [useRowsEndpoint, departmentRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
   const filteredCustomers = useMemo(() => {
-    const term = search.trim().toLowerCase()
+    const term = debouncedSearch.trim().toLowerCase()
     return onboardingCustomers
       .filter(
         (customer) =>
@@ -597,7 +599,7 @@ export function CustomerListPage() {
             customer.phone,
           ].some((value) => value.toLowerCase().includes(term)),
       )
-  }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
+  }, [activeTab, onboardingCustomers, debouncedSearch, selectedAssigneeId])
 
   const isLoading = useRowsEndpoint
     ? activeCustomerQuery.isPending
