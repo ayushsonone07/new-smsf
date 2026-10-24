@@ -75,6 +75,7 @@ const DYNAMIC_DEPARTMENT_HEAD_SCREENS: Array<{
   { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
   { key: 'users', label: 'Department User', icon: 'users', slug: 'department-user', screen: 'department-user' },
   { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customer-list', screen: 'customer-list' },
+  { key: 'billing', label: 'Billing List', icon: 'brief', slug: 'billing', screen: 'billing' },
   { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
   { key: 'service-flow', label: 'Service Flow', icon: 'flow', slug: 'service-flow', screen: 'service-flow' },
   { key: 'member-flow', label: 'Member Performance', icon: 'perf', slug: 'member-performance', screen: 'member-performance' },

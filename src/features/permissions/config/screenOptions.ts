@@ -12,6 +12,9 @@ export const SCREEN_OPTIONS: Array<{
   defaultIcon: IconName
 }> = [
   { value: 'dashboard', label: 'Dashboard', defaultSlug: 'dashboard', defaultIcon: 'grid' },
+  { value: 'recurring-dashboard', label: 'Recurring Dashboard', defaultSlug: 'recurring-dashboard', defaultIcon: 'grid' },
+  { value: 'billing', label: 'Billing List', defaultSlug: 'billing', defaultIcon: 'brief' },
+  { value: 'billing-list', label: 'Billing Customers', defaultSlug: 'billing-list', defaultIcon: 'brief' },
   { value: 'users', label: 'Department Users', defaultSlug: 'users', defaultIcon: 'userPlus' },
   { value: 'customers', label: 'Customer List', defaultSlug: 'customers', defaultIcon: 'list' },
   { value: 'attendance', label: 'Attendance', defaultSlug: 'attendance', defaultIcon: 'clock' },
