@@ -67,10 +67,74 @@ function CrmPreview() {
       })}
       <rect x="423" y="353" width="139" height="108" rx="13" fill="white" stroke="#e2e8f0"/>
       <text x="437" y="375" fontSize="12" fontWeight="700" fill="#0f172a">Quick Tasks</text>
-      {['Follow-up','Review','Approval'].map((label, i) => {
+      {/* {['Follow-up','Review','Approval'].map((label, i) => {
         const y = 396 + i * 26
         return <g key={label}><rect x="438" y={y-10} width="13" height="13" rx="4" fill="#e0f2fe" stroke="#7dd3fc"/><path d={`M441 ${y-4} l3 3 l5 -6`} stroke="#0284c7" strokeWidth="1.5" fill="none" strokeLinecap="round"/><text x="459" y={y} fontSize="10" fill="#475569">{label}</text></g>
-      })}
+      })} */}
+      {[
+        {
+          y: 393,
+          color: '#10B981',
+          title: 'Lead assigned',
+          progress: 100,
+          progressColor: '#10B981',
+        },
+        {
+          y: 417,
+          color: '#3B82F6',
+          title: 'Profile reviewed',
+          progress: 65,
+          progressColor: '#3B82F6',
+        },
+        {
+          y: 441,
+          color: '#94A3B8',
+          title: 'Task updated',
+          progress: 20,
+          progressColor: '#94A3B8',
+        },
+      ].map((item) => (
+        <g key={item.title}>
+          {/* Activity indicator */}
+          <circle
+            cx="190"
+            cy={item.y}
+            r="7"
+            fill={item.color}
+          />
+
+          {/* Activity name */}
+          <text
+            x="206"
+            y={item.y + 4}
+            fontSize="10"
+            fill="#475569"
+          >
+            {item.title}
+          </text>
+
+          {/* Progress track */}
+          <rect
+            x="339"
+            y={item.y - 3}
+            width="55"
+            height="6"
+            rx="3"
+            fill="#E2E8F0"
+          />
+
+          {/* Filled progress */}
+          <rect
+            x="339"
+            y={item.y - 3}
+            width={(55 * item.progress) / 100}
+            height="6"
+            rx="3"
+            fill={item.progressColor}
+          />
+        </g>
+      ))}
+
     </svg>
   )
 }
