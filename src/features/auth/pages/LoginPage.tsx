@@ -3,6 +3,7 @@ import {
   useState,
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { Eye, EyeOff } from 'lucide-react'
 import { useLoginWithCredentials } from '../hooks/useLoginWithCredentials'
 import {
   homeForRole,
@@ -15,6 +16,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const credentialsMutation =
     useLoginWithCredentials()
@@ -91,17 +93,33 @@ export function LoginPage() {
           <label>
             Password
 
-            <input
-              required
-              type="password"
-              minLength={6}
-              value={password}
-              onChange={(event) =>
-                setPassword(event.target.value)
-              }
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
+            <span className="auth-password-field">
+              <input
+                required
+                type={showPassword ? 'text' : 'password'}
+                minLength={6}
+                value={password}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} aria-hidden="true" />
+                ) : (
+                  <Eye size={18} aria-hidden="true" />
+                )}
+              </button>
+            </span>
           </label>
 
           {credentialsError && (

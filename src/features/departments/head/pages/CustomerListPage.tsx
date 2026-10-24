@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+﻿import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -830,7 +830,7 @@ export function CustomerListPage() {
       if (isOnboardingDept) await authSummaryQuery.refetch()
       if (status === 'completed') {
         const customer = onboardingCustomers.find((item) => item.id === customerId)
-        notifyServiceCompleted(customer ?? { id: customerId })
+        notifyServiceCompleted(customer ?? { id: customerId }, sType, currentDepartment)
       }
     } catch (err: unknown) {
       console.error('Failed to update status:', err)
