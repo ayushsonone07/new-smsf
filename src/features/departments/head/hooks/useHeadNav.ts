@@ -100,6 +100,29 @@ const ONBOARDING_HEAD_SCREENS: Array<{
   { key: 'sop', label: 'SOP', icon: 'flow', slug: 'sop', screen: 'sop' },
   { key: 'help-center', label: 'Help Center', icon: 'help', slug: 'help-center', screen: 'help-center' },
   { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
+  { key: 'leads', label: 'Leads', icon: 'tag', slug: 'leads', screen: 'leads' },
+  { key: 'manage-services', label: 'Manage Services', icon: 'settings', slug: 'manage-services', screen: 'manage-services' },
+  { key: 'salary-management', label: 'Salary Management', icon: 'trend', slug: 'salary-management', screen: 'salary-management' },
+  { key: 'airtel-calls', label: 'My Airtel Calls', icon: 'phone', slug: 'airtel-calls', screen: 'airtel-calls' },
+]
+
+const ONBOARDING_USER_SCREENS: Array<{
+  key: string
+  label: string
+  icon: IconName
+  slug: string
+  screen: HeadScreenKey
+}> = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'grid', slug: 'dashboard', screen: 'dashboard' },
+  { key: 'attendance', label: 'Attendance', icon: 'clock', slug: 'attendance', screen: 'attendance' },
+  { key: 'customers', label: 'Customer List', icon: 'list', slug: 'customers', screen: 'customers' },
+  { key: 'meeting', label: '15 Days Meeting', icon: 'calendar', slug: 'meeting', screen: 'meeting' },
+  { key: 'sop', label: 'SOP', icon: 'flow', slug: 'sop', screen: 'sop' },
+  { key: 'help-center', label: 'Help Center', icon: 'help', slug: 'help-center', screen: 'help-center' },
+  { key: 'history', label: 'History', icon: 'history', slug: 'history', screen: 'history' },
+  { key: 'leads', label: 'Leads', icon: 'tag', slug: 'leads', screen: 'leads' },
+  { key: 'salary-management', label: 'Salary Management', icon: 'trend', slug: 'salary-management', screen: 'salary-management' },
+  { key: 'airtel-calls', label: 'My Airtel Calls', icon: 'phone', slug: 'airtel-calls', screen: 'airtel-calls' },
 ]
 
 function extractCleanSlug(routeName: string): string {
@@ -110,10 +133,13 @@ function extractCleanSlug(routeName: string): string {
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1]
   const cleaned = last
-    .replace(/^(head|users|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)[-/]/i, '')
+    .replace(
+      /^(head|users|user|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)([-/]|$)/i,
+      '',
+    )
     .toLowerCase()
     .replace(/[\s_]+/g, '-')
-  return cleaned || 'custom'
+  return cleaned || 'dashboard'
 }
 
 function formatRouteLabel(slugOrName: string): string {
@@ -341,7 +367,8 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
           }
         })
 
-      if (!isOnboarding && routePerms.routes.length > 0) {
+      const userCandidateScreens = isOnboarding ? ONBOARDING_USER_SCREENS : DYNAMIC_DEPARTMENT_HEAD_SCREENS
+      if (routePerms.routes.length > 0) {
         const customUserFeatures: FeaturePermission[] = routePerms.routes
           .filter(
             (r) =>
@@ -437,28 +464,14 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
       return [...stdFeatures, ...customFeatures]
     }
 
-    // Onboarding Department Head: admin-configured features when present,
-    // otherwise fall back to the standard onboarding head screens.
-    const configuredScreens = (query.data ?? []).filter(
-      (feature) => feature.kind === 'screen',
-    )
-
-    if (configuredScreens.length > 0) {
-      return configuredScreens
-        .filter(
-          (feature) =>
-            feature.enabled &&
-            routePerms.isRouteEnabled(feature.slug) &&
-            routePerms.isRouteEnabled(buildOnboardingRoute(feature.slug, role)),
-        )
-        .sort((a, b) => a.order - b.order)
-    }
-
-    return ONBOARDING_HEAD_SCREENS
+    // Onboarding Department: standard onboarding screens + all enabled dynamic routes
+    const stdScreens = isUser ? ONBOARDING_USER_SCREENS : ONBOARDING_HEAD_SCREENS
+    const stdFeatures: FeaturePermission[] = stdScreens
       .filter(
         (item) =>
           routePerms.isRouteEnabled(item.slug) &&
-          routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)),
+          routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)) &&
+          item.slug !== 'fetch-rc',
       )
       .map((item, index) => ({
         id: `onboarding-feat-${item.slug}`,
@@ -476,6 +489,39 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
         category: 'screens',
         kind: 'screen',
       }))
+
+    const customFeatures: FeaturePermission[] = routePerms.routes
+      .filter(
+        (r) =>
+          r.routeName &&
+          routePerms.isRouteEnabled(r.routeName) &&
+          !stdFeatures.some((f) => isRouteMatch(r, f.slug)),
+      )
+      .map((r, idx) => {
+        const cleanSlug = extractCleanSlug(r.routeName)
+        const matchedStd = ONBOARDING_HEAD_SCREENS.find(
+          (s) => s.slug === cleanSlug || isRouteMatch(r, s.slug),
+        )
+        const screenKey = (matchedStd?.screen ?? (cleanSlug in SCREEN_REGISTRY ? cleanSlug : 'custom')) as HeadScreenKey
+        return {
+          id: `custom-route-${r.routeId || cleanSlug}`,
+          departmentId,
+          name: matchedStd?.label ?? formatRouteLabel(r.routeName),
+          description: `Dynamic route (${r.routeName})`,
+          enabled: true,
+          userVisible: true,
+          roleAPermission: 'CAN_EDIT',
+          roleBPermission: 'CAN_READ',
+          screen: screenKey,
+          slug: cleanSlug,
+          icon: matchedStd?.icon ?? 'brief',
+          order: stdFeatures.length + idx,
+          category: 'screens',
+          kind: 'screen',
+        }
+      })
+
+    return [...stdFeatures, ...customFeatures]
   }, [isGoogle, isUser, isOnboarding, isAutowebsion, automationCountQuery.data, effectiveDeptType, query.data, departmentId, role, routePerms])
 
   const items = useMemo<HeadNavItem[]>(() => {
@@ -499,20 +545,14 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
       }))
     }
 
-    if (isUser && isOnboarding) {
-      return DEPARTMENT_USER_SCREENS
-        .filter(
-          (item) =>
-            routePerms.isRouteEnabled(item.slug) &&
-            routePerms.isRouteEnabled(buildOnboardingRoute(item.slug, role)) &&
-            // Hide "Fetch R/C" from the sidebar for every role (ADMIN, HEAD, USER)
-            item.slug !== 'fetch-rc',
-        )
-        .map((item) => ({
-          key: item.key,
-          label: item.label,
-          icon: item.icon,
-          to: buildOnboardingRoute(item.slug, role),
+    if (isOnboarding) {
+      return features
+        .filter((feature) => feature.slug !== 'fetch-rc')
+        .map((feature) => ({
+          key: feature.slug,
+          label: feature.name,
+          icon: feature.icon,
+          to: buildOnboardingRoute(feature.slug, role),
         }))
     }
 
@@ -632,14 +672,17 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
     )
     if (found) return found
 
-    if (!isOnboarding && routePerms.routes.length > 0) {
+    if (routePerms.routes.length > 0) {
       const matchedDbRoute = routePerms.routes.find(
         (r) => extractCleanSlug(r.routeName) === s || isRouteMatch(r, s),
       )
       if (!matchedDbRoute) {
         return undefined
       }
-      const matchedStd = DYNAMIC_DEPARTMENT_HEAD_SCREENS.find(
+      const candidateScreens = isOnboarding
+        ? (isUser ? ONBOARDING_USER_SCREENS : ONBOARDING_HEAD_SCREENS)
+        : DYNAMIC_DEPARTMENT_HEAD_SCREENS
+      const matchedStd = candidateScreens.find(
         (item) => item.slug === s || item.screen === s || isRouteMatch(matchedDbRoute, item.slug),
       )
       return {
