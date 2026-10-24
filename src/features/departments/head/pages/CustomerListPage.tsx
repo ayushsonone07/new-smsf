@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -807,13 +807,14 @@ export function CustomerListPage() {
     const prevStatus = localStatusMap[customerId]
     setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
 
+    const targetCustomer =
+      filteredCustomers.find((c) => c.id === customerId) ||
+      onboardingCustomers.find((c) => c.id === customerId)
+    const sType = targetCustomer?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+
     try {
       if (useRowsEndpoint) {
-        const target =
-          filteredCustomers.find((c) => c.id === customerId) ||
-          onboardingCustomers.find((c) => c.id === customerId)
-        const oldStatus = target?.status || 'PENDING'
-        const sType = target?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+        const oldStatus = targetCustomer?.status || 'PENDING'
 
         await updateDepartmentServiceStatus({
           customerId,

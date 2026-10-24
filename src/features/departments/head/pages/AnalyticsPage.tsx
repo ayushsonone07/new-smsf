@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { getSession } from '../../../../app/auth/session'
+import { resolveDeptFromPath } from '../utils/routeUtils'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { useDepartmentUsersAnalytics } from '../../hooks/useTaskHistory'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { SectionCard } from '../../../../components/head/shared/SectionCard'
@@ -23,8 +25,10 @@ const sectionVariants: Variants = {
 
 export function AnalyticsPage(_props?: { feature?: FeaturePermission }) {
   const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const currentDepartment =
-    session?.user.departmentType || 'GOOGLE_DEPARTMENT'
+    (deptFromUrl ? normalizeDepartmentTypeName(deptFromUrl) : null) ||
+    (session?.user.departmentType ? normalizeDepartmentTypeName(session.user.departmentType) : 'GOOGLE_DEPARTMENT')
 
   const [selectedUser, setSelectedUser] = useState<string>('')
   const [page, setPage] = useState(0)

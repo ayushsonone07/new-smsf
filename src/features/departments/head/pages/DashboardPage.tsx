@@ -31,6 +31,7 @@ import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDe
 import { getSession } from '../../../../app/auth/session'
 import { resolveDeptFromPath } from '../utils/routeUtils'
 import { UserDashboardPage } from './UserDashboardPage'
+import { RecurringDashboardPage } from './RecurringDashboardPage'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useInfiniteOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { useMemberDetails } from '../../hooks/useMemberDetails'
@@ -181,6 +182,10 @@ export function DashboardPage() {
     return <UserDashboardPage />
   }
 
+  const isRecurring = Boolean(rawDepartment && rawDepartment.toUpperCase().includes('RECURRING')) || (typeof window !== 'undefined' && window.location.pathname.includes('recurring'))
+  if (isRecurring) {
+    return <RecurringDashboardPage />
+  }
   if (isAutowebsion) {
     return <AutowebsionMergedHeadDashboard rawDepartment={rawDepartment} />
   }

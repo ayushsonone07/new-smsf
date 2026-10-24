@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { getSession } from '../../../../app/auth/session'
+import { resolveDeptFromPath } from '../utils/routeUtils'
+import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import {
   getDepartmentMembersPerformance,
   type MemberPerformanceItem,
@@ -26,8 +28,10 @@ const sectionVariants: Variants = {
 
 export function MemberFlowPage(_props?: { feature?: FeaturePermission }) {
   const session = getSession()
+  const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const currentDepartment =
-    session?.user.departmentType || 'GOOGLE_DEPARTMENT'
+    (deptFromUrl ? normalizeDepartmentTypeName(deptFromUrl) : null) ||
+    (session?.user.departmentType ? normalizeDepartmentTypeName(session.user.departmentType) : 'GOOGLE_DEPARTMENT')
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)

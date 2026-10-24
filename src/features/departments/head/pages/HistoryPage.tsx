@@ -75,7 +75,11 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
 
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const isGoogle = isUserGoogle(session?.user?.departmentType || deptFromUrl)
-  const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (session?.user?.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT')
+  const currentDepartment = isGoogle
+    ? 'GOOGLE_DEPARTMENT'
+    : (deptFromUrl
+        ? normalizeDepartmentTypeName(deptFromUrl)
+        : (session?.user?.departmentType ? normalizeDepartmentTypeName(session.user.departmentType) : 'ONBOARDING_DEPARTMENT'))
 
   const { isColumnEnabled } = useDepartmentColumnPermissions(currentDepartment)
 

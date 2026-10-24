@@ -80,9 +80,13 @@ export async function apiRequest<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  // Route /help-center or /api/help-center through Vite's local dev proxy directly
+  const isHelpCenter = normalizedEndpoint.startsWith('/help-center') || normalizedEndpoint.startsWith('/api/help-center')
   const url = endpoint.startsWith('http')
     ? endpoint
-    : `${API_BASE_URL}${normalizedEndpoint}`
+    : isHelpCenter
+      ? normalizedEndpoint
+      : `${API_BASE_URL}${normalizedEndpoint}`
   // Let the browser set the multipart boundary for FormData bodies;
   // forcing application/json breaks file uploads.
   const isFormData =

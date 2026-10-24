@@ -49,6 +49,9 @@ export type HeadScreenKey =
   | 'autowebision-customers'
   | 'website-customers'
   | 'automation-customers'
+  | 'recurring-dashboard'
+  | 'billing'
+  | 'billing-list'
   | 'delivered'
   | 'custom'
 
