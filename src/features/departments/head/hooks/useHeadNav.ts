@@ -133,12 +133,35 @@ function extractCleanSlug(routeName: string): string {
     .replace(/^(\/|#)+/, '')
     .replace(/\/+$/, '')
   const parts = trimmed.split('/')
-  const last = parts[parts.length - 1]
+  const last = parts[parts.length - 1] || ''
+
+  const cleanLast = last.toLowerCase().replace(/[\s_]+/g, '-')
+  if (
+    cleanLast === 'users' ||
+    cleanLast === 'department-user' ||
+    cleanLast === 'department-users' ||
+    cleanLast === 'departmentuser' ||
+    cleanLast === 'departmentusers'
+  ) {
+    return 'department-user'
+  }
+
+  if (
+    cleanLast === 'customers' ||
+    cleanLast === 'customer-list' ||
+    cleanLast === 'all-customers' ||
+    cleanLast === 'autowebision-customers'
+  ) {
+    return 'customer-list'
+  }
+
   const cleaned = last
     .replace(
-      /^(head|users|user|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)([-/]|$)/i,
+      /^(onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding-user|google-head|google-user)[-/]/i,
       '',
     )
+    .replace(/^(head|user|users)[-/]/i, '')
+    .replace(/^(head|user|onboarding|google-head|google-user)$/i, '')
     .toLowerCase()
     .replace(/[\s_]+/g, '-')
   return cleaned || 'dashboard'
@@ -146,6 +169,12 @@ function extractCleanSlug(routeName: string): string {
 
 function formatRouteLabel(slugOrName: string): string {
   const cleaned = extractCleanSlug(slugOrName)
+  if (cleaned === 'department-user' || cleaned === 'users') {
+    return 'Department User'
+  }
+  if (cleaned === 'customer-list' || cleaned === 'customers') {
+    return 'Customer List'
+  }
   return cleaned
     .split('-')
     .filter(Boolean)
@@ -445,18 +474,21 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
         )
         .map((r, idx) => {
           const cleanSlug = extractCleanSlug(r.routeName)
+          const matchedStd = DYNAMIC_DEPARTMENT_HEAD_SCREENS.find(
+            (s) => s.slug === cleanSlug || isRouteMatch(r, s.slug),
+          )
           return {
             id: `custom-route-${r.routeId || cleanSlug}`,
             departmentId,
-            name: formatRouteLabel(r.routeName),
+            name: matchedStd?.label ?? formatRouteLabel(r.routeName),
             description: `Dynamic route (${r.routeName})`,
             enabled: true,
             userVisible: true,
             roleAPermission: 'CAN_EDIT',
             roleBPermission: 'CAN_READ',
-            screen: 'custom',
-            slug: cleanSlug,
-            icon: 'brief',
+            screen: matchedStd?.screen ?? 'custom',
+            slug: matchedStd?.slug ?? cleanSlug,
+            icon: matchedStd?.icon ?? 'brief',
             order: stdFeatures.length + idx,
             category: 'screens',
             kind: 'screen',

@@ -68,15 +68,15 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  width: clamp(200px, 20vw, 320px);
+  width: 195px;
   height: 100vh;
   background: #fff;
   border-right: 1px solid var(--c-border);
-  transition: width 0.2s;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hside.is-collapsed {
-  width: 56px;
+  width: 52px;
 }
 
 .hbrand {
@@ -840,30 +840,33 @@
 
   .hside {
     position: fixed;
-    z-index: 40;
-    box-shadow: 0 0 40px rgb(15 23 42 / 15%);
+    z-index: 50;
+    box-shadow: 0 0 40px rgb(15 23 42 / 25%);
     left: 0;
     top: 0;
     bottom: 0;
+    width: 195px !important;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .hside.is-collapsed {
-    width: 0;
+    transform: translateX(-100%);
+    width: 195px !important;
     overflow: hidden;
     border: 0;
   }
 
-  /* Main content offset for fixed sidebar */
+  /* Main content does not shift on mobile; it is overlayed */
   .hside:not(.is-collapsed) ~ .hmain {
-    margin-left: clamp(200px, 20vw, 320px);
+    margin-left: 0;
   }
 
   .hside-backdrop.is-visible {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 39;
-    background: rgba(15, 23, 42, 0.4);
+    z-index: 49;
+    background: rgba(15, 23, 42, 0.45);
     backdrop-filter: blur(2px);
     animation: hin 0.15s ease-out;
   }
@@ -911,13 +914,18 @@
 /* --- Sidebar (overrides for wider head panel) ---------------- */
 
 .hside {
-  width: clamp(190px, 18vw, 280px);
+  width: 195px;
   border-right: 1px solid var(--head-border);
 }
 
+.hbrand {
+  gap: 6px;
+  padding: 8px 6px;
+}
+
 .hbrand__mark {
-  width: 52px;
-  height: 52px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -925,14 +933,15 @@
 }
 
 .hbrand__text strong {
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .hbrand__text span {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--head-blue);
   white-space: normal;
@@ -940,12 +949,16 @@
   text-overflow: ellipsis;
 }
 
+.hnav {
+  padding: 2px 4px;
+}
+
 .hnav__item {
-  gap: 14px;
-  padding: 14px 18px;
-  border-left: 4px solid transparent;
-  border-radius: 12px;
-  font-size: 18px;
+  gap: 8px;
+  padding: 6px 10px;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
 }
 
 .hnav__item:hover {
@@ -970,10 +983,12 @@
 }
 
 .haccount {
-  margin: 8px;
-  padding: 10px;
-  border-radius: 12px;
+  margin: 4px;
+  padding: 6px;
+  border-radius: 6px;
   background: var(--c-bg);
+  min-height: auto;
+  gap: 4px;
 }
 
 .haccount__switch {
@@ -982,21 +997,40 @@
 }
 
 .haccount__logout {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.haccount__logout:hover {
+  background: #fee2e2;
 }
 
 /* Clickable account row opens the profile settings menu. */
 .haccount__row--clickable {
   width: 100%;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   background: transparent;
   padding: 4px;
-  margin: -4px;
+  margin: 0;
   cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease;
 }
 
 .haccount__row--clickable:hover {
@@ -1016,6 +1050,7 @@
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  line-height: 1.1;
 }
 
 .haccount__row--clickable .haccount__name {
@@ -1026,13 +1061,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.haccount__row--clickable .haccount__role {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .haccount__chevron {
   color: var(--c-faint);
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1;
   transition: transform 0.15s ease;
+  margin-left: auto;
+  flex: none;
 }
 
 .haccount__chevron.is-open {

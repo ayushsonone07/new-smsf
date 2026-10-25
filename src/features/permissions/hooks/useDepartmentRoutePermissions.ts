@@ -33,12 +33,35 @@ export function extractScreenSlug(str: string): string {
     .replace(/\/+$/, '')
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1] || ''
+
+  const cleanLast = last.replace(/[\s_]+/g, '-')
+  if (
+    cleanLast === 'users' ||
+    cleanLast === 'department-user' ||
+    cleanLast === 'department-users' ||
+    cleanLast === 'departmentuser' ||
+    cleanLast === 'departmentusers'
+  ) {
+    return 'users'
+  }
+
+  if (
+    cleanLast === 'customers' ||
+    cleanLast === 'customer-list' ||
+    cleanLast === 'all-customers' ||
+    cleanLast === 'autowebision-customers'
+  ) {
+    return 'customers'
+  }
+
   return (
     last
       .replace(
-        /^(head|users|user|onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding|google-head|google-user)([-/]|$)/i,
+        /^(onboarding-dashboard-head-departmentuser|onboarding-dashboard-head|onboarding-user|google-head|google-user)[-/]/i,
         '',
       )
+      .replace(/^(head|user|users)[-/]/i, '')
+      .replace(/^(head|user|onboarding|google-head|google-user)$/i, '')
       .replace(/[\s_]+/g, '-') || 'dashboard'
   )
 }
@@ -53,8 +76,18 @@ export function areSlugsEquivalent(a: string, b: string): boolean {
   const isDashB = normB === 'dashboard' || normB === 'home';
   if (isDashA && isDashB) return true
 
-  const isUsersA = normA === 'users' || normA === 'department-user' || normA === 'department-users'
-  const isUsersB = normB === 'users' || normB === 'department-user' || normB === 'department-users'
+  const isUsersA =
+    normA === 'users' ||
+    normA === 'department-user' ||
+    normA === 'department-users' ||
+    normA === 'departmentuser' ||
+    normA === 'departmentusers'
+  const isUsersB =
+    normB === 'users' ||
+    normB === 'department-user' ||
+    normB === 'department-users' ||
+    normB === 'departmentuser' ||
+    normB === 'departmentusers'
   if (isUsersA && isUsersB) return true
 
   const isCustA =
