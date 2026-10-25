@@ -113,6 +113,24 @@ export function AssignedTicketsView({
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
 
+  // Infinite scroll states: 8 items initially, fetch next 8 on scroll
+  const [visibleTicketsCount, setVisibleTicketsCount] = useState(8)
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [visibleUsersCount, setVisibleUsersCount] = useState(8)
+
+  // Reset ticket pagination when activeTab or searchQuery changes
+  useEffect(() => {
+    setVisibleTicketsCount(8)
+  }, [activeTab, searchQuery])
+
+  // Reset reassign dropdown pagination on modal open/search
+  useEffect(() => {
+    if (isReassignModalOpen) {
+      setVisibleUsersCount(8)
+      setUserSearchQuery('')
+    }
+  }, [isReassignModalOpen])
+
   // Fetch assignable users for re-assignment / round robin
   useEffect(() => {
     let cancelled = false
@@ -523,9 +541,19 @@ export function AssignedTicketsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* ── Left Column: Scrollable Ticket List ── */}
-          <div className="lg:col-span-5 space-y-3 max-h-[calc(100vh-230px)] overflow-y-auto pr-1">
-            {filteredTickets.map((t) => {
+          {/* ── Left Column: Scrollable Ticket List with 8-at-a-time pagination ── */}
+          <div
+            className="lg:col-span-5 space-y-3 max-h-[calc(100vh-230px)] overflow-y-auto pr-1"
+            onScroll={(e) => {
+              const target = e.currentTarget
+              if (target.scrollHeight - target.scrollTop - target.clientHeight < 50) {
+                if (visibleTicketsCount < filteredTickets.length) {
+                  setVisibleTicketsCount((prev) => Math.min(prev + 8, filteredTickets.length))
+                }
+              }
+            }}
+          >
+            {filteredTickets.slice(0, visibleTicketsCount).map((t) => {
               const isSelected = selectedTicket?.ticketNumber === t.ticketNumber
 
               return (
@@ -590,6 +618,12 @@ export function AssignedTicketsView({
                 </div>
               )
             })}
+
+            {visibleTicketsCount < filteredTickets.length && (
+              <div className="py-2.5 text-center text-xs text-slate-400 font-medium">
+                Scroll for more ({visibleTicketsCount} of {filteredTickets.length})…
+              </div>
+            )}
           </div>
 
           {/* ── Right Column: Selected Ticket Details Card (1:1 with media_1792575222481_a7ce2dbc.png) ── */}
@@ -917,19 +951,83 @@ export function AssignedTicketsView({
                   <p className="text-sm text-amber-600 p-3 bg-amber-50 rounded-xl border border-amber-200">
                     No assignable team members found in this department.
                   </p>
-                ) : (
-                  <select
-                    value={targetAssigneeEmail}
-                    onChange={(e) => setTargetAssigneeEmail(e.target.value)}
-                    className="w-full h-11 px-3.5 text-sm sm:text-base border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-800 shadow-xs"
-                  >
-                    {assignableUsers.map((u) => (
-                      <option key={u.email} value={u.email}>
-                        {u.username ? `${u.username} (${u.email})` : u.email}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                ) : (() => {
+                  const filteredAssignable = assignableUsers.filter((u) => {
+                    const q = userSearchQuery.trim().toLowerCase()
+                    if (!q) return true
+                    return (
+                      (u.username?.toLowerCase() || '').includes(q) ||
+                      (u.email?.toLowerCase() || '').includes(q)
+                    )
+                  })
+
+                  const visibleUsers = filteredAssignable.slice(0, visibleUsersCount)
+
+                  return (
+                    <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50/50 space-y-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={userSearchQuery}
+                          onChange={(e) => {
+                            setUserSearchQuery(e.target.value)
+                            setVisibleUsersCount(8)
+                          }}
+                          placeholder="Search assignee name or email…"
+                          className="w-full h-9 pl-8 pr-3 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                        />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      </div>
+
+                      <div
+                        className="max-h-52 overflow-y-auto space-y-1 pr-1"
+                        onScroll={(e) => {
+                          const target = e.currentTarget
+                          if (target.scrollHeight - target.scrollTop - target.clientHeight < 40) {
+                            if (visibleUsersCount < filteredAssignable.length) {
+                              setVisibleUsersCount((prev) => Math.min(prev + 8, filteredAssignable.length))
+                            }
+                          }
+                        }}
+                      >
+                        {visibleUsers.map((u) => {
+                          const isSelected = targetAssigneeEmail === u.email
+                          return (
+                            <div
+                              key={u.email}
+                              onClick={() => setTargetAssigneeEmail(u.email)}
+                              className={`p-2 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-50 border border-blue-200 text-blue-900 font-medium'
+                                  : 'hover:bg-white text-slate-700'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <p className="truncate font-semibold">{u.username || u.email}</p>
+                                <p className="truncate text-[11px] text-slate-400">{u.email}</p>
+                              </div>
+                              {isSelected && (
+                                <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
+                              )}
+                            </div>
+                          )
+                        })}
+
+                        {filteredAssignable.length === 0 && (
+                          <div className="py-4 text-center text-xs text-slate-400">
+                            No team members match "{userSearchQuery}"
+                          </div>
+                        )}
+
+                        {visibleUsersCount < filteredAssignable.length && (
+                          <div className="py-2 text-center text-[11px] text-slate-400 font-medium">
+                            Scroll for more ({visibleUsersCount} of {filteredAssignable.length})…
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
 

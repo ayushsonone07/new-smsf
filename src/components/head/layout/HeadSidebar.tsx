@@ -116,7 +116,7 @@ export function HeadSidebar({
           >
             <Avatar
               name={account.initial ?? account.label}
-              size={30}
+              size={24}
               tone="brand"
             />
 

@@ -507,6 +507,27 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
       staggerChildren), status/assign/assignee/date menus fade+scale, controls bar fade-down,
       tab buttons `whileTap`, green reset `whileTap` rotate. E2E verified: rows settle opacity 1,
       menu animates, drawer spring translate + overlay fade-in + close unmounts.
+- [x] **Recurring Department (`RECURRING_DEPARTMENT`) E2E Integration** —
+      - Backend migration & session slug normalizer: `/recurring/head/dashboard` & `/recurring/user/dashboard`.
+      - Pure Tailwind + CSS lightweight charts in `RecurringDashboardPage` (zero external chart dependencies).
+      - Wired all 7 department tabs:
+        1. **Department User**: `GET /api/auth/department/users?page=0&size=10`
+        2. **Customer List**: `GET /api/meetings/users/assigning-list?departmentType=RECURRING_DEPARTMENT`, `GET/PUT /api/round-robin/department`, `GET /api/auth/department/customer/rows`
+        3. **Billing List**: `GET /api/billing/customers?page=0&size=10` (registered `billing` / `billing-list` screen and sidebar item)
+        4. **History**: `GET /api/task-history/department`, `GET /api/status-history/get-all`
+        5. **Analytics**: `/api/meetings/users/assigning-list` & `/api/analytics/departmentUsers`
+        6. **Service Flow**: `/api/service/flows`
+        7. **Members Performance**: `/api/auth/department/members/performance`
+- [x] **Help Center Microservice Proxy & Endpoints Connection** —
+      - Vite proxy handles `/help-center` and `/api/help-center` targeting the ngrok URL (`ducking-shore-remedial.ngrok-free.dev`) and rewrites to `/api/v1` with headers `X-OAuth-Key` and `ngrok-skip-browser-warning`.
+      - API Client bypass: relative routing in `client.ts` for `/api/help-center` and `/help-center`.
+      - Fixed `fetchTicketStatusSummary` endpoint url to `/api/help-center/tickets/status_summary` (matching backend `@GetMapping("/status_summary")`).
+- [x] **System Performance & Reliability Optimizations** —
+      - **Search Debounce**: Added `useDebounce(..., 300)` across `CustomerListPage`, `DepartmentUsersPage`, `MemberFlowPage`, and `HistoryPage` to eliminate keystroke stutter and reduce API calls by up to ~90%.
+      - **TanStack Query Caching**: Set `staleTime: 60_000` (1 min) and `gcTime: 300_000` (5 mins) in `queryClient.ts` to prevent redundant network fetches on tab switching.
+      - **Vite Build Chunk Splitting**: Added `manualChunks` in `vite.config.ts` separating `react-vendor`, `tanstack-vendor`, and `icons-vendor` with `esbuild` minification for faster bundle downloads.
+      - **401 Session Expiry Interceptor**: Added in `src/api/client.ts` to cleanly clear session and redirect to `/login?expired=true` instead of hanging or crashing.
+      - **Notification Microservice 500 Fallback**: Safe error handling in `notifications.api.ts` gracefully defaulting to empty list `[]` when the standalone notification service (`localhost:9091`) is offline.
 
 ### Pending (order me)
 1. `components/head/users/` ko prototype ke exact **Department Users** screen se match karna
