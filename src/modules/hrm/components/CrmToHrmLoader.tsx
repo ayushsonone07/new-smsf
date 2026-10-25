@@ -70,7 +70,7 @@ export const CrmToHrmLoader: React.FC<CrmToHrmLoaderProps> = ({
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [fadeOpacity, setFadeOpacity] = useState(1);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cycling status animation from crmTohrm.html
   useEffect(() => {

@@ -428,6 +428,13 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Vite 8 / Rolldown production-build compatibility (25 Oct 2026)** — converted
+      `build.rollupOptions.output.manualChunks` from the unsupported object form to a
+      module-ID callback while preserving the React, TanStack, and Lucide vendor chunks.
+      Switched the explicitly configured `esbuild` minifier to Vite 8's built-in `oxc`
+      minifier. Restored `tsc -b` to the production build and fixed the surfaced router,
+      component callback, timer, Axios config, onboarding, and missing barrel-export type
+      errors. `npm run build` successful with TypeScript checking (3682 modules).
 - [x] **Admin login password visibility toggle** — sign-in password field me professional
       Eye/EyeOff button add kiya; show/hide state, keyboard focus ring, hover feedback,
       `aria-label`/`aria-pressed`, tooltip aur input text ke liye safe right padding included.

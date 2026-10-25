@@ -19,6 +19,7 @@ import {
   isUserOnboarding,
   resolveDeptFromPath,
 } from '../utils/routeUtils'
+import { SCREEN_REGISTRY } from '../config/screenRegistry'
 
 const DEPARTMENT_USER_SCREENS: Array<{
   key: string
