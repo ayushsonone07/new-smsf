@@ -31,6 +31,30 @@ interface ApiErrorResponse {
   [key: string]: unknown
 }
 
+function isAuthenticationFailure(errorData: ApiErrorResponse): boolean {
+  const error =
+    typeof errorData.error === 'string'
+      ? errorData.error.toLowerCase()
+      : ''
+  const message =
+    typeof errorData.message === 'string'
+      ? errorData.message.toLowerCase()
+      : ''
+  const legacyMessage =
+    typeof errorData.Message === 'string'
+      ? errorData.Message.toLowerCase()
+      : ''
+
+  return (
+    error === 'jwt authentication failed' ||
+    message.includes('authorization header is missing') ||
+    message.includes('invalid or expired jwt token') ||
+    (error === 'unauthorized' &&
+      (message.includes('jwt') || message.includes('authorization header'))) ||
+    legacyMessage.includes('check your credential')
+  )
+}
+
 function getApiErrorMessage(
   errorData: ApiErrorResponse & Record<string, unknown>,
   fallback: string,
@@ -110,19 +134,24 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      clearSession()
-      window.location.href = '/login?expired=true'
-    }
-
     let message = `Request failed with status ${response.status}`
+    let errorData: ApiErrorResponse = {}
 
     try {
-      const errorData = (await response.json()) as ApiErrorResponse
-
+      errorData = (await response.json()) as ApiErrorResponse
       message = getApiErrorMessage(errorData, message)
     } catch {
       // Response wasn't JSON.
+    }
+
+    if (
+      response.status === 401 &&
+      isAuthenticationFailure(errorData) &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      clearSession()
+      window.location.href = '/login?expired=true'
     }
 
     throw new ApiError(message, response.status)
