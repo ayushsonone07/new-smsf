@@ -2,7 +2,9 @@ import { getSession, clearSession } from '../app/auth/session'
 import { ACTIVE_API_BASE_URL } from '../config/api.config'
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || ACTIVE_API_BASE_URL
+  import.meta.env.DEV
+    ? ''
+    : import.meta.env.VITE_API_BASE_URL || ACTIVE_API_BASE_URL
 ).replace(/\/$/, '')
 
 type ApiActivityListener = (activeRequests: number) => void
