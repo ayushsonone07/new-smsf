@@ -4115,3 +4115,17 @@
   color: #fecaca;
   font-size: 12px;
 }
+
+.cl-skeleton-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cl-skeleton-row .cl-td {
+  padding: 14px 12px;
+  vertical-align: middle;
+}
+
+.cl-skeleton-bone {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
