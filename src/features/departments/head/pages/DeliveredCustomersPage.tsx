@@ -10,6 +10,7 @@ import type {
   OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
 import { getSession } from '../../../../app/auth/session'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getAssigningUsers } from '../../../../api/meetings.api'
 import {
   assignCustomerUser,
@@ -271,6 +272,28 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
   const isHead = session?.user.role !== 'USER'
   const isUser = session?.user.role === 'USER'
   const queryClient = useQueryClient()
+  const {
+    isColumnConfigured,
+    canEditColumn,
+  } = useDepartmentColumnPermissions(
+    SUPPORT_DEPARTMENT,
+    typeof window !== 'undefined' ? window.location.pathname : undefined,
+  )
+
+  const canAssign = isColumnConfigured('Assigned To')
+    ? canEditColumn('Assigned To')
+    : isHead
+  const deliveryColumnKey = isColumnConfigured('Delivery Status')
+    ? 'Delivery Status'
+    : isColumnConfigured('Status')
+      ? 'Status'
+      : null
+  const canEditDelivery = deliveryColumnKey
+    ? canEditColumn(deliveryColumnKey)
+    : isUser
+  const canEditRemark = isColumnConfigured('Remark')
+    ? canEditColumn('Remark')
+    : true
 
   const [page, setPage] = useState(0)
   const [pageSize] = useState(10)
@@ -310,7 +333,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
   const assigneesQuery = useQuery({
     queryKey: ['assigning-users', SUPPORT_DEPARTMENT],
     queryFn: () => getAssigningUsers(SUPPORT_DEPARTMENT),
-    enabled: isHead,
+    enabled: isHead || canAssign,
     staleTime: 30_000,
   })
 
@@ -365,6 +388,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
   }
 
   async function handleAssign(row: DepartmentCustomerRowItem, email: string) {
+    if (!canAssign) return
     const id = rowId(row)
     if (!id || assigningId) return
     const previous = assignedEmail(row)
@@ -393,6 +417,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
   }
 
   async function openDeliveryModal(row: DepartmentCustomerRowItem) {
+    if (!canEditDelivery) return
     const id = rowId(row)
     if (!id || loadingDeliveryId) return
     const customerUsername = row.customerDetails?.email ?? row.email ?? ''
@@ -571,8 +596,8 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                           className={`delivered-badge delivered-status-button ${
                             delivered ? 'is-delivered' : 'is-not-delivered'
                           }`}
-                          disabled={!isUser || loadingDeliveryId === id}
-                          title={isUser ? 'Edit delivery status' : undefined}
+                          disabled={!canEditDelivery || loadingDeliveryId === id}
+                          title={canEditDelivery ? 'Edit delivery status' : 'Read only'}
                           onClick={() => void openDeliveryModal(row)}
                         >
                           {loadingDeliveryId === id
@@ -582,7 +607,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
                       </td>
                       <td className="delivered-amount">{formatAmount(paid)}</td>
                       <td>
-                        {isHead && assigneeOptions.length > 0 ? (
+                        {canAssign && assigneeOptions.length > 0 ? (
                           <AssigneeSelect
                             value={assignedEmail(row)}
                             label={assignedLabel(row)}
@@ -634,6 +659,7 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
           customer={selectedCustomer}
           assignees={assigneeOptions}
           departmentType={SUPPORT_DEPARTMENT}
+          canEditRemark={canEditRemark}
           onClose={() => setSelectedRow(null)}
         />
       )}

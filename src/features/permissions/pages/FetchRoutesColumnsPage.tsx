@@ -16,6 +16,7 @@ import {
   useDynamicColumns,
   useDepartmentTypes,
   useUpdateColumnPermission,
+  useBulkUpdateColumnPermissions,
   useUpdateColumnStatus,
   useUpdateRouteStatus,
 } from '../hooks/useDynamicPermissions'
@@ -74,6 +75,7 @@ export function FetchRoutesColumnsPage() {
   const columnsQuery = useDynamicColumns(selectedDept)
   const deptsQuery = useDepartmentTypes()
   const updateColumnPermissionMutation = useUpdateColumnPermission()
+  const bulkUpdateColumnPermissionsMutation = useBulkUpdateColumnPermissions()
   const updateColumnStatusMutation = useUpdateColumnStatus()
   const updateRouteStatusMutation = useUpdateRouteStatus()
 
@@ -372,12 +374,25 @@ export function FetchRoutesColumnsPage() {
     )
   }
 
-  // Route permission change (pure UI state)
+  // Route permission change: apply the role's READ/WRITE level to every
+  // column linked to the route so it is actually persisted in access_controls.
   const handleRouteChange = (
     routeId: string,
     key: 'readWriteHead' | 'readWriteUser',
     val: '1' | '12',
   ) => {
+    const route = rawRoutes.find((item) => item.routeId === routeId)
+    const routeColumns = route
+      ? rawColumns.filter((column) => isColumnBelongingToRoute(column, route))
+      : rawColumns.filter(
+          (column) =>
+            column.routeId === routeId ||
+            (column.routesType ?? '')
+              .split(',')
+              .map((part) => part.trim())
+              .includes(routeId),
+        )
+
     setRoutesUiState((prev) => ({
       ...prev,
       [routeId]: {
@@ -387,11 +402,69 @@ export function FetchRoutesColumnsPage() {
         readWriteUser: key === 'readWriteUser' ? val : prev[routeId]?.readWriteUser ?? '1',
       },
     }))
-    setStatusMessage({
-      type: 'success',
-      text: `Route permission updated in UI state!`,
+
+    if (routeColumns.length === 0) {
+      setStatusMessage({
+        type: 'error',
+        text: 'No columns are linked to this route, so there is no column permission to update.',
+      })
+      setTimeout(() => setStatusMessage(null), 5000)
+      return
+    }
+
+    setColumnsUiState((prev) => {
+      const next = { ...prev }
+      for (const column of routeColumns) {
+        next[column.columnId] = {
+          enableHead: prev[column.columnId]?.enableHead ?? (column.enableHead === true),
+          enableUser: prev[column.columnId]?.enableUser ?? (column.enableUser === true),
+          readWriteHead:
+            key === 'readWriteHead'
+              ? val
+              : prev[column.columnId]?.readWriteHead ?? (column.roleAPermission === '1' ? '1' : '12'),
+          readWriteUser:
+            key === 'readWriteUser'
+              ? val
+              : prev[column.columnId]?.readWriteUser ?? (column.roleBPermission === '12' ? '12' : '1'),
+        }
+      }
+      return next
     })
-    setTimeout(() => setStatusMessage(null), 2000)
+
+    const roleName = key === 'readWriteHead' ? 'DEPARTMENT_HEAD' : 'DEPARTMENT_USER'
+    const fallbackDepartment =
+      route?.departmentType ||
+      routeColumns[0]?.departmentType ||
+      'ONBOARDING_DEPARTMENT'
+
+    bulkUpdateColumnPermissionsMutation.mutate(
+      routeColumns.map((column) => ({
+        columnId: column.columnId,
+        columnName: column.columnName,
+        roleName,
+        departmentType:
+          selectedDept === 'ALL'
+            ? column.departmentType || fallbackDepartment
+            : selectedDept,
+        readWriteAccess: val,
+      })),
+      {
+        onSuccess: () => {
+          setStatusMessage({
+            type: 'success',
+            text: `Route permission updated for ${routeColumns.length} column(s): ${key === 'readWriteHead' ? 'HEAD' : 'USER'} -> ${val === '12' ? 'Read + Write' : 'Read Only'} in access_controls.`,
+          })
+          setTimeout(() => setStatusMessage(null), 3500)
+        },
+        onError: (err: any) => {
+          setStatusMessage({
+            type: 'error',
+            text: `Failed to update route columns: ${err?.message || 'Server error'}`,
+          })
+          setTimeout(() => setStatusMessage(null), 5000)
+        },
+      },
+    )
   }
 
   const formatItemName = (str: string) => {
@@ -795,11 +868,20 @@ export function FetchRoutesColumnsPage() {
               </tr>
             ) : (
               filteredRoutes.map((route, index) => {
+                const routeColumnsForUi = rawColumns.filter((column) =>
+                  isColumnBelongingToRoute(column, route),
+                )
+                const headCanWrite = routeColumnsForUi.some(
+                  (column) => column.roleAPermission === '12' || column.roleAPermission === '2',
+                )
+                const userCanWrite = routeColumnsForUi.some(
+                  (column) => column.roleBPermission === '12' || column.roleBPermission === '2',
+                )
                 const ui = routesUiState[route.routeId] || {
                   enableHead: route.enableHead ?? route.visibility ?? false,
                   enableUser: route.enableUser ?? route.visibility ?? false,
-                  readWriteHead: '1',
-                  readWriteUser: '1',
+                  readWriteHead: headCanWrite ? '12' : '1',
+                  readWriteUser: userCanWrite ? '12' : '1',
                 }
 
                 const storeSnippet =

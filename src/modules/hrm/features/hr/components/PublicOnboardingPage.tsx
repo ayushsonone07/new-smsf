@@ -125,7 +125,7 @@ function OnboardingForm({
         setValues((curr) => ({
           ...curr,
           ...files,
-        }));
+        }) as ManualOnboardingInput);
       }
     });
   }, [token]);

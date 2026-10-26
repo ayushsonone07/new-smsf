@@ -1,4 +1,4 @@
-import { getSession } from '../app/auth/session'
+import { getSession, clearSession } from '../app/auth/session'
 import { ACTIVE_API_BASE_URL } from '../config/api.config'
 
 const API_BASE_URL = (
@@ -80,9 +80,13 @@ export async function apiRequest<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  // Route /help-center or /api/help-center through Vite's local dev proxy directly
+  const isHelpCenter = normalizedEndpoint.startsWith('/help-center') || normalizedEndpoint.startsWith('/api/help-center')
   const url = endpoint.startsWith('http')
     ? endpoint
-    : `${API_BASE_URL}${normalizedEndpoint}`
+    : isHelpCenter
+      ? normalizedEndpoint
+      : `${API_BASE_URL}${normalizedEndpoint}`
   // Let the browser set the multipart boundary for FormData bodies;
   // forcing application/json breaks file uploads.
   const isFormData =
@@ -96,7 +100,6 @@ export async function apiRequest<T>(
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         Accept: 'application/json',
-        'ngrok-skip-browser-warning': 'true',
         ...options.headers,
       },
     })
@@ -105,6 +108,11 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      clearSession()
+      window.location.href = '/login?expired=true'
+    }
+
     let message = `Request failed with status ${response.status}`
 
     try {
@@ -185,7 +193,6 @@ export async function authedFileRequest(
         Accept: 'application/pdf, application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         Authorization: `Bearer ${session.token}`,
         username: session.user.email || session.user.username || '',
-        'ngrok-skip-browser-warning': 'true',
       },
     })
     if (!response.ok) {

@@ -36,7 +36,11 @@ interface OnboardingOverrides {
 export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission }) {
   const departmentId = useHeadDepartmentId()
   const customersQuery = useDepartmentCustomers(departmentId)
-  const columnFeatures = useColumnFeatures(departmentId, 'customers')
+  const columnFeatures = useColumnFeatures(
+    departmentId,
+    'customers',
+    'ONBOARDING_DEPARTMENT',
+  )
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<CustomerTab>('all')
   const [selectedAssigneeId, setSelectedAssigneeId] =
@@ -49,17 +53,6 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const [modalTab, setModalTab] = useState<any>(undefined)
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
 
-  const screenPermission = getSession()?.user.role === 'USER'
-    ? feature.roleBPermission
-    : feature.roleAPermission
-  const canEdit =
-    screenPermission === 'CAN_EDIT' && columnFeatures.canEdit('actions')
-
-  const { isColumnEnabled, canEditColumn } =
-    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
-  const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = getSession()?.user.role === 'USER'
-
   const role = (getSession()?.user.role || '').toUpperCase()
   const isDeptUser =
     role === 'USER' ||
@@ -69,21 +62,32 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
 
-  const isAssignToVisible =
-    !isDeptUser &&
-    (isColumnEnabled('Assign To') ||
+  const screenPermission = isDeptUser
+    ? feature.roleBPermission
+    : feature.roleAPermission
+  const canEdit =
+    screenPermission === 'CAN_EDIT' && columnFeatures.canEdit('actions')
+
+  const { isColumnEnabled, isColumnConfigured } =
+    useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
+  const isStatusVisible = isColumnEnabled('Status')
+  const canEditStatus = columnFeatures.canEdit('Status', isDeptUser)
+
+  const isAssignToConfigured = isColumnConfigured('Assign To')
+  const isAssignToVisible = isAssignToConfigured
+    ? isColumnEnabled('Assign To') ||
       isColumnEnabled('Assign') ||
-      isColumnEnabled('Assignee'))
-  const canEditAssignTo =
-    !isDeptUser &&
-    (canEditColumn('Assign To') ||
-      canEditColumn('Assign') ||
-      canEditColumn('Assignee'))
+      isColumnEnabled('Assignee')
+    : !isDeptUser &&
+      (isColumnEnabled('Assign To') ||
+        isColumnEnabled('Assign') ||
+        isColumnEnabled('Assignee'))
+  const canEditAssignTo = columnFeatures.canEdit('Assign To', !isDeptUser)
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark') ||
     isColumnEnabled('Remark')
-  const canEditRemark = getSession()?.user.role === 'USER'
+  const canEditRemark = columnFeatures.canEdit('Remark', isDeptUser)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
 

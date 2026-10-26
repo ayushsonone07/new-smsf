@@ -97,7 +97,7 @@ export function FinanceFeaturesPage() {
         <DataTable
           rows={routes}
           columns={columns}
-          rowKey={(row) => row.routeId}
+          rowKey={(row: RouteInfo) => row.routeId}
           emptyState="No routes found for this department."
         />
       </Card>

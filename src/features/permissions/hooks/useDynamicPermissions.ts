@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  bulkUpdateColumnPermissions,
   createDynamicColumn,
   createDynamicDepartmentType,
   createDynamicRoute,
@@ -124,6 +125,22 @@ export function useUpdateColumnPermission() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['dynamic-permissions', 'columns'],
+      })
+    },
+  })
+}
+
+export function useBulkUpdateColumnPermissions() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateColumnPermissionPayload[]) =>
+      bulkUpdateColumnPermissions(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'columns'],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['dynamic-permissions', 'route-columns'],
       })
     },
   })

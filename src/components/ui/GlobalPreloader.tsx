@@ -56,10 +56,17 @@ export function GlobalPreloader() {
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
+    // Only show full-screen skeleton if page loading takes longer than 250ms
+    // to prevent jarring flash on quick tab clicks
+    let delayTimer: number | undefined
     if (routeIsLoading) {
-      setLeaving(false)
-      setVisible(true)
-      return
+      delayTimer = window.setTimeout(() => {
+        setLeaving(false)
+        setVisible(true)
+      }, 250)
+      return () => {
+        if (delayTimer) window.clearTimeout(delayTimer)
+      }
     }
 
     if (!visible) return
@@ -67,7 +74,7 @@ export function GlobalPreloader() {
     const timer = window.setTimeout(() => {
       setVisible(false)
       setLeaving(false)
-    }, 220)
+    }, 150)
     return () => window.clearTimeout(timer)
   }, [routeIsLoading, visible])
 

@@ -394,17 +394,6 @@
   background: #fff;
 }
 
-/* An absolutely positioned menu does not increase the table's height. When
-   there are only one or two customers, reserve enough room inside the scroll
-   container so the menu is not clipped at its bottom edge. */
-.cl-table-wrapper:has(.cl-assign-btn[aria-expanded='true']) {
-  min-height: 430px;
-}
-
-.cl-table-wrapper:has(.cl-status-btn[aria-expanded='true']) {
-  min-height: 280px;
-}
-
 .cl-table {
   width: 100%;
   min-width: 1000px;   /* below this the wrapper scrolls; under 768px it becomes cards */
@@ -893,17 +882,14 @@
 }
 
 .cl-status-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 5000;
+  position: fixed;
+  z-index: 99999;
   min-width: 150px;
   padding: 4px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  animation: hin 0.12s ease-out;
 }
 
 .cl-status-opt {
@@ -984,10 +970,8 @@
 }
 
 .cl-assign-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 5000;
+  position: fixed;
+  z-index: 99999;
   min-width: 224px;
   width: 236px;
   padding: 6px;
@@ -995,7 +979,6 @@
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
-  animation: hin 0.12s ease-out;
 }
 
 .cl-assign-search-wrap {

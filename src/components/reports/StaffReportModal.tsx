@@ -235,7 +235,7 @@ export function StaffReportModal({
         <FilterTabs
           tabs={tabs}
           value={filter}
-          onChange={setFilter}
+          onChange={(value) => setFilter(value)}
           trailing={hint}
           ariaLabel="Filter work items"
         />

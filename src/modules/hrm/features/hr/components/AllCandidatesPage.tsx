@@ -125,7 +125,7 @@ interface ButtonProps {
 interface ImportExportMenuProps {
   open: boolean;
   exporting: boolean;
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   onToggle: () => void;
   onImport: () => void;
   onExport: () => void;

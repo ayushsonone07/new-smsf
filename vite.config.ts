@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   const helpCenterUrl = (
     env.HELP_CENTER_URL ||
     env.VITE_HELP_CENTER_URL ||
-    'https://displace-cupcake-aqueduct.ngrok-free.dev'
+    'https://ducking-shore-remedial.ngrok-free.dev'
   ).trim().replace(/\/$/, '')
 
   return {
@@ -59,9 +59,26 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/api/help-center': {
-          target: backendUrl,
+          target: helpCenterUrl,
           changeOrigin: true,
           secure: false,
+          rewrite: (path) => path.replace(/^\/api\/help-center/, '/api/v1'),
+          headers: {
+            'ngrok-skip-browser-warning': '1',
+            'X-OAuth-Key': 'mbgcard-helpcenter-oauth-secret-key-2026',
+          },
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.error('[Help Center Proxy] Error:', err.message)
+            })
+            proxy.on('proxyReq', (proxyReq, req) => {
+              proxyReq.setHeader('ngrok-skip-browser-warning', '1')
+              if (!proxyReq.getHeader('X-OAuth-Key')) {
+                proxyReq.setHeader('X-OAuth-Key', 'mbgcard-helpcenter-oauth-secret-key-2026')
+              }
+              console.info('[Help Center Proxy]', req.method, req.url, '→', helpCenterUrl + proxyReq.path)
+            })
+          },
         },
         '/api': {
           target: backendUrl,
@@ -85,6 +102,32 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       global: 'globalThis',
+    },
+    build: {
+      target: 'esnext',
+      minify: 'oxc',
+      cssMinify: true,
+      sourcemap: false,
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return
+
+            if (id.includes('/react/') || id.includes('/react-dom/')) {
+              return 'react-vendor'
+            }
+
+            if (id.includes('/@tanstack/react-query/') || id.includes('/@tanstack/react-router/')) {
+              return 'tanstack-vendor'
+            }
+
+            if (id.includes('/lucide-react/')) {
+              return 'icons-vendor'
+            }
+          },
+        },
+      },
     },
   }
 })

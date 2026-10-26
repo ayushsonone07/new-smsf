@@ -12,4 +12,5 @@ export type {
   LeaveEntitlement,
   LeaveEntitlementInput,
   LeaveContext,
+  LeavePolicyItem,
 } from "./leave.types";

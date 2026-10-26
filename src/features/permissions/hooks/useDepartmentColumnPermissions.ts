@@ -15,6 +15,7 @@ export interface DepartmentColumnPermissionsResult {
   isPending: boolean
   isError: boolean
   isColumnEnabled: (nameOrId: string, routeFilter?: string) => boolean
+  isColumnConfigured: (nameOrId: string) => boolean
   canEditColumn: (nameOrId: string) => boolean
   refetch: () => unknown
 }
@@ -323,8 +324,15 @@ export function useDepartmentColumnPermissions(
     window.location.pathname.includes('-user-') ||
     window.location.pathname.endsWith('-user')
   )
-  const isDepartmentUser =
-    normalizedRole === 'USER' || normalizedRole === 'DEPARTMENT_USER' || isUserUrl
+  const hasSessionRole =
+    normalizedRole === 'USER' ||
+    normalizedRole === 'DEPARTMENT_USER' ||
+    normalizedRole === 'HEAD' ||
+    normalizedRole === 'DEPARTMENT_HEAD' ||
+    normalizedRole === 'ADMIN'
+  const isDepartmentUser = hasSessionRole
+    ? normalizedRole === 'USER' || normalizedRole === 'DEPARTMENT_USER'
+    : isUserUrl
   const isHead = !isDepartmentUser
 
   const query = useDynamicColumns(dept)
@@ -370,14 +378,10 @@ export function useDepartmentColumnPermissions(
   const columns = routeScopedColumns.length > 0 ? routeScopedColumns : allColumns
   const permissionDataPending = query.isPending || (Boolean(routeName) && routesQuery.isPending)
 
-  const isColumnEnabled = useCallback(
-    (nameOrId: string, routeFilter?: string): boolean => {
-      if (!nameOrId) return false
-      if (permissionDataPending) return false
-      // If no columns are in DB yet for this department, allow standard columns to remain visible.
-      if (allColumns.length === 0) return true
+  const findConfiguredColumn = useCallback(
+    (nameOrId: string, routeFilter?: string): DynamicColumnResponse | undefined => {
+      if (!nameOrId || allColumns.length === 0) return undefined
 
-      // 1. Try to find in route-scoped columns first (with routeFilter if provided)
       let col = routeFilter
         ? columns.find((c) => isColumnMatch(c, nameOrId) && matchesRoute(c, routeFilter))
         : undefined
@@ -386,7 +390,6 @@ export function useDepartmentColumnPermissions(
         col = columns.find((c) => isColumnMatch(c, nameOrId))
       }
 
-      // 2. If not found in route-scoped columns, search allColumns for this department
       if (!col) {
         col = routeFilter
           ? allColumns.find((c) => isColumnMatch(c, nameOrId) && matchesRoute(c, routeFilter))
@@ -395,6 +398,28 @@ export function useDepartmentColumnPermissions(
           col = allColumns.find((c) => isColumnMatch(c, nameOrId))
         }
       }
+
+      return col
+    },
+    [allColumns, columns],
+  )
+
+  const isColumnConfigured = useCallback(
+    (nameOrId: string): boolean => {
+      if (!nameOrId || permissionDataPending) return false
+      return Boolean(findConfiguredColumn(nameOrId))
+    },
+    [findConfiguredColumn, permissionDataPending],
+  )
+
+  const isColumnEnabled = useCallback(
+    (nameOrId: string, routeFilter?: string): boolean => {
+      if (!nameOrId) return false
+      if (permissionDataPending) return false
+      // If no columns are in DB yet for this department, allow standard columns to remain visible.
+      if (allColumns.length === 0) return true
+
+      const col = findConfiguredColumn(nameOrId, routeFilter)
 
       // 3. If column is configured in DB, enforce permissions
       if (col) {
@@ -410,7 +435,7 @@ export function useDepartmentColumnPermissions(
       // 4. If column is not configured in DB at all, allow it by default
       return true
     },
-    [allColumns, columns, isHead, permissionDataPending],
+    [allColumns.length, findConfiguredColumn, isHead, permissionDataPending],
   )
 
   const canEditColumn = useCallback(
@@ -420,16 +445,13 @@ export function useDepartmentColumnPermissions(
       if (!isColumnEnabled(nameOrId)) return false
       if (allColumns.length === 0) return true
 
-      let col = columns.find((c) => isColumnMatch(c, nameOrId))
-      if (!col) {
-        col = allColumns.find((c) => isColumnMatch(c, nameOrId))
-      }
+      const col = findConfiguredColumn(nameOrId)
       if (!col) return false
 
       const perm = isHead ? col.roleAPermission : col.roleBPermission
       return hasWritePermission(perm)
     },
-    [allColumns, columns, isHead, isColumnEnabled, permissionDataPending],
+    [allColumns.length, findConfiguredColumn, isHead, isColumnEnabled, permissionDataPending],
   )
 
   return {
@@ -438,6 +460,7 @@ export function useDepartmentColumnPermissions(
     isPending: permissionDataPending,
     isError: query.isError || routesQuery.isError,
     isColumnEnabled,
+    isColumnConfigured,
     canEditColumn,
     refetch: query.refetch,
   }

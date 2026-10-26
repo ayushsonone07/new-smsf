@@ -69,14 +69,14 @@ export async function fetchAssignedTickets(
 
 /**
  * Fetch status summary counts for tickets (e.g. OPEN, IN_PROGRESS, etc.).
- * Endpoint: GET /api/help-center/tickets/status-summary
+ * Endpoint: GET /api/help-center/tickets/status_summary?email=...
  */
 export async function fetchTicketStatusSummary(
   email: string
 ): Promise<HelpCenterStatusSummary | null> {
   try {
     const res = await apiClient.get<CustomApiResponse<HelpCenterStatusSummary>>(
-      '/api/help-center/tickets/status-summary',
+      '/api/help-center/tickets/status_summary',
       {
         params: { email },
       }

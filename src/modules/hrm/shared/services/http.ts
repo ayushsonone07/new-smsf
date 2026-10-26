@@ -8,6 +8,16 @@ import axios, {
 
 import { env } from "@config/env";
 
+declare module "axios" {
+  interface AxiosRequestConfig {
+    _skipAuthRefresh?: boolean;
+  }
+
+  interface InternalAxiosRequestConfig {
+    _skipAuthRefresh?: boolean;
+  }
+}
+
 /**
  * Single axios instance for the whole app.
  *

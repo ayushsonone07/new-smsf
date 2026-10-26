@@ -301,6 +301,24 @@ export async function updateColumnPermission(
   return res as ColumnPermissionUpdateResponse
 }
 
+/**
+ * Update read/write permission for many columns in one transaction.
+ */
+export async function bulkUpdateColumnPermissions(
+  payload: UpdateColumnPermissionPayload[],
+): Promise<ColumnPermissionUpdateResponse[]> {
+  const res = await authedApiRequest<
+    | ColumnPermissionUpdateResponse[]
+    | { data: ColumnPermissionUpdateResponse[] }
+  >('/api/dynamic-permission/columns/permissions/bulk', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  if (Array.isArray(res)) return res
+  if (res && 'data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
 export interface UpdateColumnStatusPayload {
   columnId?: string
   columnName?: string

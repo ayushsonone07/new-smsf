@@ -5,6 +5,7 @@ import { getSession } from '../../../../app/auth/session'
 import { useOnboardingDashboardSummary } from '../../hooks/useOnboardingDashboardSummary'
 import { useOnboardingDashboardMembers } from '../../hooks/useOnboardingDashboardMembers'
 import { getDepartmentSummary } from '../../../../api/service-flow.api'
+import { RecurringDashboardPage } from './RecurringDashboardPage'
 import { DashboardHeader } from '../../../../components/head/dashboard/DashboardHeader'
 import { DashboardStatCards } from '../../../../components/head/dashboard/DashboardStatCards'
 import { OnboardingTrend } from '../../../../components/head/dashboard/OnboardingTrend'
@@ -684,6 +685,10 @@ export function UserDashboardPage() {
     ))
   )
 
+  const isRecurring = Boolean(rawDepartment && rawDepartment.toUpperCase().includes('RECURRING')) || (typeof window !== 'undefined' && window.location.pathname.includes('recurring'))
+  if (isRecurring) {
+    return <RecurringDashboardPage />
+  }
   if (isAutowebsion) {
     return <AutowebsionUserDashboard rawDepartment={rawDepartment} />
   }

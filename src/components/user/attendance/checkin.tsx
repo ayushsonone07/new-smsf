@@ -1,10 +1,12 @@
 import React from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Loader2 } from 'lucide-react';
+
 // --- Types ---
 interface DailyAttendanceProps {
-  date?: string; // e.g., "30 Sep"
+  date?: string; // e.g., "24 Oct"
   isPresent?: boolean;
-  checkInTime?: string;
+  statusText?: string;
+  checkInTime?: string | null;
   checkOutTime?: string | null;
   isWorking?: boolean;
   stats: {
@@ -12,20 +14,50 @@ interface DailyAttendanceProps {
     absent: number;
     percentage: number;
   };
+  onCheckIn?: () => void;
   onCheckOut?: () => void;
   onMarkLeave?: () => void;
+  isLoading?: boolean;
 }
 
 export const DailyAttendanceCard: React.FC<DailyAttendanceProps> = ({
-  date = "30 Sep",
+  date = "24 Oct",
   isPresent = true,
-  checkInTime = "9:42 am",
+  statusText,
+  checkInTime = null,
   checkOutTime = null,
-  isWorking = true,
-  stats = { present: 23, absent: 3, percentage: 88 },
+  isWorking = false,
+  stats = { present: 0, absent: 0, percentage: 0 },
+  onCheckIn,
   onCheckOut,
   onMarkLeave,
+  isLoading = false,
 }) => {
+  const hasCheckedIn = Boolean(checkInTime && checkInTime !== '—')
+  const hasCheckedOut = Boolean(checkOutTime && checkOutTime !== '—')
+
+  // Button state resolution
+  let buttonLabel = 'Check in'
+  let buttonDisabled = false
+  let buttonAction = onCheckIn
+
+  if (isLoading) {
+    buttonLabel = 'Please wait...'
+    buttonDisabled = true
+  } else if (!hasCheckedIn) {
+    buttonLabel = 'Check in'
+    buttonAction = onCheckIn
+  } else if (!hasCheckedOut) {
+    buttonLabel = 'Check out'
+    buttonAction = onCheckOut
+  } else {
+    buttonLabel = 'Completed for today'
+    buttonDisabled = true
+  }
+
+  const effectiveStatus = statusText || (isPresent ? 'Present' : 'Absent')
+  const isPresentStyle = effectiveStatus.toLowerCase().includes('present')
+
   return (
     <div className="w-full max-w-3xl bg-white rounded-2xl p-4 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06),0_8px_16px_-2px_rgba(0,0,0,0.03)] border border-gray-100 font-sans">
       
@@ -39,11 +71,15 @@ export const DailyAttendanceCard: React.FC<DailyAttendanceProps> = ({
             Today · {date}
           </h2>
         </div>
-        {isPresent && (
-          <span className="px-3 py-0.5 text-[12px] font-bold text-[#2e7d32] bg-[#e6f4ea] rounded-full">
-            Present
-          </span>
-        )}
+        <span
+          className={`px-3 py-0.5 text-[12px] font-bold rounded-full ${
+            isPresentStyle
+              ? 'text-[#2e7d32] bg-[#e6f4ea]'
+              : 'text-[#c62828] bg-[#fde8e8]'
+          }`}
+        >
+          {effectiveStatus}
+        </span>
       </div>
 
       {/* --- Status Grid --- */}
@@ -51,7 +87,7 @@ export const DailyAttendanceCard: React.FC<DailyAttendanceProps> = ({
         {/* Check-in Box */}
         <div className="bg-[#f8f9fa] rounded-lg p-3">
           <p className="text-[13px] text-gray-500 mb-0.5">Check-in</p>
-          <p className="text-[16px] font-bold text-gray-900">{checkInTime}</p>
+          <p className="text-[16px] font-bold text-gray-900">{checkInTime || '—'}</p>
         </div>
         
         {/* Check-out Box */}
@@ -64,24 +100,33 @@ export const DailyAttendanceCard: React.FC<DailyAttendanceProps> = ({
         <div className="bg-[#f8f9fa] rounded-lg p-3">
           <p className="text-[13px] text-gray-500 mb-0.5">Working</p>
           <p className="text-[16px] font-bold text-gray-900">
-            {isWorking ? 'In progress' : 'Completed'}
+            {isWorking ? 'In progress' : hasCheckedOut ? 'Completed' : 'Pending'}
           </p>
         </div>
       </div>
 
       {/* --- Action Button --- */}
       <button
-        onClick={onCheckOut}
-        className="w-full py-2.5 mb-3 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[14px] font-semibold rounded-[12px] transition-colors shadow-sm"
+        type="button"
+        disabled={buttonDisabled}
+        onClick={buttonAction}
+        className={`w-full py-2.5 mb-3 text-white text-[14px] font-semibold rounded-[12px] transition-colors shadow-sm flex items-center justify-center gap-2 ${
+          buttonDisabled
+            ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+            : 'bg-[#2563eb] hover:bg-[#1d4ed8] cursor-pointer'
+        }`}
       >
-        Check out
+        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
+        <span>{buttonLabel}</span>
       </button>
 
       {/* --- Secondary Action --- */}
       <div className="text-center mb-4">
         <button 
+          type="button"
+          disabled={isLoading}
           onClick={onMarkLeave}
-          className="text-[13px] font-medium text-[#dc3545] hover:text-[#b02a37] transition-colors"
+          className="text-[13px] font-medium text-[#dc3545] hover:text-[#b02a37] transition-colors cursor-pointer"
         >
           Mark today as leave / absent
         </button>

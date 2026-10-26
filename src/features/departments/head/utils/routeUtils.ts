@@ -44,6 +44,7 @@ export function isUserOnboarding(departmentType?: string | null): boolean {
 }
 
 export function buildOnboardingRoute(slug: string, role?: string): string {
+  if (slug.startsWith('/')) return slug
   const isUser = role === 'USER'
   const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
 

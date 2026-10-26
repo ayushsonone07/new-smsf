@@ -42,7 +42,7 @@ export function CrmAdminHrmGateway({ children }: CrmAdminHrmGatewayProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const authAttemptedRef = useRef(false);
-  const successTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Skip health check on public routes (login, set-password, etc.)
   // Use matchPath to properly handle parameterized routes like /hrm/onboarding/:token

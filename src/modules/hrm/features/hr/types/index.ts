@@ -33,6 +33,7 @@ export type {
   OnboardingCounts,
   OnboardingLinkResponse,
   PublicOnboardingForm,
+  ResendPasswordSetupResponse,
   OnboardingStatus,
   UpdateAdditionalInfoInput,
   UpdateEmployeeInput,

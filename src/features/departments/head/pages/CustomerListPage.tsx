@@ -1,5 +1,6 @@
-﻿import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useDebounce } from '../../../../hooks/useDebounce'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import {
@@ -88,9 +89,14 @@ export function CustomerListPage() {
 
   const customersQuery = useDepartmentCustomers(departmentId, { enabled: isOnboardingDept })
   const updateMutation = useUpdateCustomer(departmentId)
-  const columnFeatures = useColumnFeatures(departmentId, 'customers')
+  const columnFeatures = useColumnFeatures(
+    departmentId,
+    'customers',
+    currentDepartment,
+  )
 
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [activeTab, setActiveTab] = useState<CustomerTab>('all')
   const [selectedAssigneeId, setSelectedAssigneeId] =
     useState<string | null | 'all'>('all')
@@ -171,39 +177,41 @@ export function CustomerListPage() {
       (window.location.pathname.includes('/google-user') ||
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
+  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
     : 'customers'
-  const { isColumnEnabled, canEditColumn } =
+  const { isColumnEnabled, isColumnConfigured } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = columnFeatures.canEdit('Status', true)
 
-  const isAssignToVisible =
-    !isDeptUser &&
-    (isColumnEnabled('Assigned To', 'customer') ||
+  const isAssignToConfigured = isColumnConfigured('Assign To')
+  const isAssignToVisible = isAssignToConfigured
+    ? isColumnEnabled('Assigned To', 'customer') ||
       isColumnEnabled('Assign To', 'customer') ||
       isColumnEnabled('Assign', 'customer') ||
-      isColumnEnabled('Assignee', 'customer'))
-  const canEditAssignTo =
-    !isDeptUser &&
-    (canEditColumn('Assigned To') ||
-      canEditColumn('Assign To') ||
-      canEditColumn('Assign') ||
-      canEditColumn('Assignee'))
+      isColumnEnabled('Assignee', 'customer')
+    : !isDeptUser &&
+      (isColumnEnabled('Assigned To', 'customer') ||
+        isColumnEnabled('Assign To', 'customer') ||
+        isColumnEnabled('Assign', 'customer') ||
+        isColumnEnabled('Assignee', 'customer'))
+  const canEditAssignTo = columnFeatures.canEdit('Assign To', !isDeptUser)
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
+<<<<<<< HEAD
+  const canEditRemark = columnFeatures.canEdit('Remark', true)
+=======
   const canEditRemark =
-    canEditColumn('Internal Remark') || canEditColumn('Remark')
+    !isHead && (canEditColumn('Internal Remark') || canEditColumn('Remark'))
+>>>>>>> ab3fcaab06e392fc1c814fd130a68023b3fe46b3
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
-  const canEditContact =
-    canEditColumn('Contact') ||
-    canEditColumn('Phone') ||
-    canEditColumn('Contact Number')
+  const canEditContact = columnFeatures.canEdit('Contact', true)
 
   const isBusinessVisible =
     isColumnEnabled('Business', 'customer') ||
@@ -213,10 +221,7 @@ export function CustomerListPage() {
     isColumnEnabled('Service Type', 'customer') ||
     isColumnEnabled('Service', 'customer') ||
     isColumnEnabled('Services', 'customer')
-  const canEditServiceType =
-    canEditColumn('Service Type') ||
-    canEditColumn('Service') ||
-    canEditColumn('Services')
+  const canEditServiceType = columnFeatures.canEdit('Service Type', true)
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
@@ -576,7 +581,7 @@ export function CustomerListPage() {
   }, [useRowsEndpoint, departmentRowsQuery.data, authSummaryQuery.data, onboardingApiQuery.data?.summary])
 
   const filteredCustomers = useMemo(() => {
-    const term = search.trim().toLowerCase()
+    const term = debouncedSearch.trim().toLowerCase()
     return onboardingCustomers
       .filter(
         (customer) =>
@@ -597,7 +602,7 @@ export function CustomerListPage() {
             customer.phone,
           ].some((value) => value.toLowerCase().includes(term)),
       )
-  }, [activeTab, onboardingCustomers, search, selectedAssigneeId])
+  }, [activeTab, onboardingCustomers, debouncedSearch, selectedAssigneeId])
 
   const isLoading = useRowsEndpoint
     ? activeCustomerQuery.isPending
@@ -807,13 +812,14 @@ export function CustomerListPage() {
     const prevStatus = localStatusMap[customerId]
     setLocalStatusMap((prev) => ({ ...prev, [customerId]: status }))
 
+    const targetCustomer =
+      filteredCustomers.find((c) => c.id === customerId) ||
+      onboardingCustomers.find((c) => c.id === customerId)
+    const sType = targetCustomer?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+
     try {
       if (useRowsEndpoint) {
-        const target =
-          filteredCustomers.find((c) => c.id === customerId) ||
-          onboardingCustomers.find((c) => c.id === customerId)
-        const oldStatus = target?.status || 'PENDING'
-        const sType = target?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+        const oldStatus = targetCustomer?.status || 'PENDING'
 
         await updateDepartmentServiceStatus({
           customerId,
@@ -914,7 +920,7 @@ export function CustomerListPage() {
         showAssignTo={isAssignToVisible}
         canEditAssignTo={canEditAssignTo}
         showRemark={isRemarkVisible}
-        canEditRemark={canEditRemark}
+        canEditRemark={!isHead && canEditRemark}
         showContact={isContactVisible}
         canEditContact={canEditContact}
         showBusiness={isBusinessVisible}
@@ -942,6 +948,10 @@ export function CustomerListPage() {
         onSendAcknowledgement={setConfirmingCustomer}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) => {
+          if (isHead) {
+            alert("Department Head cannot add or update internal remarks.")
+            return
+          }
           if (!canEditRemark) {
             alert("You don't have permission to update internal remarks.")
             return

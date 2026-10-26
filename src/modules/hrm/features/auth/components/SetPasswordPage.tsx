@@ -141,20 +141,21 @@ export function SetPasswordPage() {
             <p className="text-sm text-slate-500">Already have a password? Sign in directly.</p>
             <hr className="my-4 border-slate-200" />
             <Link
-              to={`${ROUTES.forgotPassword}`}
+              to={ROUTES.login}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
             >
               <Mail className="h-4 w-4" />
               Request New Link via Email
             </Link>
             <p className="text-sm text-slate-500">Don't have access? Use forgot password to get a new reset link.</p>
-            <Link
+            <button
+              type="button"
               onClick={() => window.location.reload()}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-6 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh Page
-            </Link>
+            </button>
             <p className="text-sm text-slate-500">If you just used the link, try refreshing to confirm.</p>
           </div>
         </div>

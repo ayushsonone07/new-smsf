@@ -32,6 +32,9 @@ const ServicesListPage = lazy(() =>
 const AdminTimelinesPage = lazy(() =>
   import('../features/departments/pages/AdminTimelinesPage').then((module) => ({ default: module.AdminTimelinesPage })),
 )
+const NotificationHistoryPage = lazy(() =>
+  import('../features/notifications/pages/NotificationHistoryPage').then((module) => ({ default: module.NotificationHistoryPage })),
+)
 const AdminApprovalsPage = lazy(() =>
   import('../features/departments/pages/AdminApprovalsPage').then((module) => ({ default: module.AdminApprovalsPage })),
 )
@@ -85,6 +88,9 @@ const RegisterBusinessPage = lazy(() =>
 )
 const SalesProposalPage = lazy(() =>
   import('../features/sales/pages/SalesProposalPage').then((module) => ({ default: module.SalesProposalPage })),
+)
+const LeadsManagementPage = lazy(() =>
+  import('../features/sales/pages/LeadsManagementPage').then((module) => ({ default: module.LeadsManagementPage })),
 )
 const CustomerDashboardPage = lazy(() =>
   import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
@@ -335,6 +341,27 @@ const adminCustomersRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/customers',
   component: AdminCustomersPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminNotificationHistoryRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/notification-history',
+  component: NotificationHistoryPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const manageLeadsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/manage-leads',
+  component: LeadsManagementPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminLeadsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/leads',
+  component: LeadsManagementPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -714,6 +741,18 @@ const onboardingHeadManageServicesRoute = createRoute({
   component: () => <HeadScreenPage screenOverride="manage-services" />,
 })
 
+const onboardingHeadLeadsRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-leads',
+  component: () => <HeadScreenPage screenOverride="leads" />,
+})
+
+const onboardingUserLeadsRoute = createRoute({
+  getParentRoute: () => onboardingLayoutRoute,
+  path: '/onboarding-dashboard-head-departmentUser-leads',
+  component: () => <HeadScreenPage screenOverride="leads" />,
+})
+
 const onboardingUserManageServicesRoute = createRoute({
   getParentRoute: () => onboardingLayoutRoute,
   path: '/onboarding-dashboard-head-departmentUser-manage-services',
@@ -1015,6 +1054,8 @@ const routeTree = rootRoute.addChildren([
     onboardingUserAirtelCallsRoute,
     onboardingHeadManageServicesRoute,
     onboardingUserManageServicesRoute,
+    onboardingHeadLeadsRoute,
+    onboardingUserLeadsRoute,
     onboardingHeadSalaryManagementRoute,
     onboardingUserSalaryManagementRoute,
     onboardingDynamicScreenRoute,
@@ -1032,6 +1073,9 @@ const routeTree = rootRoute.addChildren([
     adminCreateDepartmentRoute,
     adminCreateDepartmentNestedRoute,
     adminCustomersRoute,
+    adminNotificationHistoryRoute,
+    manageLeadsRoute,
+    adminLeadsRoute,
     adminServicesRoute,
     adminTimelinesRoute,
     adminServiceFlowRoute,

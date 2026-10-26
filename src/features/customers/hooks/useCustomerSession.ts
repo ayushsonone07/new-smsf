@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { Customer } from '../../departments/types/customer.types'
-import { getSession } from '../../../app/auth/session'
+import { clearSession, getSession } from '../../../app/auth/session'
 import type { AuthSession } from '../../auth/types/auth.types'
 
 export interface CustomerSession {
@@ -86,9 +86,10 @@ export function useCustomerSession() {
   }, [])
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem('smsf.customer.session')
+    clearCustomerSession()
+    clearSession()
     setSessionState(null)
-    navigate({ to: '/customers/login' })
+    navigate({ to: '/login' })
   }, [navigate])
 
   return { session, login, logout }
