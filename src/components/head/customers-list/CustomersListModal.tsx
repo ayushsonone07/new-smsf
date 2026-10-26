@@ -310,6 +310,18 @@ export function CustomersListModal({
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const isSuperAdmin = (getSession()?.user.role as string) === 'ADMIN' || (getSession()?.user.role as string) === 'SUPERADMIN'
+  const sessionUserRole = ((getSession()?.user?.role as string) || '').toUpperCase()
+  const isHead = Boolean(
+    (getSession()?.user as any)?.isHead ||
+    sessionUserRole === 'HEAD' ||
+    sessionUserRole === 'DEPARTMENT_HEAD' ||
+    (!isSuperAdmin && !['USER', 'DEPARTMENT_USER', 'CUSTOMER'].includes(sessionUserRole)) ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.includes('/head') ||
+      window.location.pathname.startsWith('/onboarding-dashboard-head') ||
+      window.location.pathname.startsWith('/google-head')
+    ))
+  )
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT
 
@@ -404,6 +416,10 @@ export function CustomersListModal({
   }
 
   async function saveRemarkEdit() {
+    if (isHead) {
+      alert('Department Head cannot add or edit internal remarks.')
+      return
+    }
     if (!canEditRemark || !current?.id || !editingRemarkText.trim() || isSavingRemark) return
     setIsSavingRemark(true)
     try {
@@ -420,6 +436,10 @@ export function CustomersListModal({
   }
 
   async function saveClientRemarkEdit() {
+    if (isHead) {
+      alert('Department Head cannot add or edit client remarks.')
+      return
+    }
     if (!current?.id || !editingClientRemarkText.trim() || isSavingClientRemark) return
     setIsSavingClientRemark(true)
     try {
@@ -1451,7 +1471,7 @@ export function CustomersListModal({
 
                 {/* Section 1: Internal Remarks */}
                 {!isSuperAdmin && <div className="cl-drawer__remark-section">
-                  {canEditRemark && getSession()?.user.role !== 'CUSTOMER' && (
+                  {!isHead && canEditRemark && getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1505,7 +1525,7 @@ export function CustomersListModal({
                       serviceRow?.internalRemark
                     }
                     internal
-                    editable={canEditRemark}
+                    editable={!isHead && canEditRemark}
                     editingRemark={editingRemark}
                     editingRemarkText={editingRemarkText}
                     onEdit={(remark) => { setEditingRemark(remark.timestamp || remark.remark || 'remark'); setEditingRemarkText(remark.remark || '') }}
@@ -1519,7 +1539,7 @@ export function CustomersListModal({
 
                 {/* Section 2: Client Remarks */}
                 <div className="cl-drawer__remark-section">
-                  {!isSuperAdmin && getSession()?.user.role !== 'CUSTOMER' && (
+                  {!isHead && !isSuperAdmin && getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()

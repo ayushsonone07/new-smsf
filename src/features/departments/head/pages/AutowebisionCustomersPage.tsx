@@ -2439,7 +2439,7 @@ export function AutowebisionCustomersPage({
             </div>
 
             {/* Add Remark Form */}
-            {session?.user?.role !== 'CUSTOMER' && (
+            {isDepartmentUser && session?.user?.role !== 'CUSTOMER' && (
               <form
                 onSubmit={async (e) => {
                   e.preventDefault()
