@@ -95,6 +95,7 @@ export interface CustomersListProps {
   showContact?: boolean
   showBusiness?: boolean
   showUpdated?: boolean
+  isLoading?: boolean
 }
 
 /* ── Status config ────────────────────────────────────────── */
@@ -185,6 +186,7 @@ export function CustomersList({
   showContact = true,
   showBusiness = true,
   showUpdated = false,
+  isLoading = false,
 }: CustomersListProps) {
   const [validationModal, setValidationModal] = useState<{
     open: boolean
@@ -194,6 +196,92 @@ export function CustomersList({
     subServices?: SubServiceStatusItem[]
     customer?: OnboardingCustomer
   } | null>(null)
+  if (isLoading) {
+    return (
+      <div className="cl-table-wrapper">
+        <table className="cl-table">
+          <colgroup>
+            <col className="cl-col cl-col--num" />
+            {showBusiness && <col className="cl-col cl-col--biz" />}
+            {showContact && <col className="cl-col cl-col--contact" />}
+            {showServiceType && <col className="cl-col cl-col--service" />}
+            {showStatus && <col className="cl-col cl-col--status" />}
+            {showAssignTo && <col className="cl-col cl-col--assign" />}
+            {showRemark && <col className="cl-col cl-col--remark" />}
+            {showUpdated && <col className="cl-col cl-col--updated" />}
+            <col className="cl-col cl-col--view" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="cl-th cl-th--num">#</th>
+              {showBusiness && <th className="cl-th cl-th--biz">Business</th>}
+              {showContact && <th className="cl-th cl-th--contact">Contact</th>}
+              {showServiceType && <th className="cl-th cl-th--service">Services</th>}
+              {showStatus && <th className="cl-th cl-th--status">Status</th>}
+              {showAssignTo && <th className="cl-th cl-th--assign">Assign To</th>}
+              {showRemark && <th className="cl-th cl-th--remark">Internal Remark</th>}
+              {showUpdated && <th className="cl-th">Updated</th>}
+              <th className="cl-th cl-th--view" aria-label="View" />
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <tr key={idx} className="cl-skeleton-row">
+                <td className="cl-td">
+                  <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '20px', height: '14px', borderRadius: '4px' }} />
+                </td>
+                {showBusiness && (
+                  <td className="cl-td">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: `${120 + (idx % 3) * 30}px`, height: '15px', borderRadius: '4px' }} />
+                      <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '75px', height: '11px', borderRadius: '4px' }} />
+                    </div>
+                  </td>
+                )}
+                {showContact && (
+                  <td className="cl-td">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: `${100 + (idx % 2) * 20}px`, height: '14px', borderRadius: '4px' }} />
+                      <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '85px', height: '11px', borderRadius: '4px' }} />
+                    </div>
+                  </td>
+                )}
+                {showServiceType && (
+                  <td className="cl-td">
+                    <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '85px', height: '22px', borderRadius: '12px' }} />
+                  </td>
+                )}
+                {showStatus && (
+                  <td className="cl-td">
+                    <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '95px', height: '24px', borderRadius: '12px' }} />
+                  </td>
+                )}
+                {showAssignTo && (
+                  <td className="cl-td">
+                    <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '105px', height: '24px', borderRadius: '6px' }} />
+                  </td>
+                )}
+                {showRemark && (
+                  <td className="cl-td">
+                    <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: `${110 + (idx % 3) * 25}px`, height: '13px', borderRadius: '4px' }} />
+                  </td>
+                )}
+                {showUpdated && (
+                  <td className="cl-td">
+                    <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '65px', height: '13px', borderRadius: '4px' }} />
+                  </td>
+                )}
+                <td className="cl-td">
+                  <div className="cl-skeleton-bone skeleton-shimmer" style={{ width: '28px', height: '28px', borderRadius: '6px' }} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   if (customers.length === 0) {
     return (
       <motion.div

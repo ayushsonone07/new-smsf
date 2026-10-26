@@ -30,6 +30,7 @@ import {
   getSession,
   homeForRole,
   openSessionInNewTab,
+  prepareLoginWindow,
 } from '../../../../app/auth/session'
 import {
   resolveUserColumnKey,
@@ -112,6 +113,7 @@ export function DepartmentUsersPage() {
   const [modal, setModal] = useState<ModalState>({ kind: 'none' })
   const [viewingAs, setViewingAs] =
     useState<DepartmentUser | null>(null)
+  const [loggingInUserId, setLoggingInUserId] = useState<string | null>(null)
   const [toast, setToast] = useState<{
     type: 'success' | 'error'
     title?: string
@@ -125,6 +127,8 @@ export function DepartmentUsersPage() {
   }, [toast])
 
   async function handleLoginAs(targetUser: DepartmentUser) {
+    if (loggingInUserId !== null) return
+
     const email = targetUser.email?.trim()
     if (!email) {
       alert('This user does not have a valid email.')
@@ -132,6 +136,8 @@ export function DepartmentUsersPage() {
     }
 
     const newWindow = window.open('', '_blank')
+    prepareLoginWindow(newWindow)
+    setLoggingInUserId(targetUser.id)
 
     try {
       const currentSession = getSession()
@@ -154,6 +160,8 @@ export function DepartmentUsersPage() {
       console.error('Failed to log in as department user:', err)
       const msg = err instanceof Error ? err.message : 'Unable to log in as user'
       alert(`Login failed: ${msg}`)
+    } finally {
+      setLoggingInUserId(null)
     }
   }
 
@@ -1041,6 +1049,7 @@ export function DepartmentUsersPage() {
             setModal({ kind: 'delete', user })
           }
           onLoginAs={handleLoginAs}
+          loggingInUserId={loggingInUserId}
           renderExpanded={(user) => (
             <UserDetails
               user={user}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   DynamicColumnResponse,
   DynamicRouteResponse,
@@ -91,6 +92,12 @@ export function DepartmentRoutesDropdown({
   const [deleteColumnError, setDeleteColumnError] = useState('')
   const [routeUpdateError, setRouteUpdateError] = useState('')
   const [orderRevision, setOrderRevision] = useState(0)
+  const [hoveredRoute, setHoveredRoute] = useState<{
+    name: string
+    x: number
+    y: number
+    showBelow: boolean
+  } | null>(null)
   const routesQuery = useDynamicRoutes(departmentType)
   const columnsQuery = useDynamicColumns(departmentType)
   const updateColumnStatusMutation = useUpdateColumnStatus()
@@ -308,7 +315,7 @@ export function DepartmentRoutesDropdown({
       ) : routes.length === 0 ? (
         <p className="department-route-state">No routes are configured for this department.</p>
       ) : (
-        <div className="department-route-list">
+        <div className="department-route-list" onScroll={() => setHoveredRoute(null)}>
           {routes.map((route) => (
             <div
               key={route.routeId}
@@ -319,6 +326,17 @@ export function DepartmentRoutesDropdown({
                 className="department-route-select"
                 aria-pressed={selectedRouteId === route.routeId}
                 onClick={() => setSelectedRouteId(route.routeId)}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const showBelow = rect.top < 45
+                  setHoveredRoute({
+                    name: route.routeName,
+                    x: Math.max(12, rect.left + 16),
+                    y: showBelow ? rect.bottom + 6 : rect.top - 6,
+                    showBelow,
+                  })
+                }}
+                onMouseLeave={() => setHoveredRoute(null)}
               >
                 <span className="department-route-option-icon" aria-hidden="true">↳</span>
                 <span className="department-route-option-name">{route.routeName}</span>
@@ -396,7 +414,21 @@ export function DepartmentRoutesDropdown({
           <div className="department-route-columns-heading">
             <div>
               <span>Columns for</span>
-              <strong>{selectedRoute.routeName}</strong>
+              <strong
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const showBelow = rect.top < 45
+                  setHoveredRoute({
+                    name: selectedRoute.routeName,
+                    x: Math.max(12, rect.left),
+                    y: showBelow ? rect.bottom + 6 : rect.top - 6,
+                    showBelow,
+                  })
+                }}
+                onMouseLeave={() => setHoveredRoute(null)}
+              >
+                {selectedRoute.routeName}
+              </strong>
             </div>
             {!columnsQuery.isPending && !columnsQuery.isError ? (
               <span className="department-route-count">{routeColumns.length} columns</span>
@@ -694,6 +726,22 @@ export function DepartmentRoutesDropdown({
         isLoading={deleteColumnMutation.isPending}
         error={deleteColumnError}
       />
+      {hoveredRoute && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="department-route-tooltip"
+              style={{
+                left: `${hoveredRoute.x}px`,
+                top: `${hoveredRoute.y}px`,
+                transform: hoveredRoute.showBelow ? 'translateY(0)' : 'translateY(-100%)',
+              }}
+              role="tooltip"
+            >
+              {hoveredRoute.name}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

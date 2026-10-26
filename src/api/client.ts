@@ -2,7 +2,9 @@ import { getSession, clearSession } from '../app/auth/session'
 import { ACTIVE_API_BASE_URL } from '../config/api.config'
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || ACTIVE_API_BASE_URL
+  import.meta.env.DEV
+    ? ''
+    : import.meta.env.VITE_API_BASE_URL || ACTIVE_API_BASE_URL
 ).replace(/\/$/, '')
 
 type ApiActivityListener = (activeRequests: number) => void
@@ -174,6 +176,27 @@ export async function apiRequest<T>(
   } catch {
     return undefined as unknown as T
   }
+}
+
+/**
+ * Sends an API request through the frontend origin. This is a fallback for
+ * deployments where direct browser access to the configured backend is
+ * blocked by CORS or a temporary gateway/DNS issue, but `/api` is proxied by
+ * the frontend server.
+ */
+export function sameOriginApiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  if (typeof window === 'undefined') {
+    return apiRequest<T>(endpoint, options)
+  }
+
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  return apiRequest<T>(
+    `${window.location.origin}${normalizedEndpoint}`,
+    options,
+  )
 }
 
 /**
