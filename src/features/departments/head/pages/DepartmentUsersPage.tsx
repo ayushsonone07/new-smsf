@@ -76,10 +76,10 @@ function toLocalDateTime(date: Date): string {
  */
 export function DepartmentUsersPage() {
   const departmentId = useHeadDepartmentId()
-  const columnFeatures = useColumnFeatures(departmentId, 'users')
-  const canManageUsers = columnFeatures.canEdit('actions')
   const session = getSession()
   const deptType = session?.user.departmentType || resolveDeptFromPath() || undefined
+  const columnFeatures = useColumnFeatures(departmentId, 'users', deptType)
+  const canManageUsers = columnFeatures.canEdit('actions')
   const dynamicColumnsQuery = useDynamicColumns(deptType)
   const isUser = session?.user.role === 'USER'
 

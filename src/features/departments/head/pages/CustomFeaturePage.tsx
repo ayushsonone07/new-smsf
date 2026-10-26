@@ -13,6 +13,7 @@ import {
   useDynamicRoutes,
 } from '../../../permissions/hooks/useDynamicPermissions'
 import { isColumnBelongingToRoute, isRouteMatch } from '../../../permissions/hooks/useDepartmentRoutePermissions'
+import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { resolveDeptFromPath } from '../utils/routeUtils'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import { useDepartmentCustomerRows } from '../../hooks/useDepartmentUsersList'
@@ -108,6 +109,18 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   const deptFromUrl = typeof window !== 'undefined' ? resolveDeptFromPath(window.location.pathname) : null
   const departmentType = session?.user.departmentType || deptFromUrl || 'ONBOARDING_DEPARTMENT'
   const isHead = session?.user.role !== 'USER'
+  const {
+    isColumnConfigured,
+    canEditColumn,
+  } = useDepartmentColumnPermissions(departmentType, feature.slug)
+  const billUploadColumnKey = isColumnConfigured('Bill Upload')
+    ? 'Bill Upload'
+    : isColumnConfigured('Upload Bill')
+      ? 'Upload Bill'
+      : null
+  const canEditBilling = billUploadColumnKey
+    ? canEditColumn(billUploadColumnKey)
+    : true
 
   const routesQuery = useDynamicRoutes(departmentType)
   const columnsQuery = useDynamicColumns(departmentType)
@@ -204,6 +217,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   }
 
   const saveInvoice = async () => {
+    if (!canEditBilling) return
     if (!detailsCustomer || !Number.isFinite(detailsCustomer.id)) return
     setBusy(true)
     setError('')
@@ -228,6 +242,7 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
   }
 
   const uploadBill = async () => {
+    if (!canEditBilling) return
     if (!uploadCustomer || !uploadFile) {
       setError('Select a bill file to upload.')
       return
@@ -287,9 +302,11 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
     if (key === 'billupload') {
       return (
         <div className="dynamic-bill-actions">
-          <button className="dynamic-action-button" type="button" onClick={() => { setUploadCustomer(customer); setUploadFile(null); setError('') }} disabled={!Number.isFinite(customer.id)}>
-            <Upload size={15} /> Upload
-          </button>
+          {canEditBilling && (
+            <button className="dynamic-action-button" type="button" onClick={() => { setUploadCustomer(customer); setUploadFile(null); setError('') }} disabled={!Number.isFinite(customer.id)}>
+              <Upload size={15} /> Upload
+            </button>
+          )}
           <button className="dynamic-eye-button dynamic-bill-eye" type="button" title="View billing details" aria-label={`View billing details for ${customer.ownerName || 'customer'}`} onClick={() => openDetails(customer)} disabled={!Number.isFinite(customer.id)}>
             <Eye size={16} />
           </button>
@@ -541,14 +558,14 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
                 <h3><FileText size={15} /> Invoices</h3>
                 <div className="billing-invoice-head"><span>Invoice</span><span>Date</span><span>Amount</span><span>Status</span></div>
                 <div className="billing-invoice-grid">
-                  <div className="billing-field"><label htmlFor="invoice-number">Invoice No</label><input id="invoice-number" value={invoice.invoiceNo} onChange={(event) => setInvoice((value) => ({ ...value, invoiceNo: event.target.value }))} /></div>
-                  <div className="billing-field"><label htmlFor="invoice-date">Date</label><input id="invoice-date" type="date" value={invoice.date} onChange={(event) => setInvoice((value) => ({ ...value, date: event.target.value }))} /></div>
-                  <div className="billing-field"><label htmlFor="invoice-amount">Amount</label><input id="invoice-amount" value={invoice.amount} onChange={(event) => setInvoice((value) => ({ ...value, amount: event.target.value }))} /></div>
-                  <div className="billing-field"><label htmlFor="invoice-status">Status</label><select id="invoice-status" value={invoice.status} onChange={(event) => setInvoice((value) => ({ ...value, status: event.target.value }))}><option value="PENDING">Pending</option><option value="IN_PROGRESS">In Progress</option><option value="GENERATED">Generated</option></select></div>
+                  <div className="billing-field"><label htmlFor="invoice-number">Invoice No</label><input id="invoice-number" value={invoice.invoiceNo} disabled={!canEditBilling} onChange={(event) => setInvoice((value) => ({ ...value, invoiceNo: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-date">Date</label><input id="invoice-date" type="date" value={invoice.date} disabled={!canEditBilling} onChange={(event) => setInvoice((value) => ({ ...value, date: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-amount">Amount</label><input id="invoice-amount" value={invoice.amount} disabled={!canEditBilling} onChange={(event) => setInvoice((value) => ({ ...value, amount: event.target.value }))} /></div>
+                  <div className="billing-field"><label htmlFor="invoice-status">Status</label><select id="invoice-status" value={invoice.status} disabled={!canEditBilling} onChange={(event) => setInvoice((value) => ({ ...value, status: event.target.value }))}><option value="PENDING">Pending</option><option value="IN_PROGRESS">In Progress</option><option value="GENERATED">Generated</option></select></div>
                 </div>
                 <div className="billing-link-row">
-                  <div className="billing-field"><label htmlFor="invoice-link">Invoice / Bill Link</label><input id="invoice-link" value={invoice.billingLink} placeholder="https://..." onChange={(event) => setInvoice((value) => ({ ...value, billingLink: event.target.value }))} /></div>
-                  <button className="primary-button" type="button" disabled={busy} onClick={saveInvoice}><Check size={15} /> {busy ? 'Saving...' : 'Save Invoice'}</button>
+                  <div className="billing-field"><label htmlFor="invoice-link">Invoice / Bill Link</label><input id="invoice-link" value={invoice.billingLink} placeholder="https://..." disabled={!canEditBilling} onChange={(event) => setInvoice((value) => ({ ...value, billingLink: event.target.value }))} /></div>
+                  {canEditBilling && <button className="primary-button" type="button" disabled={busy} onClick={saveInvoice}><Check size={15} /> {busy ? 'Saving...' : 'Save Invoice'}</button>}
                 </div>
                 {error ? <p className="billing-error" role="alert">{error}</p> : null}
               </section>
