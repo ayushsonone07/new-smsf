@@ -324,13 +324,13 @@ export function AssigneeDropdown({
   assignees,
   isEditable,
   onAssigneeChange,
-  pageSize = 5,
+  pageSize = 8,
   emptyLabel = 'Unassigned',
   searchPlaceholder = 'Search assignee...',
 }: AssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [page, setPage] = useState(0)
+  const [visibleCount, setVisibleCount] = useState(8)
   const [menuPosition, setMenuPosition] = useState<{
     left: number
     top?: number
@@ -338,9 +338,42 @@ export function AssigneeDropdown({
     maxHeight: number
   } | null>(null)
 
+  function calculatePosition() {
+    const trigger = wrapRef.current?.getBoundingClientRect()
+    if (!trigger) return null
+
+    const viewportPadding = 8
+    const menuWidth = Math.min(320, window.innerWidth - viewportPadding * 2)
+    const left = Math.min(
+      Math.max(viewportPadding, trigger.left),
+      window.innerWidth - menuWidth - viewportPadding,
+    )
+
+    const spaceBelow = window.innerHeight - trigger.bottom - viewportPadding - 4
+    const spaceAbove = trigger.top - viewportPadding - 4
+
+    // If space below is less than 240px and there is more space above, open UPWARDS
+    const openUp = spaceBelow < 240 && spaceAbove > spaceBelow
+
+    if (!openUp) {
+      return {
+        left,
+        top: trigger.bottom + 4,
+        maxHeight: Math.min(320, Math.max(160, spaceBelow)),
+      }
+    } else {
+      return {
+        left,
+        bottom: window.innerHeight - trigger.top + 4,
+        maxHeight: Math.min(320, Math.max(160, spaceAbove)),
+      }
+    }
+  }
+
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const matchedAssignee = useMemo(() => {
     if (!assigneeId) return null
@@ -371,12 +404,18 @@ export function AssigneeDropdown({
     return emptyLabel.toLowerCase().includes(q)
   }, [searchQuery, emptyLabel])
 
-  const totalPages = Math.max(1, Math.ceil(filteredAssignees.length / pageSize))
-  const safePage = Math.min(page, totalPages - 1)
-  const paginatedAssignees = useMemo(() => {
-    const start = safePage * pageSize
-    return filteredAssignees.slice(start, start + pageSize)
-  }, [filteredAssignees, pageSize, safePage])
+  const visibleAssignees = useMemo(() => {
+    return filteredAssignees.slice(0, visibleCount)
+  }, [filteredAssignees, visibleCount])
+
+  const hasMore = visibleCount < filteredAssignees.length
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop - clientHeight < 40 && hasMore) {
+      setVisibleCount((prev) => Math.min(prev + 8, filteredAssignees.length))
+    }
+  }
 
   // Close menus on outside click or escape
   useEffect(() => {
@@ -384,13 +423,11 @@ export function AssigneeDropdown({
 
     function handleOutside(e: MouseEvent) {
       const target = e.target as Node
-      if (
-        wrapRef.current &&
-        !wrapRef.current.contains(target) &&
-        !menuRef.current?.contains(target)
-      ) {
-        setIsOpen(false)
+      // If the clicked element is inside the trigger button or inside the opened menu portal, do not close
+      if (wrapRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return
       }
+      setIsOpen(false)
     }
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -414,32 +451,9 @@ export function AssigneeDropdown({
     }
 
     function positionMenu() {
-      const trigger = wrapRef.current?.getBoundingClientRect()
-      if (!trigger) return
-
-      const viewportPadding = 8
-      const menuWidth = Math.min(320, window.innerWidth - viewportPadding * 2)
-      const left = Math.min(
-        Math.max(viewportPadding, trigger.left),
-        window.innerWidth - menuWidth - viewportPadding,
-      )
-
-      const spaceBelow = window.innerHeight - trigger.bottom - viewportPadding - 4
-      const spaceAbove = trigger.top - viewportPadding - 4
-      const openBelow = spaceBelow >= 240 || spaceBelow >= spaceAbove
-
-      if (openBelow) {
-        setMenuPosition({
-          left,
-          top: trigger.bottom + 4,
-          maxHeight: Math.max(160, spaceBelow),
-        })
-      } else {
-        setMenuPosition({
-          left,
-          bottom: window.innerHeight - trigger.top + 4,
-          maxHeight: Math.max(160, spaceAbove),
-        })
+      const pos = calculatePosition()
+      if (pos) {
+        setMenuPosition(pos)
       }
     }
 
@@ -461,7 +475,7 @@ export function AssigneeDropdown({
       return () => clearTimeout(timer)
     } else {
       setSearchQuery('')
-      setPage(0)
+      setVisibleCount(8)
     }
   }, [isOpen])
 
@@ -473,7 +487,12 @@ export function AssigneeDropdown({
         type="button"
         className="cl-assign-btn"
         title={matchedAssignee ? matchedAssignee.name : assigneeId || emptyLabel}
-        onClick={() => setIsOpen((o) => !o)}
+        onClick={() => {
+          if (!isOpen) {
+            setMenuPosition(calculatePosition())
+          }
+          setIsOpen((o) => !o)
+        }}
         disabled={!isEditable}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -528,7 +547,7 @@ export function AssigneeDropdown({
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
-                setPage(0)
+                setVisibleCount(8)
               }}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
@@ -541,7 +560,7 @@ export function AssigneeDropdown({
                 onClick={(e) => {
                   e.stopPropagation()
                   setSearchQuery('')
-                  setPage(0)
+                  setVisibleCount(8)
                   searchInputRef.current?.focus()
                 }}
                 title="Clear search"
@@ -572,13 +591,18 @@ export function AssigneeDropdown({
             </button>
           )}
 
-          {showUnassigned && paginatedAssignees.length > 0 && (
+          {showUnassigned && visibleAssignees.length > 0 && (
             <div className="cl-assign-divider" />
           )}
 
-          {/* Paginated Assignees List */}
-          <div className="cl-assign-list">
-            {paginatedAssignees.map((a) => {
+          {/* Infinite Scroll Assignees List */}
+          <div
+            className="cl-assign-list"
+            ref={listRef}
+            onScroll={handleScroll}
+            style={{ maxHeight: 220, overflowY: 'auto' }}
+          >
+            {visibleAssignees.map((a) => {
               const isSelected =
                 assigneeId === a.id ||
                 assigneeId?.toLowerCase() === a.id.toLowerCase()
@@ -605,46 +629,16 @@ export function AssigneeDropdown({
                 </button>
               )
             })}
+            {hasMore && (
+              <div style={{ textAlign: 'center', padding: '6px 0', fontSize: 11, color: '#94a3b8' }}>
+                Scroll for more ({visibleAssignees.length} / {filteredAssignees.length})…
+              </div>
+            )}
           </div>
 
           {/* Empty state */}
           {!showUnassigned && filteredAssignees.length === 0 && (
             <div className="cl-assign-empty">No assignees found</div>
-          )}
-
-          {/* Pagination Controls */}
-          {filteredAssignees.length > 0 && (
-            <div className="cl-assign-pagination">
-              <button
-                type="button"
-                className="cl-assign-page-btn"
-                disabled={safePage === 0}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPage((p) => Math.max(0, p - 1))
-                }}
-                title="Previous page"
-              >
-                <Icon name="chevronLeft" size={13} strokeWidth={2.5} />
-                <span>Prev</span>
-              </button>
-              <span className="cl-assign-page-info">
-                {safePage + 1} / {totalPages}
-              </span>
-              <button
-                type="button"
-                className="cl-assign-page-btn"
-                disabled={safePage >= totalPages - 1}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPage((p) => Math.min(totalPages - 1, p + 1))
-                }}
-                title="Next page"
-              >
-                <span>Next</span>
-                <Icon name="chevronRight" size={13} strokeWidth={2.5} />
-              </button>
-            </div>
           )}
         </motion.div>,
         document.body,

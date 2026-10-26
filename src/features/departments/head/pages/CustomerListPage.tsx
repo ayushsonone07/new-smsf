@@ -177,6 +177,7 @@ export function CustomerListPage() {
       (window.location.pathname.includes('/google-user') ||
         window.location.pathname.includes('/onboarding-user') ||
         window.location.pathname.includes('/users')))
+  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
@@ -202,7 +203,12 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
+<<<<<<< HEAD
   const canEditRemark = columnFeatures.canEdit('Remark', true)
+=======
+  const canEditRemark =
+    !isHead && (canEditColumn('Internal Remark') || canEditColumn('Remark'))
+>>>>>>> ab3fcaab06e392fc1c814fd130a68023b3fe46b3
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
@@ -914,7 +920,7 @@ export function CustomerListPage() {
         showAssignTo={isAssignToVisible}
         canEditAssignTo={canEditAssignTo}
         showRemark={isRemarkVisible}
-        canEditRemark={canEditRemark}
+        canEditRemark={!isHead && canEditRemark}
         showContact={isContactVisible}
         canEditContact={canEditContact}
         showBusiness={isBusinessVisible}
@@ -942,6 +948,10 @@ export function CustomerListPage() {
         onSendAcknowledgement={setConfirmingCustomer}
         onAssigneeChange={handleAssignUser}
         onRemarkChange={(id, remark) => {
+          if (isHead) {
+            alert("Department Head cannot add or update internal remarks.")
+            return
+          }
           if (!canEditRemark) {
             alert("You don't have permission to update internal remarks.")
             return
