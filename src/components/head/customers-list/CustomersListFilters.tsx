@@ -197,6 +197,14 @@ export function DateRangePicker({
   )
   const [draftFrom, setDraftFrom] = useState(from)
   const [draftTo, setDraftTo] = useState(to)
+
+  useEffect(() => {
+    setDraftFrom(from)
+    setDraftTo(to)
+    if (from) {
+      setViewMonth(monthStart(new Date(`${from}T00:00:00`)))
+    }
+  }, [from, to])
   const pickerRef = useRef<HTMLDivElement>(null)
   const hasRange = Boolean(from || to)
   const buttonLabel = from && to
@@ -266,6 +274,7 @@ export function DateRangePicker({
   function resetRange() {
     setDraftFrom('')
     setDraftTo('')
+    onChange('', '')
     onReset()
     setOpen(false)
     onDismiss?.()
@@ -373,6 +382,7 @@ export function CustomersListFilters({
   onCompletedChange,
   showStatusTabs = true,
   actionsSlot,
+  onReset,
 }: CustomersListFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [localCompleted, setLocalCompleted] = useState({ from: '', to: '' })
@@ -468,12 +478,17 @@ export function CustomersListFilters({
               <button
                 type="button"
                 className="cl-range__reset"
-                onClick={() => onDateChange('', '')}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onDateChange('', '')
+                }}
               >
                 Reset
               </button>
             </div>
             <DateRangePicker
+              key={`created-${dateFrom}-${dateTo}`}
               label="Created between"
               from={dateFrom}
               to={dateTo}
@@ -490,12 +505,17 @@ export function CustomersListFilters({
               <button
                 type="button"
                 className="cl-range__reset"
-                onClick={() => changeCompleted('', '')}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  changeCompleted('', '')
+                }}
               >
                 Reset
               </button>
             </div>
             <DateRangePicker
+              key={`completed-${doneFrom}-${doneTo}`}
               label="Completed between"
               from={doneFrom}
               to={doneTo}
@@ -503,6 +523,22 @@ export function CustomersListFilters({
               onReset={() => changeCompleted('', '')}
             />
           </div>
+          {activeFilterCount > 0 && (
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '4px 8px' }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  onDateChange('', '')
+                  changeCompleted('', '')
+                  onReset?.()
+                }}
+              >
+                Reset All Date Filters
+              </button>
+            </div>
+          )}
         </motion.div>
       )}
     </motion.div>

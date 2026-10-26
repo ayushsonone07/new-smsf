@@ -86,6 +86,8 @@ export function useOnboardingCustomersList(
     searchParam?: string
     startDate?: string
     endDate?: string
+    completionStartDate?: string
+    completionEndDate?: string
     status?: string
     filteredUser?: string
   } = {},

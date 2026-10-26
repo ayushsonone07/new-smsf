@@ -39,8 +39,16 @@ export function useColumnFeatures(
 ): ColumnFeaturesState {
   const query = useDepartmentFeatures(departmentId)
   const session = getSession()
-
-  const isUser = session?.user.role === 'USER'
+  const userRole = (session?.user.role || '').toUpperCase()
+  const isUser =
+    userRole === 'USER' ||
+    userRole === 'DEPARTMENT_USER' ||
+    (session?.user as any)?.isHead === false ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.toLowerCase().includes('departmentuser') ||
+      window.location.pathname.toLowerCase().includes('/user/') ||
+      window.location.pathname.toLowerCase().includes('/users')
+    ))
   const permissionKey = isUser
     ? 'roleBPermission'
     : 'roleAPermission'
@@ -101,7 +109,7 @@ export function useColumnFeatures(
     columnKey: string,
     fallbackWhenUnconfigured = true,
   ): boolean {
-    if (dynamic.isPending) return false
+    if (dynamic.isPending) return fallbackWhenUnconfigured
 
     if (
       !dynamic.isError &&
