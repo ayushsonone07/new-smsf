@@ -75,6 +75,17 @@ import {
 } from '../../../../components/head/customers-list/CustomersList'
 import './AutowebisionCustomers.css'
 
+function parseSafeDate(raw: any): Date | null {
+  if (!raw) return null
+  if (Array.isArray(raw)) {
+    const [y, m, d, h = 0, min = 0, s = 0] = raw
+    const parsed = new Date(y, m - 1, d, h, min, s)
+    return isNaN(parsed.getTime()) ? null : parsed
+  }
+  const parsed = new Date(raw)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
 export type AutowebsionSubTab = 'ALL' | 'WEBSITE' | 'AUTOMATION'
 export type AutowebsionStatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
 
@@ -1495,15 +1506,16 @@ export function AutowebisionCustomersPage({
               <tbody>
                 {rawRows.map((customer, index) => {
                   const customerId = customer.customerId
-                  const createdDate = customer.createdAt
-                    ? new Date(customer.createdAt).toLocaleDateString('en-IN', {
+                  const parsedCreated = parseSafeDate(customer.createdAt)
+                  const createdDate = parsedCreated
+                    ? parsedCreated.toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
                       })
                     : '—'
-                  const createdTime = customer.createdAt
-                    ? new Date(customer.createdAt).toLocaleTimeString('en-IN', {
+                  const createdTime = parsedCreated
+                    ? parsedCreated.toLocaleTimeString('en-IN', {
                         hour: '2-digit',
                         minute: '2-digit',
                         hour12: true,
@@ -1541,37 +1553,39 @@ export function AutowebisionCustomersPage({
                         <td className="autoweb-td-date">
                           <div className="text-xs font-semibold text-slate-800">{createdDate}</div>
                           {createdTime && <div className="text-[11px] text-slate-400">{createdTime}</div>}
-                          <div className="mt-1.5">
-                            <button
-                              type="button"
-                              className={`inline-flex items-center justify-center h-7 w-7 rounded-md border transition-all ${
-                                customer.isWebsiteExists
-                                  ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-not-allowed'
-                                  : canEditWebsiteExists
-                                    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
-                                    : 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
-                              }`}
-                              disabled={customer.isWebsiteExists || !canEditWebsiteExists || updatingWebsiteExistsId === customerId}
-                              onClick={() => {
-                                if (!customer.isWebsiteExists && canEditWebsiteExists) {
-                                  setConfirmWebsiteExistsTarget(customer)
+                          {activeSubTab !== 'AUTOMATION' && (
+                            <div className="mt-1.5">
+                              <button
+                                type="button"
+                                className={`inline-flex items-center justify-center h-7 w-7 rounded-md border transition-all ${
+                                  customer.isWebsiteExists
+                                    ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-not-allowed'
+                                    : canEditWebsiteExists
+                                      ? 'border-slate-200 bg-slate-50 text-slate-400 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
+                                      : 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
+                                }`}
+                                disabled={customer.isWebsiteExists || !canEditWebsiteExists || updatingWebsiteExistsId === customerId}
+                                onClick={() => {
+                                  if (!customer.isWebsiteExists && canEditWebsiteExists) {
+                                    setConfirmWebsiteExistsTarget(customer)
+                                  }
+                                }}
+                                title={
+                                  customer.isWebsiteExists
+                                    ? 'Website Exists: YES (Cannot be turned NO)'
+                                    : canEditWebsiteExists
+                                      ? 'Click to confirm Website Exists'
+                                      : 'Website does not exist (Read-only for Head)'
                                 }
-                              }}
-                              title={
-                                customer.isWebsiteExists
-                                  ? 'Website Exists: YES (Cannot be turned NO)'
-                                  : canEditWebsiteExists
-                                    ? 'Click to confirm Website Exists'
-                                    : 'Website does not exist (Read-only for Head)'
-                              }
-                            >
-                              {updatingWebsiteExistsId === customerId ? (
-                                <Loader2 size={13} className="spin" />
-                              ) : (
-                                <Globe size={13} />
-                              )}
-                            </button>
-                          </div>
+                              >
+                                {updatingWebsiteExistsId === customerId ? (
+                                  <Loader2 size={13} className="spin" />
+                                ) : (
+                                  <Globe size={13} />
+                                )}
+                              </button>
+                            </div>
+                          )}
                         </td>
                       )}
 
@@ -1993,13 +2007,16 @@ export function AutowebisionCustomersPage({
                           <div className="flex items-center gap-1 text-xs text-red-600 font-medium">
                             <Clock size={12} />
                             <span>
-                              {customer.serviceExpiration
-                                ? new Date(customer.serviceExpiration).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })
-                                : 'Not Available'}
+                              {(() => {
+                                  const p = parseSafeDate(customer.serviceExpiration)
+                                  return p
+                                    ? p.toLocaleDateString('en-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })
+                                    : 'Not Available'
+                                })()}
                             </span>
                           </div>
                         </td>
