@@ -105,20 +105,24 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: 'esnext',
-      minify: true,
+      minify: 'oxc',
       cssMinify: true,
       sourcemap: false,
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            if (!id.includes('node_modules')) return
+
+            if (id.includes('/react/') || id.includes('/react-dom/')) {
               return 'react-vendor'
             }
-            if (id.includes('@tanstack/react-query') || id.includes('@tanstack/react-router')) {
+
+            if (id.includes('/@tanstack/react-query/') || id.includes('/@tanstack/react-router/')) {
               return 'tanstack-vendor'
             }
-            if (id.includes('lucide-react')) {
+
+            if (id.includes('/lucide-react/')) {
               return 'icons-vendor'
             }
           },

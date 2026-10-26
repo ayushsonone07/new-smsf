@@ -28,6 +28,7 @@ export type {
   ImportResult,
   OnboardingStatus,
   PublicOnboardingForm,
+  ResendPasswordSetupResponse,
 } from "./types";
 
 export { AttendancePage } from "./components/AttendancePage";
