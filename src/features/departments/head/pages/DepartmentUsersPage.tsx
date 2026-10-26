@@ -60,7 +60,8 @@ type ModalState =
   | { kind: 'create' }
   | { kind: 'bulkAssign' }
   | { kind: 'edit'; user: DepartmentUser }
-  | { kind: 'delete'; user: DepartmentUser }
+  | { kind: 'delete'; user: DepartmentUser; error?: string; isDeleting?: boolean }
+  | { kind: 'cannotDelete'; user: DepartmentUser; message: string }
   | { kind: 'report'; user: DepartmentUser }
 
 function toLocalDateTime(date: Date): string {
@@ -756,6 +757,9 @@ export function DepartmentUsersPage() {
 */
 
   async function handleDelete(user: DepartmentUser) {
+    setModal((prev) =>
+      prev.kind === 'delete' ? { ...prev, isDeleting: true, error: undefined } : prev,
+    )
     try {
       await deleteDepartmentUser({
         id: user.id,
@@ -775,8 +779,29 @@ export function DepartmentUsersPage() {
       })
     } catch (err: unknown) {
       console.error('Failed to delete department user:', err)
-      const msg = err instanceof Error ? err.message : 'Unable to delete user'
-      setToast({ type: 'error', title: 'Failed to remove user', message: msg })
+      const rawMsg = err instanceof Error ? err.message : String(err)
+      const isAssignedConflict =
+        rawMsg.toLowerCase().includes('assigned') ||
+        rawMsg.toLowerCase().includes('assign') ||
+        rawMsg.toLowerCase().includes('customer')
+
+      if (isAssignedConflict) {
+        setModal({
+          kind: 'cannotDelete',
+          user,
+          message: 'First you need to assign customer of this user to another user.',
+        })
+        setToast({
+          type: 'error',
+          title: 'Cannot Remove User',
+          message: 'First you need to assign customer of this user to another user.',
+        })
+      } else {
+        setModal((prev) =>
+          prev.kind === 'delete' ? { ...prev, isDeleting: false, error: rawMsg } : prev,
+        )
+        setToast({ type: 'error', title: 'Failed to remove user', message: rawMsg })
+      }
     }
   }
 
@@ -1067,8 +1092,32 @@ export function DepartmentUsersPage() {
           title="Remove user?"
           message={`${modal.user.name} will lose access to the department panel.`}
           confirmLabel="Remove"
+          confirmLoadingLabel="Removing..."
+          isLoading={modal.isDeleting}
+          error={modal.error}
           onClose={closeModal}
           onConfirm={() => handleDelete(modal.user)}
+        />
+      ) : null}
+
+      {modal.kind === 'cannotDelete' ? (
+        <ConfirmDialog
+          open
+          title="Cannot Remove User"
+          message={
+            <div className="space-y-2">
+              <p className="font-semibold text-amber-700 text-sm">
+                {modal.message}
+              </p>
+              <p className="text-xs text-slate-500">
+                <strong>{modal.user.name || modal.user.email}</strong> currently has customers assigned in this department. Please reassign their customers to another user before removing them.
+              </p>
+            </div>
+          }
+          confirmLabel="Reassign Customers"
+          cancelLabel="Close"
+          onClose={closeModal}
+          onConfirm={() => setModal({ kind: 'bulkAssign' })}
         />
       ) : null}
 
