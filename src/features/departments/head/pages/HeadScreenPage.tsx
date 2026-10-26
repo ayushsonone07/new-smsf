@@ -70,7 +70,7 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
     return (
       <ErrorState
         title="Unable to load menu"
-        message={nav.error.message}
+        message={nav.error?.message}
         onRetry={() => nav.refetch()}
       />
     )
@@ -145,4 +145,3 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
 
   return <Screen feature={feature} />
 }
-

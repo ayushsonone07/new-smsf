@@ -9,6 +9,7 @@ export interface DepartmentRoutePermissionsResult {
   isLoading: boolean
   isPending: boolean
   isError: boolean
+  error: Error | null
   isRouteEnabled: (slugOrPathOrName: string) => boolean
   isMasterDisabled: (slugOrPathOrName: string) => boolean
   refetch: () => unknown
@@ -282,9 +283,9 @@ export function useDepartmentRoutePermissions(
     isLoading: query.isLoading,
     isPending: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRouteEnabled,
     isMasterDisabled,
     refetch: query.refetch,
   }
 }
-

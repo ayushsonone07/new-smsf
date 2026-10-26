@@ -159,6 +159,82 @@
   overflow: auto;
 }
 
+.hnav__skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hnav__skeleton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.hnav__skeleton-icon,
+.hnav__skeleton-label {
+  display: block;
+  flex: none;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #eef1f6 25%,
+    #f7f8fb 50%,
+    #eef1f6 75%
+  );
+  background-size: 200% 100%;
+  animation: hnav-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.hnav__skeleton-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.hnav__skeleton-label {
+  width: 68%;
+  height: 12px;
+}
+
+.hnav__skeleton:nth-child(3n) .hnav__skeleton-label {
+  width: 54%;
+}
+
+.hnav__skeleton:nth-child(3n + 1) .hnav__skeleton-label {
+  width: 78%;
+}
+
+.is-collapsed .hnav__skeleton {
+  justify-content: center;
+  padding: 8px;
+}
+
+.hnav__error {
+  display: grid;
+  gap: 8px;
+  padding: 10px 8px;
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+.hnav__error button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--c-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@keyframes hnav-skeleton-pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .hnav__item {
   position: relative;
   display: flex;
