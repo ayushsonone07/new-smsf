@@ -599,13 +599,13 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, debouncedSearch, selectedAssigneeId])
 
-  const isLoading = useRowsEndpoint
-    ? activeCustomerQuery.isPending
-    : customersQuery.isPending && activeCustomerQuery.isPending
-
-  if (isLoading) {
-    return <LoadingState message="Loading customers..." />
-  }
+  const isCustomersLoading =
+    activeCustomerQuery.isPending ||
+    activeCustomerQuery.isLoading ||
+    (activeCustomerQuery.isFetching && filteredCustomers.length === 0) ||
+    (useRowsEndpoint
+      ? departmentRowsQuery.isPending
+      : onboardingApiQuery.isPending || (isOnboardingDept && customersQuery.isPending && !activeCustomerQuery.data))
 
   const isError = useRowsEndpoint
     ? activeCustomerQuery.isError
@@ -908,6 +908,7 @@ export function CustomerListPage() {
 
       <CustomersList
         customers={filteredCustomers}
+        isLoading={isCustomersLoading}
         assignees={assignees}
         canEdit={canEdit}
         showStatus={isStatusVisible}
