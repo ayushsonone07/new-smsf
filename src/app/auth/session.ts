@@ -216,7 +216,11 @@ export function openSessionInNewTab(
   }
 
   const sessionJson = JSON.stringify(session)
-  const backupJson = backupSession ? JSON.stringify(backupSession) : null
+  const tokenVal = session.token || ''
+  const roleVal = session.user.role || 'USER'
+  const deptVal = session.user.departmentType || ''
+  const phoneVal = session.user.phoneNumber || ''
+  const backupJson = backupSession ? JSON.stringify(backupSession) : ''
 
   const htmlContent = `<!DOCTYPE html>
 <html>
@@ -263,11 +267,16 @@ export function openSessionInNewTab(
     <script>
       try {
         sessionStorage.setItem('smsf.auth.session', ${JSON.stringify(sessionJson)});
-        sessionStorage.setItem('token', ${JSON.stringify(session.token)});
-        sessionStorage.setItem('role', ${JSON.stringify(session.user.role)});
-        ${session.user.departmentType ? `sessionStorage.setItem('departmentType', ${JSON.stringify(session.user.departmentType)});` : ''}
-        ${session.user.phoneNumber ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(session.user.phoneNumber)});` : ''}
-        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});` : ''}
+        sessionStorage.setItem('token', ${JSON.stringify(tokenVal)});
+        sessionStorage.setItem('role', ${JSON.stringify(roleVal)});
+        ${deptVal ? `sessionStorage.setItem('departmentType', ${JSON.stringify(deptVal)});`: ''}
+        ${phoneVal ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(phoneVal)});`: ''}
+        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});`: ''}
+        try {
+          localStorage.removeItem('smsf.auth.session');
+          localStorage.removeItem('smsf.auth.admin-backup');
+          localStorage.removeItem('token');
+        } catch (_) {}
         window.location.replace('${targetRoute}');
       } catch (e) {
         console.error('Failed to set session in sessionStorage', e);
