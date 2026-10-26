@@ -40,6 +40,8 @@ interface DepartmentUsersTableProps {
   onDelete?: (user: DepartmentUser) => void
   /** "Login as this user" button. Hidden when omitted. */
   onLoginAs?: (user: DepartmentUser) => void
+  /** Id of the user currently being logged in as. */
+  loggingInUserId?: string | null
   /**
    * Content for the expandable row under each user.
    * Chevron is hidden when omitted.
@@ -72,6 +74,7 @@ export function DepartmentUsersTable({
   onEdit,
   onDelete,
   onLoginAs,
+  loggingInUserId = null,
   renderExpanded,
   emptyMessage = 'No users found.',
   hiddenColumns,
@@ -235,6 +238,7 @@ export function DepartmentUsersTable({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onLoginAs={onLoginAs}
+                loggingInUserId={loggingInUserId}
               />
             )
           })}
@@ -345,6 +349,7 @@ interface UserRowProps {
   onEdit?: (user: DepartmentUser) => void
   onDelete?: (user: DepartmentUser) => void
   onLoginAs?: (user: DepartmentUser) => void
+  loggingInUserId: string | null
 }
 
 function UserRow({
@@ -361,7 +366,10 @@ function UserRow({
   onEdit,
   onDelete,
   onLoginAs,
+  loggingInUserId,
 }: UserRowProps) {
+  const isLoggingIn = loggingInUserId === user.id
+
   return (
     <>
       <motion.tr
@@ -404,9 +412,15 @@ function UserRow({
                   }`}
                   title={`Login as ${user.name}`}
                   aria-label={`Login as ${user.name}`}
+                  aria-busy={isLoggingIn}
+                  disabled={loggingInUserId !== null}
                   onClick={() => onLoginAs(user)}
                 >
-                  <Icon name="login" size={18} />
+                  {isLoggingIn ? (
+                    <span className="login-as-button__spinner" aria-hidden="true" />
+                  ) : (
+                    <Icon name="login" size={18} />
+                  )}
                 </button>
               ) : null}
             </div>
