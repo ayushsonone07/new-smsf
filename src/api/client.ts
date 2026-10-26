@@ -148,6 +148,27 @@ export async function apiRequest<T>(
 }
 
 /**
+ * Sends an API request through the frontend origin. This is a fallback for
+ * deployments where direct browser access to the configured backend is
+ * blocked by CORS or a temporary gateway/DNS issue, but `/api` is proxied by
+ * the frontend server.
+ */
+export function sameOriginApiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  if (typeof window === 'undefined') {
+    return apiRequest<T>(endpoint, options)
+  }
+
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  return apiRequest<T>(
+    `${window.location.origin}${normalizedEndpoint}`,
+    options,
+  )
+}
+
+/**
  * Session-bound variant of `apiRequest`.
  *
  * The backend's department APIs expect the login JWT plus a
