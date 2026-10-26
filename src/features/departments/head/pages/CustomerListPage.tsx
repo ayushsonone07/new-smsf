@@ -203,12 +203,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-<<<<<<< HEAD
   const canEditRemark = columnFeatures.canEdit('Remark', true)
-=======
-  const canEditRemark =
-    !isHead && (canEditColumn('Internal Remark') || canEditColumn('Remark'))
->>>>>>> ab3fcaab06e392fc1c814fd130a68023b3fe46b3
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
