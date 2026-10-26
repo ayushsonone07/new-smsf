@@ -143,6 +143,10 @@ export function DepartmentUsersPage() {
       const currentSession = getSession()
 
       const newSession = await generateDepartmentSession(email)
+      // Inherit the current departmentType if the generated user session does not include it
+      if (!newSession.user.departmentType && currentSession?.user.departmentType) {
+        newSession.user.departmentType = currentSession.user.departmentType
+      }
       const targetRoute = homeForRole(
         newSession.user.role as never,
         newSession.user.departmentType,
