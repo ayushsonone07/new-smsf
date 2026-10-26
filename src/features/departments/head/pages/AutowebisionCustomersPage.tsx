@@ -122,7 +122,7 @@ export function AutowebisionCustomersPage({
     : permissionDepartmentType === 'WEBSITE_DEPARTMENT'
       ? 'website_department/head/customer-list'
       : undefined
-  const { isColumnEnabled, canEditColumn } = useDepartmentColumnPermissions(
+  const { isColumnEnabled, isColumnConfigured, canEditColumn } = useDepartmentColumnPermissions(
     permissionDepartmentType,
     permissionRouteName,
   )
@@ -138,16 +138,29 @@ export function AutowebisionCustomersPage({
   const isClientRemarkVisible = isColumnEnabled('Client Remark') || isColumnEnabled('Client Remarks')
   const isInternalRemarkVisible = isColumnEnabled('Internal Remark') || isColumnEnabled('Remark') || isColumnEnabled('Remarks')
   const isDraftSentVisible = isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent')
-  const isAssigneeVisible = !isDepartmentUser && (isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee'))
+  const isAssigneeConfigured = isColumnConfigured('Assigned To')
+  const isAssigneeVisible = isAssigneeConfigured
+    ? isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee')
+    : !isDepartmentUser && (isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee'))
   const isActionsVisible = isColumnEnabled('Actions') || isColumnEnabled('Action')
 
-  // Role permission rules: Head is read-only for draft, status, and website exists.
-  // Department User has read & write permissions for draft, status, and website exists.
-  const canEditWebsiteExists = isDepartmentUser
-  const canEditStatus = isDepartmentUser
-  const canEditDraft = isDepartmentUser
-  const canEditAssignee = !isDepartmentUser && canEditColumn('Assigned To')
-  const canEditServices = isDepartmentUser
+  // Dynamic column permissions are authoritative. The legacy defaults below
+  // only apply until Admin configures the matching column for this route.
+  const canEditWebsiteExists = isColumnConfigured('Website Exists')
+    ? canEditColumn('Website Exists')
+    : isDepartmentUser
+  const canEditStatus = isColumnConfigured('Status')
+    ? canEditColumn('Status')
+    : isDepartmentUser
+  const canEditDraft = isColumnConfigured('Draft Sent')
+    ? canEditColumn('Draft Sent')
+    : isDepartmentUser
+  const canEditAssignee = isAssigneeConfigured
+    ? canEditColumn('Assigned To')
+    : !isDepartmentUser
+  const canEditServices = isColumnConfigured('Services')
+    ? canEditColumn('Services')
+    : isDepartmentUser
 
   const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
@@ -2306,7 +2319,7 @@ export function AutowebisionCustomersPage({
         customer={selectedCustomer}
         assignees={assignees}
         showStatus={true}
-        showAssignTo={!isDepartmentUser}
+        showAssignTo={isAssigneeVisible}
         departmentType={
           activeSubTab === 'AUTOMATION' || isAutomationScreen
             ? 'AUTOMATION_DEPARTMENT'
@@ -2927,7 +2940,7 @@ export function AutowebisionCustomersPage({
           isOpen={Boolean(serviceTagsTarget)}
           customer={serviceTagsTarget.customer}
           serviceType={serviceTagsTarget.serviceType}
-          readOnly={!isDepartmentUser}
+          readOnly={!canEditServices}
           onClose={() => setServiceTagsTarget(null)}
           onTagsUpdated={() => {
             customersQuery.refetch()

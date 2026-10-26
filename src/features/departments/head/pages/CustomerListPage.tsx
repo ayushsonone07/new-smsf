@@ -89,7 +89,11 @@ export function CustomerListPage() {
 
   const customersQuery = useDepartmentCustomers(departmentId, { enabled: isOnboardingDept })
   const updateMutation = useUpdateCustomer(departmentId)
-  const columnFeatures = useColumnFeatures(departmentId, 'customers')
+  const columnFeatures = useColumnFeatures(
+    departmentId,
+    'customers',
+    currentDepartment,
+  )
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
@@ -177,35 +181,31 @@ export function CustomerListPage() {
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
     : 'customers'
-  const { isColumnEnabled, canEditColumn } =
+  const { isColumnEnabled, isColumnConfigured } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = canEditColumn('Status')
+  const canEditStatus = columnFeatures.canEdit('Status', true)
 
-  const isAssignToVisible =
-    !isDeptUser &&
-    (isColumnEnabled('Assigned To', 'customer') ||
+  const isAssignToConfigured = isColumnConfigured('Assign To')
+  const isAssignToVisible = isAssignToConfigured
+    ? isColumnEnabled('Assigned To', 'customer') ||
       isColumnEnabled('Assign To', 'customer') ||
       isColumnEnabled('Assign', 'customer') ||
-      isColumnEnabled('Assignee', 'customer'))
-  const canEditAssignTo =
-    !isDeptUser &&
-    (canEditColumn('Assigned To') ||
-      canEditColumn('Assign To') ||
-      canEditColumn('Assign') ||
-      canEditColumn('Assignee'))
+      isColumnEnabled('Assignee', 'customer')
+    : !isDeptUser &&
+      (isColumnEnabled('Assigned To', 'customer') ||
+        isColumnEnabled('Assign To', 'customer') ||
+        isColumnEnabled('Assign', 'customer') ||
+        isColumnEnabled('Assignee', 'customer'))
+  const canEditAssignTo = columnFeatures.canEdit('Assign To', !isDeptUser)
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark =
-    canEditColumn('Internal Remark') || canEditColumn('Remark')
+  const canEditRemark = columnFeatures.canEdit('Remark', true)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
-  const canEditContact =
-    canEditColumn('Contact') ||
-    canEditColumn('Phone') ||
-    canEditColumn('Contact Number')
+  const canEditContact = columnFeatures.canEdit('Contact', true)
 
   const isBusinessVisible =
     isColumnEnabled('Business', 'customer') ||
@@ -215,10 +215,7 @@ export function CustomerListPage() {
     isColumnEnabled('Service Type', 'customer') ||
     isColumnEnabled('Service', 'customer') ||
     isColumnEnabled('Services', 'customer')
-  const canEditServiceType =
-    canEditColumn('Service Type') ||
-    canEditColumn('Service') ||
-    canEditColumn('Services')
+  const canEditServiceType = columnFeatures.canEdit('Service Type', true)
 
   useEffect(() => {
     if (!isStatusVisible && activeTab !== 'all') {
