@@ -6,7 +6,12 @@ import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
 import { SCREEN_REGISTRY } from '../config/screenRegistry'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
-import { buildDepartmentRoute, resolveDeptFromPath, resolveSlugFromPath } from '../utils/routeUtils'
+import {
+  buildDepartmentRoute,
+  resolveDeptFromPath,
+  resolvePortalRoleFromPath,
+  resolveSlugFromPath,
+} from '../utils/routeUtils'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { AutowebisionCustomersPage } from './AutowebisionCustomersPage'
 import { DeliveredCustomersPage } from './DeliveredCustomersPage'
@@ -20,14 +25,14 @@ interface HeadScreenPageProps {
  * and renders that screen's component.
  */
 export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
-  const { departmentName, role, screen } = useParams({ strict: false }) as {
-    departmentName?: string
-    role?: string
+  const { screen } = useParams({ strict: false }) as {
     screen?: string
   }
   const location = useLocation()
   const departmentId = useHeadDepartmentId()
-  const deptFromUrl = departmentName || resolveDeptFromPath(location.pathname) || undefined
+  // `/{dept}-head/...` -> dept; the route params are not the department name any more.
+  const deptFromUrl = resolveDeptFromPath(location.pathname) || undefined
+  const role = resolvePortalRoleFromPath(location.pathname) ?? undefined
   const session = getSession()
   const effectiveDepartmentType = session?.user.departmentType || deptFromUrl
   const nav = useHeadNav(departmentId, effectiveDepartmentType)

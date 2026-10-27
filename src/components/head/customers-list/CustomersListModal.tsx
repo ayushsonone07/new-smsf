@@ -338,7 +338,12 @@ export function CustomersListModal({
     sessionUser?.isHead === true ||
     sessionUserRole === 'HEAD' ||
     sessionUserRole === 'DEPARTMENT_HEAD' ||
-    isHeadPath
+    (!isSuperAdmin && !['USER', 'DEPARTMENT_USER', 'CUSTOMER'].includes(sessionUserRole)) ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.includes('/head') ||
+      /^\/[a-z0-9_]+-head(\/|$)/i.test(window.location.pathname) ||
+      window.location.pathname.startsWith('/google-head')
+    ))
   )
 
   const showBillUploadTab = departmentType === BILL_UPLOAD_DEPARTMENT

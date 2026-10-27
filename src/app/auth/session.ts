@@ -337,7 +337,7 @@ export type HomeRoute =
   | '/users'
   | '/customers'
   | '/forbidden'
-  | '/onboarding'
+  | '/onboarding-head'
   | '/onboarding-user'
   | '/google-head'
   | '/google-user'
@@ -356,7 +356,7 @@ export function homeForRole(
     if (role === 'USER') {
       return '/onboarding-user'
     }
-    return '/onboarding'
+    return '/onboarding-head'
   }
 
   if (dept.includes('GOOGLE')) {
@@ -370,7 +370,8 @@ export function homeForRole(
     const slug = normalizeDepartmentSlug(dept)
     if (slug && slug !== 'head' && slug !== 'users' && slug !== 'department') {
       const roleSegment = role === 'USER' ? 'user' : 'head'
-      return `/${slug}/${roleSegment}/dashboard` as HomeRoute
+      // Same URL standard as routeUtils.buildDepartmentRoute: /{dept}-head | /{dept}-user
+      return `/${slug}-${roleSegment}` as HomeRoute
     }
   }
 

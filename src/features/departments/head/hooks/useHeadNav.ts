@@ -135,6 +135,11 @@ function extractCleanSlug(routeName: string): string {
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1] || ''
 
+  // Portal dashboard URL: "/onboarding-head", "/sales-user"
+  if (parts.length === 1 && /^\/+[a-z0-9_]+-(head|user)$/.test(routeName.toLowerCase().trim())) {
+    return 'dashboard'
+  }
+
   const cleanLast = last.toLowerCase().replace(/[\s_]+/g, '-')
   if (
     cleanLast === 'users' ||
