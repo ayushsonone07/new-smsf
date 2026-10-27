@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, type InfiniteData } from '@tanstack/react-q
 import {
   getDepartmentUsers,
   getOnboardingCustomers,
+  getCustomerList,
   getDepartmentCustomerRows,
   type DepartmentUsersPageResponse,
   type OnboardedCustomersPageResponse,
@@ -106,6 +107,27 @@ export function useAuthOnboardingSummary(
   return useQuery<AuthOnboardingSummary>({
     queryKey: ['auth-onboarding-summary', params],
     queryFn: () => getAuthOnboardingSummary(params),
+    enabled: options?.enabled ?? true,
+    staleTime: 30_000,
+  })
+}
+
+/** new-smsf Customer List: GET /api/auth/department/customers/list (not for Automation / Website) */
+export function useCustomerList(
+  params: {
+    page?: number
+    size?: number
+    searchParam?: string
+    statusFilter?: string
+    userFilter?: string
+    startDate?: string
+    endDate?: string
+  } = {},
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepartmentCustomerRowsPageResponse>({
+    queryKey: ['customer-list', params],
+    queryFn: () => getCustomerList(params),
     enabled: options?.enabled ?? true,
     staleTime: 30_000,
   })
