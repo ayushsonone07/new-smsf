@@ -805,7 +805,8 @@ function CustomerRow({
   onShowValidationModal,
 }: CustomerRowProps) {
   const isCompleted = customer.status?.toLowerCase() === 'completed'
-  const canChangeStatus = (canEditStatus !== undefined ? canEditStatus : canEdit) && !isCompleted
+  const canChangeStatus =
+    (canEditStatus !== undefined ? canEditStatus : Boolean(_isDepartmentUser)) && !isCompleted
   const [statusOpen, setStatusOpen] = useState(false)
   const [statusMenuPosition, setStatusMenuPosition] = useState<{
     left: number
@@ -1509,51 +1510,13 @@ function CustomerRow({
                 style={{
                   position: 'relative',
                   padding: '6px 8px',
-                  paddingRight: (canEditRemark !== undefined ? canEditRemark : canEdit) ? '28px' : '8px',
                   backgroundColor: '#f8fafc',
                   borderRadius: '6px',
                   minHeight: '32px',
-                  cursor: (canEditRemark !== undefined ? canEditRemark : canEdit) ? 'pointer' : 'default',
                 }}
-                role="button"
-                tabIndex={(canEditRemark !== undefined ? canEditRemark : canEdit) ? 0 : -1}
-                onClick={(canEditRemark !== undefined ? canEditRemark : canEdit) ? startEditing : undefined}
-                onKeyDown={(e) => {
-                  if ((e.key === 'Enter' || e.key === ' ') && (canEditRemark !== undefined ? canEditRemark : canEdit)) {
-                    startEditing()
-                  }
-                }}
-                title={customer.remark || 'Add remark...'}
+                title={customer.remark || 'No remark'}
               >
-                {customer.remark || 'Add remark...'}
-                
-                {(canEditRemark !== undefined ? canEditRemark : canEdit) && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      startEditing()
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '4px',
-                      right: '4px',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      color: '#475569',
-                    }}
-                    title="Edit internal remark"
-                  >
-                    <Icon name="pencil" size={12} strokeWidth={2} />
-                  </button>
-                )}
+                {customer.remark || '—'}
               </div>
               <button
                 type="button"
@@ -1567,8 +1530,6 @@ function CustomerRow({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '0 4px',
-                  width: 'fit-content'
                 }}
               >
                 <Icon name="messageSquare" size={10} strokeWidth={2} />
