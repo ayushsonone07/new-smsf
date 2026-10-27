@@ -328,8 +328,16 @@ export interface DepartmentCustomerRowItem {
   hasDuplicateCustomers?: boolean
   duplicateCount?: number
   duplicateCustomers?: any[]
+  /** Only from GET /api/auth/department/customers/list */
+  latestInternalRemark?: string | null
+  latestInternalRemarkAt?: string | null
+  isServiceActive?: boolean | null
+  subServices?: Array<Record<string, unknown>>
   [key: string]: unknown
 }
+
+/** Departments that keep the old rows API: not served by /department/customers/list */
+export const LEGACY_CUSTOMER_ROWS_DEPARTMENTS = new Set(['AUTOMATION_DEPARTMENT', 'WEBSITE_DEPARTMENT'])
 
 export interface DepartmentCustomerRowsPageResponse {
   customers: DepartmentCustomerRowItem[]
@@ -490,6 +498,51 @@ export async function getDepartmentCustomerRows(params: {
     totalElements: total,
     totalPage,
     pageNumber: res?.pageNumber ?? res?.data?.pageNumber ?? (params.page ?? 0),
+  }
+}
+
+/**
+ * `GET /api/auth/department/customers/list` — new-smsf Customer List only
+ * (SMSF and the Automation / Website departments keep `/department/customer/rows`).
+ * Slim rows: no service flow, history or full remark JSON. The backend reads the
+ * user from the JWT and caps `size` at 50. Service flow and duplicate details are
+ * fetched on demand when the user clicks them.
+ */
+export async function getCustomerList(params: {
+  page?: number
+  size?: number
+  searchParam?: string
+  statusFilter?: string
+  userFilter?: string
+  startDate?: string
+  endDate?: string
+} = {}): Promise<DepartmentCustomerRowsPageResponse> {
+  const search = new URLSearchParams()
+  search.set('page', String(params.page ?? 0))
+  search.set('size', String(params.size ?? 10))
+  if (params.searchParam) search.set('searchParam', params.searchParam)
+  if (params.statusFilter && params.statusFilter !== 'all') search.set('statusFilter', params.statusFilter)
+  if (params.userFilter && params.userFilter !== 'all') search.set('userFilter', params.userFilter)
+  if (params.startDate) search.set('startDate', params.startDate)
+  if (params.endDate) search.set('endDate', params.endDate)
+
+  const res = await authedApiRequest<{
+    data?: DepartmentCustomerRowItem[]
+    totalElements?: number
+    totalPage?: number
+    pageNumber?: number
+    message?: string
+  }>(`/api/auth/department/customers/list?${search.toString()}`)
+
+  if (!Array.isArray(res?.data)) {
+    throw new Error(res?.message || 'Customer list returned no data')
+  }
+
+  return {
+    customers: res.data,
+    totalElements: res.totalElements ?? res.data.length,
+    totalPage: res.totalPage ?? 1,
+    pageNumber: res.pageNumber ?? (params.page ?? 0),
   }
 }
 

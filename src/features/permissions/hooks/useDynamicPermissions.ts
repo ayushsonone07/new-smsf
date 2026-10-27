@@ -57,8 +57,7 @@ export function useDynamicRoutes(departmentType?: string, enabled = true) {
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
     enabled: enabled && Boolean(departmentType),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 60_000,
   })
 }
 
@@ -312,7 +311,6 @@ export function useDeleteDynamicColumn() {
     },
   })
 }
-
 
 
 

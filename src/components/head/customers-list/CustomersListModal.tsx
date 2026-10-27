@@ -701,13 +701,11 @@ export function CustomersListModal({
   const assignee =
     assignees.find((a) => a.id === current?.assigneeId) ?? null
 
+  // Only this customer's rows: never fall back to another customer that matched the phone search
   const customerServiceRows = apiDetails.serviceRows.filter(
     (row) => String(row.customerId) === String(current?.id),
   )
-  const relevantServiceRows = customerServiceRows.length > 0
-    ? customerServiceRows
-    : apiDetails.serviceRows
-  const serviceRow = relevantServiceRows[0]
+  const serviceRow = customerServiceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
   interface DrawerDepartmentServiceItem {
@@ -920,7 +918,7 @@ export function CustomersListModal({
       detail: remark.remark || '',
       timestamp: remark.timestamp || '',
     })),
-    ...buildServiceStatusUpdates(relevantServiceRows),
+    ...buildServiceStatusUpdates(customerServiceRows),
     ...localActivities.map((activity) => {
       const department = formatServiceName(
         activity.departmentType.replace(/_DEPARTMENT$/i, ''),

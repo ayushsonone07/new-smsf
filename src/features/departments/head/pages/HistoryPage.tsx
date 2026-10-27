@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { getSession } from '../../../../app/auth/session'
 import { useTaskHistory } from '../../hooks/useTaskHistory'
-import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { getStatusHistory, type StatusHistoryItem } from '../../../../api/status-history.api'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
@@ -146,38 +146,39 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
     staleTime: 30_000,
   })
 
-  const deptUsersQuery = useDepartmentUsersList(
-    {
-      page: 0,
-      size: 1000,
-    },
-    { enabled: isHead && !isAutowebsionDept },
-  )
+  const assigningUsersQuery = useAssigningUsers(currentDepartment, {
+    enabled: isHead && !isAutowebsionDept,
+  })
 
   const departmentUsers = useMemo<OnboardingAssignee[]>(() => {
-    const source = isAutowebsionDept
-      ? (autowebUsersQuery.data?.data ?? autowebUsersQuery.data)
-      : deptUsersQuery.data?.data
-    const list: Array<{ email?: string; username?: string }> = Array.isArray(
-      source,
-    )
-      ? source
-      : Array.isArray(source?.data)
-        ? source.data
-        : []
+    if (isAutowebsionDept) {
+      const source = autowebUsersQuery.data?.data ?? autowebUsersQuery.data
+      const list: Array<{ email?: string; username?: string }> = Array.isArray(source)
+        ? source
+        : Array.isArray(source?.data)
+          ? source.data
+          : []
+      return list
+        .filter((user) => Boolean(user.email))
+        .map((user) => ({
+          id: user.email as string,
+          name: user.username
+            ? `${user.username} (${user.email})`
+            : (user.email as string),
+        }))
+    }
+    const list = assigningUsersQuery.data ?? []
     return list
       .filter((user) => Boolean(user.email))
       .map((user) => ({
-        id: user.email as string,
-        name: user.username
-          ? `${user.username} (${user.email})`
-          : (user.email as string),
+        id: user.email,
+        name: user.username ? `${user.username} (${user.email})` : user.email,
       }))
-  }, [isAutowebsionDept, autowebUsersQuery.data, deptUsersQuery.data])
+  }, [isAutowebsionDept, autowebUsersQuery.data, assigningUsersQuery.data])
 
   const usersLoading = isAutowebsionDept
     ? autowebUsersQuery.isPending
-    : deptUsersQuery.isPending
+    : assigningUsersQuery.isPending
 
   const departmentUserFilter = isHead
     ? (selectedUser || undefined)

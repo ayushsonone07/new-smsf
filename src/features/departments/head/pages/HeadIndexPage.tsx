@@ -49,6 +49,16 @@ export function HeadIndexPage({ portalRole = 'HEAD' }: HeadIndexPageProps) {
 
   if (nav.isPending) return <LoadingState message="Loading..." />
 
+  if (nav.isError) {
+    return (
+      <ErrorState
+        title="Unable to load menu"
+        message={nav.error?.message}
+        onRetry={() => nav.refetch()}
+      />
+    )
+  }
+
   if (!first) {
     return (
       <ErrorState

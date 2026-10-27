@@ -14,6 +14,9 @@ import type {
 interface HeadShellProps {
   /* sidebar */
   navItems: HeadNavItem[]
+  navLoading?: boolean
+  navError?: string
+  onRetryNav?: () => void
   secondaryNavItems?: HeadNavItem[]
   activeKey: string
   onNavigate: (item: HeadNavItem) => void
@@ -44,6 +47,9 @@ interface HeadShellProps {
  */
 export function HeadShell({
   navItems,
+  navLoading = false,
+  navError,
+  onRetryNav,
   secondaryNavItems,
   activeKey,
   onNavigate,
@@ -98,6 +104,9 @@ export function HeadShell({
         onToggle={toggleSidebar}
         roleLabel={roleLabel}
         items={navItems}
+        isLoading={navLoading}
+        loadError={navError}
+        onRetry={onRetryNav}
         secondaryItems={secondaryNavItems}
         activeKey={activeKey}
         onSelect={(item) => {

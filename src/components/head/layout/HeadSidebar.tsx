@@ -14,6 +14,9 @@ interface HeadSidebarProps {
   onToggle: () => void
   roleLabel: string
   items: HeadNavItem[]
+  isLoading?: boolean
+  loadError?: string
+  onRetry?: () => void
   /** Second group shown under a "Customer-facing" heading (user role). */
   secondaryItems?: HeadNavItem[]
   activeKey: string
@@ -36,6 +39,9 @@ export function HeadSidebar({
   onToggle,
   roleLabel,
   items,
+  isLoading = false,
+  loadError,
+  onRetry,
   secondaryItems = [],
   activeKey,
   onSelect,
@@ -91,17 +97,39 @@ export function HeadSidebar({
         </button>
       </div>
 
-      <nav className="hnav" aria-label="Main">
-        {items.map(renderItem)}
-
-        {secondaryItems.length > 0 ? (
-          <>
-            {open ? (
-              <div className="hnav__group">Customer-facing</div>
+      <nav className="hnav" aria-label="Main" aria-busy={isLoading}>
+        {isLoading ? (
+          <div className="hnav__skeletons" role="status" aria-label="Loading navigation">
+            {Array.from({ length: 9 }, (_, index) => (
+              <div className="hnav__skeleton" key={index}>
+                <span className="hnav__skeleton-icon" />
+                {open ? <span className="hnav__skeleton-label" /> : null}
+              </div>
+            ))}
+          </div>
+        ) : loadError ? (
+          <div className="hnav__error" role="alert">
+            <span>Unable to load menu</span>
+            {onRetry ? (
+              <button type="button" onClick={onRetry}>
+                Try again
+              </button>
             ) : null}
-            {secondaryItems.map(renderItem)}
+          </div>
+        ) : (
+          <>
+            {items.map(renderItem)}
+
+            {secondaryItems.length > 0 ? (
+              <>
+                {open ? (
+                  <div className="hnav__group">Customer-facing</div>
+                ) : null}
+                {secondaryItems.map(renderItem)}
+              </>
+            ) : null}
           </>
-        ) : null}
+        )}
       </nav>
 
       {open ? (
