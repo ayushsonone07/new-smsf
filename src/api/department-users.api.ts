@@ -188,6 +188,8 @@ export async function getOnboardingCustomers(params: {
   searchParam?: string
   startDate?: string
   endDate?: string
+  completionStartDate?: string
+  completionEndDate?: string
   status?: string
   filteredUser?: string
 } = {}): Promise<OnboardedCustomersPageResponse> {
@@ -202,6 +204,14 @@ export async function getOnboardingCustomers(params: {
   if (params.endDate) {
     const e = params.endDate.includes('T') ? params.endDate : `${params.endDate}T23:59:59`
     search.set('endDate', e)
+  }
+  if (params.completionStartDate) {
+    const cs = params.completionStartDate.includes('T') ? params.completionStartDate : `${params.completionStartDate}T00:00:00`
+    search.set('completionStartDate', cs)
+  }
+  if (params.completionEndDate) {
+    const ce = params.completionEndDate.includes('T') ? params.completionEndDate : `${params.completionEndDate}T23:59:59`
+    search.set('completionEndDate', ce)
   }
   if (params.status) search.set('status', params.status)
   if (params.filteredUser) search.set('filteredUser', params.filteredUser)

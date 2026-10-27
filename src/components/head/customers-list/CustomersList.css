@@ -2421,7 +2421,7 @@
 .cl-filter-panel {
   display: grid;
   /* two groups side by side when there is room, stacked when there isn't */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 16px 24px;
   padding: 16px 20px;
   border: 1px solid #e2e8f0;

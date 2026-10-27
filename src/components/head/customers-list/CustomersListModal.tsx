@@ -309,10 +309,33 @@ export function CustomersListModal({
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
-  const isSuperAdmin = (getSession()?.user.role as string) === 'ADMIN' || (getSession()?.user.role as string) === 'SUPERADMIN'
-  const sessionUserRole = ((getSession()?.user?.role as string) || '').toUpperCase()
-  const isHead = Boolean(
-    (getSession()?.user as any)?.isHead ||
+  const sessionUser = getSession()?.user as any
+  const sessionUserRole = ((sessionUser?.role as string) || '').toUpperCase()
+  const isSuperAdmin = sessionUserRole === 'ADMIN' || sessionUserRole === 'SUPERADMIN'
+
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('departmentuser') ||
+    currentPath.includes('/google-user') ||
+    currentPath.includes('/onboarding-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users')
+
+  const isDeptUser =
+    sessionUserRole === 'USER' ||
+    sessionUserRole === 'DEPARTMENT_USER' ||
+    sessionUser?.isHead === false ||
+    isUserPath
+
+  const isHeadPath = !isUserPath && (
+    currentPath.startsWith('/onboarding-dashboard-head') ||
+    currentPath.startsWith('/google-head') ||
+    currentPath.includes('/head')
+  )
+
+  const isHead = !isSuperAdmin && !isDeptUser && Boolean(
+    sessionUser?.isHead === true ||
     sessionUserRole === 'HEAD' ||
     sessionUserRole === 'DEPARTMENT_HEAD' ||
     (!isSuperAdmin && !['USER', 'DEPARTMENT_USER', 'CUSTOMER'].includes(sessionUserRole)) ||
@@ -429,7 +452,7 @@ export function CustomersListModal({
       await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
       setEditingRemark(null)
     } catch (error) {
-      console.error('Failed to update remark', error)
+      console.error('Failed to update remark', error); alert(error instanceof Error ? error.message : 'Failed to update remark');
     } finally {
       setIsSavingRemark(false)
     }
@@ -449,7 +472,7 @@ export function CustomersListModal({
       await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
       setEditingClientRemark(null)
     } catch (error) {
-      console.error('Failed to update client remark', error)
+      console.error('Failed to update client remark', error); alert(error instanceof Error ? error.message : 'Failed to update client remark');
     } finally {
       setIsSavingClientRemark(false)
     }
@@ -1469,7 +1492,7 @@ export function CustomersListModal({
 
                 {/* Section 1: Internal Remarks */}
                 {!isSuperAdmin && <div className="cl-drawer__remark-section">
-                  {!isHead && canEditRemark && getSession()?.user.role !== 'CUSTOMER' && (
+                  {!isHead && (isDeptUser || canEditRemark) && getSession()?.user.role !== 'CUSTOMER' && (
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault()
@@ -1486,7 +1509,7 @@ export function CustomersListModal({
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-remarks'] })
                           input.value = ''
                         } catch (err) {
-                          console.error('Failed to add remark', err)
+                          console.error('Failed to add remark', err); alert(err instanceof Error ? err.message : 'Failed to add internal remark');
                         } finally {
                           setIsAddingRemark(false)
                         }
@@ -1523,7 +1546,7 @@ export function CustomersListModal({
                       serviceRow?.internalRemark
                     }
                     internal
-                    editable={!isHead && canEditRemark}
+                    editable={!isHead && (isDeptUser || canEditRemark) && getSession()?.user.role !== 'CUSTOMER'}
                     editingRemark={editingRemark}
                     editingRemarkText={editingRemarkText}
                     onEdit={(remark) => { setEditingRemark(remark.timestamp || remark.remark || 'remark'); setEditingRemarkText(remark.remark || '') }}
@@ -1554,7 +1577,7 @@ export function CustomersListModal({
                           await queryClient.invalidateQueries({ queryKey: ['customer-drawer-details'] })
                           input.value = ''
                         } catch (err) {
-                          console.error('Failed to add client remark', err)
+                          console.error('Failed to add client remark', err); alert(err instanceof Error ? err.message : 'Failed to add client remark');
                         } finally {
                           setIsAddingClientRemark(false)
                         }
@@ -1601,7 +1624,7 @@ export function CustomersListModal({
                       badge="Customer replies"
                       emptyMessage="No client remarks recorded."
                       entries={clientRemarkEntries}
-                      editable
+                      editable={!isHead && !isSuperAdmin && getSession()?.user.role !== 'CUSTOMER'}
                       editingRemark={editingClientRemark}
                       editingRemarkText={editingClientRemarkText}
                       onEdit={(remark) => {

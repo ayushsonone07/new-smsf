@@ -303,6 +303,10 @@ export function CustomerListPage() {
         : activeTab === 'in-progress'
           ? 'IN_PROGRESS'
           : activeTab.toUpperCase(),
+    filteredUser:
+      selectedAssigneeId && selectedAssigneeId !== 'all' && selectedAssigneeId !== 'assigned' && selectedAssigneeId !== 'unassigned'
+        ? selectedAssigneeId
+        : undefined,
   }, { enabled: isOnboardingDept })
 
   // 3b. Department customer rows (any non-onboarding dept):
@@ -319,8 +323,8 @@ export function CustomerListPage() {
           ? 'IN_PROGRESS'
           : activeTab.toUpperCase(),
     userFilter:
-      selectedAssigneeId !== 'all'
-        ? selectedAssigneeId ?? undefined
+      selectedAssigneeId && selectedAssigneeId !== 'all' && selectedAssigneeId !== 'assigned' && selectedAssigneeId !== 'unassigned'
+        ? selectedAssigneeId
         : undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
@@ -591,11 +595,12 @@ export function CustomerListPage() {
         (customer) =>
           activeTab === 'all' || customer.status === activeTab,
       )
-      .filter(
-        (customer) =>
-          selectedAssigneeId === 'all' ||
-          customer.assigneeId === selectedAssigneeId,
-      )
+      .filter((customer) => {
+        if (!selectedAssigneeId || selectedAssigneeId === 'all') return true
+        if (selectedAssigneeId === 'assigned') return Boolean(customer.assigneeId)
+        if (selectedAssigneeId === 'unassigned') return !customer.assigneeId
+        return customer.assigneeId === selectedAssigneeId
+      })
       .filter(
         (customer) =>
           !term ||
@@ -695,6 +700,18 @@ export function CustomerListPage() {
   async function handleStatusChange(customerId: string, status: OnboardingStatus) {
     if (!canEditStatus) {
       alert("You don't have permission to update status.")
+      return
+    }
+
+    const currentCustomer =
+      filteredCustomers.find((c) => c.id === customerId) ||
+      onboardingCustomers.find((c) => c.id === customerId)
+
+    if (
+      currentCustomer?.status === 'completed' ||
+      (currentCustomer as any)?.onboardingStatus?.toLowerCase() === 'completed'
+    ) {
+      alert('Completed status cannot be changed.')
       return
     }
 

@@ -332,20 +332,61 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
         </button>
       </motion.div>
 
-      {/* ── Toolbar: Search, User Selector & Refresh ── */}
-      <motion.div className="history-toolbar" variants={sectionVariants}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-          <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 220 }}>
+      {/* ── Toolbar: All Filters in One Line (Status Tabs, Search & User Selector) ── */}
+      <motion.div className="history-toolbar" variants={sectionVariants} style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+          {/* Status Tabs Filter */}
+          {activeView === 'task-history' && (
+            <div style={{ display: 'inline-flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+              {(
+                [
+                  { key: 'all', label: 'All Tasks' },
+                  { key: 'ACTIVE', label: 'Active' },
+                  { key: 'PENDING', label: 'Pending' },
+                  { key: 'IN_PROGRESS', label: 'In Progress' },
+                  { key: 'COMPLETED', label: 'Completed' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => handleStatusTab(tab.key)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 20,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: '1px solid',
+                    borderColor: statusFilter === tab.key ? '#2563eb' : '#e2e8f0',
+                    background: statusFilter === tab.key ? '#2563eb' : '#ffffff',
+                    color: statusFilter === tab.key ? '#ffffff' : '#475569',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 200 }}>
             <SearchBar
               value={search}
               onChange={handleSearchChange}
-              placeholder={activeView === 'task-history' ? 'Search by customer name or phone' : 'Search by customer or lead name'}
+              placeholder={
+                activeView === 'task-history'
+                  ? 'Search by customer name or phone'
+                  : 'Search by customer or lead name'
+              }
             />
           </div>
 
           {/* Searchable, paginated department-user filter for heads. */}
           {isHead && activeView === 'task-history' && (
-            <div style={{ width: 320, maxWidth: '100%' }}>
+            <div style={{ width: 260, maxWidth: '100%', flexShrink: 0 }}>
               <AssigneeDropdown
                 assigneeId={selectedUser || null}
                 assignees={departmentUsers}
@@ -361,46 +402,11 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
             </div>
           )}
         </div>
-
       </motion.div>
 
       {/* ── Task History View ── */}
       {activeView === 'task-history' && (
         <>
-          {/* Status Tabs Filter */}
-          <motion.div variants={sectionVariants} style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(
-                [
-                  { key: 'all', label: 'All Tasks' },
-                  { key: 'ACTIVE', label: 'Active' },
-                  { key: 'PENDING', label: 'Pending' },
-                  { key: 'IN_PROGRESS', label: 'In Progress' },
-                  { key: 'COMPLETED', label: 'Completed' },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => handleStatusTab(tab.key)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 20,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    border: '1px solid',
-                    borderColor: statusFilter === tab.key ? '#2563eb' : '#e2e8f0',
-                    background: statusFilter === tab.key ? '#2563eb' : '#ffffff',
-                    color: statusFilter === tab.key ? '#ffffff' : '#475569',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
 
           {/* Table */}
           <motion.div variants={sectionVariants}>
