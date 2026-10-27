@@ -804,6 +804,8 @@ function CustomerRow({
   showUpdated = false,
   onShowValidationModal,
 }: CustomerRowProps) {
+  const isCompleted = customer.status?.toLowerCase() === 'completed'
+  const canChangeStatus = (canEditStatus !== undefined ? canEditStatus : canEdit) && !isCompleted
   const [statusOpen, setStatusOpen] = useState(false)
   const [statusMenuPosition, setStatusMenuPosition] = useState<{
     left: number
@@ -1251,20 +1253,25 @@ function CustomerRow({
           <div className="cl-status-wrap" ref={statusRef}>
             <button
               type="button"
-              className={`cl-status-btn ${statusMeta.btnClass}`}
-              onClick={() => setStatusOpen((o) => !o)}
-              disabled={canEditStatus !== undefined ? !canEditStatus : !canEdit}
-              aria-expanded={statusOpen}
-              aria-haspopup="listbox"
+              className={`cl-status-btn ${statusMeta.btnClass}${isCompleted ? ' cl-status-btn--locked' : ''}`}
+              onClick={() => {
+                if (!canChangeStatus) return
+                setStatusOpen((o) => !o)
+              }}
+              disabled={!canChangeStatus}
+              aria-expanded={canChangeStatus ? statusOpen : false}
+              aria-haspopup={canChangeStatus ? 'listbox' : undefined}
+              style={isCompleted ? { cursor: 'default', opacity: 1 } : undefined}
+              title={isCompleted ? 'Completed status cannot be changed' : undefined}
             >
               <Icon name={statusMeta.icon} size={13} strokeWidth={2} />
               {statusMeta.label}
-              {(canEditStatus !== undefined ? canEditStatus : canEdit) && (
+              {canChangeStatus && (
                 <Icon name="chevronDown" size={12} strokeWidth={2.5} />
               )}
             </button>
 
-            {(canEditStatus !== undefined ? canEditStatus : canEdit) && statusOpen && statusMenuPosition && createPortal(
+            {canChangeStatus && statusOpen && statusMenuPosition && createPortal(
               <motion.div
                 ref={statusMenuRef}
                 className="cl-status-menu"
