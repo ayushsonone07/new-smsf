@@ -805,7 +805,8 @@ function CustomerRow({
   onShowValidationModal,
 }: CustomerRowProps) {
   const isCompleted = customer.status?.toLowerCase() === 'completed'
-  const canChangeStatus = (canEditStatus !== undefined ? canEditStatus : canEdit) && !isCompleted
+  const canChangeStatus =
+    (canEditStatus !== undefined ? canEditStatus : Boolean(_isDepartmentUser)) && !isCompleted
   const [statusOpen, setStatusOpen] = useState(false)
   const [statusMenuPosition, setStatusMenuPosition] = useState<{
     left: number

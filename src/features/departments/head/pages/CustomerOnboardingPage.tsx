@@ -78,7 +78,7 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const { isColumnEnabled, isColumnConfigured } =
     useDepartmentColumnPermissions('ONBOARDING_DEPARTMENT')
   const isStatusVisible = isColumnEnabled('Status')
-  const canEditStatus = columnFeatures.canEdit('Status', isDeptUser)
+  const canEditStatus = isDeptUser
 
   const isAssignToConfigured = isColumnConfigured('Assign To')
   const isAssignToVisible = isAssignToConfigured

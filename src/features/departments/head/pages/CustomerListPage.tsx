@@ -147,13 +147,20 @@ export function CustomerListPage() {
   })
 
   const role = (session?.user?.role || '').toUpperCase()
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users') ||
+    currentPath.includes('departmentuser')
+
   const isDeptUser =
     role === 'USER' ||
     role === 'DEPARTMENT_USER' ||
-    (typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/google-user') ||
-        window.location.pathname.includes('/onboarding-user') ||
-        window.location.pathname.includes('/users')))
+    Boolean((session?.user as any)?.isHead === false) ||
+    isUserPath
+
   const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
@@ -190,7 +197,7 @@ export function CustomerListPage() {
   const { isColumnEnabled } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = columnFeatures.canEdit('Status', true)
+  const canEditStatus = isDeptUser
 
   // Department users never see the Assign To column, even if it is configured.
   const isAssignToVisible =
@@ -204,7 +211,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark = columnFeatures.canEdit('Remark', true)
+  const canEditRemark = isDeptUser ? true : columnFeatures.canEdit('Remark', true)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
