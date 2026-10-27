@@ -223,6 +223,16 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         showBusiness={isBusinessVisible}
         showUpdated={false}
         onStatusChange={(id, status) => {
+          const currentCust =
+            filteredCustomers.find((c) => c.id === id) ||
+            onboardingCustomers.find((c) => c.id === id)
+          if (
+            currentCust?.status === 'completed' ||
+            (currentCust as any)?.onboardingStatus?.toLowerCase() === 'completed'
+          ) {
+            alert('Completed status cannot be changed.')
+            return
+          }
           if (status === 'completed') {
             const target =
               filteredCustomers.find((c) => c.id === id) ||

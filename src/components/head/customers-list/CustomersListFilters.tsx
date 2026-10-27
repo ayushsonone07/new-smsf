@@ -369,6 +369,248 @@ export function DateRangePicker({
  * "Completed between". Each range button opens quick presets and
  * a two-month calendar.
  */
+function AssigneeFilterDropdown({
+  assignees = [],
+  selectedAssigneeId = 'all',
+  onChange,
+}: {
+  assignees?: AssigneeOption[]
+  selectedAssigneeId?: string | null | 'all'
+  onChange?: (id: string | null | 'all') => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [open])
+
+  const selectedAssignee = assignees.find((a) => a.id === selectedAssigneeId)
+  const isFiltered = Boolean(selectedAssigneeId && selectedAssigneeId !== 'all')
+
+  let buttonLabel = 'All Users'
+  if (selectedAssignee) {
+    buttonLabel = selectedAssignee.name.split(' (')[0] || selectedAssignee.name
+  }
+
+  const filteredAssignees = assignees.filter((a) =>
+    a.name.toLowerCase().includes(search.toLowerCase()) ||
+    a.id.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="cl-assignee-filter" ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        className={`cl-range-picker__trigger${open ? ' is-open' : ''}${isFiltered ? ' has-range' : ''}`}
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          cursor: 'pointer',
+          fontSize: '13px',
+          padding: '0 14px',
+          ...(isFiltered ? { color: '#2459e0', borderColor: '#3b82f6', background: '#eff6ff' } : {}),
+        }}
+        title="Filter by assigned user"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {buttonLabel}
+          </span>
+        </div>
+
+        <svg
+          viewBox="0 0 24 24"
+          width="13"
+          height="13"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            width: '100%',
+            maxWidth: 260,
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '10px',
+            boxShadow: '0 8px 20px -4px rgba(15, 23, 42, 0.12), 0 3px 6px -2px rgba(15, 23, 42, 0.05)',
+            padding: '5px',
+            zIndex: 1000,
+          }}
+        >
+          {/* All Users option */}
+          <button
+            type="button"
+            onClick={() => {
+              onChange?.('all')
+              setOpen(false)
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 8px',
+              border: 'none',
+              borderRadius: '6px',
+              background: !isFiltered ? '#eff6ff' : 'transparent',
+              color: !isFiltered ? '#1d4ed8' : '#334155',
+              fontWeight: !isFiltered ? 600 : 500,
+              fontSize: '12px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span>All Users</span>
+            {!isFiltered && <span style={{ fontWeight: 700 }}>✓</span>}
+          </button>
+
+          {assignees.length > 0 && (
+            <>
+              <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
+
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  color: '#94a3b8',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  padding: '3px 6px',
+                }}
+              >
+                Department Users ({assignees.length})
+              </div>
+
+              {assignees.length > 4 && (
+                <div style={{ padding: '2px 4px 5px' }}>
+                  <input
+                    type="search"
+                    placeholder="Search user..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '4px 7px',
+                      fontSize: '11.5px',
+                      borderRadius: '5px',
+                      border: '1px solid #e2e8f0',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              )}
+
+              <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {filteredAssignees.length === 0 ? (
+                  <div style={{ padding: '6px', fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
+                    No users match "{search}"
+                  </div>
+                ) : (
+                  filteredAssignees.map((user) => {
+                    const isSelected = selectedAssigneeId === user.id
+                    const initial = (user.name || user.id || 'U').charAt(0).toUpperCase()
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => {
+                          onChange?.(user.id)
+                          setOpen(false)
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 6px',
+                          border: 'none',
+                          borderRadius: '6px',
+                          background: isSelected ? '#eff6ff' : 'transparent',
+                          color: isSelected ? '#1d4ed8' : '#1e293b',
+                          fontSize: '11.5px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-grid',
+                            placeItems: 'center',
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            background: isSelected ? '#3b82f6' : '#e2e8f0',
+                            color: isSelected ? '#ffffff' : '#475569',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {initial}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                          <div style={{ fontWeight: isSelected ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {user.name.split(' (')[0] || user.name}
+                          </div>
+                          {user.name.includes('(') && (
+                            <div style={{ fontSize: '10px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {user.name.match(/\((.*?)\)/)?.[1] || user.id}
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && <span style={{ color: '#1d4ed8', fontWeight: 700, fontSize: '11px' }}>✓</span>}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CustomersListFilters({
   activeTab,
   onTabChange,
@@ -383,6 +625,9 @@ export function CustomersListFilters({
   showStatusTabs = true,
   actionsSlot,
   onReset,
+  assignees = [],
+  selectedAssigneeId = 'all',
+  onAssigneeChange,
 }: CustomersListFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [localCompleted, setLocalCompleted] = useState({ from: '', to: '' })
@@ -402,8 +647,11 @@ export function CustomersListFilters({
     return tabCounts.completed
   }
 
+  const isFilteredAssignee = Boolean(selectedAssigneeId && selectedAssigneeId !== 'all')
   const activeFilterCount =
-    (dateFrom || dateTo ? 1 : 0) + (doneFrom || doneTo ? 1 : 0)
+    (dateFrom || dateTo ? 1 : 0) +
+    (doneFrom || doneTo ? 1 : 0) +
+    (isFilteredAssignee ? 1 : 0)
 
   return (
     <motion.div
@@ -454,7 +702,7 @@ export function CustomersListFilters({
           whileTap={{ scale: 0.96 }}
         >
           <Icon name="eye" d={FUNNEL_ICON} size={16} strokeWidth={2} />
-          Date filters
+          Filter
           {activeFilterCount > 0 && (
             <span className="cl-filter-badge">{activeFilterCount}</span>
           )}
@@ -472,6 +720,32 @@ export function CustomersListFilters({
           initial="hidden"
           animate="visible"
         >
+          {onAssigneeChange && (
+            <div className="cl-range">
+              <div className="cl-range__head">
+                <span className="cl-range__title">Assign to user</span>
+                {isFilteredAssignee && (
+                  <button
+                    type="button"
+                    className="cl-range__reset"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onAssigneeChange('all')
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <AssigneeFilterDropdown
+                assignees={assignees}
+                selectedAssigneeId={selectedAssigneeId}
+                onChange={onAssigneeChange}
+              />
+            </div>
+          )}
+
           <div className="cl-range">
             <div className="cl-range__head">
               <span className="cl-range__title">Created between</span>
@@ -532,10 +806,11 @@ export function CustomersListFilters({
                   e.preventDefault()
                   onDateChange('', '')
                   changeCompleted('', '')
+                  onAssigneeChange?.('all')
                   onReset?.()
                 }}
               >
-                Reset All Date Filters
+                Reset All Filters
               </button>
             </div>
           )}

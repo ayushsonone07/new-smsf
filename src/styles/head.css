@@ -1595,13 +1595,15 @@
 
 .users-table table {
   table-layout: fixed;
+  min-width: 1000px;
+  width: 100%;
 }
 
 .users-table.table-wrapper {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .users-table th {
@@ -1621,23 +1623,23 @@
 }
 
 .users-table__expand-column {
-  width: 4%;
+  width: 3%;
 }
 
 .users-table__name-column {
-  width: 22%;
-}
-
-.users-table__phone-column {
-  width: 10%;
-}
-
-.users-table__email-column {
   width: 18%;
 }
 
-.users-table__role-column {
+.users-table__phone-column {
+  width: 9%;
+}
+
+.users-table__email-column {
   width: 17%;
+}
+
+.users-table__role-column {
+  width: 16%;
 }
 
 .users-table__target-column {
@@ -1649,11 +1651,11 @@
 }
 
 .users-table__attendance-column {
-  width: 9%;
+  width: 11.5%;
 }
 
 .users-table__actions-column {
-  width: 7%;
+  width: 12.5%;
 }
 
 .users-table .is-right {
@@ -1766,7 +1768,7 @@
 }
 
 .users-table__email {
-  max-width: 190px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1779,7 +1781,9 @@
 }
 
 .role-pill {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
   max-width: 100%;
   overflow: hidden;
   font-size: 12px;
@@ -1815,7 +1819,9 @@
 
 .users-table__actions {
   display: inline-flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .icon-action {
@@ -2105,11 +2111,11 @@
    table rules so the list remains contained within the viewport. */
 @media (max-width: 768px) {
   .users-table.table-wrapper {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
 
   .users-table table,
   .users-table tbody {
