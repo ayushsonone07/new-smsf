@@ -35,6 +35,11 @@ export function extractScreenSlug(str: string): string {
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1] || ''
 
+  // Portal dashboard URL: "/onboarding-head", "/sales-user"
+  if (parts.length === 1 && /^\/+[a-z0-9_]+-(head|user)$/.test(str.toLowerCase().trim())) {
+    return 'dashboard'
+  }
+
   const cleanLast = last.replace(/[\s_]+/g, '-')
   if (
     cleanLast === 'users' ||

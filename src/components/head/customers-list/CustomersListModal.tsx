@@ -318,7 +318,7 @@ export function CustomersListModal({
     (!isSuperAdmin && !['USER', 'DEPARTMENT_USER', 'CUSTOMER'].includes(sessionUserRole)) ||
     (typeof window !== 'undefined' && (
       window.location.pathname.includes('/head') ||
-      window.location.pathname.startsWith('/onboarding-dashboard-head') ||
+      /^\/[a-z0-9_]+-head(\/|$)/i.test(window.location.pathname) ||
       window.location.pathname.startsWith('/google-head')
     ))
   )
