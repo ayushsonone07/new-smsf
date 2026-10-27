@@ -38,7 +38,7 @@ export function CreateColumnModal({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!selectedDept || !columnName.trim()) return
+    if (!selectedDept || !selectedRouteId || !columnName.trim()) return
 
     setSuccessMessage(null)
     createColumnMutation.mutate(
@@ -136,15 +136,16 @@ export function CreateColumnModal({
           </span>
         </div>
 
-        {/* Target Route Selection (UUID stored in routes_type) */}
+        {/* Target Route Selection (column belongs to exactly one route: route_id) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-color, #334155)' }}>
-            Target Route (Stored in routes_type as Route UUID)
+            Target Route
           </label>
           <select
             value={selectedRouteId}
             onChange={(e) => setSelectedRouteId(e.target.value)}
             disabled={routesQuery.isLoading || createColumnMutation.isPending}
+            required
             style={{
               padding: '0.625rem 0.75rem',
               borderRadius: '8px',
@@ -155,7 +156,7 @@ export function CreateColumnModal({
               cursor: 'pointer',
             }}
           >
-            <option value="">-- Global / No Specific Route --</option>
+            <option value="" disabled>-- Select a route --</option>
             {routes.map((r) => (
               <option key={r.routeId} value={r.routeId}>
                 {r.routeName} (UUID: {r.routeId.length > 8 ? `${r.routeId.slice(0, 8)}...` : r.routeId})
@@ -163,7 +164,7 @@ export function CreateColumnModal({
             ))}
           </select>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Select the route where this column belongs. Its UUID will be saved in <code>routes_type</code>.
+            Every column belongs to exactly one route. To show the same column on another screen, create it again on that route.
           </span>
         </div>
 

@@ -203,8 +203,11 @@ export interface NormalizedRouteResult {
 /**
  * Smart URL Parser & Route Normalizer.
  * Takes any browser URL (e.g. http://localhost:5173/onboarding-dashboard-head-meeting,
- * /onboarding-dashboard-head, /head/meeting, etc.) and auto-converts it into the
- * clean standard DB format: /{departmentSlug}/{role}/{screenSlug}.
+ * /onboarding/head/meeting, /head/meeting, etc.) and auto-converts it into the
+ * standard DB route name: {departmentSlug}/{screenSlug}.
+ * The role is not part of the route name — one route serves both Head and User;
+ * the role only appears in the browser URL (see buildDepartmentRoute).
+ * `role` in the result is the role found in a pasted URL, for display only.
  */
 export function normalizeInputRoute(
   rawInput: string,
@@ -243,25 +246,22 @@ export function normalizeInputRoute(
 
   const deptSlug = normalizeDepartmentSlug(departmentType) || 'onboarding_department'
 
-  // If user already wrote standard format: e.g. "onboarding_department/head/meeting"
-  const standardPrefixHead = `${deptSlug}/head/`
-  const standardPrefixUser = `${deptSlug}/user/`
-  if (cleaned.startsWith(standardPrefixHead) || cleaned.startsWith(standardPrefixUser)) {
-    const isUser = cleaned.startsWith(standardPrefixUser)
-    const slug = cleaned.replace(isUser ? standardPrefixUser : standardPrefixHead, '')
+  // Already in standard format: e.g. "onboarding/meeting"
+  const standardSegments = cleaned.split('/')
+  if (standardSegments.length === 2 && standardSegments[0] === deptSlug) {
     return {
-      normalized: `/${cleaned}`,
-      wasAutoConverted: rawInput.trim() !== `/${cleaned}`,
+      normalized: cleaned,
+      wasAutoConverted: rawInput.trim() !== cleaned,
       originalCleaned: cleaned,
-      screenSlug: slug,
-      role: isUser ? 'user' : 'head',
+      screenSlug: standardSegments[1],
+      role: 'head',
     }
   }
 
   // 4. Handle legacy onboarding URLs like "onboarding-dashboard-head-meeting", "onboarding-dashboard-head", etc.
   const lower = cleaned.toLowerCase()
   let role: 'head' | 'user' = 'head'
-  let screenSlug = ''
+  let screenSlug: string
 
   if (
     lower.includes('departmentuser') ||
@@ -306,6 +306,9 @@ export function normalizeInputRoute(
     }
   }
 
+  // Same slug rule as the backend (DynamicPermissionService.buildRouteName): "Customer List" -> "customer-list"
+  screenSlug = screenSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
   // Normalize screenSlug aliases
   if (screenSlug === 'customer-list') {
     screenSlug = 'customers'
@@ -321,7 +324,7 @@ export function normalizeInputRoute(
     screenSlug = 'meeting'
   }
 
-  const result = `/${deptSlug}/${role}/${screenSlug}`
+  const result = `${deptSlug}/${screenSlug}`
   const wasConverted = rawInput.trim() !== result
 
   return {
