@@ -175,7 +175,6 @@ export function CustomerListPage() {
   const [roundRobinError, setRoundRobinError] = useState<string | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
-<<<<<<< HEAD
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
   const isUserPath =
     currentPath.includes('departmentuser') ||
@@ -192,8 +191,6 @@ export function CustomerListPage() {
     isUserPath
 
   const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
-=======
->>>>>>> 85b65e57a6885c87de759426e59500b8a4d21b03
 
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
