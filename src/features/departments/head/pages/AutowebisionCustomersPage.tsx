@@ -56,7 +56,6 @@ import {
   updateAutowebisionStatus,
   updateWebsiteExistsStatus,
   fetchAutowebsionSummaryCounts,
-  fetchAutowebsionUsers,
   fetchMeetingsAssigningList,
   fetchAutomationCount,
   type AutowebsionCustomerLightDTO,
@@ -419,15 +418,6 @@ export function AutowebisionCustomersPage({
     staleTime: 20_000,
   })
 
-  // 3. Exact Assignable Users: GET /api/autowebision/users?page=0&size=100
-  // Do NOT hit when logged in as department user (Assign is only for Head)
-  const autowebUsersQuery = useQuery({
-    queryKey: ['autowebisionUsers100'],
-    queryFn: () => fetchAutowebsionUsers(0, 100),
-    enabled: !isDepartmentUser,
-    staleTime: 60_000,
-  })
-
   // 4. Exact Assignable List: GET /api/meetings/users/assigning-list?departmentType=AUTOWEBSION_DEPARTMENT
   // Do NOT hit when logged in as department user (Assign is only for Head)
   const meetingsAssignQuery = useQuery({
@@ -445,18 +435,6 @@ export function AutowebisionCustomersPage({
     if (isDepartmentUser) return []
     const list: Array<{ id: string; name: string }> = []
     const seen = new Set<string>()
-
-    const raw1 = autowebUsersQuery.data?.data || []
-    for (const u of raw1) {
-      const email = u.email || u.username
-      if (email && !seen.has(email)) {
-        seen.add(email)
-        list.push({
-          id: email,
-          name: u.username ? `${u.username} (${email})` : email,
-        })
-      }
-    }
 
     const raw2 = Array.isArray(meetingsAssignQuery.data)
       ? meetingsAssignQuery.data
@@ -485,7 +463,7 @@ export function AutowebisionCustomersPage({
     }
 
     return list
-  }, [isDepartmentUser, autowebUsersQuery.data, meetingsAssignQuery.data, assigningUsersQuery.data])
+  }, [isDepartmentUser, meetingsAssignQuery.data, assigningUsersQuery.data])
 
   const filteredAssignees = useMemo(() => {
     if (!assignSearchQuery.trim()) return assignees
