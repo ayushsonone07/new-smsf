@@ -106,6 +106,8 @@ export function CustomerListPage() {
     useState<string | null | 'all'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [completedFrom, setCompletedFrom] = useState('')
+  const [completedTo, setCompletedTo] = useState('')
   const [selectedCustomer, setSelectedCustomer] =
     useState<OnboardingCustomer | null>(null)
   const [modalTab, setModalTab] = useState<any>(undefined)
@@ -184,6 +186,24 @@ export function CustomerListPage() {
 
   const canEdit = columnFeatures.canEdit('actions')
 
+  const role = (session?.user?.role || '').toUpperCase()
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('departmentuser') ||
+    currentPath.includes('/google-user') ||
+    currentPath.includes('/onboarding-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users')
+
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (session?.user as any)?.isHead === false ||
+    isUserPath
+
+  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
+
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
     : 'customers'
@@ -204,7 +224,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark = columnFeatures.canEdit('Remark', true)
+  const canEditRemark = isDeptUser ? true : columnFeatures.canEdit('Remark', true)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
@@ -276,6 +296,8 @@ export function CustomerListPage() {
     setSelectedAssigneeId('all')
     setDateFrom('')
     setDateTo('')
+    setCompletedFrom('')
+    setCompletedTo('')
     setPage(0)
   }
 
@@ -297,6 +319,8 @@ export function CustomerListPage() {
     searchParam: search || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
+    completionStartDate: completedFrom || undefined,
+    completionEndDate: completedTo || undefined,
     status:
       activeTab === 'all'
         ? undefined
@@ -912,6 +936,13 @@ export function CustomerListPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
         onDateChange={handleDateChange}
+        completedFrom={completedFrom}
+        completedTo={completedTo}
+        onCompletedChange={(from, to) => {
+          setCompletedFrom(from)
+          setCompletedTo(to)
+          setPage(0)
+        }}
         onReset={handleResetFilters}
       />
 
@@ -996,7 +1027,7 @@ export function CustomerListPage() {
         assignees={assignees}
         showStatus={isStatusVisible}
         showAssignTo={isAssignToVisible}
-        canEditRemark={canEditRemark}
+        canEditRemark={!isHead && (isDeptUser || canEditRemark)}
         departmentType={currentDepartment}
         initialTab={modalTab}
         onClose={() => {
