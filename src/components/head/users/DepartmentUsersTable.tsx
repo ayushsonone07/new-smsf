@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, type Variants } from 'framer-motion'
 import { Avatar } from '../shared/Avatar'
 import { RolePill } from './RolePill'
@@ -173,7 +174,7 @@ export function DepartmentUsersTable({
             {visible('email') ? <th className="users-table__email-column">Email</th> : null}
             {visible('role') ? <th className="users-table__role-column">Role</th> : null}
             {visible('target') ? (
-              <th className="is-right users-table__target-column">Target</th>
+              <th className="is-center users-table__target-column">Target</th>
             ) : null}
             {visible('achieved') ? (
               <th className="is-center users-table__achieved-column">Achieved</th>
@@ -185,7 +186,7 @@ export function DepartmentUsersTable({
               <th key={column.key}>{column.label}</th>
             ))}
             {showActions ? (
-              <th className="is-right users-table__actions-head users-table__actions-column">
+              <th className="is-center users-table__actions-head users-table__actions-column">
                 Actions
               </th>
             ) : null}
@@ -335,6 +336,108 @@ export function DepartmentUsersTable({
   )
 }
 
+interface WhiteTooltipProps {
+  text: string
+  children: ReactNode
+  className?: string
+}
+
+function WhiteTooltip({ text, children, className }: WhiteTooltipProps) {
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; placeBelow: boolean } | null>(null)
+  const triggerRef = useRef<HTMLSpanElement>(null)
+
+  const showTooltip = () => {
+    if (!triggerRef.current || !text) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const placeBelow = rect.top < 45
+    setPos({
+      top: placeBelow ? rect.bottom + 6 : rect.top - 6,
+      left: Math.max(20, Math.min(window.innerWidth - 20, rect.left + rect.width / 2)),
+      placeBelow,
+    })
+    setVisible(true)
+  }
+
+  const hideTooltip = () => {
+    setVisible(false)
+  }
+
+  useEffect(() => {
+    if (!visible) return
+    const handleScrollOrResize = () => setVisible(false)
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true })
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [visible])
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        className={className}
+        style={{ display: 'block', minWidth: 0, maxWidth: '100%', cursor: 'default' }}
+      >
+        {children}
+      </span>
+      {visible && pos && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: pos.placeBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            border: '1px solid #cbd5e1',
+            borderRadius: '6px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            fontWeight: 600,
+            lineHeight: 1.3,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 16px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.06)',
+            zIndex: 999999,
+            pointerEvents: 'none',
+          }}
+        >
+          {text}
+          <div
+            style={{
+              position: 'absolute',
+              ...(pos.placeBelow
+                ? {
+                    bottom: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderBottom: '5px solid #cbd5e1',
+                  }
+                : {
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderTop: '5px solid #cbd5e1',
+                  }),
+              width: 0,
+              height: 0,
+            }}
+          />
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
 interface UserRowProps {
   user: DepartmentUser
   expanded: boolean
@@ -400,7 +503,9 @@ function UserRow({
               <Avatar name={user.name} src={user.avatarSrc} />
 
               <div className="user-cell__text">
-                <strong title={user.name}>{user.name}</strong>
+                <WhiteTooltip text={user.name}>
+                  <strong>{user.name}</strong>
+                </WhiteTooltip>
                 <span>Joined {user.joinedLabel}</span>
               </div>
 
@@ -432,8 +537,10 @@ function UserRow({
         ) : null}
 
         {visible('email') ? (
-          <td className="users-table__email users-table__email-column" data-label="Email" title={user.email}>
-            {user.email}
+          <td className="users-table__email users-table__email-column" data-label="Email">
+            <WhiteTooltip text={user.email}>
+              <span>{user.email}</span>
+            </WhiteTooltip>
           </td>
         ) : null}
 
@@ -444,7 +551,7 @@ function UserRow({
         ) : null}
 
         {visible('target') ? (
-          <td className="is-right users-table__target users-table__target-column" data-label="Target">
+          <td className="is-center users-table__target users-table__target-column" data-label="Target">
             {user.target}
           </td>
         ) : null}
@@ -477,7 +584,7 @@ function UserRow({
         })}
 
         {showActions ? (
-          <td className="is-right users-table__actions-column" data-label="Actions">
+          <td className="is-center users-table__actions-column" data-label="Actions">
             <div className="users-table__actions">
               {onView ? (
                 <button
