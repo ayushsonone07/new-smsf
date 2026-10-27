@@ -54,13 +54,20 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
 
   const role = (getSession()?.user.role || '').toUpperCase()
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('departmentuser') ||
+    currentPath.includes('/google-user') ||
+    currentPath.includes('/onboarding-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users')
+
   const isDeptUser =
     role === 'USER' ||
     role === 'DEPARTMENT_USER' ||
-    (typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/google-user') ||
-        window.location.pathname.includes('/onboarding-user') ||
-        window.location.pathname.includes('/users')))
+    (getSession()?.user as any)?.isHead === false ||
+    isUserPath
 
   const screenPermission = isDeptUser
     ? feature.roleBPermission
