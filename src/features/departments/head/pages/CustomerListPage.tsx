@@ -149,14 +149,6 @@ export function CustomerListPage() {
   })
 
   const role = (session?.user?.role || '').toUpperCase()
-  const isDeptUser =
-    role === 'USER' ||
-    role === 'DEPARTMENT_USER' ||
-    (typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/google-user') ||
-        window.location.pathname.includes('/onboarding-user') ||
-        window.location.pathname.includes('/users')))
-  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
   // fetched on demand (and cached) only when a status is set to Completed.
@@ -185,8 +177,6 @@ export function CustomerListPage() {
   const [roundRobinError, setRoundRobinError] = useState<string | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
-
-  const role = (session?.user?.role || '').toUpperCase()
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
   const isUserPath =
     currentPath.includes('departmentuser') ||
