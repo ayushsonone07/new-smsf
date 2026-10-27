@@ -348,6 +348,20 @@ export async function getCustomerServiceRows(
   return rows
 }
 
+/**
+ * `GET /api/auth/department/customer/{customerId}/services` — new-smsf drawer only.
+ * Loads this one customer's service row by id (scoped to the logged-in user by the
+ * backend) instead of searching the department rows by phone number.
+ */
+export async function getCustomerServiceRowById(
+  customerId: number,
+): Promise<CustomerServiceRow[]> {
+  const response = await authedApiRequest<ApiEnvelope<CustomerServiceRow>>(
+    `/api/auth/department/customer/${customerId}/services`,
+  )
+  return response.data ? [response.data] : []
+}
+
 export async function addClientRemark(
   customerId: number | string,
   remark: string,

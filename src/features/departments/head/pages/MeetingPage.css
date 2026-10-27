@@ -49,6 +49,25 @@
   max-width: 440px;
 }
 
+.history-toolbar .meeting-search-wrap {
+  max-width: none;
+}
+
+.history-toolbar .cl-assign-btn {
+  height: 38px;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+  padding: 0 12px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-toolbar .cl-assign-name {
+  max-width: 220px;
+}
+
 .meeting-search-wrap .head-search {
   height: 38px;
   border-radius: 8px;

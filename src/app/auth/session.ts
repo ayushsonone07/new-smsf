@@ -188,6 +188,42 @@ export function restoreAdminSession(): boolean {
   return true
 }
 
+/** Shows feedback in a synchronously opened tab while login-as is pending. */
+export function prepareLoginWindow(targetWin: Window | null): void {
+  if (!targetWin) return
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Logging in...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: Arial, sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; background:#f4f6fb; color:#0f172a; }
+      .container { text-align:center; padding:40px; background:#fff; border:1px solid #e6e9f0; border-radius:12px; box-shadow:0 8px 24px rgba(15,23,42,.08); width:min(360px,80vw); }
+      .spinner { width:40px; height:40px; margin:20px auto; border:4px solid #dbe4ff; border-top-color:#2459e0; border-radius:50%; animation:spin .8s linear infinite; }
+      h2 { margin:0; font-size:20px; }
+      p { margin:0; color:#64748b; font-size:14px; }
+      @keyframes spin { to { transform:rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h2>Logging you in...</h2>
+      <div class="spinner" aria-label="Loading"></div>
+      <p>Please wait while we prepare the account.</p>
+    </main>
+  </body>
+</html>`
+
+  try {
+    targetWin.document.open()
+    targetWin.document.write(htmlContent)
+    targetWin.document.close()
+  } catch {
+    // The final session hand-off will still navigate this window.
+  }
+}
+
 /**
  * Opens a session in a new browser tab with its own isolated sessionStorage,
  * leaving the current tab's session completely intact (just like in SMSF).
@@ -216,7 +252,11 @@ export function openSessionInNewTab(
   }
 
   const sessionJson = JSON.stringify(session)
-  const backupJson = backupSession ? JSON.stringify(backupSession) : null
+  const tokenVal = session.token || ''
+  const roleVal = session.user.role || 'USER'
+  const deptVal = session.user.departmentType || ''
+  const phoneVal = session.user.phoneNumber || ''
+  const backupJson = backupSession ? JSON.stringify(backupSession) : ''
 
   const htmlContent = `<!DOCTYPE html>
 <html>
@@ -263,11 +303,16 @@ export function openSessionInNewTab(
     <script>
       try {
         sessionStorage.setItem('smsf.auth.session', ${JSON.stringify(sessionJson)});
-        sessionStorage.setItem('token', ${JSON.stringify(session.token)});
-        sessionStorage.setItem('role', ${JSON.stringify(session.user.role)});
-        ${session.user.departmentType ? `sessionStorage.setItem('departmentType', ${JSON.stringify(session.user.departmentType)});` : ''}
-        ${session.user.phoneNumber ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(session.user.phoneNumber)});` : ''}
-        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});` : ''}
+        sessionStorage.setItem('token', ${JSON.stringify(tokenVal)});
+        sessionStorage.setItem('role', ${JSON.stringify(roleVal)});
+        ${deptVal ? `sessionStorage.setItem('departmentType', ${JSON.stringify(deptVal)});`: ''}
+        ${phoneVal ? `sessionStorage.setItem('phoneNumber', ${JSON.stringify(phoneVal)});`: ''}
+        ${backupJson ? `sessionStorage.setItem('smsf.auth.admin-backup', ${JSON.stringify(backupJson)});`: ''}
+        try {
+          localStorage.removeItem('smsf.auth.session');
+          localStorage.removeItem('smsf.auth.admin-backup');
+          localStorage.removeItem('token');
+        } catch (_) {}
         window.location.replace('${targetRoute}');
       } catch (e) {
         console.error('Failed to set session in sessionStorage', e);
@@ -292,7 +337,7 @@ export type HomeRoute =
   | '/users'
   | '/customers'
   | '/forbidden'
-  | '/onboarding'
+  | '/onboarding-head'
   | '/onboarding-user'
   | '/google-head'
   | '/google-user'
@@ -311,7 +356,7 @@ export function homeForRole(
     if (role === 'USER') {
       return '/onboarding-user'
     }
-    return '/onboarding'
+    return '/onboarding-head'
   }
 
   if (dept.includes('GOOGLE')) {
@@ -325,7 +370,8 @@ export function homeForRole(
     const slug = normalizeDepartmentSlug(dept)
     if (slug && slug !== 'head' && slug !== 'users' && slug !== 'department') {
       const roleSegment = role === 'USER' ? 'user' : 'head'
-      return `/${slug}/${roleSegment}/dashboard` as HomeRoute
+      // Same URL standard as routeUtils.buildDepartmentRoute: /{dept}-head | /{dept}-user
+      return `/${slug}-${roleSegment}` as HomeRoute
     }
   }
 

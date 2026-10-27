@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { getSession } from '../../../../app/auth/session'
 import { useTaskHistory } from '../../hooks/useTaskHistory'
-import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import { getStatusHistory, type StatusHistoryItem } from '../../../../api/status-history.api'
 import { fetchUsersByDepartmentType } from '../../../../api/autowebsion.api'
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
@@ -146,38 +146,39 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
     staleTime: 30_000,
   })
 
-  const deptUsersQuery = useDepartmentUsersList(
-    {
-      page: 0,
-      size: 1000,
-    },
-    { enabled: isHead && !isAutowebsionDept },
-  )
+  const assigningUsersQuery = useAssigningUsers(currentDepartment, {
+    enabled: isHead && !isAutowebsionDept,
+  })
 
   const departmentUsers = useMemo<OnboardingAssignee[]>(() => {
-    const source = isAutowebsionDept
-      ? (autowebUsersQuery.data?.data ?? autowebUsersQuery.data)
-      : deptUsersQuery.data?.data
-    const list: Array<{ email?: string; username?: string }> = Array.isArray(
-      source,
-    )
-      ? source
-      : Array.isArray(source?.data)
-        ? source.data
-        : []
+    if (isAutowebsionDept) {
+      const source = autowebUsersQuery.data?.data ?? autowebUsersQuery.data
+      const list: Array<{ email?: string; username?: string }> = Array.isArray(source)
+        ? source
+        : Array.isArray(source?.data)
+          ? source.data
+          : []
+      return list
+        .filter((user) => Boolean(user.email))
+        .map((user) => ({
+          id: user.email as string,
+          name: user.username
+            ? `${user.username} (${user.email})`
+            : (user.email as string),
+        }))
+    }
+    const list = assigningUsersQuery.data ?? []
     return list
       .filter((user) => Boolean(user.email))
       .map((user) => ({
-        id: user.email as string,
-        name: user.username
-          ? `${user.username} (${user.email})`
-          : (user.email as string),
+        id: user.email,
+        name: user.username ? `${user.username} (${user.email})` : user.email,
       }))
-  }, [isAutowebsionDept, autowebUsersQuery.data, deptUsersQuery.data])
+  }, [isAutowebsionDept, autowebUsersQuery.data, assigningUsersQuery.data])
 
   const usersLoading = isAutowebsionDept
     ? autowebUsersQuery.isPending
-    : deptUsersQuery.isPending
+    : assigningUsersQuery.isPending
 
   const departmentUserFilter = isHead
     ? (selectedUser || undefined)
@@ -331,20 +332,61 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
         </button>
       </motion.div>
 
-      {/* ── Toolbar: Search, User Selector & Refresh ── */}
-      <motion.div className="history-toolbar" variants={sectionVariants}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-          <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 220 }}>
+      {/* ── Toolbar: All Filters in One Line (Status Tabs, Search & User Selector) ── */}
+      <motion.div className="history-toolbar" variants={sectionVariants} style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+          {/* Status Tabs Filter */}
+          {activeView === 'task-history' && (
+            <div style={{ display: 'inline-flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+              {(
+                [
+                  { key: 'all', label: 'All Tasks' },
+                  { key: 'ACTIVE', label: 'Active' },
+                  { key: 'PENDING', label: 'Pending' },
+                  { key: 'IN_PROGRESS', label: 'In Progress' },
+                  { key: 'COMPLETED', label: 'Completed' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => handleStatusTab(tab.key)}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 20,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: '1px solid',
+                    borderColor: statusFilter === tab.key ? '#2563eb' : '#e2e8f0',
+                    background: statusFilter === tab.key ? '#2563eb' : '#ffffff',
+                    color: statusFilter === tab.key ? '#ffffff' : '#475569',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="meeting-search-wrap" style={{ flex: 1, minWidth: 200 }}>
             <SearchBar
               value={search}
               onChange={handleSearchChange}
-              placeholder={activeView === 'task-history' ? 'Search by customer name or phone' : 'Search by customer or lead name'}
+              placeholder={
+                activeView === 'task-history'
+                  ? 'Search by customer name or phone'
+                  : 'Search by customer or lead name'
+              }
             />
           </div>
 
           {/* Searchable, paginated department-user filter for heads. */}
           {isHead && activeView === 'task-history' && (
-            <div style={{ width: 320, maxWidth: '100%' }}>
+            <div style={{ width: 260, maxWidth: '100%', flexShrink: 0 }}>
               <AssigneeDropdown
                 assigneeId={selectedUser || null}
                 assignees={departmentUsers}
@@ -360,46 +402,11 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
             </div>
           )}
         </div>
-
       </motion.div>
 
       {/* ── Task History View ── */}
       {activeView === 'task-history' && (
         <>
-          {/* Status Tabs Filter */}
-          <motion.div variants={sectionVariants} style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(
-                [
-                  { key: 'all', label: 'All Tasks' },
-                  { key: 'ACTIVE', label: 'Active' },
-                  { key: 'PENDING', label: 'Pending' },
-                  { key: 'IN_PROGRESS', label: 'In Progress' },
-                  { key: 'COMPLETED', label: 'Completed' },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => handleStatusTab(tab.key)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 20,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    border: '1px solid',
-                    borderColor: statusFilter === tab.key ? '#2563eb' : '#e2e8f0',
-                    background: statusFilter === tab.key ? '#2563eb' : '#ffffff',
-                    color: statusFilter === tab.key ? '#ffffff' : '#475569',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
 
           {/* Table */}
           <motion.div variants={sectionVariants}>

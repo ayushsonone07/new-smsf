@@ -4,6 +4,7 @@ import {
   createRoute,
   createRouter,
   Outlet,
+  redirect,
 } from '@tanstack/react-router'
 import { lazy, Suspense } from 'react'
 
@@ -20,6 +21,10 @@ import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
+import {
+  legacyToStandardPath,
+  resolvePortalRoleFromPath,
+} from '../features/departments/head/utils/routeUtils'
 import { AvailableSoonPage } from '../features/departments/head/pages/AvailableSoonPage'
 
 // Route screens are deliberately split from the startup bundle. Several of the
@@ -587,267 +592,78 @@ const departmentServicesRoute = createRoute({
   component: DepartmentServicesPage,
 })
 
-const onboardingLayoutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: '_onboarding',
-  component: () => {
-    const session = getSession()
-    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
-    return <HeadConsoleLayout portalRole={portalRole} />
-  },
-  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
-})
+/**
+ * Department portals — one URL standard for every department
+ * (see routeUtils.buildDepartmentRoute):
+ *   /{dept}-head[/{screen}]   e.g. /onboarding-head/meeting, /google-head/users
+ *   /{dept}-user[/{screen}]   e.g. /onboarding-user/customers, /google-user/history
+ * Screens are resolved dynamically from the admin-managed routes, so new
+ * routes need no change here. Old URLs (/onboarding-dashboard-head-meeting,
+ * /sales/head/leads, ...) redirect to the standard form.
+ */
+const redirectLegacyPortalPath = ({ location }: { location: { pathname: string } }) => {
+  const target = legacyToStandardPath(location.pathname)
+  if (target && target !== location.pathname) {
+    throw redirect({ to: target as never, replace: true })
+  }
+}
 
-const onboardingIndexRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding',
-  component: () => {
-    const session = getSession()
-    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
-    return <HeadIndexPage portalRole={portalRole} />
-  },
-})
+function portalLayoutRoute(id: string, portalRole: 'HEAD' | 'USER') {
+  return createRoute({
+    getParentRoute: () => rootRoute,
+    id,
+    component: () => <HeadConsoleLayout portalRole={portalRole} />,
+    beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+  })
+}
 
-const onboardingHeadDashboardRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head',
+const onboardingHeadLayoutRoute = portalLayoutRoute('_onboarding_head', 'HEAD')
+
+const onboardingHeadIndexRoute = createRoute({
+  getParentRoute: () => onboardingHeadLayoutRoute,
+  path: '/onboarding-head',
   component: () => <HeadScreenPage screenOverride="dashboard" />,
 })
 
-const onboardingUserRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
+const onboardingHeadScreenRoute = createRoute({
+  getParentRoute: () => onboardingHeadLayoutRoute,
+  path: '/onboarding-head/$screen',
+  component: HeadScreenPage,
+})
+
+const onboardingUserLayoutRoute = portalLayoutRoute('_onboarding_user', 'USER')
+
+const onboardingUserIndexRoute = createRoute({
+  getParentRoute: () => onboardingUserLayoutRoute,
   path: '/onboarding-user',
   component: () => <HeadScreenPage screenOverride="dashboard" />,
 })
 
-const onboardingUserDashboardRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
-})
-
-const onboardingHeadCustomersRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-customers',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const onboardingUserCustomersRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-customers',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const onboardingHeadCustomerListRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-customer-list',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const onboardingUserCustomerListRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-customer-list',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const onboardingHeadUsersRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-users',
-  component: () => <HeadScreenPage screenOverride="users" />,
-})
-
-const onboardingUserUsersRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-users',
-  component: () => <HeadScreenPage screenOverride="users" />,
-})
-
-const onboardingHeadMeetingRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-meeting',
-  component: () => <HeadScreenPage screenOverride="meeting" />,
-})
-
-const onboardingUserMeetingRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-meeting',
-  component: () => <HeadScreenPage screenOverride="meeting" />,
-})
-
-const onboardingHeadSopRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-sop',
-  component: () => <HeadScreenPage screenOverride="sop" />,
-})
-
-const onboardingUserSopRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-sop',
-  component: () => <HeadScreenPage screenOverride="sop" />,
-})
-
-const onboardingHeadAttendanceRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-attendance',
-  component: () => <HeadScreenPage screenOverride="attendance" />,
-})
-
-const onboardingUserAttendanceRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-attendance',
-  component: () => <HeadScreenPage screenOverride="attendance" />,
-})
-
-const onboardingHeadHelpCenterRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-help-center',
-  component: () => <HeadScreenPage screenOverride="help-center" />,
-})
-
-const onboardingUserHelpCenterRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-help-center',
-  component: () => <HeadScreenPage screenOverride="help-center" />,
-})
-
-const onboardingHeadHistoryRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-history',
-  component: () => <HeadScreenPage screenOverride="history" />,
-})
-
-const onboardingUserHistoryRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-history',
-  component: () => <HeadScreenPage screenOverride="history" />,
-})
-
-
-const onboardingHeadAirtelCallsRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-airtel-calls',
-  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
-})
-
-const onboardingUserAirtelCallsRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-airtel-calls',
-  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
-})
-
-const onboardingHeadManageServicesRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-manage-services',
-  component: () => <HeadScreenPage screenOverride="manage-services" />,
-})
-
-const onboardingHeadLeadsRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-leads',
-  component: () => <HeadScreenPage screenOverride="leads" />,
-})
-
-const onboardingUserLeadsRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-leads',
-  component: () => <HeadScreenPage screenOverride="leads" />,
-})
-
-const onboardingUserManageServicesRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-manage-services',
-  component: () => <HeadScreenPage screenOverride="manage-services" />,
-})
-
-const onboardingHeadSalaryManagementRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-salary-management',
-  component: () => <HeadScreenPage screenOverride="salary-management" />,
-})
-
-const onboardingUserSalaryManagementRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding-dashboard-head-departmentUser-salary-management',
-  component: () => <HeadScreenPage screenOverride="salary-management" />,
-})
-
-const onboardingDynamicScreenRoute = createRoute({
-  getParentRoute: () => onboardingLayoutRoute,
-  path: '/onboarding/$screen',
+const onboardingUserScreenRoute = createRoute({
+  getParentRoute: () => onboardingUserLayoutRoute,
+  path: '/onboarding-user/$screen',
   component: HeadScreenPage,
 })
 
-const googleLayoutRoute = createRoute({
+/** Old onboarding URLs: /onboarding and /onboarding/{screen} -> /onboarding-head[/{screen}]. */
+const onboardingLegacyIndexRoute = createRoute({
   getParentRoute: () => rootRoute,
-  id: '_google',
-  component: () => <HeadConsoleLayout portalRole="HEAD" />,
-  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+  path: '/onboarding',
+  beforeLoad: redirectLegacyPortalPath,
 })
+
+const onboardingLegacyScreenRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/onboarding/$screen',
+  beforeLoad: redirectLegacyPortalPath,
+})
+
+const googleLayoutRoute = portalLayoutRoute('_google', 'HEAD')
 
 const googleHeadIndexRoute = createRoute({
   getParentRoute: () => googleLayoutRoute,
   path: '/google-head',
   component: () => <HeadScreenPage screenOverride="dashboard" />,
-})
-
-const googleHeadDashboardRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/dashboard',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
-})
-
-const googleHeadUsersRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/users',
-  component: () => <HeadScreenPage screenOverride="users" />,
-})
-
-const googleHeadCustomersRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/customers',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const googleHeadCustomerListRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/customer-list',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const googleHeadHistoryRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/history',
-  component: () => <HeadScreenPage screenOverride="history" />,
-})
-
-const googleHeadAnalyticsRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/analytics',
-  component: () => <HeadScreenPage screenOverride="analytics" />,
-})
-
-const googleHeadServiceFlowRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/service-flow',
-  component: () => <HeadScreenPage screenOverride="service-flow" />,
-})
-
-const googleHeadMemberFlowRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/member-flow',
-  component: () => <HeadScreenPage screenOverride="member-flow" />,
-})
-
-const googleHeadHelpSupportRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/help-support',
-  component: () => <HeadScreenPage screenOverride="help-support" />,
-})
-
-const googleHeadHelpCenterRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/help-center',
-  component: () => <HeadScreenPage screenOverride="help-support" />,
 })
 
 const googleHeadDynamicScreenRoute = createRoute({
@@ -856,95 +672,12 @@ const googleHeadDynamicScreenRoute = createRoute({
   component: HeadScreenPage,
 })
 
-const googleUserLayoutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: '_google_user',
-  component: () => <HeadConsoleLayout portalRole="USER" />,
-  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
-})
+const googleUserLayoutRoute = portalLayoutRoute('_google_user', 'USER')
 
 const googleUserIndexRoute = createRoute({
   getParentRoute: () => googleUserLayoutRoute,
   path: '/google-user',
   component: () => <HeadScreenPage screenOverride="dashboard" />,
-})
-
-const googleUserDashboardRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/dashboard',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
-})
-
-const googleUserAttendanceRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/attendance',
-  component: () => <HeadScreenPage screenOverride="attendance" />,
-})
-
-const googleUserCustomersRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/customers',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const googleUserCustomerListRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/customer-list',
-  component: () => <HeadScreenPage screenOverride="customers" />,
-})
-
-const googleUserHistoryRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/history',
-  component: () => <HeadScreenPage screenOverride="history" />,
-})
-
-const googleUserHelpSupportRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/help-support',
-  component: () => <HeadScreenPage screenOverride="help-support" />,
-})
-
-const googleUserHelpCenterRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/help-center',
-  component: () => <HeadScreenPage screenOverride="help-support" />,
-})
-
-const googleHeadAirtelCallsRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/airtel-calls',
-  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
-})
-
-const googleHeadManageServicesRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/manage-services',
-  component: () => <HeadScreenPage screenOverride="manage-services" />,
-})
-
-const googleHeadSalaryManagementRoute = createRoute({
-  getParentRoute: () => googleLayoutRoute,
-  path: '/google-head/salary-management',
-  component: () => <HeadScreenPage screenOverride="salary-management" />,
-})
-
-const googleUserAirtelCallsRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/airtel-calls',
-  component: () => <HeadScreenPage screenOverride="airtel-calls" />,
-})
-
-const googleUserManageServicesRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/manage-services',
-  component: () => <HeadScreenPage screenOverride="manage-services" />,
-})
-
-const googleUserSalaryManagementRoute = createRoute({
-  getParentRoute: () => googleUserLayoutRoute,
-  path: '/google-user/salary-management',
-  component: () => <HeadScreenPage screenOverride="salary-management" />,
 })
 
 const googleUserDynamicScreenRoute = createRoute({
@@ -963,22 +696,21 @@ const dynamicDepartmentLayoutRoute = createRoute({
   id: '_dynamic_dept',
   component: () => {
     const session = getSession()
-    const portalRole = session?.user.role === 'USER' ? 'USER' : 'HEAD'
+    const portalRole =
+      resolvePortalRoleFromPath(window.location.pathname) ??
+      (session?.user.role === 'USER' ? 'USER' : 'HEAD')
     return <HeadConsoleLayout portalRole={portalRole} />
   },
-  beforeLoad: requireRoleDashboard('ADMIN', 'HEAD', 'USER'),
+  beforeLoad: (ctx) => {
+    requireRoleDashboard('ADMIN', 'HEAD', 'USER')()
+    redirectLegacyPortalPath(ctx)
+  },
 })
 
 const dynamicDepartmentRoleScreenRoute = createRoute({
   getParentRoute: () => dynamicDepartmentLayoutRoute,
   path: '/$departmentName/$role/$screen',
   component: HeadScreenPage,
-})
-
-const dynamicDepartmentRoleIndexRoute = createRoute({
-  getParentRoute: () => dynamicDepartmentLayoutRoute,
-  path: '/$departmentName/$role',
-  component: () => <HeadScreenPage screenOverride="dashboard" />,
 })
 
 const dynamicDepartmentIndexRoute = createRoute({
@@ -1000,66 +732,22 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,
-    googleHeadDashboardRoute,
-    googleHeadUsersRoute,
-    googleHeadCustomersRoute,
-    googleHeadCustomerListRoute,
-    googleHeadHistoryRoute,
-    googleHeadAnalyticsRoute,
-    googleHeadServiceFlowRoute,
-    googleHeadMemberFlowRoute,
-    googleHeadHelpSupportRoute,
-    googleHeadHelpCenterRoute,
-    googleHeadAirtelCallsRoute,
-    googleHeadManageServicesRoute,
-    googleHeadSalaryManagementRoute,
     googleHeadDynamicScreenRoute,
   ]),
   googleUserLayoutRoute.addChildren([
     googleUserIndexRoute,
-    googleUserDashboardRoute,
-    googleUserAttendanceRoute,
-    googleUserCustomersRoute,
-    googleUserCustomerListRoute,
-    googleUserHistoryRoute,
-    googleUserHelpSupportRoute,
-    googleUserHelpCenterRoute,
-    googleUserAirtelCallsRoute,
-    googleUserManageServicesRoute,
-    googleUserSalaryManagementRoute,
     googleUserDynamicScreenRoute,
   ]),
-  onboardingLayoutRoute.addChildren([
-    onboardingIndexRoute,
-    onboardingUserRoute,
-    onboardingHeadDashboardRoute,
-    onboardingUserDashboardRoute,
-    onboardingHeadCustomersRoute,
-    onboardingUserCustomersRoute,
-    onboardingHeadCustomerListRoute,
-    onboardingUserCustomerListRoute,
-    onboardingHeadUsersRoute,
-    onboardingUserUsersRoute,
-    onboardingHeadMeetingRoute,
-    onboardingUserMeetingRoute,
-    onboardingHeadSopRoute,
-    onboardingUserSopRoute,
-    onboardingHeadAttendanceRoute,
-    onboardingUserAttendanceRoute,
-    onboardingHeadHelpCenterRoute,
-    onboardingUserHelpCenterRoute,
-    onboardingHeadHistoryRoute,
-    onboardingUserHistoryRoute,
-    onboardingHeadAirtelCallsRoute,
-    onboardingUserAirtelCallsRoute,
-    onboardingHeadManageServicesRoute,
-    onboardingUserManageServicesRoute,
-    onboardingHeadLeadsRoute,
-    onboardingUserLeadsRoute,
-    onboardingHeadSalaryManagementRoute,
-    onboardingUserSalaryManagementRoute,
-    onboardingDynamicScreenRoute,
+  onboardingHeadLayoutRoute.addChildren([
+    onboardingHeadIndexRoute,
+    onboardingHeadScreenRoute,
   ]),
+  onboardingUserLayoutRoute.addChildren([
+    onboardingUserIndexRoute,
+    onboardingUserScreenRoute,
+  ]),
+  onboardingLegacyIndexRoute,
+  onboardingLegacyScreenRoute,
   headLayoutRoute.addChildren([
     headIndexRoute,
     headScreenRoute,
@@ -1123,7 +811,6 @@ const routeTree = rootRoute.addChildren([
   hrmRoute,
   dynamicDepartmentLayoutRoute.addChildren([
     dynamicDepartmentRoleScreenRoute,
-    dynamicDepartmentRoleIndexRoute,
     dynamicDepartmentIndexRoute,
     dynamicDepartmentScreenRoute,
   ]),

@@ -135,6 +135,11 @@ function extractCleanSlug(routeName: string): string {
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1] || ''
 
+  // Portal dashboard URL: "/onboarding-head", "/sales-user"
+  if (parts.length === 1 && /^\/+[a-z0-9_]+-(head|user)$/.test(routeName.toLowerCase().trim())) {
+    return 'dashboard'
+  }
+
   const cleanLast = last.toLowerCase().replace(/[\s_]+/g, '-')
   if (
     cleanLast === 'users' ||
@@ -814,8 +819,26 @@ export function useHeadNav(departmentId: string, departmentType?: string) {
     return routePerms.isRouteEnabled(slugOrPath)
   }
 
+  const isAutomationCountPending =
+    isUser && isAutowebsion && Boolean(session?.user?.email) &&
+    automationCountQuery.isPending
+
   return {
     ...query,
+    isPending: query.isPending || routePerms.isPending || isAutomationCountPending,
+    isError: query.isError || routePerms.isError || (
+      isUser && isAutowebsion && automationCountQuery.isError
+    ),
+    error: query.error ?? routePerms.error ?? (
+      isUser && isAutowebsion ? automationCountQuery.error : null
+    ),
+    refetch: () => {
+      void query.refetch()
+      void routePerms.refetch()
+      if (isUser && isAutowebsion && session?.user?.email) {
+        void automationCountQuery.refetch()
+      }
+    },
     features,
     items,
     bySlug,

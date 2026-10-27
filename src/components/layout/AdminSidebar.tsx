@@ -162,7 +162,7 @@ export function AdminSidebar({
           const targetTo =
             (item.to === '/head' || item.to === '/users') &&
             session?.user.departmentType?.toUpperCase().includes('ONBOARDING')
-              ? '/onboarding'
+              ? item.to === '/users' ? '/onboarding-user' : '/onboarding-head'
               : item.to
 
           return (

@@ -9,6 +9,7 @@ export interface DepartmentRoutePermissionsResult {
   isLoading: boolean
   isPending: boolean
   isError: boolean
+  error: Error | null
   isRouteEnabled: (slugOrPathOrName: string) => boolean
   isMasterDisabled: (slugOrPathOrName: string) => boolean
   refetch: () => unknown
@@ -33,6 +34,11 @@ export function extractScreenSlug(str: string): string {
     .replace(/\/+$/, '')
   const parts = trimmed.split('/')
   const last = parts[parts.length - 1] || ''
+
+  // Portal dashboard URL: "/onboarding-head", "/sales-user"
+  if (parts.length === 1 && /^\/+[a-z0-9_]+-(head|user)$/.test(str.toLowerCase().trim())) {
+    return 'dashboard'
+  }
 
   const cleanLast = last.replace(/[\s_]+/g, '-')
   if (
@@ -282,9 +288,9 @@ export function useDepartmentRoutePermissions(
     isLoading: query.isLoading,
     isPending: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRouteEnabled,
     isMasterDisabled,
     refetch: query.refetch,
   }
 }
-

@@ -2988,3 +2988,18 @@ button.profile-chip--clickable:focus-visible {
 .drawer-backdrop-enter {
   animation: drawer-fade-in 0.22s ease-out both;
 }
+@keyframes login-as-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login-as-button__spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: login-as-spin 0.7s linear infinite;
+}

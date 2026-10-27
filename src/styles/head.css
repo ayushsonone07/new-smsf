@@ -159,6 +159,82 @@
   overflow: auto;
 }
 
+.hnav__skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hnav__skeleton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.hnav__skeleton-icon,
+.hnav__skeleton-label {
+  display: block;
+  flex: none;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #eef1f6 25%,
+    #f7f8fb 50%,
+    #eef1f6 75%
+  );
+  background-size: 200% 100%;
+  animation: hnav-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.hnav__skeleton-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.hnav__skeleton-label {
+  width: 68%;
+  height: 12px;
+}
+
+.hnav__skeleton:nth-child(3n) .hnav__skeleton-label {
+  width: 54%;
+}
+
+.hnav__skeleton:nth-child(3n + 1) .hnav__skeleton-label {
+  width: 78%;
+}
+
+.is-collapsed .hnav__skeleton {
+  justify-content: center;
+  padding: 8px;
+}
+
+.hnav__error {
+  display: grid;
+  gap: 8px;
+  padding: 10px 8px;
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+.hnav__error button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--c-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@keyframes hnav-skeleton-pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .hnav__item {
   position: relative;
   display: flex;
@@ -1519,13 +1595,15 @@
 
 .users-table table {
   table-layout: fixed;
+  min-width: 1000px;
+  width: 100%;
 }
 
 .users-table.table-wrapper {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .users-table th {
@@ -1545,23 +1623,23 @@
 }
 
 .users-table__expand-column {
-  width: 4%;
+  width: 3%;
 }
 
 .users-table__name-column {
-  width: 22%;
-}
-
-.users-table__phone-column {
-  width: 10%;
-}
-
-.users-table__email-column {
   width: 18%;
 }
 
-.users-table__role-column {
+.users-table__phone-column {
+  width: 9%;
+}
+
+.users-table__email-column {
   width: 17%;
+}
+
+.users-table__role-column {
+  width: 16%;
 }
 
 .users-table__target-column {
@@ -1573,11 +1651,11 @@
 }
 
 .users-table__attendance-column {
-  width: 9%;
+  width: 11.5%;
 }
 
 .users-table__actions-column {
-  width: 7%;
+  width: 12.5%;
 }
 
 .users-table .is-right {
@@ -1690,7 +1768,7 @@
 }
 
 .users-table__email {
-  max-width: 190px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1703,7 +1781,9 @@
 }
 
 .role-pill {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
   max-width: 100%;
   overflow: hidden;
   font-size: 12px;
@@ -1739,7 +1819,9 @@
 
 .users-table__actions {
   display: inline-flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .icon-action {
@@ -2029,11 +2111,11 @@
    table rules so the list remains contained within the viewport. */
 @media (max-width: 768px) {
   .users-table.table-wrapper {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
 
   .users-table table,
   .users-table tbody {

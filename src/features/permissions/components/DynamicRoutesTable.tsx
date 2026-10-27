@@ -64,7 +64,7 @@ export function DynamicRoutesTable({
                         className="route-select-button"
                         aria-pressed={selectedRouteId === route.routeId}
                         onClick={() => onSelectRoute(route)}
-                      >
+                        >
                         {route.routeName}
                       </button>
                     ) : (

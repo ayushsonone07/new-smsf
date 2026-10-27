@@ -101,6 +101,7 @@ export function DepartmentTable({
                 <Button
                   variant="action-dashboard"
                   disabled={loggingInId !== null}
+                  aria-busy={loggingInId === department.id}
                   onClick={(event) => {
                     event.stopPropagation()
                     onViewDashboard(department)
@@ -108,7 +109,9 @@ export function DepartmentTable({
                   title="Login as this department"
                   aria-label={`Login as ${department.name}`}
                 >
-                  {loggingInId === department.id ? '…' : '⌂'}
+                  {loggingInId === department.id ? (
+                    <span className="login-as-button__spinner" aria-hidden="true" />
+                  ) : '⌂'}
                 </Button>
 
                 <Button

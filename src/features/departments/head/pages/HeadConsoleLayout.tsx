@@ -106,6 +106,9 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
   return (
     <HeadShell
       navItems={nav.items}
+      navLoading={nav.isPending}
+      navError={nav.isError ? nav.error?.message : undefined}
+      onRetryNav={() => nav.refetch()}
       secondaryNavItems={[]}
       activeKey={feature?.slug ?? slug}
       onNavigate={(item) => {

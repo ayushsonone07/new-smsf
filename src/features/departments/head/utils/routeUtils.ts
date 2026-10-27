@@ -18,12 +18,81 @@ const STATIC_TOP_LEVEL_PATHS = new Set([
   'google',
 ])
 
+/**
+ * URL standard for every department portal (Onboarding, Google and dynamic ones):
+ *   /{dept}-head            -> Head dashboard
+ *   /{dept}-head/{screen}   -> Head screen
+ *   /{dept}-user            -> User dashboard
+ *   /{dept}-user/{screen}   -> User screen
+ * {dept} is the department slug (ONBOARDING_DEPARTMENT -> onboarding).
+ * The DB route name stays `{dept}/{screen}` — the role only lives in the URL.
+ */
+const PORTAL_SEGMENT = /^([a-z0-9_]+)-(head|user)$/i
+
+export function parsePortalSegment(
+  segment: string,
+): { dept: string; role: 'HEAD' | 'USER' } | null {
+  const match = PORTAL_SEGMENT.exec(segment)
+  if (!match) return null
+  return { dept: match[1].toLowerCase(), role: match[2].toLowerCase() === 'user' ? 'USER' : 'HEAD' }
+}
+
+/** HEAD / USER from a `/{dept}-head|user/...` URL, or null for other URLs. */
+export function resolvePortalRoleFromPath(pathname: string): 'HEAD' | 'USER' | null {
+  const first = pathname.replace(/^\/+/, '').split('/')[0] || ''
+  return parsePortalSegment(first)?.role ?? null
+}
+
+/**
+ * Maps old portal URLs to the standard one, or null when the URL is already standard:
+ *   /onboarding-dashboard-head-departmentUser-meeting -> /onboarding-user/meeting
+ *   /onboarding-dashboard-head-meeting                -> /onboarding-head/meeting
+ *   /onboarding, /onboarding/meeting                  -> /onboarding-head[/meeting]
+ *   /sales/head/leads, /sales/user                    -> /sales-head/leads, /sales-user
+ */
+export function legacyToStandardPath(pathname: string): string | null {
+  const p = pathname.replace(/\/+$/, '')
+  const lower = p.toLowerCase()
+  const withScreen = (base: string, screen: string) =>
+    !screen || screen === 'dashboard' ? base : `${base}/${screen === 'customer-list' ? 'customers' : screen}`
+
+  const userPrefix = '/onboarding-dashboard-head-departmentuser'
+  if (lower === userPrefix || lower.startsWith(`${userPrefix}-`)) {
+    return withScreen('/onboarding-user', p.slice(userPrefix.length + 1))
+  }
+  const headPrefix = '/onboarding-dashboard-head'
+  if (lower === headPrefix || lower.startsWith(`${headPrefix}-`)) {
+    return withScreen('/onboarding-head', p.slice(headPrefix.length + 1))
+  }
+  if (lower === '/onboarding' || lower.startsWith('/onboarding/')) {
+    return withScreen('/onboarding-head', p.slice('/onboarding/'.length))
+  }
+
+  const segments = p.replace(/^\/+/, '').split('/')
+  const [dept, role, screen] = segments
+  if (
+    segments.length >= 2 &&
+    segments.length <= 3 &&
+    (role === 'head' || role === 'user') &&
+    dept &&
+    !STATIC_TOP_LEVEL_PATHS.has(dept.toLowerCase())
+  ) {
+    return withScreen(`/${dept.toLowerCase()}-${role}`, screen ?? '')
+  }
+  return null
+}
+
 export function resolveDeptFromPath(pathname?: string): string | null {
   if (typeof window === 'undefined' && !pathname) return null
   const p = (pathname || window.location.pathname).replace(/\/+$/, '')
   const first = p.replace(/^\/+/, '').split('/')[0]
   if (!first) return null
   const lower = first.toLowerCase()
+  const portal = parsePortalSegment(lower)
+  if (portal) {
+    // Onboarding / Google keep their own detection (isUserOnboarding / isUserGoogle).
+    return portal.dept === 'onboarding' || portal.dept === 'google' ? null : portal.dept
+  }
   if (STATIC_TOP_LEVEL_PATHS.has(lower) || lower.startsWith('onboarding-')) {
     return null
   }
@@ -43,20 +112,17 @@ export function isUserOnboarding(departmentType?: string | null): boolean {
   return false
 }
 
+/** /{dept}-head[/{screen}] or /{dept}-user[/{screen}] — the one URL standard. */
+function buildPortalRoute(deptSlug: string, slug: string, role?: string): string {
+  const roleSegment = role?.toUpperCase() === 'USER' ? 'user' : 'head'
+  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
+  const base = `/${deptSlug}-${roleSegment}`
+  return normalizedSlug === 'dashboard' ? base : `${base}/${normalizedSlug}`
+}
+
 export function buildOnboardingRoute(slug: string, role?: string): string {
   if (slug.startsWith('/')) return slug
-  const isUser = role === 'USER'
-  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
-
-  if (normalizedSlug === 'dashboard') {
-    return isUser
-      ? '/onboarding-user'
-      : '/onboarding-dashboard-head'
-  }
-
-  return isUser
-    ? `/onboarding-dashboard-head-departmentUser-${normalizedSlug}`
-    : `/onboarding-dashboard-head-${normalizedSlug}`
+  return buildPortalRoute('onboarding', slug, role)
 }
 
 export function isUserGoogle(departmentType?: string | null): boolean {
@@ -75,13 +141,7 @@ export function isUserGoogle(departmentType?: string | null): boolean {
 }
 
 export function buildGoogleRoute(slug: string, role?: string): string {
-  const isUser = role === 'USER'
-  const normalizedSlug = slug === 'customer-list' ? 'customers' : slug
-  const base = isUser ? '/google-user' : '/google-head'
-  if (normalizedSlug === 'dashboard') {
-    return base
-  }
-  return `${base}/${normalizedSlug}`
+  return buildPortalRoute('google', slug, role)
 }
 
 export function buildDepartmentRoute(
@@ -95,14 +155,13 @@ export function buildDepartmentRoute(
   if (isUserOnboarding(departmentType)) {
     return buildOnboardingRoute(slug, role)
   }
-  const roleSegment = role?.toUpperCase() === 'USER' ? 'user' : 'head'
   // The authenticated session department passed by callers is authoritative.
   // The URL is only a fallback for admin previews or legacy links.
   const resolvedDept = departmentType || resolveDeptFromPath()
   if (resolvedDept) {
     const deptSlug = normalizeDepartmentSlug(resolvedDept)
     if (deptSlug && deptSlug !== 'head' && deptSlug !== 'users' && deptSlug !== 'department') {
-      return `/${deptSlug}/${roleSegment}/${slug}`
+      return buildPortalRoute(deptSlug, slug, role)
     }
   }
   const basePath = role === 'USER' ? '/users' : '/head'
@@ -113,64 +172,8 @@ export function resolveSlugFromPath(
   pathname: string,
   portalRole?: HeadRole | string,
 ): string {
-  const p = pathname.replace(/\/+$/, '')
-
-  if (p === '/google-user' || p === '/google-user/dashboard') {
-    return 'dashboard'
-  }
-
-  if (p.startsWith('/google-user/')) {
-    const s = p.replace('/google-user/', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p.startsWith('/google-user-')) {
-    const s = p.replace('/google-user-', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p === '/google-head' || p === '/google-head/dashboard') {
-    return 'dashboard'
-  }
-
-  if (p.startsWith('/google-head/')) {
-    const s = p.replace('/google-head/', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p.startsWith('/google-head-')) {
-    const s = p.replace('/google-head-', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (
-    p === '/onboarding' ||
-    p === '/onboarding-dashboard-head' ||
-    p === '/onboarding-dashboard-head-departmentUser' ||
-    p === '/onboarding-user'
-  ) {
-    return 'dashboard'
-  }
-
-  if (p.startsWith('/onboarding-user/')) {
-    const s = p.replace('/onboarding-user/', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p.startsWith('/onboarding-dashboard-head-departmentUser-')) {
-    const s = p.replace('/onboarding-dashboard-head-departmentUser-', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p.startsWith('/onboarding-dashboard-head-')) {
-    const s = p.replace('/onboarding-dashboard-head-', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
-
-  if (p.startsWith('/onboarding/')) {
-    const s = p.replace('/onboarding/', '')
-    return s === 'customer-list' ? 'customers' : s
-  }
+  // Old URLs resolve through their standard form.
+  const p = (legacyToStandardPath(pathname) ?? pathname).replace(/\/+$/, '')
 
   const segments = p.replace(/^\/+|\/+$/g, '').split('/')
   if (segments.length >= 3) {
@@ -203,8 +206,11 @@ export interface NormalizedRouteResult {
 /**
  * Smart URL Parser & Route Normalizer.
  * Takes any browser URL (e.g. http://localhost:5173/onboarding-dashboard-head-meeting,
- * /onboarding-dashboard-head, /head/meeting, etc.) and auto-converts it into the
- * clean standard DB format: /{departmentSlug}/{role}/{screenSlug}.
+ * /onboarding/head/meeting, /head/meeting, etc.) and auto-converts it into the
+ * standard DB route name: {departmentSlug}/{screenSlug}.
+ * The role is not part of the route name — one route serves both Head and User;
+ * the role only appears in the browser URL (see buildDepartmentRoute).
+ * `role` in the result is the role found in a pasted URL, for display only.
  */
 export function normalizeInputRoute(
   rawInput: string,
@@ -243,25 +249,22 @@ export function normalizeInputRoute(
 
   const deptSlug = normalizeDepartmentSlug(departmentType) || 'onboarding_department'
 
-  // If user already wrote standard format: e.g. "onboarding_department/head/meeting"
-  const standardPrefixHead = `${deptSlug}/head/`
-  const standardPrefixUser = `${deptSlug}/user/`
-  if (cleaned.startsWith(standardPrefixHead) || cleaned.startsWith(standardPrefixUser)) {
-    const isUser = cleaned.startsWith(standardPrefixUser)
-    const slug = cleaned.replace(isUser ? standardPrefixUser : standardPrefixHead, '')
+  // Already in standard format: e.g. "onboarding/meeting"
+  const standardSegments = cleaned.split('/')
+  if (standardSegments.length === 2 && standardSegments[0] === deptSlug) {
     return {
-      normalized: `/${cleaned}`,
-      wasAutoConverted: rawInput.trim() !== `/${cleaned}`,
+      normalized: cleaned,
+      wasAutoConverted: rawInput.trim() !== cleaned,
       originalCleaned: cleaned,
-      screenSlug: slug,
-      role: isUser ? 'user' : 'head',
+      screenSlug: standardSegments[1],
+      role: 'head',
     }
   }
 
   // 4. Handle legacy onboarding URLs like "onboarding-dashboard-head-meeting", "onboarding-dashboard-head", etc.
   const lower = cleaned.toLowerCase()
   let role: 'head' | 'user' = 'head'
-  let screenSlug = ''
+  let screenSlug: string
 
   if (
     lower.includes('departmentuser') ||
@@ -272,7 +275,17 @@ export function normalizeInputRoute(
     role = 'user'
   }
 
-  if (
+  const firstSegment = lower.split('/')[0]
+  const portal = parsePortalSegment(firstSegment)
+  if (portal) role = portal.role === 'USER' ? 'user' : 'head'
+
+  if (portal && !lower.includes('/')) {
+    // "onboarding-head" / "sales-user" -> dashboard
+    screenSlug = 'dashboard'
+  } else if (portal) {
+    // "onboarding-head/meeting" -> meeting
+    screenSlug = lower.split('/')[1]
+  } else if (
     lower === 'onboarding' ||
     lower === 'onboarding-dashboard-head' ||
     lower === 'onboarding-dashboard-head-departmentuser' ||
@@ -306,6 +319,9 @@ export function normalizeInputRoute(
     }
   }
 
+  // Same slug rule as the backend (DynamicPermissionService.buildRouteName): "Customer List" -> "customer-list"
+  screenSlug = screenSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
   // Normalize screenSlug aliases
   if (screenSlug === 'customer-list') {
     screenSlug = 'customers'
@@ -321,7 +337,7 @@ export function normalizeInputRoute(
     screenSlug = 'meeting'
   }
 
-  const result = `/${deptSlug}/${role}/${screenSlug}`
+  const result = `${deptSlug}/${screenSlug}`
   const wasConverted = rawInput.trim() !== result
 
   return {

@@ -1,4 +1,4 @@
-import { apiRequest, ApiError } from './client'
+import { apiRequest, ApiError, sameOriginApiRequest } from './client'
 import { getSession } from '../app/auth/session'
 import type {
   AuthSession,
@@ -189,18 +189,77 @@ export async function generateDepartmentSession(
   }
 
   const adminSession = getSession()
+  const tokenEndpoint =
+    `/api/auth/generate-token?username=${encodeURIComponent(username)}`
+  const requestOptions: RequestInit = {
+    method: 'POST',
+    headers: adminSession?.token
+      ? { Authorization: `Bearer ${adminSession.token}` }
+      : undefined,
+  }
 
-  const response = await apiRequest<
-    BackendTokenEnvelope | string
-  >(
-    `/api/auth/generate-token?username=${encodeURIComponent(username)}`,
-    {
-      method: 'POST',
-      headers: adminSession?.token
-        ? { Authorization: `Bearer ${adminSession.token}` }
-        : undefined,
-    },
-  )
+  let response: BackendTokenEnvelope | string | undefined
+  let lastError: unknown
+
+  // The backend can briefly fail while completing the login hand-off. Retry
+  // temporary failures here so all login-as screens behave consistently.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      try {
+        response = await apiRequest<BackendTokenEnvelope | string>(
+          tokenEndpoint,
+          requestOptions,
+        )
+      } catch (directError) {
+        // A browser-level network/CORS failure has no HTTP status. In that
+        // case try the frontend's same-origin `/api` proxy before retrying.
+        if (!(directError instanceof TypeError)) throw directError
+
+        response = await sameOriginApiRequest<BackendTokenEnvelope | string>(
+          tokenEndpoint,
+          requestOptions,
+        )
+      }
+
+      if (
+        typeof response === 'object' &&
+        response !== null &&
+        response.success === false
+      ) {
+        throw new Error(response.message || 'Unable to generate token')
+      }
+
+      break
+    } catch (error) {
+      lastError = error
+      const isPermanentClientError =
+        error instanceof ApiError && error.status >= 400 && error.status < 500
+
+      if (isPermanentClientError || attempt === 2) {
+        if (
+          error instanceof TypeError ||
+          (error instanceof ApiError && error.status >= 500)
+        ) {
+          throw new Error(
+            'The login server is currently unavailable. Please try again shortly.',
+            { cause: error },
+          )
+        }
+
+        throw error
+      }
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 600 * (attempt + 1))
+      })
+    }
+  }
+
+  if (response === undefined) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Unable to generate token')
+  }
 
   if (
     typeof response === 'object' &&

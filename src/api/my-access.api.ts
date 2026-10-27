@@ -8,15 +8,16 @@ export interface MyRoute {
 
 /**
  * One row of `GET /api/auth/my-column-permissions`.
- * `columnName` is populated by the backend from
- * `access_customer_columns`; `access` is one of
- * `"12"` (read+write), `"1"` (read), `"2"` (write) or
- * null when the user has no explicit access.
+ * Only columns of the user's allowed routes that the admin made visible
+ * are returned, so every field is always set. `routeId` is the one route
+ * (screen) the column belongs to; `access` is `"12"` (read+write),
+ * `"1"` (read) or `"2"` (write).
  */
 export interface MyColumnPermission {
   columnId: string
-  columnName?: string
-  access?: string | null
+  columnName: string
+  routeId: string
+  access: string
 }
 
 interface BackendEnvelope<T> {

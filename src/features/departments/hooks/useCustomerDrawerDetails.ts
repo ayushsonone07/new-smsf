@@ -4,9 +4,11 @@ import {
   getCustomerRemarks,
   getCustomerInternalRemarks,
   getCustomerReviewReplies,
+  getCustomerServiceRowById,
   getCustomerServiceRows,
   getSuperAdminCustomerRemarks,
 } from '../../../api/customer-drawer.api'
+import { LEGACY_CUSTOMER_ROWS_DEPARTMENTS } from '../../../api/department-users.api'
 import type { CustomerDrawerApiDetails } from '../../../api/customer-drawer.api'
 import type { OnboardingCustomer } from '../../../components/head/customers-list/CustomersList'
 import { getSession } from '../../../app/auth/session'
@@ -78,11 +80,20 @@ export function useCustomerDrawerDetails(
     staleTime: 0,
   })
 
+  // By customer id (one small row, cached 60s). Automation / Website keep the
+  // old phone search on /department/customer/rows.
+  const rowsById = hasCustomerId && !LEGACY_CUSTOMER_ROWS_DEPARTMENTS.has(customerDepartment)
   const rowsQuery = useQuery({
-    queryKey: ['customer-drawer-rows', contact, options.requestUsername],
-    queryFn: () => getCustomerServiceRows(contact, options.requestUsername).catch(() => []),
-    enabled: isOpen && contact.length > 0 && !profileOnly,
-    staleTime: 0,
+    queryKey: rowsById
+      ? ['customer-drawer-rows', customerId]
+      : ['customer-drawer-rows', contact, options.requestUsername],
+    queryFn: () =>
+      (rowsById
+        ? getCustomerServiceRowById(customerId)
+        : getCustomerServiceRows(contact, options.requestUsername)
+      ).catch(() => []),
+    enabled: isOpen && !profileOnly && (rowsById || contact.length > 0),
+    staleTime: rowsById ? 60_000 : 0,
   })
 
   return {

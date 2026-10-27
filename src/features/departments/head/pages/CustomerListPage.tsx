@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -40,12 +40,16 @@ import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useOnboardingCustomersList,
   useAuthOnboardingSummary,
+  useCustomerList,
   useDepartmentCustomerRows,
-  useDepartmentUsersList,
 } from '../../hooks/useDepartmentUsersList'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getSession } from '../../../../app/auth/session'
-import { assignCustomerUser, updateOnboardingStatus } from '../../../../api/department-users.api'
+import {
+  assignCustomerUser,
+  LEGACY_CUSTOMER_ROWS_DEPARTMENTS,
+  updateOnboardingStatus,
+} from '../../../../api/department-users.api'
 import { useRoundRobinStatus, useUpdateRoundRobinStatus } from '../../hooks/useRoundRobin'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import { notifyCustomerAssigned, notifyServiceCompleted } from '../../../../api/notification-factory'
@@ -63,7 +67,7 @@ import { recordCustomerActivity } from '../../../../utils/customerActivity'
  * - Any other (dynamic) department: GET
  *   /api/auth/department/customer/rows?page=0&size=10&compatible=true
  *   (used whenever the admin picks customer columns for the dept)
- * - Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100
+ * - Sub-service flows: GET /api/service/flows?page=0&size=100 (on demand, when marking Completed)
  * - Round robin: GET/PUT /api/round-robin/department?departmentType=X
  * - GET /api/meetings/users/assigning-list?departmentType=X
  */
@@ -142,21 +146,24 @@ export function CustomerListPage() {
     enabled: useRowsEndpoint,
   })
 
-  // 2. Sub-service flows (when they exist): GET /api/service/flows?page=0&size=100&departmentType=...
-  const serviceFlowsQuery = useQuery({
-    queryKey: ['serviceFlows', currentDepartment],
-    queryFn: () =>
-      getServiceFlows({
-        page: 0,
-        size: 100,
-        departmentType: currentDepartment,
-      }),
-    enabled: useRowsEndpoint,
-  })
-  const hasSubServiceFlow = (serviceFlowsQuery.data?.data.length ?? 0) > 0
+  const role = (session?.user?.role || '').toUpperCase()
 
-  // 3. Department Users: GET /api/auth/department/users?page=0&size=100
-  useDepartmentUsersList({ page: 0, size: 100 }, { enabled: useRowsEndpoint })
+  // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
+  // fetched on demand (and cached) only when a status is set to Completed.
+  const queryClient = useQueryClient()
+  const fetchHasSubServiceFlow = async () => {
+    const flows = await queryClient.fetchQuery({
+      queryKey: ['serviceFlows', currentDepartment],
+      queryFn: () =>
+        getServiceFlows({
+          page: 0,
+          size: 100,
+          departmentType: currentDepartment,
+        }),
+      staleTime: 5 * 60_000,
+    })
+    return (flows?.data.length ?? 0) > 0
+  }
 
   // 4. Round robin status: GET /api/round-robin/department?departmentType=X
   const roundRobinQuery = useRoundRobinStatus(currentDepartment, {
@@ -168,37 +175,39 @@ export function CustomerListPage() {
   const [roundRobinError, setRoundRobinError] = useState<string | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('departmentuser') ||
+    currentPath.includes('/google-user') ||
+    currentPath.includes('/onboarding-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users')
 
-  const role = (session?.user?.role || '').toUpperCase()
   const isDeptUser =
     role === 'USER' ||
     role === 'DEPARTMENT_USER' ||
-    (typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/google-user') ||
-        window.location.pathname.includes('/onboarding-user') ||
-        window.location.pathname.includes('/users')))
+    (session?.user as any)?.isHead === false ||
+    isUserPath
+
   const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
     : 'customers'
-  const { isColumnEnabled, isColumnConfigured } =
+  const { isColumnEnabled } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
   const canEditStatus = columnFeatures.canEdit('Status', true)
 
-  const isAssignToConfigured = isColumnConfigured('Assign To')
-  const isAssignToVisible = isAssignToConfigured
-    ? isColumnEnabled('Assigned To', 'customer') ||
+  // Department users never see the Assign To column, even if it is configured.
+  const isAssignToVisible =
+    !isDeptUser &&
+    (isColumnEnabled('Assigned To', 'customer') ||
       isColumnEnabled('Assign To', 'customer') ||
       isColumnEnabled('Assign', 'customer') ||
-      isColumnEnabled('Assignee', 'customer')
-    : !isDeptUser &&
-      (isColumnEnabled('Assigned To', 'customer') ||
-        isColumnEnabled('Assign To', 'customer') ||
-        isColumnEnabled('Assign', 'customer') ||
-        isColumnEnabled('Assignee', 'customer'))
-  const canEditAssignTo = columnFeatures.canEdit('Assign To', !isDeptUser)
+      isColumnEnabled('Assignee', 'customer'))
+  const canEditAssignTo = !isDeptUser && columnFeatures.canEdit('Assign To', true)
 
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
@@ -302,31 +311,39 @@ export function CustomerListPage() {
         : activeTab === 'in-progress'
           ? 'IN_PROGRESS'
           : activeTab.toUpperCase(),
+    filteredUser:
+      selectedAssigneeId && selectedAssigneeId !== 'all' && selectedAssigneeId !== 'assigned' && selectedAssigneeId !== 'unassigned'
+        ? selectedAssigneeId
+        : undefined,
   }, { enabled: isOnboardingDept })
 
   // 3b. Department customer rows (any non-onboarding dept):
-  // /api/auth/department/customer/rows?page=0&size=10&compatible=true
-  const departmentRowsQuery = useDepartmentCustomerRows(
-    {
-      page,
-      size,
-      searchParam: search || undefined,
-      statusFilter:
-        activeTab === 'all'
-          ? undefined
-          : activeTab === 'in-progress'
-            ? 'IN_PROGRESS'
-            : activeTab.toUpperCase(),
-      userFilter:
-        selectedAssigneeId !== 'all'
-          ? selectedAssigneeId ?? undefined
-          : undefined,
-      startDate: dateFrom || undefined,
-      endDate: dateTo || undefined,
-      compatible: true,
-    },
-    { enabled: useRowsEndpoint },
+  // - slim list:  /api/auth/department/customers/list (new-smsf only)
+  // - Automation / Website keep /api/auth/department/customer/rows?compatible=true
+  const rowsParams = {
+    page,
+    size,
+    searchParam: search || undefined,
+    statusFilter:
+      activeTab === 'all'
+        ? undefined
+        : activeTab === 'in-progress'
+          ? 'IN_PROGRESS'
+          : activeTab.toUpperCase(),
+    userFilter:
+      selectedAssigneeId && selectedAssigneeId !== 'all' && selectedAssigneeId !== 'assigned' && selectedAssigneeId !== 'unassigned'
+        ? selectedAssigneeId
+        : undefined,
+    startDate: dateFrom || undefined,
+    endDate: dateTo || undefined,
+  }
+  const useSlimList = useRowsEndpoint && !LEGACY_CUSTOMER_ROWS_DEPARTMENTS.has(currentDepartment)
+  const slimListQuery = useCustomerList(rowsParams, { enabled: useSlimList })
+  const legacyRowsQuery = useDepartmentCustomerRows(
+    { ...rowsParams, compatible: true },
+    { enabled: useRowsEndpoint && !useSlimList },
   )
+  const departmentRowsQuery = useSlimList ? slimListQuery : legacyRowsQuery
 
   const activeCustomerQuery = useRowsEndpoint ? departmentRowsQuery : onboardingApiQuery
 
@@ -397,12 +414,16 @@ export function CustomerListPage() {
           callStatus: 'connected',
           status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
-          remark: getLatestInternalRemark(c, [currentDepartment, 'ONBOARDING_DEPARTMENT']) || c.remark || '',
+          remark:
+            c.latestInternalRemark ||
+            getLatestInternalRemark(c, [currentDepartment, 'ONBOARDING_DEPARTMENT']) ||
+            c.remark ||
+            '',
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
           serviceTags: extractServiceTags(c),
-          subServiceInfo: (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
+          subServiceInfo: c.subServices || (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
           services: (c as any).services || [],
           serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
           rawCustomer: c,
@@ -582,11 +603,12 @@ export function CustomerListPage() {
         (customer) =>
           activeTab === 'all' || customer.status === activeTab,
       )
-      .filter(
-        (customer) =>
-          selectedAssigneeId === 'all' ||
-          customer.assigneeId === selectedAssigneeId,
-      )
+      .filter((customer) => {
+        if (!selectedAssigneeId || selectedAssigneeId === 'all') return true
+        if (selectedAssigneeId === 'assigned') return Boolean(customer.assigneeId)
+        if (selectedAssigneeId === 'unassigned') return !customer.assigneeId
+        return customer.assigneeId === selectedAssigneeId
+      })
       .filter(
         (customer) =>
           !term ||
@@ -599,13 +621,13 @@ export function CustomerListPage() {
       )
   }, [activeTab, onboardingCustomers, debouncedSearch, selectedAssigneeId])
 
-  const isLoading = useRowsEndpoint
-    ? activeCustomerQuery.isPending
-    : customersQuery.isPending && activeCustomerQuery.isPending
-
-  if (isLoading) {
-    return <LoadingState message="Loading customers..." />
-  }
+  const isCustomersLoading =
+    activeCustomerQuery.isPending ||
+    activeCustomerQuery.isLoading ||
+    (activeCustomerQuery.isFetching && filteredCustomers.length === 0) ||
+    (useRowsEndpoint
+      ? departmentRowsQuery.isPending
+      : onboardingApiQuery.isPending || (isOnboardingDept && customersQuery.isPending && !activeCustomerQuery.data))
 
   const isError = useRowsEndpoint
     ? activeCustomerQuery.isError
@@ -689,6 +711,18 @@ export function CustomerListPage() {
       return
     }
 
+    const currentCustomer =
+      filteredCustomers.find((c) => c.id === customerId) ||
+      onboardingCustomers.find((c) => c.id === customerId)
+
+    if (
+      currentCustomer?.status === 'completed' ||
+      (currentCustomer as any)?.onboardingStatus?.toLowerCase() === 'completed'
+    ) {
+      alert('Completed status cannot be changed.')
+      return
+    }
+
     // Customer acknowledgement is strictly required before marking Completed for Onboarding department
     if (!useRowsEndpoint && status === 'completed') {
       const target =
@@ -701,7 +735,7 @@ export function CustomerListPage() {
     }
 
     // When sub-service flows exist, all sub-services must be completed before marking Completed
-    if (hasSubServiceFlow && status === 'completed') {
+    if (status === 'completed' && useRowsEndpoint && (await fetchHasSubServiceFlow().catch(() => false))) {
       const target =
         filteredCustomers.find((c) => c.id === customerId) ||
         onboardingCustomers.find((c) => c.id === customerId)
@@ -908,6 +942,7 @@ export function CustomerListPage() {
 
       <CustomersList
         customers={filteredCustomers}
+        isLoading={isCustomersLoading}
         assignees={assignees}
         canEdit={canEdit}
         showStatus={isStatusVisible}

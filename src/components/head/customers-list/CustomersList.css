@@ -2421,7 +2421,7 @@
 .cl-filter-panel {
   display: grid;
   /* two groups side by side when there is room, stacked when there isn't */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 16px 24px;
   padding: 16px 20px;
   border: 1px solid #e2e8f0;
@@ -4114,4 +4114,18 @@
 .cl-drawer__export-error {
   color: #fecaca;
   font-size: 12px;
+}
+
+.cl-skeleton-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cl-skeleton-row .cl-td {
+  padding: 14px 12px;
+  vertical-align: middle;
+}
+
+.cl-skeleton-bone {
+  background: #e2e8f0;
+  border-radius: 4px;
 }

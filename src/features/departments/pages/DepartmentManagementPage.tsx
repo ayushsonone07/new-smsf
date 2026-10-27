@@ -8,6 +8,7 @@ import {
   getSession,
   homeForRole,
   openSessionInNewTab,
+  prepareLoginWindow,
 } from '../../../app/auth/session'
 import type {
   Department,
@@ -112,6 +113,7 @@ export function DepartmentManagementPage() {
     loginAsMutation.reset()
 
     const newWindow = window.open('', '_blank')
+    prepareLoginWindow(newWindow)
     const adminSession = getSession()
 
     loginAsMutation.mutate(department.email, {
