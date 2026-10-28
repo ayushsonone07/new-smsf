@@ -137,6 +137,8 @@ export function AutowebisionCustomersPage({
     permissionRouteName,
   )
 
+  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
+
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
   const isCustomerVisible = isColumnEnabled('Customer') || isColumnEnabled('Business') || isColumnEnabled('Company')
@@ -147,7 +149,10 @@ export function AutowebisionCustomersPage({
   const isExpirationVisible = isColumnEnabled('Expiration') || isColumnEnabled('Expiry') || isColumnEnabled('Service Expiration')
   const isClientRemarkVisible = isColumnEnabled('Client Remark') || isColumnEnabled('Client Remarks')
   const isInternalRemarkVisible = isColumnEnabled('Internal Remark') || isColumnEnabled('Remark') || isColumnEnabled('Remarks')
-  const isDraftSentVisible = isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent')
+  // Draft Sent column is visible on Autowebsion (ALL) and Website, and strictly hidden ONLY on Automation tab
+  const isDraftSentVisible =
+    activeSubTab !== 'AUTOMATION' &&
+    (isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent'))
   const isAssigneeConfigured = isColumnConfigured('Assigned To')
   const isAssigneeVisible = isAssigneeConfigured
     ? isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee')
@@ -162,17 +167,15 @@ export function AutowebisionCustomersPage({
   const canEditStatus = isColumnConfigured('Status')
     ? canEditColumn('Status')
     : isDepartmentUser
-  const canEditDraft = isColumnConfigured('Draft Sent')
-    ? canEditColumn('Draft Sent')
-    : isDepartmentUser
+  const canEditDraft =
+    activeSubTab !== 'AUTOMATION' &&
+    (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : isDepartmentUser)
   const canEditAssignee = isAssigneeConfigured
     ? canEditColumn('Assigned To')
     : !isDepartmentUser
   const canEditServices = isColumnConfigured('Services')
     ? canEditColumn('Services')
     : isDepartmentUser
-
-  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
