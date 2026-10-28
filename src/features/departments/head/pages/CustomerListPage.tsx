@@ -139,24 +139,6 @@ export function CustomerListPage() {
   }, [toast])
 
   const role = (session?.user?.role || '').toUpperCase()
-<<<<<<< HEAD
-=======
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
-  const isUserPath =
-    currentPath.includes('-user') ||
-    currentPath.includes('/user/') ||
-    currentPath.endsWith('/user') ||
-    currentPath.includes('/users') ||
-    currentPath.includes('departmentuser')
-
-  const isDeptUser =
-    role === 'USER' ||
-    role === 'DEPARTMENT_USER' ||
-    Boolean((session?.user as any)?.isHead === false) ||
-    isUserPath
-
-  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
->>>>>>> 38848b4551fbe6f4e910e2bc29adc383fbcad4a5
 
   // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
   // fetched on demand (and cached) only when a status is set to Completed.
