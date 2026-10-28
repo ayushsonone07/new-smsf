@@ -373,7 +373,8 @@ export function CustomerHelpSupportView() {
   }, [customerEmail, customerName])
 
   // Load Status Summary & Tickets
-  const loadData = async (targetPage = page) => {
+  // refreshDetails: also re-fetch ticket details already cached (used by the Refresh button).
+  const loadData = async (targetPage = page, refreshDetails = false) => {
     if (!customerEmail) return
     setLoading(true)
     try {
@@ -416,7 +417,7 @@ export function CustomerHelpSupportView() {
 
       // Eagerly pre-fetch details for visible tickets
       parsedItems.forEach((t) => {
-        if (!ticketDetailsMap[t.ticketNumber]) {
+        if (refreshDetails || !ticketDetailsMap[t.ticketNumber]) {
           fetchCustomerTicketDetails(t.ticketNumber, customerEmail).then((res) => {
             if (res) {
               setTicketDetailsMap((prev) => ({ ...prev, [t.ticketNumber]: res }))
@@ -1267,7 +1268,7 @@ export function CustomerHelpSupportView() {
 
             {/* Refresh Button */}
             <button
-              onClick={() => loadData(0)}
+              onClick={() => loadData(page, true)}
               disabled={loading}
               title="Refresh tickets"
               style={{

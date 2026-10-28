@@ -108,8 +108,8 @@ export function GoogleInfoModal({
       const res = await getDepartmentSpecialData(customer.id, 'GOOGLE_DEPARTMENT')
       setData(res)
       setError(null)
-    } catch (err: any) {
-      setError(err?.message || 'Failed to reload.')
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to reload.')
     } finally {
       setIsRefreshing(false)
     }

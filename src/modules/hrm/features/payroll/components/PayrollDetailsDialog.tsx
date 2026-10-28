@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 
 import { Dialog, StatusBadge } from "@shared/components/ui";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { usePayrollDetails } from "../hooks";
 import { formatMoney, monthName } from "../lib/payrollFormat";
@@ -29,16 +30,38 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function PayrollDetailsDialog({ open, payroll, onClose }: PayrollDetailsDialogProps) {
-  const { data: details, isLoading } = usePayrollDetails(payroll?.id ?? 0);
+  const payrollId = payroll?.id ?? 0;
+  const detailsQuery = usePayrollDetails(payrollId);
+  const { data: details, isLoading } = detailsQuery;
+  const detailsRefreshing = detailsQuery.isFetching && !isLoading;
 
   return (
-    <Dialog open={open} onClose={onClose} title="Payroll Details" size="lg">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Payroll Details"
+      size="lg"
+      headerActions={
+        payrollId > 0 ? (
+          <RefreshButton
+            onRefresh={() => detailsQuery.refetch()}
+            isRefreshing={detailsQuery.isFetching}
+            label="payroll details"
+          />
+        ) : undefined
+      }
+    >
       {!details || isLoading ? (
         <div className="flex items-center justify-center gap-2 p-10 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading payroll details…
         </div>
       ) : (
-        <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+        <div
+          className={`max-h-[70vh] space-y-6 overflow-y-auto p-6 transition-opacity ${
+            detailsRefreshing ? "pointer-events-none opacity-60" : ""
+          }`}
+          aria-busy={detailsRefreshing}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-foreground">
