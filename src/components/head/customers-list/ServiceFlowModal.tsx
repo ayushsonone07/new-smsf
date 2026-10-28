@@ -128,18 +128,25 @@ export function extractDepartmentFlows(
     const rawOverall = resData?.status || resData?.overallStatus
     const autowebMap = new Map<string, { steps: Phase1Step[]; overallStatus?: string }>()
 
-    for (const sub of autowebSubInfo) {
-      const subName = String(
-        sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub) || 'Sub-Service',
-      ).trim()
-      const subStatus = String(
-        sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING') || 'PENDING',
-      ).toUpperCase()
-      const steps: Phase1Step[] = []
+    const norm = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
 
-      const flowStepsObj = autowebFlowJson?.[subName]
-      if (flowStepsObj && typeof flowStepsObj === 'object') {
-        for (const [sName, sVal] of Object.entries(flowStepsObj as Record<string, any>)) {
+    // Case-insensitive / normalized lookup in flow json
+    const findStepsInFlowJson = (targetName: string): any => {
+      if (!autowebFlowJson) return undefined
+      if (autowebFlowJson[targetName]) return autowebFlowJson[targetName]
+      const clean = norm(targetName)
+      for (const [k, v] of Object.entries(autowebFlowJson)) {
+        if (norm(k) === clean) return v
+      }
+      return undefined
+    }
+
+    // Process all entries from autowebFlowJson first so exact step definitions are preserved
+    if (autowebFlowJson) {
+      for (const [subName, sObj] of Object.entries(autowebFlowJson)) {
+        if (!sObj || typeof sObj !== 'object') continue
+        const steps: Phase1Step[] = []
+        for (const [sName, sVal] of Object.entries(sObj as Record<string, any>)) {
           if (!sVal || typeof sVal !== 'object') continue
           steps.push({
             stepName: sName,
@@ -149,31 +156,37 @@ export function extractDepartmentFlows(
             updatedAt: sVal?.updatedAt,
           })
         }
-      }
-
-      if (steps.length === 0) {
-        steps.push({
-          stepName: subName,
-          order: 1,
-          status: subStatus,
-          createdAt: resData?.createdAt,
-          updatedAt: resData?.updatedAt,
-        })
-      } else {
         steps.sort((a, b) => a.order - b.order)
-      }
 
-      autowebMap.set(subName, {
-        steps,
-        overallStatus: subStatus,
-      })
+        const subMatch = autowebSubInfo.find((sub: any) => {
+          const name = String(sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub) || '')
+          return norm(name) === norm(subName)
+        })
+        const status = subMatch
+          ? String(subMatch.status || (typeof subMatch === 'object' ? Object.values(subMatch)[0] : 'PENDING')).toUpperCase()
+          : String(rawOverall || 'PENDING').toUpperCase()
+
+        autowebMap.set(subName, {
+          steps,
+          overallStatus: status,
+        })
+      }
     }
 
-    if (autowebFlowJson) {
-      for (const [subName, sObj] of Object.entries(autowebFlowJson)) {
-        if (!autowebMap.has(subName) && sObj && typeof sObj === 'object') {
-          const steps: Phase1Step[] = []
-          for (const [sName, sVal] of Object.entries(sObj as Record<string, any>)) {
+    // Also include any sub-services in autowebSubInfo not already in autowebMap
+    for (const sub of autowebSubInfo) {
+      const subName = String(
+        sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub) || 'Sub-Service',
+      ).trim()
+      const existingKey = Array.from(autowebMap.keys()).find((k) => norm(k) === norm(subName))
+      if (!existingKey) {
+        const subStatus = String(
+          sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING') || 'PENDING',
+        ).toUpperCase()
+        const flowStepsObj = findStepsInFlowJson(subName)
+        const steps: Phase1Step[] = []
+        if (flowStepsObj && typeof flowStepsObj === 'object') {
+          for (const [sName, sVal] of Object.entries(flowStepsObj as Record<string, any>)) {
             if (!sVal || typeof sVal !== 'object') continue
             steps.push({
               stepName: sName,
@@ -183,14 +196,22 @@ export function extractDepartmentFlows(
               updatedAt: sVal?.updatedAt,
             })
           }
-          if (steps.length > 0) {
-            steps.sort((a, b) => a.order - b.order)
-            autowebMap.set(subName, {
-              steps,
-              overallStatus: rawOverall ? String(rawOverall).toUpperCase() : 'PENDING',
-            })
-          }
         }
+        if (steps.length === 0) {
+          steps.push({
+            stepName: subName,
+            order: 1,
+            status: subStatus,
+            createdAt: resData?.createdAt,
+            updatedAt: resData?.updatedAt,
+          })
+        } else {
+          steps.sort((a, b) => a.order - b.order)
+        }
+        autowebMap.set(subName, {
+          steps,
+          overallStatus: subStatus,
+        })
       }
     }
 
@@ -237,6 +258,7 @@ export function extractDepartmentFlows(
       if (matchesDepartmentKey(key, targetDepartment)) {
         const deptObj = val as Record<string, any>
 
+        const isWebOrAutoTarget = targetDepartment.toUpperCase().includes("WEB") || targetDepartment.toUpperCase().includes("AUTO");
         for (const [subName, subVal] of Object.entries(deptObj)) {
           if (!subVal || typeof subVal !== 'object') continue
 
@@ -408,7 +430,7 @@ export function ServiceFlowModal({
   const [isSendingAck, setIsSendingAck] = useState(false)
 
   // Step confirmation dialog state
-  const [confirmingStep, setConfirmingStep] = useState<Phase1Step | null>(null)
+  const [confirmingStep, setConfirmingStep] = useState<{ step: Phase1Step; subServiceName: string } | null>(null)
   const [isCompletingStep, setIsCompletingStep] = useState(false)
 
   // Resolve the actual department strictly
@@ -578,11 +600,11 @@ export function ServiceFlowModal({
 
   // Determine if all steps are completed
   const allFlowsCompleted = useMemo(() => {
-    return (
-      steps.length > 0 &&
-      steps.every((s) => s.status.toUpperCase() === 'COMPLETED')
+    if (subServices.length === 0) return false
+    return subServices.every(
+      (sub) => sub.steps.length > 0 && sub.steps.every((s) => s.status.toUpperCase() === 'COMPLETED'),
     )
-  }, [steps])
+  }, [subServices])
 
   // Confirm and complete a flow step
   async function handleConfirmStepCompletion() {
@@ -590,48 +612,35 @@ export function ServiceFlowModal({
     setIsCompletingStep(true)
     setMessage(null)
 
+    const targetSubName = confirmingStep.subServiceName || subServiceName
+
     try {
       await updateServiceFlowStepStatus({
         customerId: customer.id,
-        subServiceName,
-        flowStepName: confirmingStep.stepName,
+        subServiceName: targetSubName,
+        flowStepName: confirmingStep.step.stepName,
         status: 'COMPLETED',
       })
-      notifyServiceCompleted(customer, confirmingStep.stepName, effectiveDept)
+      notifyServiceCompleted(customer, confirmingStep.step.stepName, effectiveDept)
 
-      // Optimistic update of the step
-      const updatedSteps = steps.map((s) =>
-        s.stepName === confirmingStep.stepName
-          ? { ...s, status: 'COMPLETED', updatedAt: new Date().toISOString() }
-          : s,
-      )
-
+      let updatedSubSteps: Phase1Step[] = []
       setSubServices((prev) =>
-        prev.map((sub, idx) =>
-          idx === activeSubServiceIndex ? { ...sub, steps: updatedSteps } : sub,
-        ),
+        prev.map((sub) => {
+          if (sub.name !== targetSubName) return sub
+          const updatedSteps = sub.steps.map((s) =>
+            s.stepName === confirmingStep.step.stepName
+              ? { ...s, status: 'COMPLETED', updatedAt: new Date().toISOString() }
+              : s,
+          )
+          updatedSubSteps = updatedSteps
+          return { ...sub, steps: updatedSteps }
+        }),
       )
 
-      // Auto-advance sub-service from PENDING to IN_PROGRESS on first completed step
-      if (subServiceStatus === 'PENDING') {
-        try {
-          await updateCustomerSubServiceStatus({
-            customerId: customer.id,
-            departmentType: effectiveDept,
-            subServiceName,
-            newStatus: 'IN_PROGRESS',
-          })
-          setSubServiceStatus('IN_PROGRESS')
-          onSubServiceStatusUpdated?.('IN_PROGRESS', subServiceName)
-        } catch {
-          // ignore background update error
-        }
-      }
-
-      onStepsUpdated?.(updatedSteps)
+      onStepsUpdated?.(updatedSubSteps)
       setMessage({
         type: 'success',
-        text: `"${confirmingStep.stepName}" has been marked as completed!`,
+        text: `"${confirmingStep.step.stepName}" has been marked as completed!`,
       })
       setConfirmingStep(null)
     } catch (err: any) {
@@ -791,158 +800,120 @@ export function ServiceFlowModal({
               </div>
             )}
 
-            {/* Sub-Service Tabs (if department has multiple subservices, e.g. Autowebsion) */}
-            {subServices.length > 1 && (
-              <div className="ssd-subservice-tabs">
-                {subServices.map((sub, idx) => (
-                  <button
-                    key={sub.name}
-                    type="button"
-                    className={`ssd-tab-btn ${idx === activeSubServiceIndex ? 'active' : ''}`}
-                    onClick={() => handleSelectSubService(idx)}
-                  >
-                    {sub.name}
-                  </button>
-                ))}
+            {isLoading ? (
+              <div style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
+                <Icon name="refresh" size={24} strokeWidth={2} className="animate-spin inline-block mb-2" />
+                <p style={{ fontSize: '13px' }}>Loading service flow...</p>
+              </div>
+            ) : error ? (
+              <div style={{ textAlign: 'center', padding: '24px 16px', color: '#ef4444' }}>
+                <p style={{ fontSize: '13px' }}>{error}</p>
+              </div>
+            ) : subServices.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
+                <p style={{ fontSize: '13px' }}>No service flow data available.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {subServices.map((sub) => {
+                  return (
+                    <div
+                      key={sub.name}
+                      className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden"
+                    >
+                      {/* Card Header matching Reference */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                        <span className="rounded-md bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold">
+                          {sub.name}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">
+                          {sub.steps.length} {sub.steps.length === 1 ? 'step' : 'steps'}
+                        </span>
+                      </div>
+
+                      {/* Step list matching Reference */}
+                      <ol className="divide-y divide-slate-100">
+                        {sub.steps.map((step, i) => {
+                          const isCompleted = step.status.toUpperCase() === 'COMPLETED'
+                          const isInProgress =
+                            step.status.toUpperCase() === 'IN_PROGRESS' ||
+                            step.status.toUpperCase() === 'IN-PROGRESS'
+                          const isAwaitingAck =
+                            step.status.toUpperCase() === 'PENDING_CUSTOMER_ACK'
+
+                          const badgeStyle = isCompleted
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : isInProgress
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : isAwaitingAck
+                                ? 'bg-violet-50 text-violet-700 border-violet-200'
+                                : 'bg-[#fff8eb] text-[#b45309] border-amber-200/80'
+
+                          const label = isCompleted
+                            ? 'Completed'
+                            : isInProgress
+                              ? 'In Progress'
+                              : isAwaitingAck
+                                ? 'Awaiting Ack'
+                                : 'Pending'
+
+                          const dateSource = step.updatedAt || step.createdAt
+                          const formattedDate = dateSource
+                            ? new Date(dateSource).toLocaleDateString('en-GB', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : ''
+
+                          return (
+                            <li
+                              key={`${sub.name}-${step.stepName}-${i}`}
+                              className={`flex items-center justify-between px-4 py-3 gap-3 ${
+                                !isCompleted && isEditable
+                                  ? 'cursor-pointer hover:bg-slate-50 transition-colors'
+                                  : ''
+                              }`}
+                              onClick={() => {
+                                if (!isCompleted && isEditable) {
+                                  setConfirmingStep({ step, subServiceName: sub.name })
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="flex h-8 w-8 shrink-0 rounded-full border border-slate-200 bg-white items-center justify-center font-semibold text-xs text-slate-700">
+                                  {step.order || i + 1}
+                                </span>
+                                <span className="text-xs font-medium text-slate-800 break-words">
+                                  {step.stepName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs border font-medium ${badgeStyle}`}
+                                >
+                                  <Icon
+                                    name={isCompleted ? 'check' : isInProgress ? 'clock' : 'alert'}
+                                    size={12}
+                                    strokeWidth={2.2}
+                                  />
+                                  <span>{label}</span>
+                                </span>
+                                {formattedDate && (
+                                  <span className="text-xs text-slate-500 whitespace-nowrap">
+                                    {formattedDate}
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    </div>
+                  )
+                })}
               </div>
             )}
-
-            {/* Sub-Service Card */}
-            <div className="ssd-subservice-card">
-              <div className="ssd-subservice-left">
-                <div className="ssd-subservice-icon">
-                  <Icon name="tag" size={18} strokeWidth={2} />
-                </div>
-                <div>
-                  <h3 className="ssd-subservice-name">{subServiceName}</h3>
-                  <p className="ssd-subservice-label">Sub-Service</p>
-                </div>
-              </div>
-              <span className={`ssd-badge ${statusMeta.className}`}>
-                <Icon name={statusMeta.icon} size={12} strokeWidth={2.5} />
-                <span>{statusMeta.label}</span>
-              </span>
-            </div>
-
-            {/* Service Flow Section */}
-            <div className="ssd-section">
-              <h4 className="ssd-section-title">Service Flow:</h4>
-
-              {isLoading ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                  <Icon name="refresh" size={20} strokeWidth={2} />
-                  <p style={{ marginTop: '8px', fontSize: '13px' }}>Loading service flow...</p>
-                </div>
-              ) : error ? (
-                <div style={{ textAlign: 'center', padding: '16px', color: '#ef4444' }}>
-                  <p style={{ fontSize: '13px' }}>{error}</p>
-                </div>
-              ) : steps.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                  <p style={{ fontSize: '13px' }}>No service flow steps found for this department.</p>
-                </div>
-              ) : (
-                <div className="ssd-flow-container">
-                  <div className="ssd-flow-header">
-                    <div className="ssd-flow-header-title">
-                      <span className="ssd-dot ssd-dot--blue" />
-                      <span>Service Flow Steps</span>
-                    </div>
-                    <div className="ssd-flow-counts">
-                      <span className="ssd-count-item">
-                        <span className="ssd-dot ssd-dot--emerald" />
-                        {steps.filter((s) => s.status.toUpperCase() === 'COMPLETED').length} completed
-                      </span>
-                      <span className="ssd-count-item">
-                        <span className="ssd-dot ssd-dot--blue" />
-                        {
-                          steps.filter(
-                            (s) =>
-                              s.status.toUpperCase() === 'IN_PROGRESS' ||
-                              s.status.toUpperCase() === 'IN-PROGRESS',
-                          ).length
-                        }{' '}
-                        in progress
-                      </span>
-                      <span className="ssd-count-item">
-                        <span className="ssd-dot ssd-dot--amber" />
-                        {
-                          steps.filter(
-                            (s) =>
-                              s.status.toUpperCase() === 'PENDING' ||
-                              s.status.toUpperCase() === 'PENDING_CUSTOMER_ACK',
-                          ).length
-                        }{' '}
-                        pending
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="ssd-step-list">
-                    {steps.map((step, index) => {
-                      const isCompleted = step.status.toUpperCase() === 'COMPLETED'
-                      const isInProgress =
-                        step.status.toUpperCase() === 'IN_PROGRESS' ||
-                        step.status.toUpperCase() === 'IN-PROGRESS'
-                      const dotClass = isCompleted
-                        ? 'ssd-dot--emerald'
-                        : isInProgress
-                          ? 'ssd-dot--blue'
-                          : 'ssd-dot--amber'
-
-                      const badgeClass = isCompleted
-                        ? 'ssd-badge--completed'
-                        : isInProgress
-                          ? 'ssd-badge--in-progress'
-                          : 'ssd-badge--pending'
-
-                      const stepIcon = isCompleted ? (
-                        <Icon name="check" size={13} strokeWidth={2.8} className="text-emerald-600" />
-                      ) : isInProgress ? (
-                        <Icon name="clock" size={12} strokeWidth={2.2} className="text-blue-600" />
-                      ) : (
-                        <Icon name="alert" size={12} strokeWidth={2.2} className="text-amber-500" />
-                      )
-
-                      const dateSource = step.updatedAt || step.createdAt
-                      const formattedDate = dateSource
-                        ? new Date(dateSource).toLocaleDateString('en-US')
-                        : new Date().toLocaleDateString('en-US')
-
-                      return (
-                        <div
-                          key={step.stepName}
-                          className={`ssd-step-row ${!isCompleted && isEditable ? 'ssd-step-row--clickable' : ''}`}
-                          onClick={() => {
-                            if (!isCompleted && isEditable) {
-                              setConfirmingStep(step)
-                            }
-                          }}
-                          title={
-                            !isCompleted && isEditable
-                              ? `Click to mark "${step.stepName}" as completed`
-                              : undefined
-                          }
-                        >
-                          <div className="ssd-step-num">{index + 1}</div>
-                          <span className={`ssd-dot ${dotClass}`} />
-                          <div className="ssd-step-content">
-                            <div className="ssd-step-title-wrap">
-                              <span className="ssd-step-title">{step.stepName}</span>
-                              {stepIcon}
-                            </div>
-                            <span className="ssd-step-date">Updated: {formattedDate}</span>
-                          </div>
-                          <span className={`ssd-badge ${badgeClass}`}>
-                            {isCompleted ? 'COMPLETED' : isInProgress ? 'IN PROGRESS' : 'PENDING'}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Read-Only Notice Box for Department Head */}
             {!isEditable && (
@@ -1042,8 +1013,7 @@ export function ServiceFlowModal({
             >
               <h3 className="ssd-confirm-title">Confirm Completion</h3>
               <p className="ssd-confirm-desc">
-                Mark "<strong>{confirmingStep.stepName}</strong>" as completed? This will complete
-                the step for sub-service "<strong>{subServiceName}</strong>".
+                Mark "<strong>{confirmingStep.step.stepName}</strong>" as completed? This will complete the step for sub-service "<strong>{confirmingStep.subServiceName}</strong>".
               </p>
               <div className="ssd-confirm-actions">
                 <button

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Building2, Check, Clock3, Hourglass, ListChecks } from 'lucide-react'
 import { getCustomerServiceFlow } from '../../../api/service-flow.api'
+import { fetchCustomerServiceFlowDetail } from '../../../api/autowebsion.api'
 import { matchesDepartmentKey } from '../customers-list/ServiceFlowModal'
 import type { Meeting, MeetingDepartment } from './MeetingList'
 import './DepartmentFlowModal.css'
@@ -66,6 +67,66 @@ function getSections(response: unknown, departmentType: string): FlowSection[] {
     .filter((section) => section.steps.length > 0)
 }
 
+/** WEBSITE_DEPARTMENT -> WEBSITE, AUTOMATION_DEPARTMENT -> AUTOMATION, others -> null. */
+function autowebsionServiceType(departmentType: string): 'WEBSITE' | 'AUTOMATION' | null {
+  const key = normalizeKey(departmentType)
+  if (key.startsWith('WEBSITE')) return 'WEBSITE'
+  if (key.startsWith('AUTOMATION')) return 'AUTOMATION'
+  return null
+}
+
+/**
+ * Sections from GET /api/autowebision/customers/{id}/services/{WEBSITE|AUTOMATION}/flow:
+ * every sub-service in `subServiceInfo` (e.g. "Website Created", "SEO Complete"),
+ * with its steps from `serviceFlowJson[subName]`, or the sub-service status alone.
+ */
+function getAutowebsionSections(response: unknown): FlowSection[] {
+  const data = (response as { data?: unknown })?.data ?? response
+  if (!data || typeof data !== 'object') return []
+  const { subServiceInfo, serviceFlowJson } = data as {
+    subServiceInfo?: unknown
+    serviceFlowJson?: unknown
+  }
+  const flowMap =
+    serviceFlowJson && typeof serviceFlowJson === 'object' && !Array.isArray(serviceFlowJson)
+      ? (serviceFlowJson as Record<string, unknown>)
+      : {}
+  const flowFor = (name: string) =>
+    Object.entries(flowMap).find(([key]) => normalizeKey(key) === normalizeKey(name))?.[1]
+
+  const toSteps = (value: unknown) =>
+    Object.entries((value ?? {}) as Record<string, unknown>)
+      .filter(([, step]) => Boolean(step && typeof step === 'object'))
+      .map(([name, step]) => ({
+        name,
+        status: String((step as FlowStep).status ?? 'PENDING'),
+        order: Number((step as FlowStep).order ?? Number.MAX_SAFE_INTEGER),
+      }))
+      .filter((step) => step.order >= 0)
+      .sort((a, b) => a.order - b.order)
+
+  const sections: FlowSection[] = []
+  const seen = new Set<string>()
+  for (const sub of Array.isArray(subServiceInfo) ? subServiceInfo : []) {
+    if (!sub || typeof sub !== 'object') continue
+    const entry = sub as Record<string, unknown>
+    // { name, status } or legacy { "Website Created": "COMPLETED" }
+    const name = String(entry.name ?? Object.keys(entry)[0] ?? '').trim()
+    if (!name || seen.has(normalizeKey(name))) continue
+    const status = String(entry.status ?? (entry.name ? 'PENDING' : Object.values(entry)[0]) ?? 'PENDING')
+    const steps = toSteps(flowFor(name))
+    seen.add(normalizeKey(name))
+    sections.push({ name, steps: steps.length > 0 ? steps : [{ name, status, order: 1 }] })
+  }
+  // Flow sections that have no subServiceInfo entry
+  for (const [name, value] of Object.entries(flowMap)) {
+    if (seen.has(normalizeKey(name)) || normalizeKey(name) === 'OVERALL_STATUS') continue
+    const steps = toSteps(value)
+    if (steps.length > 0) sections.push({ name, steps })
+  }
+  return sections
+}
+
 function formatStatus(status: string) {
   return status.replace(/[_-]+/g, ' ').toUpperCase()
 }
@@ -85,19 +146,42 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 export function DepartmentFlowModal({ selection, onClose }: DepartmentFlowModalProps) {
+  // Website / Automation keep their sub-services (Website Created, SEO Complete, ...)
+  // on their own service row, so they use the autowebision flow API.
+  const autowebType = selection ? autowebsionServiceType(selection.department.id) : null
+
   const flowQuery = useQuery({
     queryKey: ['meeting-customer-service-flow', selection?.meeting.id],
     queryFn: () => getCustomerServiceFlow(selection!.meeting.id),
-    enabled: Boolean(selection),
+    enabled: Boolean(selection) && !autowebType,
   })
 
+  const autowebFlowQuery = useQuery({
+    queryKey: ['meeting-autowebsion-service-flow', selection?.meeting.id, autowebType],
+    queryFn: () => fetchCustomerServiceFlowDetail(selection!.meeting.id, autowebType!),
+    enabled: Boolean(selection) && Boolean(autowebType),
+    staleTime: 60_000,
+  })
+
+  const activeQuery = autowebType ? autowebFlowQuery : flowQuery
+
   const sections = useMemo(
-    () => selection ? getSections(flowQuery.data, selection.department.id) : [],
-    [flowQuery.data, selection],
+    () => {
+      if (!selection) return []
+      return autowebType
+        ? getAutowebsionSections(autowebFlowQuery.data)
+        : getSections(flowQuery.data, selection.department.id)
+    },
+    [autowebType, autowebFlowQuery.data, flowQuery.data, selection],
   )
-  const overallStatus = sections
-    .find((section) => normalizeKey(section.name) === 'OVERALL_STATUS')
-    ?.steps.find((step) => normalizeKey(step.name) === 'SERVICE_STATUS')?.status
+  const autowebStatus = (
+    (autowebFlowQuery.data as { data?: { status?: string } } | undefined)?.data?.status
+  )
+  const overallStatus = autowebType
+    ? autowebStatus || undefined
+    : sections
+        .find((section) => normalizeKey(section.name) === 'OVERALL_STATUS')
+        ?.steps.find((step) => normalizeKey(step.name) === 'SERVICE_STATUS')?.status
 
   if (!selection) return null
 
@@ -146,17 +230,17 @@ export function DepartmentFlowModal({ selection, onClose }: DepartmentFlowModalP
           </header>
 
           <div className="department-flow__body">
-            {flowQuery.isPending ? (
+            {activeQuery.isPending ? (
               <div className="department-flow__loading" role="status" aria-label="Loading service details">
                 <div className="department-flow__skeleton department-flow__skeleton--heading" />
                 <div className="department-flow__skeleton" />
                 <div className="department-flow__skeleton" />
                 <div className="department-flow__skeleton department-flow__skeleton--short" />
               </div>
-            ) : flowQuery.isError ? (
+            ) : activeQuery.isError ? (
               <p className="department-flow__message department-flow__message--error" role="alert">
-                {flowQuery.error instanceof Error
-                  ? flowQuery.error.message
+                {activeQuery.error instanceof Error
+                  ? activeQuery.error.message
                   : 'Unable to load service details.'}
               </p>
             ) : sections.length === 0 ? (

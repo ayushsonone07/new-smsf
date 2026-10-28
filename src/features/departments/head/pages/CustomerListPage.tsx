@@ -26,7 +26,6 @@ import {
 import {
   updateDepartmentServiceStatus,
   extractServiceTags,
-  getDepartmentConfig,
   getServiceFlows,
 } from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
@@ -139,14 +138,25 @@ export function CustomerListPage() {
     return () => window.clearTimeout(timeout)
   }, [toast])
 
-  // 1. Department Config: GET /api/dept-config/{departmentType}
-  useQuery({
-    queryKey: ['deptConfig', currentDepartment],
-    queryFn: () => getDepartmentConfig(currentDepartment),
-    enabled: useRowsEndpoint,
-  })
-
   const role = (session?.user?.role || '').toUpperCase()
+<<<<<<< HEAD
+=======
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users') ||
+    currentPath.includes('departmentuser')
+
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    Boolean((session?.user as any)?.isHead === false) ||
+    isUserPath
+
+  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
+>>>>>>> 38848b4551fbe6f4e910e2bc29adc383fbcad4a5
 
   // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
   // fetched on demand (and cached) only when a status is set to Completed.
@@ -198,7 +208,7 @@ export function CustomerListPage() {
   const { isColumnEnabled } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = columnFeatures.canEdit('Status', true)
+  const canEditStatus = isDeptUser
 
   // Department users never see the Assign To column, even if it is configured.
   const isAssignToVisible =
@@ -212,7 +222,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark = columnFeatures.canEdit('Remark', true)
+  const canEditRemark = isDeptUser ? true : columnFeatures.canEdit('Remark', true)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
