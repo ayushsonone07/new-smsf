@@ -488,7 +488,7 @@ export function RegisterBusinessPage() {
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
   const verifiedPaymentAmount =
     paymentVerified && currentPaymentCheck?.amount != null
-      ? normalizeAmountToRupees(currentPaymentCheck.amount)
+      ? Number(currentPaymentCheck.amount)
       : null
 
   const handleVerifyPayment = useCallback(async () => {
@@ -521,7 +521,7 @@ export function RegisterBusinessPage() {
       })
 
       if (res.success && res.data?.amount != null) {
-        const verifiedAmt = normalizeAmountToRupees(res.data.amount)
+        const verifiedAmt = Number(res.data.amount)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
           const remaining = total - verifiedAmt
@@ -602,9 +602,10 @@ export function RegisterBusinessPage() {
           ? priceOf(pkg.name).withGst
           : priceOf(pkg.name).amount
         if (pkgPrice > verifiedPaymentAmount) {
+          const extra = pkgPrice - verifiedPaymentAmount
           showToast({
-            title: 'Package Exceeds Verified Amount',
-            description: `${pkg.name} price (₹${pkgPrice.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
+            title: 'Package Exceeds Verified Payment',
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -624,10 +625,12 @@ export function RegisterBusinessPage() {
             )
           }, 0)
 
-        if (otherSelectedCost + pkgPrice > verifiedPaymentAmount) {
+        const totalSelected = otherSelectedCost + pkgPrice
+        if (totalSelected > verifiedPaymentAmount) {
+          const extra = totalSelected - verifiedPaymentAmount
           showToast({
-            title: 'Total Exceeds Verified Amount',
-            description: `Total amount (₹${(otherSelectedCost + pkgPrice).toLocaleString('en-IN')}) cannot exceed verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
+            title: 'Total Exceeds Verified Payment',
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -881,9 +884,10 @@ export function RegisterBusinessPage() {
     if (paymentVerified && verifiedPaymentAmount != null) {
       const currentTotal = parseInt(formData.totalAmount) || autoTotal
       if (currentTotal > verifiedPaymentAmount) {
+        const extra = currentTotal - verifiedPaymentAmount
         showToast({
-          title: 'Amount Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) cannot exceed your verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}.`,
+          title: 'Total Exceeds Verified Payment',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please adjust your packages to match the paid amount.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
