@@ -48,6 +48,7 @@ export interface CustomersListModalProps {
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
+  onBillUploaded?: () => void | Promise<unknown>
   initialTab?: DrawerTab
   /** Fetch only the common customer profile endpoint (used by superadmin). */
   profileOnly?: boolean
@@ -268,6 +269,7 @@ export function CustomersListModal({
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
   onOpenFullPage,
+  onBillUploaded,
   initialTab,
   profileOnly = false,
   requestUsername,
@@ -617,6 +619,7 @@ export function CustomersListModal({
         extractBillingCustomers(refreshed.data).find(
           (item) => String(item.id) === String(billingCustomer.id),
         ) ?? billingCustomer
+      await onBillUploaded?.()
       const details = getBillingInvoice(refreshedCustomer)
       setInvoice((value) => ({
         ...value,
