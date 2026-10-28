@@ -1,4 +1,4 @@
-import { apiRequest, authedApiRequest, authedFileRequest, type ApiEnvelope } from './client'
+import { apiRequest, authedApiRequest, authedFileRequest } from './client'
 import { getSession } from '../app/auth/session'
 
 export interface CustomerProfileDetails {
