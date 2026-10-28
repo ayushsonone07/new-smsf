@@ -25,6 +25,7 @@ import {
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import {
   useCreateAnnouncement,
@@ -140,7 +141,11 @@ export function AnnouncementsPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div
+        className={`grid gap-4 transition-opacity md:grid-cols-3 ${
+          announcements.isFetching && !announcements.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         <MetricCard label="Total announcements" value={records.length} />
         <MetricCard label="Active" value={activeCount} tone="success" />
         <MetricCard label="Pinned" value={pinnedCount} tone="violet" />
@@ -180,10 +185,21 @@ export function AnnouncementsPage() {
               ariaLabel="Filter announcements by status"
             />
           </div>
+          <RefreshButton
+            onRefresh={() => announcements.refetch()}
+            isRefreshing={announcements.isFetching}
+            label="announcements"
+            className="h-10 w-10 shrink-0 self-end rounded-xl lg:self-auto"
+          />
         </div>
       </Card>
 
-      <Card padding="none" className="overflow-hidden">
+      <Card
+        padding="none"
+        className={`overflow-hidden transition-opacity ${
+          announcements.isFetching && !announcements.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         {announcements.isLoading ? (
           <div className="p-5">
             <TableSkeleton rows={6} />

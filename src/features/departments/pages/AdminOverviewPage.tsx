@@ -7,6 +7,7 @@ import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /**
  * SuperAdmin Overview tab (/admin/overview): company-wide service totals and one
@@ -24,6 +25,9 @@ export function AdminOverviewPage() {
     [departmentsQuery.data],
   )
 
+  // Refresh keeps the cards on screen; dim them while the refetch runs.
+  const isRefreshing = departmentsQuery.isFetching && !departmentsQuery.isPending
+
   return (
     <PageLayout>
       <PageHeader
@@ -36,6 +40,13 @@ export function AdminOverviewPage() {
         }
         title="Overview"
         description="Service totals across all departments."
+        actions={
+          <RefreshButton
+            onRefresh={() => departmentsQuery.refetch()}
+            isRefreshing={departmentsQuery.isFetching}
+            label="departments"
+          />
+        }
       />
 
       {departmentsQuery.isPending ? (
@@ -47,7 +58,12 @@ export function AdminOverviewPage() {
           onRetry={() => departmentsQuery.refetch()}
         />
       ) : (
-        <AdminOverview departmentTypes={departmentTypes} />
+        <div
+          className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={isRefreshing}
+        >
+          <AdminOverview departmentTypes={departmentTypes} />
+        </div>
       )}
     </PageLayout>
   )

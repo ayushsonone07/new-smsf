@@ -6,6 +6,7 @@ import { ErrorState } from '../ui/ErrorState'
 import { FilterTabs } from '../ui/FilterTabs'
 import { LoadingState } from '../ui/LoadingState'
 import { Pill } from '../ui/Pill'
+import { RefreshButton } from '../ui/RefreshButton'
 
 type HeadFilter = 'all' | 'heads' | 'members'
 
@@ -59,11 +60,18 @@ export function AllDepartmentsPanel() {
           { value: 'members', label: 'Members' },
         ]}
         trailing={
-          !departmentsQuery.isPending && !departmentsQuery.isError ? (
-            <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>
-              {totalElements} total
-            </span>
-          ) : undefined
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            {!departmentsQuery.isPending && !departmentsQuery.isError ? (
+              <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+                {totalElements} total
+              </span>
+            ) : null}
+            <RefreshButton
+              onRefresh={() => departmentsQuery.refetch()}
+              isRefreshing={departmentsQuery.isFetching}
+              label="departments"
+            />
+          </span>
         }
       />
 
@@ -76,7 +84,10 @@ export function AllDepartmentsPanel() {
           onRetry={() => departmentsQuery.refetch()}
         />
       ) : (
-        <>
+        <div
+          className={`transition-opacity ${departmentsQuery.isFetching ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={departmentsQuery.isFetching}
+        >
           <DataTable
             columns={[
               {
@@ -163,7 +174,7 @@ export function AllDepartmentsPanel() {
               Next →
             </Button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

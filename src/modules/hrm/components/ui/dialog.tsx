@@ -18,6 +18,8 @@ interface DialogProps {
   closable?: boolean | undefined;
   children: ReactNode;
   className?: string;
+  /** Extra header controls rendered next to the close button (e.g. a refresh button). */
+  headerActions?: ReactNode;
 }
 
 type DialogSize = "sm" | "md" | "lg" | "xl";
@@ -38,6 +40,7 @@ function Dialog({
   closable = true,
   children,
   className,
+  headerActions,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -136,15 +139,20 @@ function Dialog({
               </p>
             ) : null}
           </div>
-          {closable ? (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="-mr-1 -mt-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <X size={18} />
-            </button>
+          {headerActions || closable ? (
+            <div className="flex shrink-0 items-center gap-2">
+              {headerActions}
+              {closable ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close"
+                  className="-mr-1 -mt-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X size={18} />
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </header>
         <div className="overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>

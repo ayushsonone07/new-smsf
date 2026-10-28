@@ -10,6 +10,7 @@ import type {
   OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
 import { getSession } from '../../../../app/auth/session'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { useDepartmentColumnPermissions } from '../../../permissions/hooks/useDepartmentColumnPermissions'
 import { getAssigningUsers } from '../../../../api/meetings.api'
 import {
@@ -518,6 +519,15 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
               onChange={(event) => setSearchInput(event.target.value)}
             />
           </div>
+          <RefreshButton
+            onRefresh={async () => {
+              const result = await rowsQuery.refetch()
+              // Drop local assignee overrides so the freshly fetched assignees are shown.
+              if (result.isSuccess) setAssigneeOverrides({})
+            }}
+            isRefreshing={rowsQuery.isFetching}
+            label="delivered customers"
+          />
         </div>
       </div>
 
@@ -540,7 +550,10 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
         ) : rows.length === 0 ? (
           <div className="delivered-state">No customers found.</div>
         ) : (
-          <div className="delivered-table-wrap">
+          <div
+            className={`delivered-table-wrap transition-opacity${rowsQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+            aria-busy={rowsQuery.isFetching}
+          >
             <table className="delivered-table">
               <thead>
                 <tr>

@@ -18,6 +18,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ROUTES } from "@shared/constants";
 import { getApiErrorMessage } from "@shared/lib";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { employeeAttendanceService } from "../services/employeeAttendanceService";
 
@@ -125,6 +126,13 @@ export function EmployeeAttendanceHistoryPage() {
             <ArrowLeft size={15} />
             Back to Attendance
           </Link>
+          <div className="flex items-center gap-2">
+          <RefreshButton
+            onRefresh={() => query.refetch()}
+            isRefreshing={query.isFetching}
+            label="attendance history"
+            className="h-10 w-10 rounded-md print:hidden"
+          />
           <button
             type="button"
             onClick={() => data && exportPdf(data, visibleMonth)}
@@ -134,6 +142,7 @@ export function EmployeeAttendanceHistoryPage() {
             <Download size={15} />
             Export PDF
           </button>
+          </div>
         </div>
 
         {query.isLoading ? (
@@ -141,7 +150,12 @@ export function EmployeeAttendanceHistoryPage() {
         ) : query.error ? (
           <ErrorState message={getApiErrorMessage(query.error)} />
         ) : data ? (
-          <>
+          <div
+            className={`space-y-4 transition-opacity print:space-y-3 ${
+              query.isFetching ? "pointer-events-none opacity-60 print:opacity-100" : ""
+            }`}
+            aria-busy={query.isFetching}
+          >
             <EmployeeHeader data={data} />
             <StatsRow data={data} />
             <ControlsBar
@@ -160,7 +174,7 @@ export function EmployeeAttendanceHistoryPage() {
             ) : (
               <ListCard records={filteredRecords} />
             )}
-          </>
+          </div>
         ) : null}
       </div>
     </div>

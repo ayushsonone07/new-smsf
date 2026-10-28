@@ -2,10 +2,15 @@ import { Cake, Gift, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useBirthdaysToday, useUpcomingBirthdays } from "../hooks/useBirthdays";
 import { Card } from "@shared/components/ui";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 export function BirthdayWidget() {
-  const { data: todayBirthdays = [], isLoading: loadingToday } = useBirthdaysToday();
-  const { data: upcomingBirthdays = [], isLoading: loadingUpcoming } = useUpcomingBirthdays(7);
+  const todayQuery = useBirthdaysToday();
+  const upcomingQuery = useUpcomingBirthdays(7);
+  const { data: todayBirthdays = [], isLoading: loadingToday } = todayQuery;
+  const { data: upcomingBirthdays = [], isLoading: loadingUpcoming } = upcomingQuery;
+  const refreshing =
+    (todayQuery.isFetching || upcomingQuery.isFetching) && !loadingToday && !loadingUpcoming;
 
   if (loadingToday && loadingUpcoming) {
     return (
@@ -25,7 +30,11 @@ export function BirthdayWidget() {
     <div className="space-y-4">
       {/* Today's Birthdays Celebration Popup / Banner */}
       {todayBirthdays.length > 0 && (
-        <div className="relative overflow-hidden rounded-2xl border border-pink-500/40 bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-amber-500/15 p-5 shadow-lg backdrop-blur-md">
+        <div
+          className={`relative overflow-hidden rounded-2xl border border-pink-500/40 bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-amber-500/15 p-5 shadow-lg backdrop-blur-md transition-opacity ${
+            refreshing ? "opacity-60" : ""
+          }`}
+        >
           {/* Floating Balloons, Stars, and Emojis Background Animation */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <span className="absolute bottom-1 left-8 text-2xl anim-balloon-rise" style={{ animationDelay: "0s" }}>🎈</span>
@@ -79,11 +88,24 @@ export function BirthdayWidget() {
             <Gift size={16} className="text-primary" />
             Upcoming Birthdays (Next 7 Days)
           </h3>
-          <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-semibold text-primary">
-            {upcomingBirthdays.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {upcomingBirthdays.length}
+            </span>
+            <RefreshButton
+              onRefresh={() => Promise.all([todayQuery.refetch(), upcomingQuery.refetch()])}
+              isRefreshing={todayQuery.isFetching || upcomingQuery.isFetching}
+              label="birthdays"
+              size={13}
+              className="p-1"
+            />
+          </div>
         </div>
 
+        <div
+          className={`transition-opacity ${refreshing ? "pointer-events-none opacity-60" : ""}`}
+          aria-busy={refreshing}
+        >
         {upcomingBirthdays.length === 0 ? (
           <p className="py-4 text-center text-xs text-muted-foreground">No upcoming birthdays in the next 7 days.</p>
         ) : (
@@ -107,6 +129,7 @@ export function BirthdayWidget() {
             ))}
           </div>
         )}
+        </div>
       </motion.div>
     </div>
   );

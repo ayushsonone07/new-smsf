@@ -13,6 +13,7 @@ import type {
   TicketHistoryPageResponse,
 } from '../../../features/departments/types/help-center.types'
 import { fetchTicketHistory } from '../../../api/help-center.api'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 interface TicketStatusHistoryModalProps {
   isOpen: boolean
@@ -168,13 +169,20 @@ export function TicketStatusHistoryModal({
               <p className="text-xs font-mono font-semibold text-blue-600 mt-0.5">{ticketNumber}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <RefreshButton
+              onRefresh={() => loadHistory(page, pageSize)}
+              isRefreshing={loading}
+              label="status history"
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* 3 Summary Cards */}

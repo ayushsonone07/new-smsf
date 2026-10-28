@@ -93,6 +93,10 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
   const dues = duesQuery.data?.items ?? []
   const error = summaryQuery.error ?? duesQuery.error
   const isRefreshing = summaryQuery.isFetching || duesQuery.isFetching
+  // Light "refreshing" state for each section while its query re-fetches (first load has its own loader).
+  const summaryDimClass =
+    summaryQuery.isFetching && !summaryQuery.isLoading ? ' opacity-60 pointer-events-none' : ''
+  const duesDimClass = duesQuery.isFetching && !duesQuery.isLoading ? ' opacity-60 pointer-events-none' : ''
 
   const resetPage = <T,>(setter: (value: T) => void) => (value: T) => {
     setter(value)
@@ -181,7 +185,7 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
       )}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity${summaryDimClass}`}>
         {kpis.map((kpi) => (
           <div key={kpi.label} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -197,7 +201,7 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
       </div>
 
       {/* Aging, today, team */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity${summaryDimClass}`}>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -332,7 +336,7 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className={`overflow-x-auto transition-opacity${duesDimClass}`} aria-busy={duesQuery.isFetching}>
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase">
               <tr>

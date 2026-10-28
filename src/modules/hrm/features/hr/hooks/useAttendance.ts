@@ -37,6 +37,8 @@ export function useWeeklyAttendance(from: string, to: string) {
   return {
     records: query.data ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
   };
 }
 

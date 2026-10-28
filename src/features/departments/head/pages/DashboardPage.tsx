@@ -315,6 +315,18 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
     refetchPermissions()
   }
 
+  // Team performance table refresh: reloads only the members list.
+  function handleRefreshMembers() {
+    return infiniteMembersQuery.refetch()
+  }
+
+  // Light "refreshing" state for sections fed by each query (initial load shows LoadingState).
+  const summaryRefreshClass = summaryQuery.isFetching ? 'transition-opacity opacity-60 pointer-events-none' : 'transition-opacity'
+  const membersRefreshClass =
+    infiniteMembersQuery.isFetching && !infiniteMembersQuery.isFetchingNextPage
+      ? 'transition-opacity opacity-60 pointer-events-none'
+      : 'transition-opacity'
+
   // All dashboard totals and chart data come from the shared summary endpoint.
   const mergedKpis = {
     totalCustomers: summaryQuery.data?.kpis?.totalCustomers ?? 0,
@@ -486,12 +498,12 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
       </motion.div>
 
       {/* 2. Top Stats Grid (8 Cards + 3D Hero Illustration) */}
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryRefreshClass} aria-busy={summaryQuery.isFetching}>
         <DashboardStatCards stats={statsData} />
       </motion.div>
 
       {/* 3. Middle Row 1: Onboarding Trend & Team Target Achievement */}
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryRefreshClass} aria-busy={summaryQuery.isFetching}>
         <div className="hdb-row-two-col">
           <OnboardingTrend
             total={
@@ -516,7 +528,7 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
       </motion.div>
 
       {/* 4. Middle Row 2: Status Breakdown, Most Active Day & Delay Donut */}
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryRefreshClass} aria-busy={summaryQuery.isFetching}>
         <div className="hdb-row-three-col">
           <StatusBreakdown
             pendingCount={
@@ -563,11 +575,11 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
       </motion.div>
 
       {/* 5. Team Target & Performance Full Table */}
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={membersRefreshClass} aria-busy={infiniteMembersQuery.isFetching}>
         <TeamTargetPerformance
           members={teamMembers}
           onSelectMember={setSelectedMember}
-          onRefresh={handleRefresh}
+          onRefresh={handleRefreshMembers}
           hasNextPage={Boolean(infiniteMembersQuery.hasNextPage)}
           isFetchingNextPage={Boolean(infiniteMembersQuery.isFetchingNextPage)}
           onLoadMore={handleLoadMoreMembers}

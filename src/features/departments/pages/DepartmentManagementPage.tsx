@@ -24,6 +24,7 @@ import { PageLayout } from '../../../components/layout/PageLayout'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import './DepartmentManagementPage.css'
 import { notifyHeadDeleted } from '../../../api/notification-factory'
 
@@ -157,6 +158,8 @@ export function DepartmentManagementPage() {
     )
   }
 
+  const isRefreshing = departmentsQuery.isFetching
+
   return (
     <PageLayout>
       <div className="department-management-page">
@@ -184,6 +187,12 @@ export function DepartmentManagementPage() {
               <h2>Department List</h2>
               <p>Total {departments.length} department account(s) registered</p>
             </div>
+
+            <RefreshButton
+              onRefresh={() => departmentsQuery.refetch()}
+              isRefreshing={departmentsQuery.isFetching}
+              label="departments"
+            />
           </div>
 
           <DepartmentFilters
@@ -191,6 +200,10 @@ export function DepartmentManagementPage() {
             onSearchChange={setSearch}
           />
 
+          <div
+            className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isRefreshing}
+          >
           <DepartmentTable
             departments={filteredDepartments}
             onEdit={setEditingDepartment}
@@ -206,6 +219,7 @@ export function DepartmentManagementPage() {
                 : null
             }
           />
+          </div>
         </Card>
 
         {editingDepartment ? (

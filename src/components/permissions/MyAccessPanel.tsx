@@ -10,6 +10,7 @@ import { ErrorState } from '../ui/ErrorState'
 import { FilterTabs } from '../ui/FilterTabs'
 import { LoadingState } from '../ui/LoadingState'
 import { Pill } from '../ui/Pill'
+import { RefreshButton } from '../ui/RefreshButton'
 import type { PillTone } from '../ui/Pill'
 
 type AccessTab = 'routes' | 'columns'
@@ -46,27 +47,42 @@ export function MyAccessPanel() {
 
   const routes = routesQuery.data ?? []
   const columns = columnsQuery.data ?? []
+  // The refresh icon only reloads the list behind the active tab.
+  const activeQuery = tab === 'routes' ? routesQuery : columnsQuery
 
   return (
     <div>
-      <FilterTabs<AccessTab>
-        ariaLabel="My routes and columns"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          {
-            value: 'routes',
-            label: 'Routes',
-            count: routesQuery.data?.length,
-          },
-          {
-            value: 'columns',
-            label: 'Columns',
-            count: columnsQuery.data?.length,
-          },
-        ]}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <FilterTabs<AccessTab>
+          ariaLabel="My routes and columns"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            {
+              value: 'routes',
+              label: 'Routes',
+              count: routesQuery.data?.length,
+            },
+            {
+              value: 'columns',
+              label: 'Columns',
+              count: columnsQuery.data?.length,
+            },
+          ]}
+        />
+        <RefreshButton
+          onRefresh={() => activeQuery.refetch()}
+          isRefreshing={activeQuery.isFetching}
+          label={tab === 'routes' ? 'routes' : 'columns'}
+        />
+      </div>
 
+      <div
+        className={`transition-opacity ${
+          activeQuery.isFetching && !activeQuery.isPending ? 'pointer-events-none opacity-60' : ''
+        }`}
+        aria-busy={activeQuery.isFetching}
+      >
       {tab === 'routes' ? (
         routesQuery.isPending ? (
           <LoadingState message="Loading your routes..." />
@@ -151,6 +167,7 @@ export function MyAccessPanel() {
           emptyState="No columns configured for your role yet."
         />
       )}
+      </div>
     </div>
   )
 }

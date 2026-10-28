@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Send, Eye, EyeOff, Save, Mail, CheckCircle2 } from 'lucide-react'
 import {
   getHrmSmtpConfig,
@@ -6,6 +6,7 @@ import {
   testHrmSmtpEmail,
   type HrmSmtpConfig,
 } from '../../../api/config.api'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 interface HrmSmtpTabProps {
   onNotify: (msg: string, type?: 'success' | 'error') => void
@@ -28,6 +29,10 @@ export function HrmSmtpTab({ onNotify }: HrmSmtpTabProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // Bumped by the refresh button to re-run the config load below.
+  const [reloadKey, setReloadKey] = useState(0)
+  // Last config loaded from the server, used to warn before a refresh discards unsaved edits.
+  const loadedConfigRef = useRef(JSON.stringify(DEFAULT_HRM_SMTP))
 
   // Test modal/input
   const [testEmail, setTestEmail] = useState('')
@@ -36,24 +41,36 @@ export function HrmSmtpTab({ onNotify }: HrmSmtpTabProps) {
   useEffect(() => {
     let cancelled = false
     getHrmSmtpConfig().then((cfg: HrmSmtpConfig | null) => {
-      if (!cancelled && cfg) {
-        setFormData({
-          ...DEFAULT_HRM_SMTP,
-          ...cfg,
-        })
+      if (!cancelled) {
+        // Re-sync the form with the server (falls back to defaults when nothing is saved).
+        const next = { ...DEFAULT_HRM_SMTP, ...(cfg ?? {}) }
+        loadedConfigRef.current = JSON.stringify(next)
+        setFormData(next)
       }
       setLoading(false)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadKey])
+
+  const handleRefresh = () => {
+    if (
+      JSON.stringify(formData) !== loadedConfigRef.current &&
+      !window.confirm('Discard your unsaved HRM SMTP changes and reload from the server?')
+    ) {
+      return
+    }
+    setLoading(true)
+    setReloadKey((key) => key + 1)
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
       await saveHrmSmtpConfig(formData)
+      loadedConfigRef.current = JSON.stringify(formData)
       onNotify('HRM SMTP settings saved successfully', 'success')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save HRM SMTP configuration'
@@ -105,9 +122,16 @@ export function HrmSmtpTab({ onNotify }: HrmSmtpTabProps) {
             </p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
-          <CheckCircle2 className="w-3.5 h-3.5" /> HRM Module
-        </span>
+        <div className="flex items-center gap-2">
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isRefreshing={loading}
+            label="HRM SMTP configuration"
+          />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+            <CheckCircle2 className="w-3.5 h-3.5" /> HRM Module
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

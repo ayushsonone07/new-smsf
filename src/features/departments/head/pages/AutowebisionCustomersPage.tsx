@@ -28,6 +28,7 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { TablePagination } from '../../../../components/ui/TablePagination'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
 import { ServiceFlowModal } from '../../../../components/head/customers-list/ServiceFlowModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
@@ -190,32 +191,16 @@ export function AutowebisionCustomersPage({
     }
   }, [defaultSubTab])
 
-  const handleOpenClientRemarkDialog = useCallback(
-    async (customer: AutowebsionCustomerLightDTO) => {
-      const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
-        activeSubTab === 'AUTOMATION' || isAutomationScreen
-          ? 'AUTOMATION_DEPARTMENT'
-          : activeSubTab === 'WEBSITE' || isWebsiteScreen
-            ? 'WEBSITE_DEPARTMENT'
-            : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
-                ? 'AUTOMATION_DEPARTMENT'
-                : 'WEBSITE_DEPARTMENT')
+  // Customer whose client remarks are open, so the dialog's refresh button can reload them.
+  const clientRemarkCustomerRef = useRef<AutowebsionCustomerLightDTO | null>(null)
 
+  // Fetches the client remarks for one customer into the open Client Remark dialog.
+  const loadClientRemarks = useCallback(
+    async (
+      customer: AutowebsionCustomerLightDTO,
+      targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT',
+    ) => {
       const initialText = customer.clientRemark?.trim()
-      const initialRemarks: Array<{ reply: string; timestamp: string; staffName?: string }> = initialText
-        ? [{ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' }]
-        : []
-
-      setViewingClientRemark({
-        customerId: customer.customerId,
-        name: customer.businessName || customer.ownerName || 'Customer',
-        departmentType: targetDept,
-        remarks: initialRemarks,
-        loading: true,
-        error: null,
-      })
-      setNewClientRemarkText('')
-
       try {
         const [reviewRepliesRes, generalRemarksRes] = await Promise.allSettled([
           getCustomerReviewReplies(customer.customerId, targetDept),
@@ -270,7 +255,39 @@ export function AutowebisionCustomersPage({
         )
       }
     },
-    [activeSubTab, isAutomationScreen, isWebsiteScreen, userEmail],
+    [userEmail],
+  )
+
+  const handleOpenClientRemarkDialog = useCallback(
+    async (customer: AutowebsionCustomerLightDTO) => {
+      const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
+        activeSubTab === 'AUTOMATION' || isAutomationScreen
+          ? 'AUTOMATION_DEPARTMENT'
+          : activeSubTab === 'WEBSITE' || isWebsiteScreen
+            ? 'WEBSITE_DEPARTMENT'
+            : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
+                ? 'AUTOMATION_DEPARTMENT'
+                : 'WEBSITE_DEPARTMENT')
+
+      const initialText = customer.clientRemark?.trim()
+      const initialRemarks: Array<{ reply: string; timestamp: string; staffName?: string }> = initialText
+        ? [{ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' }]
+        : []
+
+      clientRemarkCustomerRef.current = customer
+      setViewingClientRemark({
+        customerId: customer.customerId,
+        name: customer.businessName || customer.ownerName || 'Customer',
+        departmentType: targetDept,
+        remarks: initialRemarks,
+        loading: true,
+        error: null,
+      })
+      setNewClientRemarkText('')
+
+      await loadClientRemarks(customer, targetDept)
+    },
+    [activeSubTab, isAutomationScreen, isWebsiteScreen, loadClientRemarks],
   )
 
   // Modals state
@@ -926,6 +943,32 @@ export function AutowebisionCustomersPage({
     }
   }
 
+  // Fetches the internal remarks for one customer into the open Internal Remarks dialog.
+  const loadInternalRemarks = useCallback(
+    (customerId: number, departmentType: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT') =>
+      getCustomerInternalRemarks(customerId, departmentType, userEmail)
+        .then((data) => {
+          const list = Array.isArray(data) ? data : []
+          setViewingInternalRemarks((prev) =>
+            prev && prev.customerId === customerId
+              ? { ...prev, remarks: list, loading: false }
+              : prev,
+          )
+        })
+        .catch((err) => {
+          setViewingInternalRemarks((prev) =>
+            prev && prev.customerId === customerId
+              ? {
+                  ...prev,
+                  error: err instanceof Error ? err.message : 'Failed to fetch remarks',
+                  loading: false,
+                }
+              : prev,
+          )
+        }),
+    [userEmail],
+  )
+
   // Handle on-demand fetching of internal remarks for Website or Automation
   const handleOpenFullRemarkDialog = useCallback(
     (
@@ -944,29 +987,10 @@ export function AutowebisionCustomersPage({
       })
 
       if (!hasPreloaded) {
-        getCustomerInternalRemarks(customer.customerId, departmentType, userEmail)
-          .then((data) => {
-            const list = Array.isArray(data) ? data : []
-            setViewingInternalRemarks((prev) =>
-              prev && prev.customerId === customer.customerId
-                ? { ...prev, remarks: list, loading: false }
-                : prev,
-            )
-          })
-          .catch((err) => {
-            setViewingInternalRemarks((prev) =>
-              prev && prev.customerId === customer.customerId
-                ? {
-                    ...prev,
-                    error: err instanceof Error ? err.message : 'Failed to fetch remarks',
-                    loading: false,
-                  }
-                : prev,
-            )
-          })
+        void loadInternalRemarks(customer.customerId, departmentType)
       }
     },
-    [userEmail],
+    [loadInternalRemarks],
   )
 
   // Website Draft Handlers
@@ -1406,9 +1430,13 @@ export function AutowebisionCustomersPage({
 
           <button
             type="button"
-            onClick={() => {
-              customersQuery.refetch()
-              countsQuery.refetch()
+            onClick={async () => {
+              const [customersResult] = await Promise.all([
+                customersQuery.refetch(),
+                countsQuery.refetch(),
+              ])
+              // Drop optimistic status overrides so the freshly fetched statuses are shown.
+              if (customersResult.isSuccess) setLocalStatusMap({})
             }}
             disabled={customersQuery.isFetching}
             className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 transition-all shadow-none"
@@ -1531,7 +1559,12 @@ export function AutowebisionCustomersPage({
       </div>
 
       {/* Main Customers Table Card */}
-      <div className="autoweb-table-card">
+      <div
+        className={`autoweb-table-card transition-opacity${
+          customersQuery.isFetching && !customersQuery.isPending ? ' opacity-60 pointer-events-none' : ''
+        }`}
+        aria-busy={customersQuery.isFetching}
+      >
         {customersQuery.isPending ? (
           <LoadingState message="Loading Autowebsion customers..." />
         ) : customersQuery.isError ? (
@@ -2466,13 +2499,26 @@ export function AutowebisionCustomersPage({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => setViewingClientRemark(null)}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <RefreshButton
+                  onRefresh={() => {
+                    const customer = clientRemarkCustomerRef.current
+                    if (!customer || customer.customerId !== viewingClientRemark.customerId) return
+                    const targetDept = viewingClientRemark.departmentType
+                    setViewingClientRemark((prev) => (prev ? { ...prev, loading: true, error: null } : prev))
+                    return loadClientRemarks(customer, targetDept)
+                  }}
+                  isRefreshing={viewingClientRemark.loading}
+                  label="client remarks"
+                />
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setViewingClientRemark(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Add Remark Form */}
@@ -2649,13 +2695,24 @@ export function AutowebisionCustomersPage({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => setViewingInternalRemarks(null)}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <RefreshButton
+                  onRefresh={() => {
+                    const { customerId, departmentType } = viewingInternalRemarks
+                    setViewingInternalRemarks((prev) => (prev ? { ...prev, loading: true, error: null } : prev))
+                    return loadInternalRemarks(customerId, departmentType)
+                  }}
+                  isRefreshing={viewingInternalRemarks.loading}
+                  label="internal remarks"
+                />
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setViewingInternalRemarks(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Body */}

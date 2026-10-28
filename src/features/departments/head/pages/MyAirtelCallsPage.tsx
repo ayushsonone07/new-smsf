@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getSession } from '../../../../app/auth/session'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import {
   getMyAirtelCalls,
@@ -134,11 +135,14 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
   const [pagination, setPagination] = useState<AirtelPagination | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Bumped by the refresh button to re-run only the calls + analytics load below.
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Detail modal
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<AirtelCallDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailId, setDetailId] = useState<number | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -213,9 +217,10 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
       .catch(() => { /* analytics failure is non-critical */ })
 
     return () => { cancelled = true }
-  }, [buildQuery, analyticsQuery, isHead, departmentType, page])
+  }, [buildQuery, analyticsQuery, isHead, departmentType, page, reloadKey])
 
   const openDetail = async (id: number) => {
+    setDetailId(id)
     setDetailOpen(true)
     setDetail(null)
     setDetailLoading(true)
@@ -369,6 +374,13 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
           >
             ↺ Reset
           </button>
+
+          <RefreshButton
+            className="mb-1"
+            onRefresh={() => setReloadKey((key) => key + 1)}
+            isRefreshing={loading}
+            label="calls"
+          />
         </div>
       </div>
 
@@ -515,12 +527,21 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
               <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                 📞 Call Details
               </h3>
-              <button
-                onClick={() => setDetailOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-xl"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {detailId !== null && (
+                  <RefreshButton
+                    onRefresh={() => openDetail(detailId)}
+                    isRefreshing={detailLoading}
+                    label="call details"
+                  />
+                )}
+                <button
+                  onClick={() => setDetailOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {detailLoading ? (

@@ -19,6 +19,13 @@ import { OnboardingConfirmationModal } from '../../../../components/head/custome
 import { ServiceFlowModal } from '../../../../components/head/customers-list/ServiceFlowModal'
 import { GoogleInfoModal } from '../../../../components/head/customers-list/GoogleInfoModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
+import { DeliveryConfirmationModal } from '../components/DeliveryConfirmationModal'
+import { ServiceDeliveryHistoryModal } from '../components/ServiceDeliveryHistoryModal'
+import {
+  getCustomerDeliveryLinks,
+  getServiceDeliveryHistory,
+  type DeliveryConfirmationData,
+} from '../../../../api/department-users.api'
 import {
   SubServiceValidationModal,
   type SubServiceStatusItem,
@@ -58,6 +65,7 @@ import { getCustomerFormUrl } from '../../../../utils/urlEncryption'
 import type { UpdateCustomerRequest } from '../../types/customer.types'
 import { initiateAirtelClickToCall } from '../../../../api/airtel.api'
 import { recordCustomerActivity } from '../../../../utils/customerActivity'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 
 /**
  * Head panel — Customer List. Renders the customers-list UI
@@ -83,6 +91,13 @@ export function CustomerListPage() {
       window.location.pathname.startsWith('/google-head') ||
       window.location.pathname.startsWith('/google-user') ||
       window.location.pathname.startsWith('/google')
+    ))
+  const isSupport =
+    resolvedDept.toUpperCase().includes('SUPPORT') ||
+    (typeof window !== 'undefined' && (
+      window.location.pathname.startsWith('/support-head') ||
+      window.location.pathname.startsWith('/support-user') ||
+      window.location.pathname.startsWith('/support')
     ))
   const currentDepartment = isGoogle ? 'GOOGLE_DEPARTMENT' : (resolvedDept || 'ONBOARDING_DEPARTMENT')
   const isOnboardingDept = currentDepartment === 'ONBOARDING_DEPARTMENT'
@@ -131,6 +146,63 @@ export function CustomerListPage() {
     message: string
   } | null>(null)
   const [callingCustomerId, setCallingCustomerId] = useState<string | null>(null)
+  const [deliveryModalCustomer, setDeliveryModalCustomer] = useState<{
+    customer: OnboardingCustomer
+    initialData: Partial<DeliveryConfirmationData> | null
+  } | null>(null)
+  const [deliveryHistoryCustomer, setDeliveryHistoryCustomer] = useState<OnboardingCustomer | null>(null)
+  const [deliveryCompletionMap, setDeliveryCompletionMap] = useState<Record<string, number | null>>({})
+  const [deliveryStatusMap, setDeliveryStatusMap] = useState<Record<string, boolean>>({})
+  const [loadingDeliveryLinksForCustId, setLoadingDeliveryLinksForCustId] = useState<string | null>(null)
+
+  async function handleOpenDeliveryConfirmation(customer: OnboardingCustomer) {
+    const custId = customer.id
+    setLoadingDeliveryLinksForCustId(custId)
+    let initialData: Partial<DeliveryConfirmationData> | null = null
+    try {
+      if (customer.email) {
+        try {
+          initialData = await getCustomerDeliveryLinks(custId, customer.email)
+        } catch {
+          initialData = null
+        }
+      }
+      try {
+        const hist = await getServiceDeliveryHistory(custId)
+        if (hist) {
+          if (typeof hist.completionPercentage === 'number') {
+            setDeliveryCompletionMap((prev) => ({ ...prev, [custId]: hist.completionPercentage! }))
+          }
+          const emailSent = Boolean(hist.isSent?.email)
+          const whatsappSent = Boolean(hist.isSent?.whatsapp)
+          if (emailSent || whatsappSent) {
+            setDeliveryStatusMap((prev) => ({ ...prev, [custId]: true }))
+          }
+          if (hist.Data && Object.keys(hist.Data).length > 0) {
+            initialData = {
+              ...(initialData || {}),
+              ...(hist.Data as any),
+              profileLink:
+                (hist.Data as any).profileLink ||
+                (hist.Data as any).googleBusinessProfileLink ||
+                initialData?.profileLink ||
+                '',
+              positiveReviewQrUsername:
+                (hist.Data as any).positiveReviewQrUsername ||
+                (hist.Data as any).reviewUsUsername ||
+                initialData?.positiveReviewQrUsername ||
+                '',
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setDeliveryModalCustomer({ customer, initialData })
+    } finally {
+      setLoadingDeliveryLinksForCustId(null)
+    }
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -670,6 +742,22 @@ export function CustomerListPage() {
     }
   }
 
+  // Reloads only this list: the active customer rows plus their tab counts.
+  async function handleRefreshList() {
+    const [listResult] = await Promise.all([
+      activeCustomerQuery.refetch(),
+      ...(isOnboardingDept ? [authSummaryQuery.refetch(), customersQuery.refetch()] : []),
+    ])
+    // Drop optimistic overrides so the freshly fetched status / assignee values are shown.
+    if (listResult.isSuccess) {
+      setLocalStatusMap({})
+      setLocalAssigneeMap({})
+    }
+  }
+
+  const isListRefreshing =
+    activeCustomerQuery.isFetching || (isOnboardingDept && authSummaryQuery.isFetching)
+
   async function handleCallCustomer(customer: OnboardingCustomer) {
     setCallingCustomerId(customer.id)
     try {
@@ -908,20 +996,27 @@ export function CustomerListPage() {
           />
         }
         actionsSlot={
-          showRoundRobinToggle ? (
-            <button
-              type="button"
-              className={`cl-filter-btn${roundRobinEnabled ? ' is-open' : ''}`}
-              title={roundRobinEnabled ? 'Disable round robin assignment' : 'Enable round robin assignment'}
-              onClick={() => {
-                setRoundRobinError(null)
-                setRoundRobinDialogOpen(true)
-              }}
-              disabled={roundRobinQuery.isPending}
-            >
-              ⇄ Round Robin: {roundRobinQuery.isPending ? '…' : roundRobinEnabled ? 'ON' : 'OFF'}
-            </button>
-          ) : undefined
+          <>
+            <RefreshButton
+              onRefresh={handleRefreshList}
+              isRefreshing={isListRefreshing}
+              label="customers"
+            />
+            {showRoundRobinToggle ? (
+              <button
+                type="button"
+                className={`cl-filter-btn${roundRobinEnabled ? ' is-open' : ''}`}
+                title={roundRobinEnabled ? 'Disable round robin assignment' : 'Enable round robin assignment'}
+                onClick={() => {
+                  setRoundRobinError(null)
+                  setRoundRobinDialogOpen(true)
+                }}
+                disabled={roundRobinQuery.isPending}
+              >
+                ⇄ Round Robin: {roundRobinQuery.isPending ? '…' : roundRobinEnabled ? 'ON' : 'OFF'}
+              </button>
+            ) : null}
+          </>
         }
         assignees={assignees}
         selectedAssigneeId={selectedAssigneeId}
@@ -932,60 +1027,73 @@ export function CustomerListPage() {
         onReset={handleResetFilters}
       />
 
-      <CustomersList
-        customers={filteredCustomers}
-        isLoading={isCustomersLoading}
-        assignees={assignees}
-        canEdit={canEdit}
-        showStatus={isStatusVisible}
-        canEditStatus={canEditStatus}
-        showAssignTo={isAssignToVisible}
-        canEditAssignTo={canEditAssignTo}
-        showRemark={isRemarkVisible}
-        canEditRemark={!isHead && canEditRemark}
-        showContact={isContactVisible}
-        canEditContact={canEditContact}
-        showBusiness={isBusinessVisible}
-        showUpdated={false}
-        showServiceType={useRowsEndpoint && isServiceTypeVisible}
-        isGoogle={isGoogle}
-        isDepartmentUser={isDeptUser}
-        onOpenServiceFlow={(cust, subName) => {
-          if (currentDepartment === 'BILLING_DEPARTMENT') {
+      <div
+        className={`transition-opacity${
+          activeCustomerQuery.isFetching && !isCustomersLoading ? ' opacity-60 pointer-events-none' : ''
+        }`}
+        aria-busy={activeCustomerQuery.isFetching}
+      >
+        <CustomersList
+          customers={filteredCustomers}
+          isLoading={isCustomersLoading}
+          assignees={assignees}
+          canEdit={canEdit}
+          showStatus={isStatusVisible}
+          canEditStatus={canEditStatus}
+          showAssignTo={isAssignToVisible}
+          canEditAssignTo={canEditAssignTo}
+          showRemark={isRemarkVisible}
+          canEditRemark={!isHead && canEditRemark}
+          showContact={isContactVisible}
+          canEditContact={canEditContact}
+          showBusiness={isBusinessVisible}
+          showUpdated={false}
+          showServiceType={useRowsEndpoint && isServiceTypeVisible}
+          isGoogle={isGoogle}
+          isDepartmentUser={isDeptUser}
+          isSupport={isSupport}
+          isDepartmentHead={isHead}
+          deliveryCompletionMap={deliveryCompletionMap}
+          deliveryStatusMap={deliveryStatusMap}
+          onOpenDeliveryConfirmation={(cust) => handleOpenDeliveryConfirmation(cust)}
+          onOpenDeliveryHistory={(cust) => setDeliveryHistoryCustomer(cust)}
+          onOpenServiceFlow={(cust, subName) => {
+            if (currentDepartment === 'BILLING_DEPARTMENT') {
+              setSelectedCustomer(cust)
+              setModalTab('bill-upload')
+              return
+            }
+            setServiceFlowCustomer(cust)
+            setSelectedSubServiceName(subName)
+          }}
+          onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
+          onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
+          onOpenDetail={(cust, tab) => {
             setSelectedCustomer(cust)
-            setModalTab('bill-upload')
-            return
-          }
-          setServiceFlowCustomer(cust)
-          setSelectedSubServiceName(subName)
-        }}
-        onOpenServiceTags={(cust) => setServiceTagsCustomer(cust)}
-        onOpenGoogleInfo={(cust) => setGoogleInfoCustomer(cust)}
-        onOpenDetail={(cust, tab) => {
-          setSelectedCustomer(cust)
-          setModalTab(tab)
-        }}
-        onOpenDuplicate={(cust) => {
-          setSelectedCustomer(cust)
-          setModalTab('duplicates')
-        }}
-        onStatusChange={(id, status) => handleStatusChange(id, status)}
-        onCallCustomer={handleCallCustomer}
-        callingCustomerId={callingCustomerId}
-        onSendAcknowledgement={setConfirmingCustomer}
-        onAssigneeChange={handleAssignUser}
-        onRemarkChange={(id, remark) => {
-          if (isHead) {
-            alert("Department Head cannot add or update internal remarks.")
-            return
-          }
-          if (!canEditRemark) {
-            alert("You don't have permission to update internal remarks.")
-            return
-          }
-          patchCustomer(id, { remark })
-        }}
-      />
+            setModalTab(tab)
+          }}
+          onOpenDuplicate={(cust) => {
+            setSelectedCustomer(cust)
+            setModalTab('duplicates')
+          }}
+          onStatusChange={(id, status) => handleStatusChange(id, status)}
+          onCallCustomer={handleCallCustomer}
+          callingCustomerId={callingCustomerId}
+          onSendAcknowledgement={setConfirmingCustomer}
+          onAssigneeChange={handleAssignUser}
+          onRemarkChange={(id, remark) => {
+            if (isHead) {
+              alert("Department Head cannot add or update internal remarks.")
+              return
+            }
+            if (!canEditRemark) {
+              alert("You don't have permission to update internal remarks.")
+              return
+            }
+            patchCustomer(id, { remark })
+          }}
+        />
+      </div>
 
       {/* Table Pagination */}
       <TablePagination
@@ -1060,6 +1168,52 @@ export function CustomerListPage() {
         isOpen={Boolean(googleInfoCustomer)}
         onClose={() => setGoogleInfoCustomer(null)}
       />
+
+      {deliveryModalCustomer && (
+        <DeliveryConfirmationModal
+          open={Boolean(deliveryModalCustomer)}
+          customerId={deliveryModalCustomer.customer.id}
+          customerName={
+            deliveryModalCustomer.customer.businessName ||
+            deliveryModalCustomer.customer.contactName ||
+            'Customer'
+          }
+          initialData={deliveryModalCustomer.initialData}
+          readOnly={isHead}
+          onClose={() => setDeliveryModalCustomer(null)}
+          onSuccess={async (result) => {
+            setDeliveryStatusMap((prev) => ({
+              ...prev,
+              [deliveryModalCustomer.customer.id]: true,
+            }))
+            await activeCustomerQuery.refetch()
+            setToast({
+              type: 'success',
+              title: 'Delivery Confirmation',
+              message: result.message || 'Delivery confirmation sent successfully.',
+            })
+          }}
+        />
+      )}
+
+      {deliveryHistoryCustomer && (
+        <ServiceDeliveryHistoryModal
+          open={Boolean(deliveryHistoryCustomer)}
+          customerId={deliveryHistoryCustomer.id}
+          customerName={
+            deliveryHistoryCustomer.businessName ||
+            deliveryHistoryCustomer.contactName ||
+            'Customer'
+          }
+          onClose={() => setDeliveryHistoryCustomer(null)}
+          onHistoryLoaded={(cId, pct, isDeliv) => {
+            if (pct !== null) {
+              setDeliveryCompletionMap((prev) => (prev[cId] === pct ? prev : { ...prev, [cId]: pct }))
+            }
+            setDeliveryStatusMap((prev) => (prev[cId] === isDeliv ? prev : { ...prev, [cId]: isDeliv }))
+          }}
+        />
+      )}
 
       {/* Sub-Service Validation / Acknowledgment Modal */}
       <SubServiceValidationModal

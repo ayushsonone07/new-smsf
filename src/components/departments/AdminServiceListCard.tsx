@@ -28,6 +28,7 @@ import {
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Modal } from '../ui/Modal'
+import { RefreshButton } from '../ui/RefreshButton'
 import { AddAdminServiceModal } from './AddAdminServiceModal'
 
 interface AdminServiceListCardProps {
@@ -176,6 +177,12 @@ export function AdminServiceListCard({
       }),
     enabled: isTimelineModalOpen,
   })
+
+  // Light dimming while a section re-fetches data it already shows (first loads keep their own spinners).
+  const refreshingStyle = (query: { isFetching: boolean; isPending: boolean }) =>
+    query.isFetching && !query.isPending
+      ? { opacity: 0.6, pointerEvents: 'none' as const, transition: 'opacity 150ms' }
+      : { transition: 'opacity 150ms' }
 
   const updateTimelineMutation = useMutation({
     mutationFn: updateAdminServiceTimeline,
@@ -525,13 +532,39 @@ export function AdminServiceListCard({
       <Card>
         <div className="table-toolbar">
           <div>
-            <h2>
-              {onlyServiceList
-                ? 'Service List'
-                : showPlans
-                  ? 'Plans Management'
-                  : 'Services Management (Service List)'}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <h2>
+                {onlyServiceList
+                  ? 'Service List'
+                  : showPlans
+                    ? 'Plans Management'
+                    : 'Services Management (Service List)'}
+              </h2>
+              {/* Reloads only the list currently shown (plans or services). */}
+              {showPlans && !onlyServiceList ? (
+                <RefreshButton
+                  onRefresh={() => plansQuery.refetch()}
+                  isRefreshing={plansQuery.isFetching}
+                  label="plans"
+                />
+              ) : (
+                <RefreshButton
+                  onRefresh={() =>
+                    onlyServiceList
+                      ? servicesQuery.refetch()
+                      : Promise.all([
+                          servicesQuery.refetch(),
+                          pendingTimelineQuery.refetch(),
+                        ])
+                  }
+                  isRefreshing={
+                    servicesQuery.isFetching ||
+                    (!onlyServiceList && pendingTimelineQuery.isFetching)
+                  }
+                  label="services"
+                />
+              )}
+            </div>
             <p>
               {onlyServiceList
                 ? `Total ${services.length} service(s) registered in the system.`
@@ -683,6 +716,7 @@ export function AdminServiceListCard({
           </div>
         </div>
 
+        <div style={refreshingStyle(showPlans && !onlyServiceList ? plansQuery : servicesQuery)}>
         {!showPlans ? (
           <>
             <div
@@ -1438,6 +1472,7 @@ export function AdminServiceListCard({
             )}
           </>
         )}
+        </div>
       </Card>
 
       {/* Add / Edit Service Modal */}
@@ -1788,9 +1823,24 @@ export function AdminServiceListCard({
         }}
         size="lg"
         title={
-          isAddSubservicesOpen
-            ? 'Add Services to Plan'
-            : 'Associated Services'
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            {isAddSubservicesOpen
+              ? 'Add Services to Plan'
+              : 'Associated Services'}
+            {isAddSubservicesOpen ? (
+              <RefreshButton
+                onRefresh={() => allAvailableSubservicesQuery.refetch()}
+                isRefreshing={allAvailableSubservicesQuery.isFetching}
+                label="available services"
+              />
+            ) : (
+              <RefreshButton
+                onRefresh={() => planSubservicesQuery.refetch()}
+                isRefreshing={planSubservicesQuery.isFetching}
+                label="associated services"
+              />
+            )}
+          </span>
         }
         description={
           selectedPlanForSubservices
@@ -1799,7 +1849,7 @@ export function AdminServiceListCard({
         }
       >
         {!isAddSubservicesOpen ? (
-          <div>
+          <div style={refreshingStyle(planSubservicesQuery)}>
             {planSubservicesQuery.isLoading ? (
               <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                 Loading associated services...
@@ -1868,7 +1918,7 @@ export function AdminServiceListCard({
             </div>
           </div>
         ) : (
-          <div>
+          <div style={refreshingStyle(allAvailableSubservicesQuery)}>
             {allAvailableSubservicesQuery.isLoading ? (
               <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                 Loading available services...
@@ -1964,7 +2014,25 @@ export function AdminServiceListCard({
         open={isTimelineModalOpen}
         onClose={() => setIsTimelineModalOpen(false)}
         size="lg"
-        title="⏱ Service Timelines Management"
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            ⏱ Service Timelines Management
+            {/* Reloads only the active tab's list. */}
+            {timelineTab === 'set' ? (
+              <RefreshButton
+                onRefresh={() => adminFlowsQuery.refetch()}
+                isRefreshing={adminFlowsQuery.isFetching}
+                label="service timelines"
+              />
+            ) : (
+              <RefreshButton
+                onRefresh={() => pendingTimelineQuery.refetch()}
+                isRefreshing={pendingTimelineQuery.isFetching}
+                label="pending approvals"
+              />
+            )}
+          </span>
+        }
         description="SuperAdmin direct control: Set or update turnaround timeline (in days) for any department service, or review pending approval requests."
       >
         {/* Tab switchers */}
@@ -2056,7 +2124,7 @@ export function AdminServiceListCard({
 
         {/* TAB 1: Set / Update Any Timeline */}
         {timelineTab === 'set' && (
-          <div>
+          <div style={refreshingStyle(adminFlowsQuery)}>
             <div
               style={{
                 backgroundColor: '#f0f9ff',
@@ -2338,7 +2406,7 @@ export function AdminServiceListCard({
 
         {/* TAB 2: Pending Approvals */}
         {timelineTab === 'pending' && (
-          <div>
+          <div style={refreshingStyle(pendingTimelineQuery)}>
             {pendingTimelineQuery.isLoading ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>
                 Loading pending timeline requests...

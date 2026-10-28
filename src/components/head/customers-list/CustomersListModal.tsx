@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { motion, AnimatePresence, type Variants } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
+import { useIsFetching, useQuery, type Query } from '@tanstack/react-query'
 import './CustomersList.css'
 import { getSession } from '../../../app/auth/session'
 import { useQueryClient } from '@tanstack/react-query'
@@ -16,6 +16,7 @@ import {
 } from '../../../api/billing.api'
 import { Button } from '../../ui/Button'
 import { Icon } from '../shared/Icon'
+import { RefreshButton } from '../../ui/RefreshButton'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
 import { useCustomerDrawerDetails } from '../../../features/departments/hooks/useCustomerDrawerDetails'
 import type {
@@ -201,6 +202,33 @@ const HOURGLASS_ICON =
 
 /** Department that is allowed to upload generated bills. */
 const BILL_UPLOAD_DEPARTMENT = 'BILLING_DEPARTMENT'
+
+// Query keys owned by useCustomerDrawerDetails (overview / remarks / deliverables /
+// activity tabs). The drawer's refresh icon re-requests only these for those tabs.
+const DRAWER_DETAIL_QUERY_KEYS = new Set([
+  'customer-drawer-profile',
+  'customer-drawer-review-replies',
+  'customer-drawer-remarks',
+  'customer-drawer-internal-remarks',
+  'customer-drawer-superadmin-remarks',
+  'customer-drawer-rows',
+])
+
+function isDrawerDetailQuery(query: Query) {
+  return DRAWER_DETAIL_QUERY_KEYS.has(String(query.queryKey[0]))
+}
+
+/** Editable invoice draft seeded from a billing record. */
+function invoiceDraftFromBilling(record: BillingCustomer) {
+  const details = getBillingInvoice(record)
+  return {
+    invoiceNo: details.invoiceNo || `INV-${record.id}`,
+    date: details.invoiceDate.slice(0, 10),
+    amount: details.invoiceAmount,
+    status: details.status,
+    billingLink: details.billingLink,
+  }
+}
 const BILL_FILE_ACCEPT = '.pdf,.doc,.docx,image/*,video/*'
 
 const overlayVariants: Variants = {
@@ -503,6 +531,8 @@ export function CustomersListModal({
     staleTime: 60_000,
   })
 
+  const isDrawerDetailsFetching = useIsFetching({ predicate: isDrawerDetailQuery }) > 0
+
   const duplicateItems = useMemo(() => {
     const fromApi = duplicatesQuery.data ?? []
     if (fromApi.length > 0) return fromApi
@@ -579,15 +609,8 @@ export function CustomersListModal({
   // Seed the editable invoice draft once per billing record. Re-seeding is
   // keyed on the billing id so background refetches never clobber user edits.
   if (billingCustomer && invoiceDraftId !== billingCustomer.id) {
-    const details = getBillingInvoice(billingCustomer)
     setInvoiceDraftId(billingCustomer.id)
-    setInvoice({
-      invoiceNo: details.invoiceNo || `INV-${billingCustomer.id}`,
-      date: details.invoiceDate.slice(0, 10),
-      amount: details.invoiceAmount,
-      status: details.status,
-      billingLink: details.billingLink,
-    })
+    setInvoice(invoiceDraftFromBilling(billingCustomer))
     setInvoiceError('')
     setInvoiceSuccess('')
   }
@@ -673,6 +696,53 @@ export function CustomersListModal({
       setInvoiceSaving(false)
     }
   }
+
+  // Bill Upload refresh: re-read the billing record, then re-seed the invoice draft
+  // from it — unless the user has unsaved edits in the draft, which are kept.
+  async function refreshBilling() {
+    if (!billingSearch) return
+    const previous = billingCustomer
+    const refreshed = await billingQuery.refetch()
+    if (!previous) return
+    const fresh = extractBillingCustomers(refreshed.data).find(
+      (item) => String(item.id) === String(previous.id),
+    )
+    if (!fresh) return
+    const seeded = invoiceDraftFromBilling(previous)
+    setInvoice((value) => {
+      const hasUnsavedEdits = (Object.keys(seeded) as (keyof typeof seeded)[]).some(
+        (key) => value[key] !== seeded[key],
+      )
+      return hasUnsavedEdits ? value : invoiceDraftFromBilling(fresh)
+    })
+  }
+
+  // Refresh icon in the drawer header: reloads only the active tab's data.
+  function refreshActiveTab() {
+    switch (activeTab) {
+      case 'recurring':
+        if (!departmentType || !Number.isFinite(recurringCustomerId)) return
+        return recurringQuery.refetch()
+      case 'bill-upload':
+        return refreshBilling()
+      case 'duplicates':
+        return duplicatesQuery.refetch()
+      default:
+        setLocalActivities(getCustomerActivities(current?.id, current?.phone))
+        return queryClient.invalidateQueries({ predicate: isDrawerDetailQuery })
+    }
+  }
+
+  const activeTabQueryState =
+    activeTab === 'recurring'
+      ? { isFetching: recurringQuery.isFetching, isLoading: recurringQuery.isLoading }
+      : activeTab === 'bill-upload'
+        ? { isFetching: billingQuery.isFetching, isLoading: billingQuery.isLoading }
+        : activeTab === 'duplicates'
+          ? { isFetching: duplicatesQuery.isFetching, isLoading: duplicatesQuery.isLoading }
+          : { isFetching: isDrawerDetailsFetching, isLoading: apiDetails.isLoading }
+  // Dim the tab content while it re-fetches data it already shows (first loads keep their own states).
+  const isActiveTabRefreshing = activeTabQueryState.isFetching && !activeTabQueryState.isLoading
 
   const allBusinesses = useMemo(() => {
     if (!customer) return []
@@ -1052,6 +1122,11 @@ export function CustomersListModal({
                     {current.contactDate}
                   </span>
                 )}
+                <RefreshButton
+                  onRefresh={refreshActiveTab}
+                  isRefreshing={activeTabQueryState.isFetching}
+                  label="this tab"
+                />
                 {isSuperAdmin && (
                   <div
                     ref={exportMenuRef}
@@ -1324,6 +1399,10 @@ export function CustomersListModal({
             ))}
           </div>
 
+          <div
+            className={`transition-opacity ${isActiveTabRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={activeTabQueryState.isFetching}
+          >
           {/* Overview */}
           {activeTab === 'overview' && (
             <motion.div
@@ -2529,6 +2608,7 @@ export function CustomersListModal({
               </div>
             </motion.div>
           )}
+          </div>
         </div>
       </motion.div>
     </>

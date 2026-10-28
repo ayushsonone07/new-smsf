@@ -12,6 +12,7 @@ import { useDepartments, useDesignations } from "../hooks";
 import { hrService } from "../services";
 
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import type { Candidate, CreateEmployeeInput, EmploymentType, UserRole } from "../types";
 
@@ -142,6 +143,13 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       title="Create employee"
       description={candidate ? "Create the employee record first, then send the onboarding form." : "Create an employee directly, then continue onboarding setup."}
       size="lg"
+      headerActions={
+        <RefreshButton
+          onRefresh={() => Promise.all([departments.refetch(), designations.refetch(), managers.refetch()])}
+          isRefreshing={departments.isFetching || designations.isFetching || managers.isFetching}
+          label="departments, designations and managers"
+        />
+      }
     >
       <form onSubmit={submit} noValidate>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
@@ -278,7 +286,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                     update("departmentId", e.target.value ? Number(e.target.value) : 0);
                     update("designationId", null);
                   }}
-                  className={fieldClass(errors.departmentId)}
+                  className={`${fieldClass(errors.departmentId)}${refreshingClass(departments)}`}
                   disabled={mutation.isPending || departments.isLoading}
                 >
                   <option value="">
@@ -303,7 +311,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                   onChange={(e) =>
                     update("designationId", e.target.value ? Number(e.target.value) : null)
                   }
-                  className={fieldClass(errors.designationId)}
+                  className={`${fieldClass(errors.designationId)}${refreshingClass(designations)}`}
                   disabled={mutation.isPending || designations.isLoading}
                 >
                   <option value="">
@@ -329,7 +337,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                   onChange={(e) =>
                     update("managerId", e.target.value ? Number(e.target.value) : null)
                   }
-                  className={fieldClass(errors.managerId)}
+                  className={`${fieldClass(errors.managerId)}${refreshingClass(managers)}`}
                   disabled={mutation.isPending || managers.isLoading}
                 >
                   <option value="">
@@ -458,6 +466,11 @@ function Field({ id, label, required, error, input }: FieldProps) {
       {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
     </div>
   );
+}
+
+/** Dims a lookup dropdown while its options are being re-fetched in the background. */
+function refreshingClass(query: { isFetching: boolean; isLoading: boolean }): string {
+  return query.isFetching && !query.isLoading ? " opacity-60" : "";
 }
 
 function fieldClass(error?: string): string {

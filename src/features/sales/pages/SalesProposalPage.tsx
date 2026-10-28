@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { ACTIVE_API_BASE_URL } from "../../../config/api.config";
+import { RefreshButton } from "../../../components/ui/RefreshButton";
 
 // Templates + sending live ENTIRELY in the CRM backend (static/template/sales-*.html), sent from
 // info@mbgcard.com. This page just collects inputs and calls the backend.
@@ -145,6 +146,7 @@ const publicApi = {
 export function SalesProposalPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [packages, setPackages] = useState<Array<{ key: string; label: string }>>([]);
+  const [packagesRefreshing, setPackagesRefreshing] = useState(false);
   const [showNewOnly, setShowNewOnly] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -182,13 +184,28 @@ export function SalesProposalPage() {
     }
   }, [form]);
 
-  // Load the package list from the backend.
+  // Load the package list from the backend (on mount and from the packages refresh button).
+  const loadPackages = useCallback(
+    () =>
+      publicApi
+        .get<{ success?: boolean; data?: Array<{ key: string; label: string }> }>("/sales/packages")
+        .then((r) => setPackages(r.data?.data ?? FALLBACK_PACKAGES))
+        .catch(() => setPackages(FALLBACK_PACKAGES)),
+    [],
+  );
+
   useEffect(() => {
-    publicApi
-      .get<{ success?: boolean; data?: Array<{ key: string; label: string }> }>("/sales/packages")
-      .then((r) => setPackages(r.data?.data ?? FALLBACK_PACKAGES))
-      .catch(() => setPackages(FALLBACK_PACKAGES));
-  }, []);
+    void loadPackages();
+  }, [loadPackages]);
+
+  const refreshPackages = async () => {
+    setPackagesRefreshing(true);
+    try {
+      await loadPackages();
+    } finally {
+      setPackagesRefreshing(false);
+    }
+  };
 
   // All Plans = old plans only. New Plans button = ONLY the 5 new plans.
   const visiblePackages = showNewOnly
@@ -477,8 +494,20 @@ export function SalesProposalPage() {
                   >
                     New GMB Plans (5)
                   </button>
+                  <RefreshButton
+                    onRefresh={refreshPackages}
+                    isRefreshing={packagesRefreshing}
+                    label="packages"
+                    size={13}
+                    className="ml-auto"
+                  />
                 </div>
-                <select className={input} value={form.packageKey} onChange={(e) => set("packageKey", e.target.value)}>
+                <select
+                  className={`${input} transition-opacity ${packagesRefreshing ? "pointer-events-none opacity-60" : ""}`}
+                  aria-busy={packagesRefreshing}
+                  value={form.packageKey}
+                  onChange={(e) => set("packageKey", e.target.value)}
+                >
                   {visiblePackages.map((p) => (
                     <option key={p.key} value={p.key}>
                       {p.label}
@@ -684,7 +713,8 @@ export function SalesProposalPage() {
             <iframe
               title="Email preview"
               srcDoc={previewHtml}
-              className="h-[640px] w-full rounded-lg border border-slate-200 bg-white"
+              aria-busy={previewLoading}
+              className={`h-[640px] w-full rounded-lg border border-slate-200 bg-white transition-opacity ${previewLoading ? "opacity-60" : ""}`}
             />
           </div>
         </div>

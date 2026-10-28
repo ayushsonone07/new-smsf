@@ -48,6 +48,7 @@ import { canonicalSourceKey, prettySource } from "@features/hr/utils/source";
 import { useReportsData } from "@features/reports/hooks";
 import type { RecruitmentFunnelStage } from "@features/reports/types";
 import { AnimatedFilterSelect, AnimatedNumber, StaggerContainer, StaggerItem } from "@shared/components/ui";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { DashboardChartCard } from "../components/DashboardChartCard";
 import { DashboardLayout } from "../components/DashboardLayout";
@@ -84,8 +85,9 @@ function DashboardHeaderCard({
   title,
   description,
   filter,
+  refresh,
   children,
-}: DashboardHeaderProps & { children: ReactNode }) {
+}: DashboardHeaderProps & { refresh?: ReactNode; children: ReactNode }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -98,7 +100,10 @@ function DashboardHeaderCard({
           <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
           <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
         </div>
-        <div className="shrink-0">{filter}</div>
+        <div className="flex shrink-0 items-center gap-2">
+          {filter}
+          {refresh}
+        </div>
       </div>
       <div className="pt-4">{children}</div>
     </motion.section>
@@ -188,7 +193,26 @@ function TimeAttendanceDashboard({ title, description, filter }: DashboardHeader
 return (
     <StaggerContainer className="space-y-5">
       <StaggerItem variant="card">
-      <DashboardHeaderCard title={title} description={description} filter={filter}>
+      <DashboardHeaderCard
+        title={title}
+        description={description}
+        filter={filter}
+        refresh={
+          <RefreshButton
+            onRefresh={() =>
+              Promise.all([
+                todayAttendanceQuery.refetch(),
+                weeklyAttendance.refetch(),
+                weeklyLeaveStatusQuery.refetch(),
+              ])
+            }
+            isRefreshing={
+              todayAttendanceQuery.isFetching || weeklyAttendance.isFetching || weeklyLeaveStatusQuery.isFetching
+            }
+            label="attendance dashboard"
+          />
+        }
+      >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -222,7 +246,11 @@ return (
       </StaggerItem>
 
       <StaggerItem>
-      <section className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className={`grid auto-rows-fr grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-4 ${
+          todayAttendanceQuery.isFetching && !todayAttendanceQuery.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         <WorkforceMetric
           delay={0.05}
           label="Present today"
@@ -264,7 +292,18 @@ return (
 
       <StaggerItem variant="card">
       <section>
-        <DashboardChartCard title="Check-in & check-out status" loading={weeklyAttendance.isLoading}>
+        <DashboardChartCard
+          title="Check-in & check-out status"
+          loading={weeklyAttendance.isLoading}
+          actions={
+            <RefreshButton
+              onRefresh={() => weeklyAttendance.refetch()}
+              isRefreshing={weeklyAttendance.isFetching}
+              label="check-in & check-out status"
+            />
+          }
+          refreshing={weeklyAttendance.isFetching && !weeklyAttendance.isLoading}
+        >
           <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Weekly check-in and check-out breakdown across your team
@@ -280,7 +319,18 @@ return (
 
       <StaggerItem variant="card">
       <section>
-        <DashboardChartCard title="Leave status" loading={weeklyLeaveStatusQuery.isLoading}>
+        <DashboardChartCard
+          title="Leave status"
+          loading={weeklyLeaveStatusQuery.isLoading}
+          actions={
+            <RefreshButton
+              onRefresh={() => weeklyLeaveStatusQuery.refetch()}
+              isRefreshing={weeklyLeaveStatusQuery.isFetching}
+              label="leave status"
+            />
+          }
+          refreshing={weeklyLeaveStatusQuery.isFetching && !weeklyLeaveStatusQuery.isLoading}
+        >
           <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Weekly leave approvals and rejections
@@ -487,7 +537,18 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
   return (
     <StaggerContainer className="space-y-5">
       <StaggerItem variant="card">
-      <DashboardHeaderCard title={title} description={description} filter={filter}>
+      <DashboardHeaderCard
+        title={title}
+        description={description}
+        filter={filter}
+        refresh={
+          <RefreshButton
+            onRefresh={() => Promise.all([employeesQuery.refetch(), attendanceQuery.refetch()])}
+            isRefreshing={employeesQuery.isFetching || attendanceQuery.isFetching}
+            label="employees dashboard"
+          />
+        }
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -519,7 +580,11 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
       </StaggerItem>
 
       <StaggerItem>
-      <section className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className={`grid auto-rows-fr grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-4 ${
+          employeesQuery.isFetching && !employeesQuery.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         <WorkforceMetric
           delay={0.05}
           label="Total employees"
@@ -563,6 +628,14 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
           title="Workforce health"
+          actions={
+            <RefreshButton
+              onRefresh={() => Promise.all([employeesQuery.refetch(), attendanceQuery.refetch()])}
+              isRefreshing={employeesQuery.isFetching || attendanceQuery.isFetching}
+              label="workforce health"
+            />
+          }
+          refreshing={(employeesQuery.isFetching || attendanceQuery.isFetching) && !employeesQuery.isLoading && !attendanceQuery.isLoading}
           className="xl:col-span-5"
           loading={employeesQuery.isLoading || attendanceQuery.isLoading}
         >
@@ -578,6 +651,14 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
         </DashboardChartCard>
         <DashboardChartCard
           title="Department distribution"
+          actions={
+            <RefreshButton
+              onRefresh={() => employeesQuery.refetch()}
+              isRefreshing={employeesQuery.isFetching}
+              label="department distribution"
+            />
+          }
+          refreshing={employeesQuery.isFetching && !employeesQuery.isLoading}
           className="xl:col-span-7"
           loading={employeesQuery.isLoading}
         >
@@ -593,6 +674,14 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
           title="Onboarded by"
+          actions={
+            <RefreshButton
+              onRefresh={() => employeesQuery.refetch()}
+              isRefreshing={employeesQuery.isFetching}
+              label="onboarded by"
+            />
+          }
+          refreshing={employeesQuery.isFetching && !employeesQuery.isLoading}
           className="xl:col-span-12"
           loading={employeesQuery.isLoading}
         >
@@ -611,6 +700,14 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
         </div>
         <DashboardChartCard
           title="Onboarding status"
+          actions={
+            <RefreshButton
+              onRefresh={() => employeesQuery.refetch()}
+              isRefreshing={employeesQuery.isFetching}
+              label="onboarding status"
+            />
+          }
+          refreshing={employeesQuery.isFetching && !employeesQuery.isLoading}
           className="xl:col-span-5"
           loading={employeesQuery.isLoading}
         >
@@ -997,7 +1094,18 @@ function RecruitmentDashboard({ title, description, filter }: DashboardHeaderPro
 return (
     <StaggerContainer className="space-y-5">
       <StaggerItem variant="card">
-      <DashboardHeaderCard title={title} description={description} filter={filter}>
+      <DashboardHeaderCard
+        title={title}
+        description={description}
+        filter={filter}
+        refresh={
+          <RefreshButton
+            onRefresh={() => Promise.all([kpis.refetch(), charts.refetch(), reports.refetch()])}
+            isRefreshing={kpis.isFetching || charts.isFetching || reports.isFetching}
+            label="recruitment dashboard"
+          />
+        }
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -1047,7 +1155,11 @@ return (
       </StaggerItem>
 
       <StaggerItem>
-      <section className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className={`grid auto-rows-fr grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-4 ${
+          (kpis.isFetching || charts.isFetching) && !kpis.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         <RecruitmentMetric
           label="Total candidates"
           value={data?.totalCandidates}
@@ -1085,6 +1197,14 @@ return (
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
           title="Candidate intake"
+          actions={
+            <RefreshButton
+              onRefresh={() => charts.refetch()}
+              isRefreshing={charts.isFetching}
+              label="candidate intake"
+            />
+          }
+          refreshing={charts.isFetching && !charts.isLoading}
           className="xl:col-span-7"
           loading={charts.isLoading}
           emptyMessage="No candidate intake has been recorded for this period."
@@ -1102,6 +1222,14 @@ return (
 
         <DashboardChartCard
           title="Profile completion"
+          actions={
+            <RefreshButton
+              onRefresh={() => kpis.refetch()}
+              isRefreshing={kpis.isFetching}
+              label="profile completion"
+            />
+          }
+          refreshing={kpis.isFetching && !kpis.isLoading}
           className="xl:col-span-5"
           loading={kpis.isLoading}
           emptyMessage="Add candidates to see profile quality."
@@ -1115,6 +1243,14 @@ return (
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
           title="Candidate sources"
+          actions={
+            <RefreshButton
+              onRefresh={() => charts.refetch()}
+              isRefreshing={charts.isFetching}
+              label="candidate sources"
+            />
+          }
+          refreshing={charts.isFetching && !charts.isLoading}
           className="xl:col-span-12"
           loading={charts.isLoading}
           emptyMessage="No source data has been recorded yet."
@@ -1136,6 +1272,14 @@ return (
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
           title="Recruitment funnel"
+          actions={
+            <RefreshButton
+              onRefresh={() => reports.refetch()}
+              isRefreshing={reports.isFetching}
+              label="recruitment funnel"
+            />
+          }
+          refreshing={reports.isFetching && !reports.isLoading}
           className="xl:col-span-12"
           loading={reports.isLoading}
           isEmpty={recruitmentFunnel.length === 0}

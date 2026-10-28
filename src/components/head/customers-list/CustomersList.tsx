@@ -89,6 +89,12 @@ export interface CustomersListProps {
   canEditContact?: boolean
   isGoogle?: boolean
   isDepartmentUser?: boolean
+  isSupport?: boolean
+  isDepartmentHead?: boolean
+  deliveryCompletionMap?: Record<string, number | null>
+  deliveryStatusMap?: Record<string, boolean>
+  onOpenDeliveryConfirmation?: (customer: OnboardingCustomer) => void
+  onOpenDeliveryHistory?: (customer: OnboardingCustomer) => void
   /* Accepted so existing pages keep compiling; the table doesn't use them yet. */
   showRemark?: boolean
   canEditRemark?: boolean
@@ -180,6 +186,12 @@ export function CustomersList({
   onOpenServiceTags,
   isGoogle = false,
   isDepartmentUser,
+  isSupport = false,
+  isDepartmentHead = false,
+  deliveryCompletionMap,
+  deliveryStatusMap,
+  onOpenDeliveryConfirmation,
+  onOpenDeliveryHistory,
   onOpenGoogleInfo,
   showRemark = true,
   canEditRemark,
@@ -364,6 +376,20 @@ export function CustomersList({
               canEditContact={canEditContact}
               isGoogle={isGoogle}
               isDepartmentUser={isDepartmentUser}
+              isSupport={isSupport}
+              isDepartmentHead={isDepartmentHead}
+              deliveryCompletionMap={deliveryCompletionMap}
+              deliveryStatusMap={deliveryStatusMap}
+              onOpenDeliveryConfirmation={
+                onOpenDeliveryConfirmation
+                  ? () => onOpenDeliveryConfirmation(customer)
+                  : undefined
+              }
+              onOpenDeliveryHistory={
+                onOpenDeliveryHistory
+                  ? () => onOpenDeliveryHistory(customer)
+                  : undefined
+              }
               showStatus={showStatus}
               canEditStatus={canEditStatus}
               showAssignTo={showAssignTo}
@@ -752,6 +778,12 @@ interface CustomerRowProps {
   onOpenServiceTags?: () => void
   isGoogle?: boolean
   isDepartmentUser?: boolean
+  isSupport?: boolean
+  isDepartmentHead?: boolean
+  deliveryCompletionMap?: Record<string, number | null>
+  deliveryStatusMap?: Record<string, boolean>
+  onOpenDeliveryConfirmation?: () => void
+  onOpenDeliveryHistory?: () => void
   onOpenGoogleInfo?: () => void
   canEdit: boolean
   showBusiness?: boolean
@@ -789,6 +821,12 @@ function CustomerRow({
   onOpenServiceFlow,
   isGoogle = false,
   isDepartmentUser: _isDepartmentUser,
+  isSupport = false,
+  isDepartmentHead = false,
+  deliveryCompletionMap,
+  deliveryStatusMap,
+  onOpenDeliveryConfirmation,
+  onOpenDeliveryHistory,
   onOpenGoogleInfo,
   canEdit,
   showBusiness = true,
@@ -1188,6 +1226,144 @@ function CustomerRow({
       {/* Services / Sub-Services */}
       {showServiceType && (
         <td className="cl-td" data-label="Services">
+          {isSupport ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              {/* 1. Completion Percentage Badge */}
+              {(() => {
+                const rawPct =
+                  deliveryCompletionMap?.[customer.id] ??
+                  customer.rawCustomer?.completionPercentage ??
+                  customer.rawCustomer?.delivery?.completionPercentage ??
+                  customer.rawCustomer?.deliveryCompletionPct ??
+                  customer.rawCustomer?.serviceDeliveryDataCompletenessPct ??
+                  null
+                if (rawPct === null || rawPct === undefined) return null
+                const pct = Number(rawPct)
+                const pctStyle =
+                  pct >= 80
+                    ? { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' }
+                    : pct >= 40
+                      ? { bg: '#fffbeb', color: '#b45309', border: '#fde68a' }
+                      : { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' }
+                return (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 7px',
+                      borderRadius: '9999px',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      backgroundColor: pctStyle.bg,
+                      color: pctStyle.color,
+                      border: `1px solid ${pctStyle.border}`,
+                    }}
+                  >
+                    {pct}% Complete
+                  </span>
+                )
+              })()}
+
+              {/* 2. Main Delivery Button */}
+              {(() => {
+                const isDelivered =
+                  deliveryStatusMap?.[customer.id] ??
+                  Boolean(
+                    customer.rawCustomer?.isDelivered ||
+                    customer.rawCustomer?.delivered ||
+                    customer.rawCustomer?.serviceDeliverySent ||
+                    customer.rawCustomer?.delivery?.delivered ||
+                    customer.rawCustomer?.deliveryStatus?.isDelivered ||
+                    customer.rawCustomer?.deliveryStatus?.delivered,
+                  )
+
+                const isHead = isDepartmentHead || !_isDepartmentUser
+
+                return (
+                  <button
+                    type="button"
+                    className="cl-service-type-badge"
+                    onClick={() => onOpenDeliveryConfirmation?.()}
+                    title={
+                      isHead
+                        ? isDelivered
+                          ? 'Delivered - Click to view delivery details'
+                          : 'Not Delivered - Click to view delivery form'
+                        : isDelivered
+                          ? 'Click to resend delivery details'
+                          : 'Click to confirm delivery'
+                    }
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '3px 9px',
+                      borderRadius: '8px',
+                      border: isDelivered ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+                      backgroundColor: isDelivered ? '#ecfdf5' : '#f8fafc',
+                      color: isDelivered ? '#047857' : '#475569',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon name={isDelivered ? 'done' : 'package'} size={12} strokeWidth={2.4} />
+                    <span>
+                      {isHead
+                        ? isDelivered
+                          ? 'Delivered'
+                          : 'Not Delivered'
+                        : isDelivered
+                          ? 'Send Again'
+                          : 'Confirm'}
+                    </span>
+                  </button>
+                )
+              })()}
+
+              {/* 3. History Button (only shown if history exists) */}
+              {(() => {
+                const hasHistory =
+                  deliveryStatusMap?.[customer.id] !== undefined
+                    ? deliveryStatusMap[customer.id]
+                    : Boolean(
+                        customer.rawCustomer?.hasServiceHistory ||
+                        customer.rawCustomer?.delivery?.hasServiceHistory ||
+                        customer.rawCustomer?.deliveryStatus?.hasServiceHistory ||
+                        customer.rawCustomer?.isDelivered ||
+                        customer.rawCustomer?.delivered ||
+                        customer.rawCustomer?.serviceDeliverySent,
+                      )
+
+                if (!hasHistory) return null
+
+                return (
+                  <button
+                    type="button"
+                    className="cl-service-type-badge"
+                    onClick={() => onOpenDeliveryHistory?.()}
+                    title="View previous service delivery history"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      border: '1px solid #99f6e4',
+                      backgroundColor: '#f0fdfa',
+                      color: '#0f766e',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon name="history" size={11} strokeWidth={2.4} />
+                    <span>History</span>
+                  </button>
+                )
+              })()}
+            </div>
+          ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {subServicesList.slice(0, 2).map((sub, sIdx) => {
               const st = (sub.status || 'PENDING').toUpperCase().replace(/-/g, '_')
@@ -1245,6 +1421,7 @@ function CustomerRow({
               </button>
             )}
           </div>
+        )}
         </td>
       )}
 

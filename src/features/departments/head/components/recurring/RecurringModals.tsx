@@ -10,6 +10,7 @@ import {
   type RecurringDue,
   type RecurringUpdatePayload,
 } from '../../../../../api/recurring.api'
+import { RefreshButton } from '../../../../../components/ui/RefreshButton'
 import { formatCurrency, formatDate } from './recurringFormat'
 
 const label = (value: string) =>
@@ -42,12 +43,15 @@ function ModalShell({
   onClose,
   children,
   wide = false,
+  headerActions,
 }: {
   title: string
   subtitle?: string
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  /** Optional controls shown next to the close button (e.g. a refresh button). */
+  headerActions?: ReactNode
 }) {
   return (
     <div
@@ -67,14 +71,17 @@ function ModalShell({
             <h2 className="text-base font-bold text-slate-900">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         {children}
       </div>
@@ -372,7 +379,19 @@ export function RecurringHistoryModal({ due, onClose }: { due: RecurringDue; onC
   const detail = detailQuery.data
 
   return (
-    <ModalShell title="Payments & history" subtitle={due.businessName ?? undefined} onClose={onClose} wide>
+    <ModalShell
+      title="Payments & history"
+      subtitle={due.businessName ?? undefined}
+      onClose={onClose}
+      wide
+      headerActions={
+        <RefreshButton
+          onRefresh={() => detailQuery.refetch()}
+          isRefreshing={detailQuery.isFetching}
+          label="payments & history"
+        />
+      }
+    >
       <div className="p-5 space-y-6">
         {detailQuery.isPending ? (
           <div className="py-10 text-center text-slate-400">

@@ -13,6 +13,7 @@ import { EditColumnModal } from '../../../components/permissions/EditColumnModal
 import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { Select } from '../../../components/ui/Select'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import {
   useDynamicColumns,
   useDynamicRoutes,
@@ -273,6 +274,12 @@ export function DepartmentRoutesDropdown({
     })
   }
 
+  // Background refetch (refresh button): keep the lists visible but dimmed.
+  const isRefreshing =
+    (routesQuery.isFetching && !routesQuery.isPending) ||
+    (columnsQuery.isFetching && !columnsQuery.isPending)
+  const refreshingClass = isRefreshing ? ' pointer-events-none opacity-60' : ''
+
   const updateErrorMessage =
     routeUpdateError ||
     createRouteColumnsMutation.error?.message ||
@@ -297,6 +304,13 @@ export function DepartmentRoutesDropdown({
           {!routesQuery.isPending ? (
             <span className="department-route-count">{routes.length} routes</span>
           ) : null}
+          <RefreshButton
+            onRefresh={() =>
+              Promise.all([routesQuery.refetch(), columnsQuery.refetch()])
+            }
+            isRefreshing={routesQuery.isFetching || columnsQuery.isFetching}
+            label="routes and columns"
+          />
         </div>
       </div>
 
@@ -315,7 +329,11 @@ export function DepartmentRoutesDropdown({
       ) : routes.length === 0 ? (
         <p className="department-route-state">No routes are configured for this department.</p>
       ) : (
-        <div className="department-route-list" onScroll={() => setHoveredRoute(null)}>
+        <div
+          className={`department-route-list transition-opacity${refreshingClass}`}
+          aria-busy={isRefreshing}
+          onScroll={() => setHoveredRoute(null)}
+        >
           {routes.map((route) => (
             <div
               key={route.routeId}
@@ -410,7 +428,11 @@ export function DepartmentRoutesDropdown({
       )}
 
       {selectedRoute ? (
-        <section className="department-route-columns" aria-live="polite">
+        <section
+          className={`department-route-columns transition-opacity${refreshingClass}`}
+          aria-live="polite"
+          aria-busy={isRefreshing}
+        >
           <div className="department-route-columns-heading">
             <div>
               <span>Columns for</span>

@@ -29,6 +29,7 @@ import { env } from "@config/env";
 import { useAuth } from "@features/auth";
 import { BirthdayWidget } from "@features/birthdays";
 import { ErrorDisplay, StaggerContainer, StaggerItem } from "@shared/components/ui";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { DashboardLayout } from "../components/DashboardLayout";
 import { EMPLOYEE_DEMO_DATA } from "../data/dashboard.demo";
@@ -71,7 +72,15 @@ function getGreeting(hour: number): { text: string; icon: typeof Sun } {
 
 export default function EmployeeDashboardPage() {
   const { role } = useAuth();
-  const { data, isLoading, error } = useEmployeeDashboard();
+  const dashboardQuery = useEmployeeDashboard();
+  const { data, isLoading, error } = dashboardQuery;
+  const refreshButton = (
+    <RefreshButton
+      onRefresh={() => dashboardQuery.refetch()}
+      isRefreshing={dashboardQuery.isFetching}
+      label="dashboard"
+    />
+  );
   const [liveClock, setLiveClock] = useState(() => new Date());
 
   useEffect(() => {
@@ -86,7 +95,10 @@ export default function EmployeeDashboardPage() {
       <DashboardLayout>
         <StaggerContainer>
           <StaggerItem>
-            <h1 className="mbg-heading">My Dashboard</h1>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="mbg-heading">My Dashboard</h1>
+              {refreshButton}
+            </div>
           </StaggerItem>
           <StaggerItem variant="card">
             <ErrorDisplay message="Dashboard data could not be loaded from the server." />
@@ -126,7 +138,11 @@ export default function EmployeeDashboardPage() {
   const isCheckedOut = Boolean(attendance?.checkOut);
 
   return (
-    <DashboardLayout className="space-y-5">
+    <DashboardLayout
+      className={`space-y-5 transition-opacity ${
+        dashboardQuery.isFetching && !isLoading ? "pointer-events-none opacity-60" : ""
+      }`}
+    >
       {/* 1. HERO WELCOME BANNER */}
       <StaggerContainer>
         <StaggerItem variant="card">
@@ -165,6 +181,7 @@ export default function EmployeeDashboardPage() {
                         year: "numeric",
                       })}
                     </span>
+                    {refreshButton}
                   </div>
 
                   <h1 className="mt-1.5 text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
