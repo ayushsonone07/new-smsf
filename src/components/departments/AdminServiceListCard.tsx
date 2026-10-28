@@ -1,6 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Pencil,
+  Trash2,
+  Plus,
+  Download,
+  Search,
+  Play,
+  Pause,
+} from 'lucide-react'
+import {
   addServicesToAdminPlan,
   decideTimelineRequest,
   fetchAdminPlans,
@@ -535,17 +544,71 @@ export function AdminServiceListCard({
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {onlyServiceList ? (
               <>
-                <Button
+                <button
+                  type="button"
                   onClick={() => {
                     setEditingService(null)
                     setShowAddModal(true)
                   }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.5rem 1.1rem',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(79, 70, 229, 0.35)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.25)'
+                  }}
                 >
-                  <span>＋</span> Add Service
-                </Button>
-                <Button variant="secondary" onClick={handleExportCsv}>
-                  ⬇ Export
-                </Button>
+                  <Plus style={{ width: '16px', height: '16px' }} />
+                  <span>Add Service</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.5rem 1rem',
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc'
+                    e.currentTarget.style.borderColor = '#cbd5e1'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff'
+                    e.currentTarget.style.borderColor = '#e2e8f0'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <Download style={{ width: '15px', height: '15px', color: '#64748b' }} />
+                  <span>Export</span>
+                </button>
               </>
             ) : !showPlans ? (
               <>
@@ -628,28 +691,71 @@ export function AdminServiceListCard({
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: '1rem',
-                marginBottom: '1rem',
+                marginBottom: '1.25rem',
                 flexWrap: 'wrap',
               }}
             >
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search services..."
+              <div
                 style={{
+                  position: 'relative',
                   flex: '1 1 280px',
-                  maxWidth: '420px',
-                  padding: '0.55rem 0.85rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.875rem',
+                  maxWidth: '380px',
                 }}
-              />
+              >
+                <Search
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '16px',
+                    height: '16px',
+                    color: '#94a3b8',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search services..."
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.85rem 0.55rem 2.25rem',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#f8fafc',
+                    fontSize: '0.85rem',
+                    color: '#0f172a',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff'
+                    e.currentTarget.style.borderColor = '#6366f1'
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.12)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc'
+                    e.currentTarget.style.borderColor = '#e2e8f0'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
 
-              <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-                Showing <strong>{filteredServices.length}</strong> of{' '}
-                <strong>{services.length}</strong> services
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  color: '#64748b',
+                  backgroundColor: '#f1f5f9',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '20px',
+                  fontWeight: 500,
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                Showing <strong style={{ color: '#0f172a' }}>{filteredServices.length}</strong> of{' '}
+                <strong style={{ color: '#0f172a' }}>{services.length}</strong> services
               </span>
             </div>
 
@@ -676,16 +782,25 @@ export function AdminServiceListCard({
                 Failed to load services: {servicesQuery.error.message}
               </div>
             ) : (
-              <div className="table-wrapper">
-                <table className="data-table">
+              <div
+                className="table-wrapper"
+                style={{
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.03)',
+                  overflow: 'hidden',
+                  background: '#ffffff',
+                }}
+              >
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>SERVICE TYPE</th>
-                      <th>DEPARTMENT TYPE</th>
-                      <th>STATUS</th>
-                      <th>CREATED AT</th>
-                      <th className="align-right">ACTIONS</th>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>#</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>SERVICE TYPE</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>DEPARTMENT TYPE</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>STATUS</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>CREATED AT</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'right', minWidth: '100px' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -695,7 +810,7 @@ export function AdminServiceListCard({
                           colSpan={6}
                           style={{
                             textAlign: 'center',
-                            padding: '2rem',
+                            padding: '2.5rem 1rem',
                             color: '#64748b',
                           }}
                         >
@@ -706,49 +821,113 @@ export function AdminServiceListCard({
                       </tr>
                     ) : (
                       filteredServices.map((service, index) => (
-                        <tr key={service.id}>
-                          <td>{index + 1}</td>
-                          <td>
-                            <strong style={{ color: '#0f172a' }}>
+                        <tr
+                          key={service.id}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            transition: 'background-color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fafbff'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                        >
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>
+                            {index + 1}
+                          </td>
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem', letterSpacing: '-0.01em' }}>
                               {service.serviceType.replace(/_/g, ' ')}
-                            </strong>
-                            <div
-                              style={{ fontSize: '0.72rem', color: '#64748b' }}
-                            >
-                              <code>{service.serviceType}</code>
+                            </div>
+                            <div style={{ marginTop: '2px' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.6875rem',
+                                  color: '#64748b',
+                                  background: '#f1f5f9',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {service.serviceType}
+                              </span>
                             </div>
                           </td>
-                          <td>
-                            <span className="dept-type-badge">
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '0.25rem 0.65rem',
+                                borderRadius: '6px',
+                                background: '#f8fafc',
+                                color: '#334155',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                letterSpacing: '0.02em',
+                              }}
+                            >
                               {service.departmentType}
                             </span>
                           </td>
-                          <td>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <span
-                              className={`status-pill ${
-                                service.isServiceActive ? 'active' : 'inactive'
-                              }`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '0.25rem 0.65rem',
+                                borderRadius: '9999px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: service.isServiceActive ? '#ecfdf5' : '#fef2f2',
+                                color: service.isServiceActive ? '#059669' : '#dc2626',
+                                border: `1px solid ${service.isServiceActive ? '#a7f3d0' : '#fecaca'}`,
+                              }}
                             >
+                              <span
+                                style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  background: service.isServiceActive ? '#10b981' : '#ef4444',
+                                  boxShadow: service.isServiceActive ? '0 0 6px #10b981' : 'none',
+                                }}
+                              />
                               {service.isServiceActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
-                          <td>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.8125rem', color: '#475569' }}>
                             {service.createdAt
                               ? new Date(service.createdAt).toLocaleDateString()
                               : '—'}
                           </td>
-                          <td className="align-right">
-                            <div className="action-group">
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                            <div
+                              className="action-group"
+                              style={{
+                                display: 'inline-flex',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'flex-end',
+                                gap: '8px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {onCreateDepartmentForService && !onlyServiceList ? (
                                 <button
                                   type="button"
-                                  className="icon-action"
                                   title="Step 2: Create Department Head for this Service"
                                   onClick={() =>
                                     onCreateDepartmentForService(service)
                                   }
                                   style={{
-                                    width: 'auto',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
                                     padding: '0.25rem 0.6rem',
                                     fontSize: '0.75rem',
                                     fontWeight: 600,
@@ -756,27 +935,90 @@ export function AdminServiceListCard({
                                     backgroundColor: '#eff6ff',
                                     border: '1px solid #bfdbfe',
                                     borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
                                   }}
                                 >
                                   + Create Dept
                                 </button>
                               ) : null}
+
+                              {/* Left icon: Edit */}
                               <button
                                 type="button"
-                                className="icon-action"
                                 title="Edit service"
                                 onClick={() => setEditingService(service)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #e2e8f0',
+                                  backgroundColor: '#ffffff',
+                                  color: '#475569',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+                                  transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#eef2ff'
+                                  e.currentTarget.style.borderColor = '#c7d2fe'
+                                  e.currentTarget.style.color = '#4f46e5'
+                                  e.currentTarget.style.transform = 'translateY(-1px)'
+                                  e.currentTarget.style.boxShadow = '0 2px 5px rgba(79, 70, 229, 0.12)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#ffffff'
+                                  e.currentTarget.style.borderColor = '#e2e8f0'
+                                  e.currentTarget.style.color = '#475569'
+                                  e.currentTarget.style.transform = 'translateY(0)'
+                                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.04)'
+                                }}
                               >
-                                ✎
+                                <Pencil style={{ width: '14px', height: '14px' }} />
                               </button>
+
+                              {/* Right icon: Delete */}
                               <button
                                 type="button"
-                                className="icon-action danger"
                                 title="Delete service"
                                 disabled={deletingId === service.id}
                                 onClick={() => handleDeleteService(service)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #e2e8f0',
+                                  backgroundColor: '#ffffff',
+                                  color: '#64748b',
+                                  cursor: deletingId === service.id ? 'not-allowed' : 'pointer',
+                                  opacity: deletingId === service.id ? 0.5 : 1,
+                                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+                                  transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (deletingId === service.id) return
+                                  e.currentTarget.style.backgroundColor = '#fef2f2'
+                                  e.currentTarget.style.borderColor = '#fecaca'
+                                  e.currentTarget.style.color = '#dc2626'
+                                  e.currentTarget.style.transform = 'translateY(-1px)'
+                                  e.currentTarget.style.boxShadow = '0 2px 5px rgba(220, 38, 38, 0.12)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (deletingId === service.id) return
+                                  e.currentTarget.style.backgroundColor = '#ffffff'
+                                  e.currentTarget.style.borderColor = '#e2e8f0'
+                                  e.currentTarget.style.color = '#64748b'
+                                  e.currentTarget.style.transform = 'translateY(0)'
+                                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.04)'
+                                }}
                               >
-                                🗑
+                                <Trash2 style={{ width: '14px', height: '14px' }} />
                               </button>
                             </div>
                           </td>
@@ -1027,34 +1269,114 @@ export function AdminServiceListCard({
                                 : '—'}
                             </td>
                             <td className="align-right">
-                              <div className="action-group">
+                              <div
+                                className="action-group"
+                                style={{
+                                  display: 'inline-flex',
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'flex-end',
+                                  gap: '8px',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
                                 <button
                                   type="button"
-                                  className="icon-action"
                                   title="Edit plan"
                                   onClick={() => openEditPlanModal(plan)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    backgroundColor: '#ffffff',
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.18s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#eef2ff'
+                                    e.currentTarget.style.borderColor = '#c7d2fe'
+                                    e.currentTarget.style.color = '#4f46e5'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#ffffff'
+                                    e.currentTarget.style.borderColor = '#e2e8f0'
+                                    e.currentTarget.style.color = '#475569'
+                                  }}
                                 >
-                                  ✎
+                                  <Pencil style={{ width: '14px', height: '14px' }} />
                                 </button>
                                 <button
                                   type="button"
-                                  className="icon-action"
                                   title={
                                     plan.enabled !== false
                                       ? 'Deactivate plan'
                                       : 'Activate plan'
                                   }
                                   onClick={() => handleTogglePlanActive(plan)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    backgroundColor: '#ffffff',
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.18s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#f1f5f9'
+                                    e.currentTarget.style.borderColor = '#cbd5e1'
+                                    e.currentTarget.style.color = '#0f172a'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#ffffff'
+                                    e.currentTarget.style.borderColor = '#e2e8f0'
+                                    e.currentTarget.style.color = '#475569'
+                                  }}
                                 >
-                                  {plan.enabled !== false ? '⏸' : '▶'}
+                                  {plan.enabled !== false ? (
+                                    <Pause style={{ width: '13px', height: '13px' }} />
+                                  ) : (
+                                    <Play style={{ width: '13px', height: '13px' }} />
+                                  )}
                                 </button>
                                 <button
                                   type="button"
-                                  className="icon-action danger"
                                   title="Delete plan"
                                   onClick={() => handleDeletePlan(plan)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    backgroundColor: '#ffffff',
+                                    color: '#64748b',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.18s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#fef2f2'
+                                    e.currentTarget.style.borderColor = '#fecaca'
+                                    e.currentTarget.style.color = '#dc2626'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#ffffff'
+                                    e.currentTarget.style.borderColor = '#e2e8f0'
+                                    e.currentTarget.style.color = '#64748b'
+                                  }}
                                 >
-                                  🗑
+                                  <Trash2 style={{ width: '14px', height: '14px' }} />
                                 </button>
                               </div>
                             </td>

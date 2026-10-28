@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Icon } from '../shared/Icon'
 import { Avatar } from '../shared/Avatar'
 import { SegmentedControl } from '../shared/SegmentedControl'
@@ -51,6 +51,27 @@ export function HeadSidebar({
   onLogout,
 }: HeadSidebarProps) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!panelOpen) return
+    function handleClickOutside(event: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setPanelOpen(false)
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setPanelOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [panelOpen])
 
   function renderItem(item: HeadNavItem) {
     const on = item.key === activeKey
@@ -133,7 +154,7 @@ export function HeadSidebar({
       </nav>
 
       {open ? (
-        <div className="haccount">
+        <div ref={accountRef} className="haccount" style={{ position: "relative" }}>
           <button
             type="button"
             className="haccount__row haccount__row--clickable"
@@ -162,9 +183,22 @@ export function HeadSidebar({
           </button>
 
           {panelOpen ? (
-            <ProfileMenu
-              onNavigate={() => setPanelOpen(false)}
-            />
+            <div
+              className="sidebar-profile-menu-popover"
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 8px)',
+                left: 0,
+                right: 0,
+                zIndex: 100,
+                maxHeight: 'calc(100vh - 160px)',
+                overflowY: 'auto',
+              }}
+            >
+              <ProfileMenu
+                onNavigate={() => setPanelOpen(false)}
+              />
+            </div>
           ) : null}
 
           {role && onRoleChange ? (

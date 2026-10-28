@@ -139,14 +139,6 @@ export function CustomerListPage() {
   }, [toast])
 
   const role = (session?.user?.role || '').toUpperCase()
-  const isDeptUser =
-    role === 'USER' ||
-    role === 'DEPARTMENT_USER' ||
-    (typeof window !== 'undefined' &&
-      (window.location.pathname.includes('/google-user') ||
-        window.location.pathname.includes('/onboarding-user') ||
-        window.location.pathname.includes('/users')))
-  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   // 2. Sub-service flows: GET /api/service/flows is NOT called on page load —
   // fetched on demand (and cached) only when a status is set to Completed.
@@ -175,6 +167,22 @@ export function CustomerListPage() {
   const [roundRobinError, setRoundRobinError] = useState<string | null>(null)
 
   const canEdit = columnFeatures.canEdit('actions')
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
+  const isUserPath =
+    currentPath.includes('departmentuser') ||
+    currentPath.includes('/google-user') ||
+    currentPath.includes('/onboarding-user') ||
+    currentPath.includes('/user/') ||
+    currentPath.endsWith('/user') ||
+    currentPath.includes('/users')
+
+  const isDeptUser =
+    role === 'USER' ||
+    role === 'DEPARTMENT_USER' ||
+    (session?.user as any)?.isHead === false ||
+    isUserPath
+
+  const isHead = !isDeptUser && role !== 'ADMIN' && role !== 'SUPERADMIN'
 
   const permissionRouteName = typeof window !== 'undefined'
     ? resolveSlugFromPath(window.location.pathname) || window.location.pathname.replace(/^\/+|\/+$/g, '')
@@ -182,7 +190,7 @@ export function CustomerListPage() {
   const { isColumnEnabled } =
     useDepartmentColumnPermissions(currentDepartment, permissionRouteName)
   const isStatusVisible = isColumnEnabled('Status', 'customer')
-  const canEditStatus = columnFeatures.canEdit('Status', true)
+  const canEditStatus = isDeptUser
 
   // Department users never see the Assign To column, even if it is configured.
   const isAssignToVisible =
@@ -196,7 +204,7 @@ export function CustomerListPage() {
   const isRemarkVisible =
     isColumnEnabled('Internal Remark', 'customer') ||
     isColumnEnabled('Remark', 'customer')
-  const canEditRemark = columnFeatures.canEdit('Remark', true)
+  const canEditRemark = isDeptUser ? true : columnFeatures.canEdit('Remark', true)
 
   const isContactVisible = isColumnEnabled('Contact', 'customer')
   const canEditContact = columnFeatures.canEdit('Contact', true)
@@ -943,6 +951,11 @@ export function CustomerListPage() {
         isGoogle={isGoogle}
         isDepartmentUser={isDeptUser}
         onOpenServiceFlow={(cust, subName) => {
+          if (currentDepartment === 'BILLING_DEPARTMENT') {
+            setSelectedCustomer(cust)
+            setModalTab('bill-upload')
+            return
+          }
           setServiceFlowCustomer(cust)
           setSelectedSubServiceName(subName)
         }}
@@ -1008,6 +1021,7 @@ export function CustomerListPage() {
         canEditRemark={canEditRemark}
         departmentType={currentDepartment}
         initialTab={modalTab}
+        onBillUploaded={() => activeCustomerQuery.refetch()}
         onClose={() => {
           setSelectedCustomer(null)
           setModalTab(undefined)

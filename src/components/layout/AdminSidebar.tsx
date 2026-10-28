@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import {
   clearSession,
@@ -6,6 +6,7 @@ import {
 } from '../../app/auth/session'
 import type { UserRole } from '../../features/auth/types/auth.types'
 import { ProfileMenu } from '../common/ProfileMenu'
+import { Icon } from '../head/shared/Icon'
 
 type NavPath =
   | '/admin'
@@ -123,6 +124,27 @@ export function AdminSidebar({
   const location = useLocation()
   const navigate = useNavigate()
   const [panelOpen, setPanelOpen] = useState(false)
+  const footerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!panelOpen) return
+    function handleClickOutside(event: MouseEvent) {
+      if (footerRef.current && !footerRef.current.contains(event.target as Node)) {
+        setPanelOpen(false)
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setPanelOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [panelOpen])
 
   const session = getSession()
   const role = session?.user.role
@@ -211,64 +233,83 @@ export function AdminSidebar({
         )}
       </nav>
 
-      {panelOpen ? (
-        <ProfileMenu
-          variant="light"
-          onNavigate={() => {
-            setPanelOpen(false)
-            onNavigate?.()
-          }}
-        />
-      ) : null}
-
       <div
-        className="sidebar-footer sidebar-footer--clickable"
-        role="button"
-        tabIndex={0}
-        title="Open profile settings"
-        aria-label="Open profile settings"
-        aria-expanded={panelOpen}
-        onClick={() => setPanelOpen((value) => !value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            setPanelOpen((value) => !value)
-          }
-        }}
+        ref={footerRef}
+        className="sidebar-footer-container"
+        style={{ position: 'relative', marginTop: 'auto' }}
       >
-        <div className="admin-avatar">
-          {role === 'HEAD'
-            ? 'H'
-            : role === 'USER'
-              ? 'U'
-              : 'A'}
-        </div>
+        {panelOpen ? (
+          <div
+            className="sidebar-profile-menu-popover"
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 4px)',
+              left: '2px',
+              right: '2px',
+              zIndex: 100,
+              maxHeight: 'calc(100vh - 140px)',
+              overflowY: 'auto',
+            }}
+          >
+            <ProfileMenu
+              variant="light"
+              onNavigate={() => {
+                setPanelOpen(false)
+                onNavigate?.()
+              }}
+            />
+          </div>
+        ) : null}
 
-        <div className="admin-info">
-          <strong>
-            {session?.user.name ?? 'Signed out'}
-          </strong>
-          <span>{role ?? '—'}</span>
-        </div>
-
-        <span
-          className={`sidebar-footer__chevron${panelOpen ? ' is-open' : ''}`}
-          aria-hidden="true"
-        >
-          ›
-        </span>
-
-        <button
-          className="logout-button"
-          aria-label="Logout"
-          title="Logout"
-          onClick={(event) => {
-            event.stopPropagation()
-            handleLogout()
+        <div
+          className="sidebar-footer sidebar-footer--clickable"
+          role="button"
+          tabIndex={0}
+          title="Open profile settings"
+          aria-label="Open profile settings"
+          aria-expanded={panelOpen}
+          onClick={() => setPanelOpen((value) => !value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              setPanelOpen((value) => !value)
+            }
           }}
         >
-          ↪
-        </button>
+          <div className="admin-avatar">
+            {role === 'HEAD'
+              ? 'H'
+              : role === 'USER'
+                ? 'U'
+                : 'A'}
+          </div>
+
+          <div className="admin-info">
+            <strong>
+              {session?.user.name ?? 'Signed out'}
+            </strong>
+            <span>{role ?? '—'}</span>
+          </div>
+
+          <span
+            className={`sidebar-footer__chevron${panelOpen ? ' is-open' : ''}`}
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
+          <button
+            className="logout-button"
+            aria-label="Logout"
+            title="Logout"
+            onClick={(event) => {
+              event.stopPropagation()
+              handleLogout()
+            }}
+          >
+            <Icon name="logout" size={16} />
+          </button>
+        </div>
       </div>
       </aside>
     </>

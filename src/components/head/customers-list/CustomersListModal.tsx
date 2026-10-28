@@ -48,6 +48,7 @@ export interface CustomersListModalProps {
   onClose: () => void
   /** Optional: when passed, a "Full page" button appears in Personal information */
   onOpenFullPage?: (customer: OnboardingCustomer) => void
+  onBillUploaded?: () => void | Promise<unknown>
   initialTab?: DrawerTab
   /** Fetch only the common customer profile endpoint (used by superadmin). */
   profileOnly?: boolean
@@ -268,6 +269,7 @@ export function CustomersListModal({
   departmentType = 'ONBOARDING_DEPARTMENT',
   onClose,
   onOpenFullPage,
+  onBillUploaded,
   initialTab,
   profileOnly = false,
   requestUsername,
@@ -617,6 +619,7 @@ export function CustomersListModal({
         extractBillingCustomers(refreshed.data).find(
           (item) => String(item.id) === String(billingCustomer.id),
         ) ?? billingCustomer
+      await onBillUploaded?.()
       const details = getBillingInvoice(refreshedCustomer)
       setInvoice((value) => ({
         ...value,
@@ -1546,14 +1549,6 @@ export function CustomersListModal({
                       serviceRow?.internalRemark
                     }
                     internal
-                    editable={!isHead && (isDeptUser || canEditRemark) && getSession()?.user.role !== 'CUSTOMER'}
-                    editingRemark={editingRemark}
-                    editingRemarkText={editingRemarkText}
-                    onEdit={(remark) => { setEditingRemark(remark.timestamp || remark.remark || 'remark'); setEditingRemarkText(remark.remark || '') }}
-                    onEditTextChange={setEditingRemarkText}
-                    onCancelEdit={() => setEditingRemark(null)}
-                    onSaveEdit={saveRemarkEdit}
-                    isSavingRemark={isSavingRemark}
                     pageSize={4}
                   />
                 </div>}
@@ -1624,17 +1619,6 @@ export function CustomersListModal({
                       badge="Customer replies"
                       emptyMessage="No client remarks recorded."
                       entries={clientRemarkEntries}
-                      editable={!isHead && !isSuperAdmin && getSession()?.user.role !== 'CUSTOMER'}
-                      editingRemark={editingClientRemark}
-                      editingRemarkText={editingClientRemarkText}
-                      onEdit={(remark) => {
-                        setEditingClientRemark(remark.timestamp || remark.remark || 'remark')
-                        setEditingClientRemarkText(remark.remark || '')
-                      }}
-                      onEditTextChange={setEditingClientRemarkText}
-                      onCancelEdit={() => setEditingClientRemark(null)}
-                      onSaveEdit={saveClientRemarkEdit}
-                      isSavingRemark={isSavingClientRemark}
                     />
                   )}
                 </div>
@@ -3001,13 +2985,7 @@ function RemarkGroup({
         <ul className="cl-drawer__remark-list">
           {entries.map(({ remark }, index) => (
             <li key={`${remark.timestamp || index}-${remark.staffName || ''}-${index}`}>
-              {editable && editingRemark === (remark.timestamp || remark.remark || 'remark') ? (
-                <div className="cl-remark-edit">
-                  <textarea value={editingRemarkText} onChange={(event) => onEditTextChange?.(event.target.value)} rows={3} />
-                  <div><button type="button" onClick={onCancelEdit}>Cancel</button><button type="button" onClick={onSaveEdit} disabled={isSavingRemark}>{isSavingRemark ? 'Saving...' : 'Save'}</button></div>
-                </div>
-              ) : <p>{remark.remark || '—'}</p>}
-              {editable && editingRemark !== (remark.timestamp || remark.remark || 'remark') ? <button type="button" className="cl-remark-edit-trigger" onClick={() => onEdit?.(remark)}>Edit</button> : null}
+              <p>{remark.remark || '—'}</p>
               <span>
                 {[remark.staffName, remark.type, remark.timestamp]
                   .filter(Boolean)
