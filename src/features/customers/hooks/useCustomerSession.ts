@@ -9,6 +9,7 @@ export interface CustomerSession {
   name: string
   email: string
   company: string
+  phone?: string
   loggedInAt: string
   accessToken?: string
   username?: string
@@ -25,6 +26,7 @@ export function getCustomerSession(): CustomerSession | null {
         customerSession.username ||= authSession.user.username || authSession.user.email
         customerSession.customerId ||= authSession.user.id
         customerSession.email ||= authSession.user.email
+        customerSession.phone ||= authSession.user.phoneNumber || authSession.user.contact
         setCustomerSession(customerSession)
       }
       return customerSession
@@ -46,6 +48,7 @@ function createCustomerSession(authSession: AuthSession): CustomerSession {
     name: authSession.user.name || authSession.user.email,
     email: authSession.user.email,
     company: authSession.user.name || authSession.user.email,
+    phone: authSession.user.phoneNumber || authSession.user.contact,
     loggedInAt: authSession.issuedAt,
     accessToken: authSession.token,
     username: authSession.user.username || authSession.user.email,
@@ -79,6 +82,7 @@ export function useCustomerSession() {
       name: customer.name,
       email: customer.email,
       company: customer.company,
+      phone: customer.phone,
       loggedInAt: new Date().toISOString(),
     }
     setCustomerSession(session)
