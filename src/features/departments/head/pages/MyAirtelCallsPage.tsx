@@ -378,18 +378,12 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-slate-50/70 text-slate-600">
-                <th className="px-4 py-3 text-left font-semibold">Time</th>
                 <th className="px-4 py-3 text-left font-semibold">Status</th>
                 <th className="px-4 py-3 text-left font-semibold">Type</th>
-                <th className="px-4 py-3 text-left font-semibold">Customer</th>
                 <th className="px-4 py-3 text-left font-semibold">Caller</th>
-                <th className="px-4 py-3 text-left font-semibold">Caller ID</th>
                 <th className="px-4 py-3 text-left font-semibold">Destination</th>
-                <th className="px-4 py-3 text-left font-semibold">Duration</th>
-                <th className="px-4 py-3 text-left font-semibold">Talk</th>
                 <th className="px-4 py-3 text-center font-semibold">Rec</th>
                 <th className="px-4 py-3 text-center font-semibold">Legs</th>
-                <th className="px-4 py-3 text-left font-semibold">Session ID</th>
                 <th className="px-4 py-3 text-center font-semibold">View</th>
               </tr>
             </thead>
@@ -397,54 +391,43 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
                   <tr key={i} className="border-b">
-                    <td colSpan={13} className="px-4 py-3">
+                    <td colSpan={7} className="px-4 py-3">
                       <div className="h-6 w-full animate-pulse rounded bg-slate-100" />
                     </td>
                   </tr>
                 ))
               ) : error ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-10 text-center text-rose-600">
+                  <td colSpan={7} className="px-4 py-10 text-center text-rose-600">
                     ⚠ {error}
                   </td>
                 </tr>
               ) : calls.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                     No calls found for the selected filters.
                   </td>
                 </tr>
               ) : (
                 calls.map((c) => (
                   <tr key={c.id} className="border-b hover:bg-slate-50/60">
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-700">
-                      {formatDateTime(c.callTimestamp)}
-                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={c.overallCallStatus} />
                     </td>
                     <td className="px-4 py-3">
                       <TypeBadge type={c.callType} />
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{c.customerName || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-700">{c.callerNumber || '—'}</div>
                       {c.callerCircleName && (
                         <div className="text-xs text-slate-400">{c.callerCircleName}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{c.airtelCallerId || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="text-slate-700">{c.destinationNumber || '—'}</div>
                       {c.destinationName && (
                         <div className="text-xs text-slate-400">{c.destinationName}</div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-700">
-                      {c.overallCallDuration || formatMs(c.durationMs)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-700">
-                      {formatMs(c.conversationDurationMs)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {c.hasRecording && c.recordingUrl ? (
@@ -463,9 +446,6 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
                     </td>
                     <td className="px-4 py-3 text-center text-slate-600">
                       {c.participantCount ?? 0}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 font-mono text-xs">
-                      {c.sessionId ? c.sessionId.slice(0, 14) + '…' : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button

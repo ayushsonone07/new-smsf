@@ -3016,3 +3016,19 @@ button.profile-chip--clickable:focus-visible {
   border-radius: 50%;
   animation: login-as-spin 0.7s linear infinite;
 }
+
+
+/* Action group horizontal alignment for tables */
+.action-group {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+}
+
+.action-group .icon-action,
+.action-group button {
+  flex-shrink: 0;
+}
