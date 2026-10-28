@@ -3,6 +3,7 @@ import { useDebounce } from '../../../../hooks/useDebounce'
 import { Button } from '../../../../components/ui/Button'
 import { Pill } from '../../../../components/ui/Pill'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { SearchBar } from '../../../../components/head/shared/SearchBar'
 import { SectionCard } from '../../../../components/head/shared/SectionCard'
 import { LearningButton } from '../../../../components/head/shared/LearningButton'
@@ -486,6 +487,18 @@ export function DepartmentUsersPage() {
   }, [isAutowebsionDept, autowebUsersQuery.data])
 
   const users = isAutowebsionDept ? autowebUsersList : apiUsersList
+
+  // Reloads only the visible users list (and its tab counts for Autowebsion).
+  const handleRefreshUsers = () =>
+    isAutowebsionDept
+      ? Promise.all([autowebUsersQuery.refetch(), autowebTabCountsQuery.refetch()])
+      : departmentUsersQuery.refetch()
+  const isUsersRefreshing = isAutowebsionDept
+    ? autowebUsersQuery.isFetching || autowebTabCountsQuery.isFetching
+    : departmentUsersQuery.isFetching && !departmentUsersQuery.isFetchingNextPage
+  const usersListQuery = isAutowebsionDept ? autowebUsersQuery : departmentUsersQuery
+  const isUsersListDimmed =
+    usersListQuery.isFetching && !usersListQuery.isLoading && !departmentUsersQuery.isFetchingNextPage
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -1015,47 +1028,58 @@ export function DepartmentUsersPage() {
             <Pill tone="success" size="sm">
               {presentToday} present today
             </Pill>
+
+            <RefreshButton
+              onRefresh={handleRefreshUsers}
+              isRefreshing={isUsersRefreshing}
+              label="users"
+            />
           </>
         }
         hint="Attendance & achievement · this month"
       >
-        <DepartmentUsersTable
-          users={filteredUsers}
-          emptyMessage={
-            isAutowebsionDept
-              ? autowebUsersQuery.isLoading
-                ? 'Loading users…'
-                : autowebUsersQuery.isError
-                  ? 'Unable to load users. Please try again.'
-                  : 'No users found.'
-              : departmentUsersQuery.isLoading
-                ? 'Loading users…'
-                : departmentUsersQuery.isError
-                  ? 'Unable to load users. Please try again.'
-                  : 'No users found.'
-          }
-          hiddenColumns={[
-            ...columnFeatures.hiddenColumns,
-            ...mappedHiddenColumns,
-          ]}
-          canEditActions={canManageUsers}
-          hasNextPage={departmentUsersQuery.hasNextPage}
-          isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
-          onLoadMore={loadNextUsersPage}
-          totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
-          onView={(user) => setModal({ kind: 'report', user })}
-          onEdit={(user) => setModal({ kind: 'edit', user })}
-          onDelete={(user) =>
-            setModal({ kind: 'delete', user })
-          }
-          onLoginAs={handleLoginAs}
-          loggingInUserId={loggingInUserId}
-          renderExpanded={(user) => (
-            <UserDetails
-              user={user}
-            />
-          )}
-        />
+        <div
+          className={`transition-opacity${isUsersListDimmed ? ' opacity-60 pointer-events-none' : ''}`}
+          aria-busy={isUsersListDimmed}
+        >
+          <DepartmentUsersTable
+            users={filteredUsers}
+            emptyMessage={
+              isAutowebsionDept
+                ? autowebUsersQuery.isLoading
+                  ? 'Loading users…'
+                  : autowebUsersQuery.isError
+                    ? 'Unable to load users. Please try again.'
+                    : 'No users found.'
+                : departmentUsersQuery.isLoading
+                  ? 'Loading users…'
+                  : departmentUsersQuery.isError
+                    ? 'Unable to load users. Please try again.'
+                    : 'No users found.'
+            }
+            hiddenColumns={[
+              ...columnFeatures.hiddenColumns,
+              ...mappedHiddenColumns,
+            ]}
+            canEditActions={canManageUsers}
+            hasNextPage={departmentUsersQuery.hasNextPage}
+            isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
+            onLoadMore={loadNextUsersPage}
+            totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
+            onView={(user) => setModal({ kind: 'report', user })}
+            onEdit={(user) => setModal({ kind: 'edit', user })}
+            onDelete={(user) =>
+              setModal({ kind: 'delete', user })
+            }
+            onLoginAs={handleLoginAs}
+            loggingInUserId={loggingInUserId}
+            renderExpanded={(user) => (
+              <UserDetails
+                user={user}
+              />
+            )}
+          />
+        </div>
       </SectionCard>
 
       {canManageUsers ? (

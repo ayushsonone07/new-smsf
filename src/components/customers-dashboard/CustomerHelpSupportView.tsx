@@ -12,6 +12,7 @@ import {
   type TicketHistoryEntry,
   type HelpCenterDepartment,
 } from './api/customer-features.api'
+import { RefreshButton } from '../ui/RefreshButton'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import {
   Search,
@@ -324,6 +325,7 @@ export function CustomerHelpSupportView() {
   } | null>(null)
   const [historyEntries, setHistoryEntries] = useState<TicketHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRefreshing, setHistoryRefreshing] = useState(false)
 
   // Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
@@ -466,6 +468,20 @@ export function CustomerHelpSupportView() {
       setHistoryEntries([])
     } finally {
       setHistoryLoading(false)
+    }
+  }
+
+  // Refresh icon in the history modal: re-reads only this ticket's timeline, keeping it on screen meanwhile.
+  const refreshHistory = async () => {
+    if (!historyModalTicket) return
+    setHistoryRefreshing(true)
+    try {
+      const entries = await fetchCustomerTicketHistory(historyModalTicket.ticketNumber, 0, 20)
+      setHistoryEntries(entries)
+    } catch {
+      // keep the current timeline
+    } finally {
+      setHistoryRefreshing(false)
     }
   }
 
@@ -1614,6 +1630,11 @@ export function CustomerHelpSupportView() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {historyModalTicket.status && <StatusPill status={historyModalTicket.status} />}
                 {historyModalTicket.priority && <PriorityPill priority={historyModalTicket.priority} />}
+                <RefreshButton
+                  onRefresh={refreshHistory}
+                  isRefreshing={historyLoading || historyRefreshing}
+                  label="ticket history"
+                />
                 <button
                   onClick={() => setHistoryModalTicket(null)}
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
@@ -1624,7 +1645,16 @@ export function CustomerHelpSupportView() {
             </div>
 
             {/* Timeline Body */}
-            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+            <div
+              style={{
+                padding: '24px',
+                overflowY: 'auto',
+                flex: 1,
+                transition: 'opacity 150ms',
+                ...(historyRefreshing ? { opacity: 0.6, pointerEvents: 'none' as const } : {}),
+              }}
+              aria-busy={historyRefreshing}
+            >
               {historyLoading ? (
                 <div style={{ padding: '48px 0', textAlign: 'center', color: '#64748b' }}>
                   <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px', display: 'block', color: '#4f46e5' }} />

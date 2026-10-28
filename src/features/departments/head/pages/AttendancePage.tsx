@@ -10,6 +10,7 @@ import {
   markUserAbsent,
 } from '../../../../api/attendance.api'
 import { getSession } from '../../../../app/auth/session'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { CheckCircle2, AlertCircle, X, AlertTriangle } from 'lucide-react'
 
 function formatTimeString(timeStr?: string | null): string | null {
@@ -289,27 +290,45 @@ export function AttendancePage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DailyAttendanceCard
-          date={dateLabel}
-          checkInTime={checkInFormatted}
-          checkOutTime={checkOutFormatted}
-          isPresent={isPresent}
-          statusText={statusText}
-          isWorking={isWorking}
-          stats={stats}
-          isLoading={isActionLoading}
-          onCheckIn={handleCheckIn}
-          onCheckOut={handleCheckOut}
-          onMarkLeave={handleMarkLeave}
-        />
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-end">
+            <RefreshButton
+              onRefresh={() => todayQuery.refetch()}
+              isRefreshing={todayQuery.isFetching}
+              label="today's attendance"
+            />
+          </div>
+          <DailyAttendanceCard
+            date={dateLabel}
+            checkInTime={checkInFormatted}
+            checkOutTime={checkOutFormatted}
+            isPresent={isPresent}
+            statusText={statusText}
+            isWorking={isWorking}
+            stats={stats}
+            isLoading={isActionLoading}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onMarkLeave={handleMarkLeave}
+          />
+        </div>
 
-        <AttendanceCalendar
-          month={currentMonth}
-          year={currentYear}
-          absentDays={absentDays}
-          presentDays={presentDays}
-          currentDay={currentDay}
-        />
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-end">
+            <RefreshButton
+              onRefresh={() => historyQuery.refetch()}
+              isRefreshing={historyQuery.isFetching}
+              label="attendance history"
+            />
+          </div>
+          <AttendanceCalendar
+            month={currentMonth}
+            year={currentYear}
+            absentDays={absentDays}
+            presentDays={presentDays}
+            currentDay={currentDay}
+          />
+        </div>
       </div>
     </div>
   )

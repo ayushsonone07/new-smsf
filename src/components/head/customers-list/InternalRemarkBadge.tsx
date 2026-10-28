@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Globe, Bot, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 import { getCustomerInternalRemarks, type CustomerRemark } from '../../../api/customer-drawer.api'
 import type { AutowebsionCustomerLightDTO } from '../../../api/autowebsion.api'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 // Module-level cache for internal remark history
 const internalRemarkHistoryCache = new Map<string, CustomerRemark[]>()
@@ -112,8 +113,9 @@ export function InternalRemarkBadge({
   const localRemark = getInternalRemarkForDepartment(customer, deptKey)
   const hasRemark = remarks !== null ? remarks.length > 0 : Boolean(localRemark)
 
-  const fetchHistory = useCallback(async () => {
-    const cached = internalRemarkHistoryCache.get(popoverKey)
+  // `force` (the popover's refresh icon) skips the module cache and re-reads the history.
+  const fetchHistory = useCallback(async (force = false) => {
+    const cached = force ? undefined : internalRemarkHistoryCache.get(popoverKey)
     if (cached) {
       setRemarks(cached)
       return
@@ -213,7 +215,15 @@ export function InternalRemarkBadge({
           className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 animate-in fade-in duration-100 text-left"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="text-sm font-bold text-slate-800 mb-2">History</div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-bold text-slate-800">History</div>
+            <RefreshButton
+              onRefresh={() => fetchHistory(true)}
+              isRefreshing={isLoading}
+              label="remark history"
+              size={13}
+            />
+          </div>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-4 text-slate-500 text-xs gap-2">

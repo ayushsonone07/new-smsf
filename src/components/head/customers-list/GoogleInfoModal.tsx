@@ -7,6 +7,7 @@ import {
   type DepartmentSpecialServiceDataDTO,
 } from '../../../api/service-flow.api'
 import type { OnboardingCustomer } from './CustomersList'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 export interface GoogleInfoModalProps {
   customer: OnboardingCustomer | null
@@ -34,6 +35,7 @@ export function GoogleInfoModal({
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [draftValues, setDraftValues] = useState<Record<string, Record<string, string>>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   useEffect(() => {
     if (!isOpen || !customer) {
@@ -98,6 +100,21 @@ export function GoogleInfoModal({
     setEditingCategory(category)
   }
 
+  // Refresh icon: re-reads the special data while keeping the current view (and any open edit draft) on screen.
+  const refreshData = async () => {
+    if (!customer) return
+    setIsRefreshing(true)
+    try {
+      const res = await getDepartmentSpecialData(customer.id, 'GOOGLE_DEPARTMENT')
+      setData(res)
+      setError(null)
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reload.')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   const handleSave = async (category: string) => {
     if (!customer) return
     setIsSaving(true)
@@ -150,20 +167,30 @@ export function GoogleInfoModal({
                 Department special service configuration & requirements
               </p>
             </div>
-            <button
-              type="button"
-              className="cl-sf-close-btn"
-              onClick={onClose}
-              aria-label="Close modal"
-              title="Close"
-              disabled={isSaving}
-            >
-              <Icon name="x" size={16} strokeWidth={2} />
-            </button>
+            <div className="flex items-center gap-1">
+              <RefreshButton
+                onRefresh={refreshData}
+                isRefreshing={isLoading || isRefreshing}
+                label="Google Info"
+              />
+              <button
+                type="button"
+                className="cl-sf-close-btn"
+                onClick={onClose}
+                aria-label="Close modal"
+                title="Close"
+                disabled={isSaving}
+              >
+                <Icon name="x" size={16} strokeWidth={2} />
+              </button>
+            </div>
           </div>
 
           {/* Body */}
-          <div className="cl-sf-body">
+          <div
+            className={`cl-sf-body transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isLoading || isRefreshing}
+          >
             {isLoading && (
               <div className="cl-sf-loading">
                 <div className="cl-sf-spinner" />

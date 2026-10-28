@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Users,
   Database,
@@ -14,6 +14,7 @@ import {
   getServiceDataTemplate,
   saveServiceDataTemplate,
 } from '../../../api/config.api'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 interface CustomerManagementTabProps {
   onNotify: (msg: string, type?: 'success' | 'error') => void
@@ -53,6 +54,8 @@ export function CustomerManagementTab({ onNotify }: CustomerManagementTabProps) 
   const [serviceRows, setServiceRows] = useState<ServiceRow[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [savingServices, setSavingServices] = useState(false)
+  // Last rows loaded from the server, used to warn before a refresh discards unsaved edits.
+  const loadedRowsRef = useRef('')
 
   const loadData = async () => {
     setLoadingData(true)
@@ -92,17 +95,18 @@ export function CustomerManagementTab({ onNotify }: CustomerManagementTabProps) 
         })
       }
 
-      if (rows.length === 0) {
-        setServiceRows([
-          {
-            id: 'row-1',
-            departmentType: 'COMMON_INFO',
-            services: [{ id: 'srv-1', name: '' }],
-          },
-        ])
-      } else {
-        setServiceRows(rows)
-      }
+      const nextRows: ServiceRow[] =
+        rows.length === 0
+          ? [
+              {
+                id: 'row-1',
+                departmentType: 'COMMON_INFO',
+                services: [{ id: 'srv-1', name: '' }],
+              },
+            ]
+          : rows
+      loadedRowsRef.current = JSON.stringify(nextRows)
+      setServiceRows(nextRows)
     } catch {
       onNotify('Failed to load customer configuration data', 'error')
     } finally {
@@ -127,6 +131,19 @@ export function CustomerManagementTab({ onNotify }: CustomerManagementTabProps) 
     } finally {
       setTogglingStatus(false)
     }
+  }
+
+  const handleRefresh = () => {
+    const hasUnsavedChanges =
+      loadedRowsRef.current !== '' &&
+      JSON.stringify(serviceRows) !== loadedRowsRef.current
+    if (
+      hasUnsavedChanges &&
+      !window.confirm('Discard your unsaved template changes and reload from the server?')
+    ) {
+      return
+    }
+    return loadData()
   }
 
   const handleAddRow = () => {
@@ -270,6 +287,12 @@ export function CustomerManagementTab({ onNotify }: CustomerManagementTabProps) 
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isRefreshing={loadingData}
+            label="customer configuration"
+          />
           <button
             type="button"
             onClick={handleAddRow}
@@ -278,6 +301,7 @@ export function CustomerManagementTab({ onNotify }: CustomerManagementTabProps) 
             <Plus className="w-4 h-4" />
             Add Department Row
           </button>
+          </div>
         </div>
 
         {loadingData ? (

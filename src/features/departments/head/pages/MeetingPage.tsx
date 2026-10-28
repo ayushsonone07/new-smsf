@@ -7,6 +7,7 @@ import { DepartmentFlowModal } from '../../../../components/head/15-days-meeting
 import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { Button } from '../../../../components/ui/Button'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useFollowUpRecentMeetings,
@@ -189,6 +190,15 @@ export function MeetingPage() {
     assigningUsersQuery.refetch()
   }
 
+  // Reloads only the meeting lists and their done / not-done counts (filters are kept).
+  function handleRefreshMeetings() {
+    counts.refetch()
+    return Promise.all([recentQuery.refetch(), dueQuery.refetch()])
+  }
+
+  const isMeetingsRefreshing = recentQuery.isFetching || dueQuery.isFetching
+  const isMeetingsDimmed = isMeetingsRefreshing && !recentQuery.isLoading && !dueQuery.isLoading
+
   function handleFilterStatusChange(status: MeetingStatus) {
     setStatusFilter(status)
   }
@@ -360,6 +370,12 @@ export function MeetingPage() {
             )}
           </div>
 
+          <RefreshButton
+            onRefresh={handleRefreshMeetings}
+            isRefreshing={isMeetingsRefreshing}
+            label="meetings"
+          />
+
           <IconButton
             icon="refresh"
             label="Reset all filters"
@@ -372,19 +388,24 @@ export function MeetingPage() {
         </div>
       </motion.div>
 
-      <MeetingList
-        departmentType={currentDepartment}
-        meetings={meetings}
-        statusFilter={statusFilter}
-        searchQuery={search}
-        onMarkDone={handleMarkDone}
-        onDepartmentClick={(meeting, department) =>
-          setSelectedDepartmentFlow({ meeting, department })
-        }
-        onPhoneClick={handlePhoneClick}
-        onMessageClick={handleMessageClick}
-        onHistoryClick={handleHistoryClick}
-      />
+      <div
+        className={`transition-opacity${isMeetingsDimmed ? ' opacity-60 pointer-events-none' : ''}`}
+        aria-busy={isMeetingsDimmed}
+      >
+        <MeetingList
+          departmentType={currentDepartment}
+          meetings={meetings}
+          statusFilter={statusFilter}
+          searchQuery={search}
+          onMarkDone={handleMarkDone}
+          onDepartmentClick={(meeting, department) =>
+            setSelectedDepartmentFlow({ meeting, department })
+          }
+          onPhoneClick={handlePhoneClick}
+          onMessageClick={handleMessageClick}
+          onHistoryClick={handleHistoryClick}
+        />
+      </div>
       <DepartmentFlowModal
         selection={selectedDepartmentFlow}
         onClose={() => setSelectedDepartmentFlow(null)}

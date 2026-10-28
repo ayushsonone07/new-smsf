@@ -186,7 +186,8 @@ describe('CustomersListModal — Bill Upload tab', () => {
 
   it('uploads the selected bill file', async () => {
     const user = userEvent.setup()
-    const { container } = renderModal()
+    const onBillUploaded = vi.fn()
+    const { container } = renderModal({ onBillUploaded })
 
     await screen.findByText('23AGNPT5905E1ZB')
 
@@ -206,6 +207,7 @@ describe('CustomersListModal — Bill Upload tab', () => {
     expect(
       await screen.findByText(/bill uploaded successfully/i),
     ).toBeInTheDocument()
+    expect(onBillUploaded).toHaveBeenCalledOnce()
   })
 
   it('saves the invoice and shows a confirmation', async () => {

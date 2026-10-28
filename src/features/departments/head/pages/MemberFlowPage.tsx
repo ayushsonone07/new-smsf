@@ -111,7 +111,11 @@ export function MemberFlowPage(_props?: { feature?: FeaturePermission }) {
             }
             hint={`Department: ${currentDepartment}`}
           >
-            <div style={{ overflowX: 'auto' }}>
+            <div
+              className={`transition-opacity${membersQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+              style={{ overflowX: 'auto' }}
+              aria-busy={membersQuery.isFetching}
+            >
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>

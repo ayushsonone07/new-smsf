@@ -8,6 +8,7 @@ import { useDepartments } from "@features/hr/hooks";
 import { Card, PageHeader } from "@shared/components/ui";
 
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { adminService } from "../services/adminService";
 
@@ -146,13 +147,25 @@ export function AdminHrUsersPage() {
             </div>
             {form.role === "HR" ? (
               <div>
-                <label htmlFor="user-department" className="mb-1.5 block text-sm font-semibold text-card-foreground">Department</label>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <label htmlFor="user-department" className="block text-sm font-semibold text-card-foreground">Department</label>
+                  <RefreshButton
+                    onRefresh={() => departmentsQuery.refetch()}
+                    isRefreshing={departmentsQuery.isFetching}
+                    label="departments"
+                    size={13}
+                    className="p-1"
+                  />
+                </div>
                 <Select
                   id="user-department"
                   required
                   value={form.departmentId ?? ""}
                   onChange={(e) => setField("departmentId", e.target.value ? Number(e.target.value) : undefined)}
-                  className="mbg-filter-control h-11 w-full rounded-xl border border-border bg-surface-elevated px-4 text-sm font-medium text-foreground outline-none"
+                  aria-busy={departmentsQuery.isFetching}
+                  className={`mbg-filter-control h-11 w-full rounded-xl border border-border bg-surface-elevated px-4 text-sm font-medium text-foreground outline-none transition-opacity ${
+                    departmentsQuery.isFetching && !departmentsQuery.isLoading ? "opacity-60" : ""
+                  }`}
                 >
                   <option value="" disabled>Select department</option>
                   {departments.map((d) => (

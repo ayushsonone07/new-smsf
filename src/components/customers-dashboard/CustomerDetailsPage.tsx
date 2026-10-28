@@ -2,9 +2,17 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { CustomerDashboardLayout } from './CustomerDashboardLayout'
 import { Icon } from '../head/shared/Icon'
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  X as CloseIcon,
+  ArrowRight,
+  ArrowLeft,
+} from 'lucide-react'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import { decryptUrlParams } from '../../utils/urlEncryption'
-import { getCustomerProfileDetails } from '../../api/customer-drawer.api'
+import { getCustomerProfileDetails, saveCustomerProfileDetails, type CustomerProfileDetails } from '../../api/customer-drawer.api'
 
 export interface OfferItem {
   id: string
@@ -13,12 +21,93 @@ export interface OfferItem {
   description: string
 }
 
+function parseFriendlyError(rawMsg: string): { title: string; message: string; field?: string } {
+  if (!rawMsg) {
+    return {
+      title: 'Unable to Save Details',
+      message: 'Something went wrong while saving your details. Please check the entered fields and try again.',
+    }
+  }
+
+  // 1. Duplicate email entry
+  const dupEmailMatch = rawMsg.match(/Duplicate entry '([^']+@[^']+)'/i)
+  if (dupEmailMatch) {
+    return {
+      title: 'Email Address Already Registered',
+      message: `The email address "${dupEmailMatch[1]}" is already registered with another customer account. Please enter a different email address.`,
+      field: 'email',
+    }
+  }
+
+  // 2. Duplicate phone entry
+  const dupPhoneMatch = rawMsg.match(/Duplicate entry '([0-9+ -]{7,15})'/i)
+  if (dupPhoneMatch) {
+    return {
+      title: 'Phone Number Already Registered',
+      message: `The phone number "${dupPhoneMatch[1]}" is already registered with an existing customer. Please enter a unique phone number.`,
+      field: 'phone',
+    }
+  }
+
+  // 3. Generic duplicate entry
+  const genericDupMatch = rawMsg.match(/Duplicate entry '([^']+)'/i)
+  if (genericDupMatch) {
+    return {
+      title: 'Duplicate Record Found',
+      message: `The value "${genericDupMatch[1]}" already exists in the system. Please provide unique information.`,
+    }
+  }
+
+  // 4. Already exists message
+  if (rawMsg.toLowerCase().includes('already exists')) {
+    return {
+      title: 'Account Conflict',
+      message: 'A customer account already exists with this email address or phone number. Please verify the entered details.',
+    }
+  }
+
+  // 5. Database constraint / SQL error
+  if (/could not execute statement|constraint|SQL/i.test(rawMsg)) {
+    return {
+      title: 'Conflict with Existing Record',
+      message: 'One of the unique fields (such as Email or Phone) is already assigned to another customer in the system. Please review your entries.',
+    }
+  }
+
+  // 6. Transaction rollback error (Spring UnexpectedRollbackException)
+  if (/Transaction rolled back|rollback-only|UnexpectedRollback|rollback/i.test(rawMsg)) {
+    return {
+      title: 'Account Details Conflict',
+      message: 'Unable to save because the entered Email or Phone number is already assigned to another customer. Please enter a unique email/phone.',
+    }
+  }
+
+  // 7. Network / connection error
+  if (/Failed to fetch|NetworkError|status 500|status 502|status 504/i.test(rawMsg)) {
+    return {
+      title: 'Server Connection Issue',
+      message: 'Could not communicate with the server. Please check your network connection and try again.',
+    }
+  }
+
+  return {
+    title: 'Validation Notice',
+    message: rawMsg,
+  }
+}
+
 export function CustomerDetailsPage() {
   const navigate = useNavigate()
   const { session } = useCustomerSession()
 
   // Active step state: 1: Basic Info, 2: Billing, 3: Website, 4: Google, 5: Automation, 6: Done
   const [activeStep, setActiveStep] = useState<number>(1) // Default to step 1 for onboarding
+
+  const [phone, setPhone] = useState('')
+  const [searchContact, setSearchContact] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
 
   // Step 2: Billing Form State
   const [billingAddress, setBillingAddress] = useState(
@@ -89,10 +178,14 @@ export function CustomerDetailsPage() {
       }
     }
 
-    const contact = (decrypted.contact || search.get('contact') || '').trim()
+    const contact = (decrypted.contact || search.get('contact') || search.get('phone') || '').trim()
     if (contact) {
+      setPhone(contact)
+      setSearchContact(contact)
       getCustomerProfileDetails(contact)
         .then((profile) => {
+          if (profile.phone) setPhone(profile.phone)
+          if (profile.ownerName) setOwnerName(profile.ownerName)
           if (profile.businessName) setBusinessName(profile.businessName)
           if (profile.email) setEmail(profile.email)
           if (profile.billingAddress) setBillingAddress(profile.billingAddress)
@@ -101,13 +194,37 @@ export function CustomerDetailsPage() {
           if (profile.domainStatus) setDomainStatus(profile.domainStatus)
           if (profile.tagline) setBusinessTagline(profile.tagline)
           if (profile.businessCategory) setBusinessCategory(profile.businessCategory)
+          if (profile.bookingLink) setBookingLink(profile.bookingLink)
+          if (profile.paymentLink) setPaymentLink(profile.paymentLink)
+          if (profile.topProducts) {
+            const list = profile.topProducts.split(',').map((s: string) => s.trim()).filter(Boolean)
+            if (list.length) setMainServices(list)
+          }
           if (profile.gmbProfileLink) setGmbProfileLink(profile.gmbProfileLink)
+          if (profile.googleReviewLink) setGoogleReviewLink(profile.googleReviewLink)
+          if (profile.appointmentLink) setAppointmentLink(profile.appointmentLink)
           if (profile.brandName) setBrandName(profile.brandName)
           if (profile.websiteLink) setWebsiteLink(profile.websiteLink)
           if (profile.area) setArea(profile.area)
           if (profile.city) setCityName(profile.city)
           if (profile.state) setStateName(profile.state)
           if (profile.address) setFullAddress(profile.address)
+          if (profile.mainGoal) setMainGoal(profile.mainGoal)
+          if (profile.aiChatbotEmail) setAiChatbotEmail(profile.aiChatbotEmail)
+          if (profile.aiChatbotLink) setAiChatbotLink(profile.aiChatbotLink)
+          if (profile.offers) {
+            try {
+              const parsed = JSON.parse(profile.offers)
+              if (Array.isArray(parsed) && parsed.length) {
+                setOffers(parsed.map((o: any, idx: number) => ({
+                  id: o.id || `off-${idx + 1}`,
+                  offerType: o.offerType || o.type || '',
+                  discountValue: o.discountValue || o.val || '',
+                  description: o.description || o.desc || '',
+                })))
+              }
+            } catch {}
+          }
         })
         .catch(console.error)
     }
@@ -117,11 +234,101 @@ export function CustomerDetailsPage() {
   const progressPercent =
     activeStep === 1 ? 20 : activeStep === 2 ? 20 : activeStep === 3 ? 40 : activeStep === 4 ? 60 : activeStep === 5 ? 80 : 100
 
-  function handleNextStep(e?: FormEvent) {
+  async function handleNextStep(e?: FormEvent) {
     if (e) e.preventDefault()
-    if (activeStep < 6) {
-      setActiveStep((prev) => prev + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (isSaving) return
+
+    const effectivePhone = (phone || searchContact || session?.phone || '').trim()
+
+    // Validation
+    if (activeStep === 1) {
+      if (!businessName.trim()) {
+        setToast({ type: 'error', title: 'Required Field', message: 'Business Name is required before proceeding.' })
+        return
+      }
+      if (!effectivePhone) {
+        setToast({ type: 'error', title: 'Required Field', message: 'Phone / WhatsApp Number is required before proceeding.' })
+        return
+      }
+      if (!email.trim()) {
+        setToast({ type: 'error', title: 'Required Field', message: 'Email address is required before proceeding.' })
+        return
+      }
+    }
+
+    if (!effectivePhone) {
+      setToast({ type: 'error', title: 'Phone Required', message: 'Phone number is required to save customer details.' })
+      return
+    }
+
+    const rawPayload: Record<string, any> = {
+      phone: effectivePhone,
+      businessName: businessName.trim() || undefined,
+      ownerName: ownerName.trim() || undefined,
+      email: email.trim() || undefined,
+      billingAddress: billingAddress.trim() || undefined,
+      gstNumber: noGstNumber ? undefined : gstNumber.trim() || undefined,
+      domain: domainName.trim() || undefined,
+      domainStatus: domainStatus.trim() || undefined,
+      tagline: businessTagline.trim() || undefined,
+      businessCategory: businessCategory.trim() || undefined,
+      bookingLink: bookingLink.trim() || undefined,
+      paymentLink: paymentLink.trim() || undefined,
+      topProducts: mainServices.length ? mainServices.join(', ') : undefined,
+      gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || undefined,
+      brandName: brandName.trim() || undefined,
+      googleReviewLink: googleReviewLink.trim() || undefined,
+      appointmentLink: appointmentLink.trim() || undefined,
+      address: fullAddress.trim() || undefined,
+      area: area.trim() || undefined,
+      city: cityName.trim() || undefined,
+      state: stateName.trim() || undefined,
+      websiteLink: websiteLink.trim() || undefined,
+      mainGoal: mainGoal.trim() || undefined,
+      offers: offers.filter(o => o.offerType || o.discountValue || o.description).length
+        ? JSON.stringify(offers.filter(o => o.offerType || o.discountValue || o.description))
+        : undefined,
+      aiChatbotEmail: aiChatbotEmail.trim() || undefined,
+      aiChatbotLink: aiChatbotLink.trim() || undefined,
+      source: 'INTERNAL_CUSTOMER_FORM',
+    }
+
+    // Filter out undefined and empty string values
+    const payload: Partial<CustomerProfileDetails> = {}
+    Object.entries(rawPayload).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        (payload as any)[k] = v
+      }
+    })
+
+    setIsSaving(true)
+    try {
+      console.log('[CustomerDetails] Calling saveCustomerProfileDetails with:', payload)
+      const res = await saveCustomerProfileDetails(payload)
+      console.log('[CustomerDetails] saveCustomerProfileDetails success:', res)
+
+      setToast({
+        type: 'success',
+        title: 'Details Saved Successfully',
+        message: activeStep === 5 ? 'All customer details have been saved to your business profile.' : 'Step details saved. Proceeding to next step.',
+      })
+      setTimeout(() => setToast(null), 4000)
+
+      if (activeStep < 6) {
+        setActiveStep((prev) => prev + 1)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    } catch (err: any) {
+      console.error('[CustomerDetails] Failed to save customer details:', err)
+      const friendly = parseFriendlyError(err?.message || err?.error || String(err))
+      setToast({
+        type: 'error',
+        title: friendly.title,
+        message: friendly.message,
+      })
+      // Stay on the current step so the user can fix the field!
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -174,6 +381,101 @@ export function CustomerDetailsPage() {
 
         {/* Main Details Card */}
         <div className="cdb-card" style={{ padding: '24px' }}>
+          {toast && (
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '14px 18px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '14px',
+                backgroundColor: toast.type === 'success' ? '#f0fdf4' : '#fff5f5',
+                color: toast.type === 'success' ? '#166534' : '#991b1b',
+                border: `1px solid ${toast.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                boxShadow: toast.type === 'success'
+                  ? '0 4px 16px rgba(22, 163, 74, 0.12)'
+                  : '0 4px 16px rgba(239, 68, 68, 0.12)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    backgroundColor: toast.type === 'success' ? '#dcfce7' : '#fee2e2',
+                    color: toast.type === 'success' ? '#16a34a' : '#dc2626',
+                  }}
+                >
+                  {toast.type === 'success' ? (
+                    <CheckCircle2 style={{ width: '18px', height: '18px' }} />
+                  ) : (
+                    <AlertCircle style={{ width: '18px', height: '18px' }} />
+                  )}
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: toast.type === 'success' ? '#14532d' : '#7f1d1d',
+                      marginBottom: '3px',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {toast.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '13px',
+                      lineHeight: '1.5',
+                      color: toast.type === 'success' ? '#166534' : '#991b1b',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {toast.message}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  width: '26px',
+                  height: '26px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: toast.type === 'success' ? '#15803d' : '#b91c1c',
+                  opacity: 0.8,
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                  e.currentTarget.style.backgroundColor = toast.type === 'success' ? '#dcfce7' : '#fee2e2'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.8'
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+                title="Dismiss"
+              >
+                <CloseIcon style={{ width: '16px', height: '16px' }} />
+              </button>
+            </div>
+          )}
+
           {/* Card Title & Progress Header */}
           <div className="cdb-card-header" style={{ marginBottom: '16px' }}>
             <div className="cdb-card-title-group">
@@ -249,23 +551,34 @@ export function CustomerDetailsPage() {
                 <button
                   key={st.label}
                   type="button"
-                  onClick={() => setActiveStep(st.step)}
+                  onClick={() => {
+                    setActiveStep(st.step)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '6px 14px',
+                    padding: '8px 16px',
                     borderRadius: '999px',
-                    border: isCurrent ? '0' : '1px solid #cbd5e1',
-                    background: isCurrent ? '#2563eb' : isDone ? '#dcfce7' : '#ffffff',
-                    color: isCurrent ? '#ffffff' : isDone ? '#16a34a' : '#475569',
+                    border: isCurrent ? 'none' : isDone ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                    background: isCurrent
+                      ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
+                      : isDone
+                        ? '#f0fdf4'
+                        : '#ffffff',
+                    color: isCurrent ? '#ffffff' : isDone ? '#15803d' : '#475569',
                     fontSize: '13px',
                     fontWeight: 600,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
+                    boxShadow: isCurrent ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
-                  {isDone ? <Icon name="check" size={14} strokeWidth={2.5} /> : null}
+                  {isDone ? (
+                    <CheckCircle2 style={{ width: '14px', height: '14px', color: '#16a34a' }} />
+                  ) : null}
                   <span>{st.label}</span>
                 </button>
               )
@@ -431,15 +744,54 @@ export function CustomerDetailsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                    Full Address
+                    Owner / Contact Person Name
                   </label>
-                  <input type="text" className="cdb-input" value="N/A, MIC Institute Narmadapuram 461001" readOnly />
+                  <input
+                    type="text"
+                    className="cdb-input"
+                    placeholder="e.g. Rahul Sharma"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                  />
                 </div>
+
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                    Email
+                    Phone / WhatsApp Number <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <input type="email" className="cdb-input" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <input
+                    type="tel"
+                    className="cdb-input"
+                    placeholder="e.g. 9827337896"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Email <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="cdb-input"
+                    placeholder="e.g. info@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Full Address
+                  </label>
+                  <input
+                    type="text"
+                    className="cdb-input"
+                    placeholder="Enter complete address"
+                    value={fullAddress}
+                    onChange={(e) => setFullAddress(e.target.value)}
+                  />
                 </div>
               </div>
             </div>
@@ -1093,8 +1445,47 @@ export function CustomerDetailsPage() {
                 Step {activeStep} of 5
               </span>
 
-              <button type="button" className="cdb-btn-primary" onClick={handleNextStep}>
-                Save &amp; next &rarr;
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleNextStep}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  background: activeStep === 5
+                    ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                    : 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: activeStep === 5
+                    ? '0 4px 14px rgba(16, 185, 129, 0.3)'
+                    : '0 4px 14px rgba(37, 99, 235, 0.3)',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.75 : 1,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                    <span>Saving details...</span>
+                  </>
+                ) : activeStep === 5 ? (
+                  <>
+                    <span>Save &amp; Complete Profile</span>
+                    <CheckCircle2 style={{ width: '16px', height: '16px' }} />
+                  </>
+                ) : (
+                  <>
+                    <span>Save &amp; next</span>
+                    <ArrowRight style={{ width: '15px', height: '15px' }} />
+                  </>
+                )}
               </button>
             </div>
           ) : null}

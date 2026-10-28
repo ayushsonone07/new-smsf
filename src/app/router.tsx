@@ -19,6 +19,8 @@ import { getSession } from './auth/session'
 import { AdminLayout } from '../components/layout/AdminLayout'
 import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
+import { AdminOverviewPage } from '../features/departments/pages/AdminOverviewPage'
+import { PaymentSuccessPage } from '../features/payment/pages/PaymentSuccessPage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
 import {
@@ -215,6 +217,13 @@ const salesProposalRoute = createRoute({
   component: SalesProposalPage,
 })
 
+/** Public: Razorpay payment-link callback (records payment_id). */
+const paymentSuccessRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/payment/success',
+  component: PaymentSuccessPage,
+})
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
@@ -255,6 +264,13 @@ const adminRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin',
   component: DepartmentManagementPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminOverviewRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/overview',
+  component: AdminOverviewPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -729,6 +745,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   registerBusinessRoute,
   salesProposalRoute,
+  paymentSuccessRoute,
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,
@@ -758,6 +775,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   authedLayoutRoute.addChildren([
     adminRoute,
+    adminOverviewRoute,
     adminCreateDepartmentRoute,
     adminCreateDepartmentNestedRoute,
     adminCustomersRoute,

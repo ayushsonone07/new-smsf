@@ -26,6 +26,7 @@ import {
   TableSkeleton,
 } from "@shared/components/ui";
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { useCreateHoliday, useDeleteHoliday, useHolidays, useUpdateHoliday } from "../hooks";
@@ -84,6 +85,8 @@ export function HolidaysPage() {
     sort: "holidayDate,asc",
   };
   const holidays = useHolidays(params);
+  const holidaysRefreshingClass =
+    holidays.isFetching && !holidays.isLoading ? "pointer-events-none opacity-60" : "";
   const records = holidays.data?.data ?? [];
   const upcoming = useMemo(() => getUpcoming(records), [records]);
   const activeCount = records.filter((item) => item.active).length;
@@ -151,7 +154,7 @@ export function HolidaysPage() {
       </StaggerItem>
 
       <StaggerItem variant="card">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className={`grid gap-4 transition-opacity md:grid-cols-4 ${holidaysRefreshingClass}`}>
           <MetricCard label="Total holidays" value={records.length} />
           <MetricCard label="Active" value={activeCount} tone="success" />
           <MetricCard label="Optional" value={optionalCount} tone="violet" />
@@ -192,12 +195,18 @@ export function HolidaysPage() {
               ariaLabel="Filter holidays by type"
             />
           </div>
+          <RefreshButton
+            onRefresh={() => holidays.refetch()}
+            isRefreshing={holidays.isFetching}
+            label="holidays"
+            className="h-10 w-10 shrink-0 self-end rounded-xl lg:self-auto"
+          />
         </div>
       </Card>
       </StaggerItem>
 
       <StaggerItem variant="card">
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className={`overflow-hidden transition-opacity ${holidaysRefreshingClass}`}>
         {holidays.isLoading ? (
           <div className="p-5">
             <TableSkeleton rows={6} />

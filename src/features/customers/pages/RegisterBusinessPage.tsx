@@ -29,6 +29,7 @@ import type {
   PlanWithDepartments,
 } from '../types/register-business.types'
 import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /* ─────────────────────────────────────────────────────────────────
    Single-page version of the "Register Your Business" form from SMSF
@@ -245,6 +246,10 @@ export function RegisterBusinessPage() {
   const plans: PlanWithDepartments[] = plansQuery.data ?? []
   const isLoadingPlans = plansQuery.isLoading
   const planAmounts: PlanAmount[] = amountsQuery.data ?? []
+  // Background refetch (refresh button) — keep showing packages but dim them.
+  const plansRefreshing =
+    (plansQuery.isFetching && !plansQuery.isLoading) ||
+    (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
   const [validationErrors, setValidationErrors] = useState({
@@ -488,7 +493,7 @@ export function RegisterBusinessPage() {
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
   const verifiedPaymentAmount =
     paymentVerified && currentPaymentCheck?.amount != null
-      ? normalizeAmountToRupees(currentPaymentCheck.amount)
+      ? Number(currentPaymentCheck.amount)
       : null
 
   const handleVerifyPayment = useCallback(async () => {
@@ -521,7 +526,7 @@ export function RegisterBusinessPage() {
       })
 
       if (res.success && res.data?.amount != null) {
-        const verifiedAmt = normalizeAmountToRupees(res.data.amount)
+        const verifiedAmt = Number(res.data.amount)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
           const remaining = total - verifiedAmt
@@ -602,9 +607,10 @@ export function RegisterBusinessPage() {
           ? priceOf(pkg.name).withGst
           : priceOf(pkg.name).amount
         if (pkgPrice > verifiedPaymentAmount) {
+          const extra = pkgPrice - verifiedPaymentAmount
           showToast({
-            title: 'Package Exceeds Verified Amount',
-            description: `${pkg.name} price (₹${pkgPrice.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
+            title: 'Package Exceeds Verified Payment',
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -624,10 +630,12 @@ export function RegisterBusinessPage() {
             )
           }, 0)
 
-        if (otherSelectedCost + pkgPrice > verifiedPaymentAmount) {
+        const totalSelected = otherSelectedCost + pkgPrice
+        if (totalSelected > verifiedPaymentAmount) {
+          const extra = totalSelected - verifiedPaymentAmount
           showToast({
-            title: 'Total Exceeds Verified Amount',
-            description: `Total amount (₹${(otherSelectedCost + pkgPrice).toLocaleString('en-IN')}) cannot exceed verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}`,
+            title: 'Total Exceeds Verified Payment',
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -881,9 +889,10 @@ export function RegisterBusinessPage() {
     if (paymentVerified && verifiedPaymentAmount != null) {
       const currentTotal = parseInt(formData.totalAmount) || autoTotal
       if (currentTotal > verifiedPaymentAmount) {
+        const extra = currentTotal - verifiedPaymentAmount
         showToast({
-          title: 'Amount Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) cannot exceed your verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}.`,
+          title: 'Total Exceeds Verified Payment',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please adjust your packages to match the paid amount.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
@@ -1394,11 +1403,20 @@ export function RegisterBusinessPage() {
           locked={!businessComplete}
           lockedMessage="Please complete Business Details in Step 1 first."
           aside={
-            selectedCount > 0 ? (
-              <span className="text-xs font-semibold text-blue-600">
-                {selectedCount} selected
-              </span>
-            ) : null
+            <span className="flex items-center gap-2">
+              {selectedCount > 0 ? (
+                <span className="text-xs font-semibold text-blue-600">
+                  {selectedCount} selected
+                </span>
+              ) : null}
+              <RefreshButton
+                onRefresh={() =>
+                  Promise.all([plansQuery.refetch(), amountsQuery.refetch()])
+                }
+                isRefreshing={plansQuery.isFetching || amountsQuery.isFetching}
+                label="packages"
+              />
+            </span>
           }
         >
           {/* Note: First verify payment, then select package */}
@@ -1534,7 +1552,10 @@ export function RegisterBusinessPage() {
               No packages available. Please contact administrator.
             </div>
           ) : (
-            <>
+            <div
+              className={`transition-opacity ${plansRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+              aria-busy={plansRefreshing}
+            >
               {verifiedPaymentAmount != null && (
                 <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                   <span className="flex items-center gap-1.5 font-medium">
@@ -1724,7 +1745,7 @@ export function RegisterBusinessPage() {
                 })
               )}
               </div>
-            </>
+            </div>
           )}
         </Section>
 

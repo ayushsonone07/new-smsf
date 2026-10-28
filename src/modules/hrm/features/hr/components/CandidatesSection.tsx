@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -79,7 +78,6 @@ export function CandidatesSection({ range, showRecruiter }: CandidatesSectionPro
   const [creatingFrom, setCreatingFrom] = useState<Candidate | null>(null);
   const [mailingTo, setMailingTo] = useState<Candidate | null>(null);
   const [additionalInfoFor, setAdditionalInfoFor] = useState<Candidate | null>(null);
-  const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,14 +85,14 @@ export function CandidatesSection({ range, showRecruiter }: CandidatesSectionPro
   const isSearching = search.trim().length >= 2;
 
   /**
-   * Manual refresh — re-fetches the entire HR namespace (KPIs, charts, list,
-   * search). The button is the user's explicit escape hatch since per-row
-   * status / remark edits no longer auto-invalidate everything.
+   * Manual refresh — re-fetches only the candidates table that is on screen
+   * (the list query, or the search query while searching).
    */
   async function onRefresh() {
     setIsRefreshing(true);
     try {
-      await qc.invalidateQueries({ queryKey: ["hr"] });
+      const result = await (isSearching ? searchQuery : listQuery).refetch();
+      if (result.error) throw result.error;
       toast.success("Candidates refreshed", "The latest candidates were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh candidates", getApiErrorMessage(err));
@@ -167,6 +165,10 @@ export function CandidatesSection({ range, showRecruiter }: CandidatesSectionPro
           {isSearching ? "No candidates match your search." : "No candidates yet."}
         </p>
       ) : (
+        <div
+          className={`transition-opacity ${active.isFetching && !active.isLoading ? "pointer-events-none opacity-60" : ""}`}
+          aria-busy={active.isFetching}
+        >
         <Table
           items={items}
           showRecruiter={showRecruiter}
@@ -182,6 +184,7 @@ export function CandidatesSection({ range, showRecruiter }: CandidatesSectionPro
             })
           }
         />
+        </div>
       )}
 
       <Pagination

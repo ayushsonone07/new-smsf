@@ -7,6 +7,7 @@ import { PageLayout } from '../../../components/layout/PageLayout'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 export function DepartmentHelpCenterPage() {
   const { departmentId } = useParams({
@@ -41,6 +42,8 @@ export function DepartmentHelpCenterPage() {
     )
   }
 
+  const isRefreshing = articlesQuery.isFetching
+
   return (
     <PageLayout>
       <PageHeader
@@ -64,9 +67,20 @@ export function DepartmentHelpCenterPage() {
               this department.
             </p>
           </div>
+
+          <RefreshButton
+            onRefresh={() => articlesQuery.refetch()}
+            isRefreshing={articlesQuery.isFetching}
+            label="help articles"
+          />
         </div>
 
-        <HelpCenter articles={articlesQuery.data} />
+        <div
+          className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={isRefreshing}
+        >
+          <HelpCenter articles={articlesQuery.data} />
+        </div>
       </Card>
     </PageLayout>
   )

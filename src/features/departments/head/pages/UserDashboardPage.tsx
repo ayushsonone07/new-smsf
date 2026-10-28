@@ -275,6 +275,8 @@ function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) 
       ? Math.round(((activeEntry.completed + activeEntry.inProgress) / activeEntry.total) * 100)
       : 0
   const avgPerformance = Math.round((completionRate + efficiencyScore) / 2)
+  // Light "refreshing" state for the sections fed by the counts query.
+  const countsDimClass = query.isFetching ? ' opacity-60 pointer-events-none' : ''
 
   return (
     <motion.div
@@ -390,7 +392,7 @@ function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) 
       )}
 
       {/* 4 KPI Cards */}
-      <motion.div variants={sectionVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={sectionVariants} className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity${countsDimClass}`}>
         <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Customers</span>
@@ -445,7 +447,7 @@ function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) 
       </motion.div>
 
       {/* Performance Summary & Analytics */}
-      <motion.div variants={sectionVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <motion.div variants={sectionVariants} className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity${countsDimClass}`}>
         {/* Performance Summary */}
         <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between min-h-[300px]">
           <div className="flex items-center justify-between mb-4">
@@ -609,7 +611,7 @@ function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) 
       </motion.div>
 
       {/* Quick Action Navigation Links */}
-      <motion.div variants={sectionVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <motion.div variants={sectionVariants} className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity${countsDimClass}`}>
         {hasWebsiteAssigned && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/70 rounded-xl p-5 flex items-center justify-between">
             <div className="flex items-center gap-3.5">
@@ -901,6 +903,10 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
     setRefreshKey((key) => key + 1)
   }
 
+  // Light "refreshing" state for the sections fed by the summary query.
+  const summaryFetching = isGoogle ? googleQuery.isFetching : query.isFetching
+  const summaryDimClass = summaryFetching ? 'transition-opacity opacity-60 pointer-events-none' : 'transition-opacity'
+
   return (
     <motion.div
       className="hdb-container"
@@ -926,7 +932,7 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         />
       </motion.div>
 
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryDimClass} aria-busy={summaryFetching}>
         <DashboardStatCards
           stats={{
             totalCustomers: {
@@ -977,7 +983,7 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         />
       </motion.div>
 
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryDimClass} aria-busy={summaryFetching}>
         <div className="hdb-row-two-col">
           <OnboardingTrend
             total={newTotal}
@@ -997,7 +1003,7 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         </div>
       </motion.div>
 
-      <motion.div variants={sectionVariants}>
+      <motion.div variants={sectionVariants} className={summaryDimClass} aria-busy={summaryFetching}>
         <div className={isStatusVisible ? 'hdb-row-three-col' : 'hdb-row-two-col-equal'}>
           {isStatusVisible && (
             <StatusBreakdown
@@ -1051,7 +1057,7 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
       </motion.div>
 
       {isGoogle && (googleSummary?.dailyCompletedServices?.length ?? 0) > 0 && (
-        <motion.div variants={sectionVariants}>
+        <motion.div variants={sectionVariants} className={summaryDimClass} aria-busy={summaryFetching}>
           <div className="hdb-card" style={{ padding: '20px' }}>
             <div className="hdb-card__header" style={{ marginBottom: '16px' }}>
               <div>

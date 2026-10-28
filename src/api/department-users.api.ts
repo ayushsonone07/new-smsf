@@ -307,6 +307,9 @@ export interface DepartmentCustomerRowItem {
   delivered?: boolean
   isDelivered?: boolean
   serviceDeliverySent?: boolean
+  completionPercentage?: number | null
+  deliveryCompletionPct?: number | null
+  hasServiceHistory?: boolean
   deliveryStatus?: {
     isDelivered?: boolean
     delivered?: boolean
@@ -419,13 +422,36 @@ export async function updateDeliveryConfirmation(
 
   // The backend deliberately returns HTTP 200 even when either delivery
   // channel was skipped or failed, so the message is the authoritative result.
-  if (!result.emailSent || !result.whatsappSent) {
+  if (!result.emailSent && !result.whatsappSent) {
     throw new Error(
       `Delivery unsuccessful. ${message || 'Email or WhatsApp was not sent.'}`,
     )
   }
 
   return result
+}
+
+export interface ServiceDeliveryHistory {
+  isSent?: { email?: boolean; whatsapp?: boolean }
+  updatedAt?: string
+  Data?: Record<string, string>
+  completionPercentage?: number
+}
+
+/** Fetches the last service-delivery history and completion percentage sent to a customer. */
+export async function getServiceDeliveryHistory(
+  customerId: number | string,
+): Promise<ServiceDeliveryHistory | null> {
+  const search = new URLSearchParams({ customerId: String(customerId) })
+  const res = await authedApiRequest<any>(
+    `/api/auth/customer-service/service-delivery-history?${search.toString()}`,
+  )
+
+  if (res?.success === false) {
+    throw new Error(res.message || 'Failed to fetch service delivery history')
+  }
+
+  return (res?.data as ServiceDeliveryHistory) ?? null
 }
 
 /**

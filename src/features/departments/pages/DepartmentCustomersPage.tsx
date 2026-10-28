@@ -25,6 +25,7 @@ import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { notifyCustomerDeleted } from '../../../api/notification-factory'
 
 type DepartmentRole =
@@ -170,6 +171,8 @@ export function DepartmentCustomersPage() {
     )
   }
 
+  const isRefreshing = customersQuery.isFetching
+
   return (
     <PageLayout>
       <PageHeader
@@ -243,6 +246,12 @@ export function DepartmentCustomersPage() {
                 : 'View customer accounts for this department.'}
             </p>
           </div>
+
+          <RefreshButton
+            onRefresh={() => customersQuery.refetch()}
+            isRefreshing={customersQuery.isFetching}
+            label="customers"
+          />
         </div>
 
         <CustomerFilters
@@ -252,13 +261,18 @@ export function DepartmentCustomersPage() {
           onStatusFilterChange={setStatusFilter}
         />
 
-        <CustomerTable
-          customers={filteredCustomers}
-          canEdit={canManageCustomers}
-          hiddenColumns={columnFeatures.hiddenColumns}
-          onEdit={setEditingCustomer}
-          onDelete={setCustomerToDelete}
-        />
+        <div
+          className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={isRefreshing}
+        >
+          <CustomerTable
+            customers={filteredCustomers}
+            canEdit={canManageCustomers}
+            hiddenColumns={columnFeatures.hiddenColumns}
+            onEdit={setEditingCustomer}
+            onDelete={setCustomerToDelete}
+          />
+        </div>
       </Card>
 
       {canManageCustomers && (

@@ -150,6 +150,8 @@ export function OnboardingPage() {
   const total = meta?.totalElements ?? 0;
   const totalPages = meta?.totalPages ?? 0;
   const hasNext = meta?.hasNext ?? false;
+  const listRefreshing = listQuery.isFetching && !listQuery.isLoading;
+  const refreshingClass = listRefreshing ? "pointer-events-none opacity-60" : "";
 
   function resetPage(next: () => void) {
     setPage(0);
@@ -167,7 +169,10 @@ export function OnboardingPage() {
         </StaggerItem>
 
         <StaggerItem variant="card">
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section
+            className={`grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${refreshingClass}`}
+            aria-busy={listRefreshing}
+          >
             {counts.map(({ label, tone, total: count }) => (
               <Card key={label}>
                 <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -226,6 +231,7 @@ export function OnboardingPage() {
                 />
               </div>
             ) : (
+              <div className={`transition-opacity ${refreshingClass}`} aria-busy={listRefreshing}>
               <OnboardingTable
                 employees={items}
                 sendingIds={sendLink.isPending ? [sendLink.variables?.id] : []}
@@ -253,6 +259,7 @@ export function OnboardingPage() {
                   }
                 }}
               />
+              </div>
             )}
 
             <PaginationFooter

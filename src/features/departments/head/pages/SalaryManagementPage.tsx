@@ -346,12 +346,12 @@ export function SalaryManagementPage({ feature: _feature }: Props = {}) {
           <button
             type="button"
             onClick={() => void loadData()}
-            disabled={loading || !departmentType}
+            disabled={loading || salaryQuery.isFetching || !departmentType}
             aria-label="Refresh salary data"
             title="Refresh"
             className="grid h-12 w-12 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={18} className={loading || salaryQuery.isFetching ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
@@ -470,7 +470,12 @@ export function SalaryManagementPage({ feature: _feature }: Props = {}) {
             </div>
           </header>
 
-          <div className="max-h-[58vh] overflow-auto">
+          <div
+            className={`max-h-[58vh] overflow-auto transition-opacity${
+              salaryQuery.isFetching && !loading ? ' opacity-60 pointer-events-none' : ''
+            }`}
+            aria-busy={salaryQuery.isFetching}
+          >
             <table className="w-full min-w-[1120px] border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 shadow-[0_1px_0_#e2e8f0]">
                 <tr>

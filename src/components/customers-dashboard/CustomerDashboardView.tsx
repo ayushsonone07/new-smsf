@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CustomerWelcomeBanner } from './CustomerWelcomeBanner'
 import { UpcomingMeetingBanner } from './UpcomingMeetingBanner'
 import { CustomerServicesSection } from './CustomerServicesSection'
 import { LatestUpdatesCard } from './LatestUpdatesCard'
 import { CustomerHelpCenterCard } from './CustomerHelpCenterCard'
 import { Icon } from '../head/shared/Icon'
+import { RefreshButton } from '../ui/RefreshButton'
 import {
   fetchCustomerDashboardData,
   submitCustomerTicket,
@@ -31,31 +32,44 @@ export function CustomerDashboardView() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isDownloadingBill, setIsDownloadingBill] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Shared by the first load and the refresh icon; isActive guards against updates after unmount.
+  const loadData = useCallback(async (isActive: () => boolean = () => true) => {
+    try {
+      const res = await fetchCustomerDashboardData()
+      if (isActive()) {
+        setData(res)
+        setLoadError('')
+      }
+    } catch (err) {
+      console.error('Failed to load customer dashboard data:', err)
+      if (isActive()) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load dashboard data.')
+      }
+    } finally {
+      if (isActive()) {
+        setIsLoading(false)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
-    async function loadData() {
-      try {
-        const res = await fetchCustomerDashboardData()
-        if (isMounted) {
-          setData(res)
-        }
-      } catch (err) {
-        console.error('Failed to load customer dashboard data:', err)
-        if (isMounted) {
-          setLoadError(err instanceof Error ? err.message : 'Failed to load dashboard data.')
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-    loadData()
+    void loadData(() => isMounted)
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [loadData])
+
+  async function refreshDashboard() {
+    setIsRefreshing(true)
+    try {
+      await loadData()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   async function handleTicketSubmit(input: CreateTicketInput) {
     const newTicket = await submitCustomerTicket(input)
@@ -109,12 +123,16 @@ export function CustomerDashboardView() {
     return (
       <div className="cdb-body" role="alert" style={{ padding: '40px 0', textAlign: 'center' }}>
         {loadError || 'Dashboard data is unavailable.'}
+        <RefreshButton onRefresh={refreshDashboard} isRefreshing={isRefreshing} label="dashboard" className="ml-2 align-middle" />
       </div>
     )
   }
 
   return (
-    <div className="cdb-body">
+    <div
+      className={`cdb-body transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+      aria-busy={isRefreshing}
+    >
       {/* Subtitle preview bar */}
       <div className="cdb-preview-bar">
         <span className="cdb-preview-icon">
@@ -123,6 +141,7 @@ export function CustomerDashboardView() {
         <span>
           Preview of <strong>{data.profile.companyName} ’s dashboard</strong> — every step, call and reply your team makes shows here live.
         </span>
+        <RefreshButton onRefresh={refreshDashboard} isRefreshing={isRefreshing} label="dashboard" className="ml-auto pointer-events-auto" />
       </div>
 
       {/* 1. Welcome Banner (Blue Gradient) */}

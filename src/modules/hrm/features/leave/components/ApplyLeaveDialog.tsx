@@ -7,6 +7,7 @@ import { DatePicker, Dialog } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { useApplyLeave, useLeaveBalances, useLeaveContext } from "../hooks";
 
@@ -79,8 +80,11 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
 
   const applyLeave = useApplyLeave();
   const toast = useToast();
-  const { data: balances } = useLeaveBalances();
-  const { data: context } = useLeaveContext();
+  const balancesQuery = useLeaveBalances();
+  const contextQuery = useLeaveContext();
+  const { data: balances } = balancesQuery;
+  const { data: context } = contextQuery;
+  const balancesRefreshing = balancesQuery.isFetching && !balancesQuery.isLoading;
 
   const workingDays = context?.workingDays ?? DEFAULT_WORKING_DAYS;
   const holidays = context?.holidays ?? [];
@@ -137,7 +141,19 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
   const disabled = applyLeave.isPending;
 
   return (
-    <Dialog open={open} onClose={onClose} title="Apply for Leave" size="md">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Apply for Leave"
+      size="md"
+      headerActions={
+        <RefreshButton
+          onRefresh={() => Promise.all([balancesQuery.refetch(), contextQuery.refetch()])}
+          isRefreshing={balancesQuery.isFetching || contextQuery.isFetching}
+          label="leave balances"
+        />
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-5 p-6">
         <div>
           <label
@@ -151,7 +167,10 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
             value={leaveType}
             onChange={(e) => setLeaveType(e.target.value as LeaveTypeValue)}
             disabled={disabled}
-            className="w-full rounded-xl border border-border bg-surface-elevated px-4 py-2.5 text-sm text-foreground shadow transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`w-full rounded-xl border border-border bg-surface-elevated px-4 py-2.5 text-sm text-foreground shadow transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60 ${
+              balancesRefreshing ? "opacity-60" : ""
+            }`}
+            aria-busy={balancesRefreshing}
             aria-invalid={!!errors.leaveType}
             aria-describedby={errors.leaveType ? "leave-type-error" : undefined}
           >

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { Modal } from '../../ui/Modal'
 import { Button } from '../../ui/Button'
+import { RefreshButton } from '../../ui/RefreshButton'
 import {
   bulkTransferCustomers,
   getDepartmentCustomerRows,
@@ -181,7 +182,19 @@ export function BulkAssignModal({
             <ArrowRightLeft className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 sm:text-lg">Bulk Assign Customers</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-base font-bold text-slate-900 sm:text-lg">Bulk Assign Customers</h2>
+              <RefreshButton
+                onRefresh={() =>
+                  Promise.all([
+                    usersQuery.refetch(),
+                    fromEmail ? customersQuery.refetch() : undefined,
+                  ])
+                }
+                isRefreshing={usersQuery.isFetching || customersQuery.isFetching}
+                label="members and customers"
+              />
+            </div>
             <p className="text-xs font-normal text-slate-500">
               Transfer accounts between members in <span className="font-semibold text-slate-700">{departmentTypeFormatted}</span>
             </p>
@@ -189,7 +202,14 @@ export function BulkAssignModal({
         </div>
       }
     >
-      <div className="space-y-4 pt-1">
+      <div
+        className={`space-y-4 pt-1 transition-opacity ${
+          (usersQuery.isFetching && !usersQuery.isPending) ||
+          (customersQuery.isFetching && !customersQuery.isPending)
+            ? 'pointer-events-none opacity-60'
+            : ''
+        }`}
+      >
         {/* Success View */}
         {successMessage ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">

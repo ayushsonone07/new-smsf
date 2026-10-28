@@ -341,7 +341,11 @@ export function ServiceFlowPage(_props?: { feature?: FeaturePermission }) {
           onRetry={handleRefresh}
         />
       ) : (
-        <motion.div variants={sectionVariants}>
+        <motion.div
+          variants={sectionVariants}
+          className={`transition-opacity${flowsQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+          aria-busy={flowsQuery.isFetching}
+        >
           <SectionCard
             title="Service Flows & Timelines"
             meta={

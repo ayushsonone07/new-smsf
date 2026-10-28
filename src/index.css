@@ -2658,6 +2658,14 @@ tr.is-selected-row td {
   background: #1e293b;
 }
 
+.sidebar-footer--clickable:hover .admin-info strong {
+  color: #fff;
+}
+
+.sidebar-footer--clickable:hover .admin-info span {
+  color: #94a3b8;
+}
+
 .sidebar-footer--clickable:focus-visible {
   outline: 2px solid #4f46e5;
   outline-offset: 2px;
@@ -2721,16 +2729,16 @@ button.profile-chip--clickable:focus-visible {
 .profile-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: 4px;
+  padding: 5px;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   box-shadow: 0 10px 28px rgb(15 23 42 / 10%);
 }
 
 .profile-menu--dark {
-  margin: 0 4px 8px;
+  margin: 0 2px 4px;
   background: #0b1220;
   border-color: #1e293b;
   box-shadow: none;
@@ -2739,10 +2747,10 @@ button.profile-chip--clickable:focus-visible {
 .profile-menu__phone {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 4px 6px;
   border: 1px solid #e2e8f0;
-  border-radius: 9px;
+  border-radius: 7px;
   background: #f8fafc;
 }
 
@@ -2755,10 +2763,11 @@ button.profile-chip--clickable:focus-visible {
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fff;
   color: #475569;
 }
@@ -2773,18 +2782,19 @@ button.profile-chip--clickable:focus-visible {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  line-height: 1.15;
 }
 
 .profile-menu__phone-text span {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #94a3b8;
 }
 
 .profile-menu__phone-text strong {
-  font-size: 13px;
+  font-size: 12px;
   color: #0f172a;
 }
 
@@ -2795,16 +2805,17 @@ button.profile-chip--clickable:focus-visible {
 .profile-menu__list {
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
 .profile-menu__item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 7px 8px;
+  padding: 4px 6px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 7px;
   background: transparent;
   font: inherit;
   text-align: left;
@@ -2824,10 +2835,11 @@ button.profile-chip--clickable:focus-visible {
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #f8fafc;
   color: #334155;
 }
@@ -2843,10 +2855,11 @@ button.profile-chip--clickable:focus-visible {
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  line-height: 1.2;
 }
 
 .profile-menu__item-text strong {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: #0f172a;
 }
 
@@ -2855,7 +2868,7 @@ button.profile-chip--clickable:focus-visible {
 }
 
 .profile-menu__item-text span {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
   white-space: nowrap;
   overflow: hidden;
@@ -3002,4 +3015,20 @@ button.profile-chip--clickable:focus-visible {
   border-right-color: transparent;
   border-radius: 50%;
   animation: login-as-spin 0.7s linear infinite;
+}
+
+
+/* Action group horizontal alignment for tables */
+.action-group {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+}
+
+.action-group .icon-action,
+.action-group button {
+  flex-shrink: 0;
 }

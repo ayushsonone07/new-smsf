@@ -91,9 +91,14 @@ async function refresh() {
       </StaggerItem>
 
       <StaggerItem>
+        <div
+          className={`transition-opacity ${isRefreshing ? "pointer-events-none opacity-60" : ""}`}
+          aria-busy={isRefreshing}
+        >
         {mode === "team" && canViewTeam ? <TeamAttendance
   date={selectedDate}
 /> : <MyAttendance />}
+        </div>
       </StaggerItem>
     </StaggerContainer>
   );

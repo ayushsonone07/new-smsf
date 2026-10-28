@@ -12,6 +12,7 @@ import { PageLayout } from '../../../components/layout/PageLayout'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { PendingApprovalsModal } from '../components/PendingApprovalsModal'
 
 export function AdminTimelinesPage() {
@@ -91,6 +92,8 @@ export function AdminTimelinesPage() {
       showFeedback(errMsg, 'err')
     }
   }
+
+  const isRefreshing = flowsQuery.isFetching && !flowsQuery.isLoading
 
   const flowsList = useMemo(() => {
     const q = serviceSearch.trim().toLowerCase()
@@ -238,6 +241,19 @@ export function AdminTimelinesPage() {
               </span>
             )}
           </Button>
+
+          <RefreshButton
+            onRefresh={() =>
+              Promise.all([
+                flowsQuery.refetch(),
+                pendingTimelineQuery.refetch(),
+              ])
+            }
+            isRefreshing={
+              flowsQuery.isFetching || pendingTimelineQuery.isFetching
+            }
+            label="service timelines"
+          />
         </div>
 
         {flowsQuery.isLoading ? (
@@ -251,7 +267,10 @@ export function AdminTimelinesPage() {
             No department services found matching your criteria.
           </div>
         ) : (
-          <div className="table-wrapper">
+          <div
+            className={`table-wrapper transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isRefreshing}
+          >
             <table className="data-table">
               <thead>
                 <tr>

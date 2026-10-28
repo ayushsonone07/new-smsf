@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 export function DepartmentDashboardPage() {
   const { departmentId } = useParams({
@@ -40,6 +41,8 @@ export function DepartmentDashboardPage() {
     )
   }
 
+  const isRefreshing = dashboardQuery.isFetching
+
   return (
     <PageLayout>
       <PageHeader
@@ -51,12 +54,24 @@ export function DepartmentDashboardPage() {
         }
         title={`${department?.name ?? 'Department'} Dashboard`}
         description="Overview of customers, services and recent activity for this department."
+        actions={
+          <RefreshButton
+            onRefresh={() => dashboardQuery.refetch()}
+            isRefreshing={dashboardQuery.isFetching}
+            label="dashboard"
+          />
+        }
       />
 
-      <DepartmentDashboard
-        departmentId={departmentId}
-        dashboard={dashboardQuery.data}
-      />
+      <div
+        className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+        aria-busy={isRefreshing}
+      >
+        <DepartmentDashboard
+          departmentId={departmentId}
+          dashboard={dashboardQuery.data}
+        />
+      </div>
     </PageLayout>
   )
 }

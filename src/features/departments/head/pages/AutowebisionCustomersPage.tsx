@@ -28,6 +28,7 @@ import { LoadingState } from '../../../../components/ui/LoadingState'
 import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import { TablePagination } from '../../../../components/ui/TablePagination'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
 import { ServiceFlowModal } from '../../../../components/head/customers-list/ServiceFlowModal'
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
@@ -56,7 +57,6 @@ import {
   updateAutowebisionStatus,
   updateWebsiteExistsStatus,
   fetchAutowebsionSummaryCounts,
-  fetchAutowebsionUsers,
   fetchMeetingsAssigningList,
   fetchAutomationCount,
   type AutowebsionCustomerLightDTO,
@@ -138,6 +138,8 @@ export function AutowebisionCustomersPage({
     permissionRouteName,
   )
 
+  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
+
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
   const isCustomerVisible = isColumnEnabled('Customer') || isColumnEnabled('Business') || isColumnEnabled('Company')
@@ -148,7 +150,10 @@ export function AutowebisionCustomersPage({
   const isExpirationVisible = isColumnEnabled('Expiration') || isColumnEnabled('Expiry') || isColumnEnabled('Service Expiration')
   const isClientRemarkVisible = isColumnEnabled('Client Remark') || isColumnEnabled('Client Remarks')
   const isInternalRemarkVisible = isColumnEnabled('Internal Remark') || isColumnEnabled('Remark') || isColumnEnabled('Remarks')
-  const isDraftSentVisible = isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent')
+  // Draft Sent column is visible on Autowebsion (ALL) and Website, and strictly hidden ONLY on Automation tab
+  const isDraftSentVisible =
+    activeSubTab !== 'AUTOMATION' &&
+    (isColumnEnabled('Draft Sent') || isColumnEnabled('Draft') || isColumnEnabled('Mail Sent'))
   const isAssigneeConfigured = isColumnConfigured('Assigned To')
   const isAssigneeVisible = isAssigneeConfigured
     ? isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee')
@@ -163,17 +168,15 @@ export function AutowebisionCustomersPage({
   const canEditStatus = isColumnConfigured('Status')
     ? canEditColumn('Status')
     : isDepartmentUser
-  const canEditDraft = isColumnConfigured('Draft Sent')
-    ? canEditColumn('Draft Sent')
-    : isDepartmentUser
+  const canEditDraft =
+    activeSubTab !== 'AUTOMATION' &&
+    (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : isDepartmentUser)
   const canEditAssignee = isAssigneeConfigured
     ? canEditColumn('Assigned To')
     : !isDepartmentUser
   const canEditServices = isColumnConfigured('Services')
     ? canEditColumn('Services')
     : isDepartmentUser
-
-  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -191,32 +194,16 @@ export function AutowebisionCustomersPage({
     }
   }, [defaultSubTab])
 
-  const handleOpenClientRemarkDialog = useCallback(
-    async (customer: AutowebsionCustomerLightDTO) => {
-      const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
-        activeSubTab === 'AUTOMATION' || isAutomationScreen
-          ? 'AUTOMATION_DEPARTMENT'
-          : activeSubTab === 'WEBSITE' || isWebsiteScreen
-            ? 'WEBSITE_DEPARTMENT'
-            : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
-                ? 'AUTOMATION_DEPARTMENT'
-                : 'WEBSITE_DEPARTMENT')
+  // Customer whose client remarks are open, so the dialog's refresh button can reload them.
+  const clientRemarkCustomerRef = useRef<AutowebsionCustomerLightDTO | null>(null)
 
+  // Fetches the client remarks for one customer into the open Client Remark dialog.
+  const loadClientRemarks = useCallback(
+    async (
+      customer: AutowebsionCustomerLightDTO,
+      targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT',
+    ) => {
       const initialText = customer.clientRemark?.trim()
-      const initialRemarks: Array<{ reply: string; timestamp: string; staffName?: string }> = initialText
-        ? [{ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' }]
-        : []
-
-      setViewingClientRemark({
-        customerId: customer.customerId,
-        name: customer.businessName || customer.ownerName || 'Customer',
-        departmentType: targetDept,
-        remarks: initialRemarks,
-        loading: true,
-        error: null,
-      })
-      setNewClientRemarkText('')
-
       try {
         const [reviewRepliesRes, generalRemarksRes] = await Promise.allSettled([
           getCustomerReviewReplies(customer.customerId, targetDept),
@@ -271,7 +258,39 @@ export function AutowebisionCustomersPage({
         )
       }
     },
-    [activeSubTab, isAutomationScreen, isWebsiteScreen, userEmail],
+    [userEmail],
+  )
+
+  const handleOpenClientRemarkDialog = useCallback(
+    async (customer: AutowebsionCustomerLightDTO) => {
+      const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
+        activeSubTab === 'AUTOMATION' || isAutomationScreen
+          ? 'AUTOMATION_DEPARTMENT'
+          : activeSubTab === 'WEBSITE' || isWebsiteScreen
+            ? 'WEBSITE_DEPARTMENT'
+            : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
+                ? 'AUTOMATION_DEPARTMENT'
+                : 'WEBSITE_DEPARTMENT')
+
+      const initialText = customer.clientRemark?.trim()
+      const initialRemarks: Array<{ reply: string; timestamp: string; staffName?: string }> = initialText
+        ? [{ reply: initialText, timestamp: customer.updatedAt || customer.createdAt || '' }]
+        : []
+
+      clientRemarkCustomerRef.current = customer
+      setViewingClientRemark({
+        customerId: customer.customerId,
+        name: customer.businessName || customer.ownerName || 'Customer',
+        departmentType: targetDept,
+        remarks: initialRemarks,
+        loading: true,
+        error: null,
+      })
+      setNewClientRemarkText('')
+
+      await loadClientRemarks(customer, targetDept)
+    },
+    [activeSubTab, isAutomationScreen, isWebsiteScreen, loadClientRemarks],
   )
 
   // Modals state
@@ -430,15 +449,6 @@ export function AutowebisionCustomersPage({
     staleTime: 20_000,
   })
 
-  // 3. Exact Assignable Users: GET /api/autowebision/users?page=0&size=100
-  // Do NOT hit when logged in as department user (Assign is only for Head)
-  const autowebUsersQuery = useQuery({
-    queryKey: ['autowebisionUsers100'],
-    queryFn: () => fetchAutowebsionUsers(0, 100),
-    enabled: !isDepartmentUser,
-    staleTime: 60_000,
-  })
-
   // 4. Exact Assignable List: GET /api/meetings/users/assigning-list?departmentType=AUTOWEBSION_DEPARTMENT
   // Do NOT hit when logged in as department user (Assign is only for Head)
   const meetingsAssignQuery = useQuery({
@@ -456,18 +466,6 @@ export function AutowebisionCustomersPage({
     if (isDepartmentUser) return []
     const list: Array<{ id: string; name: string }> = []
     const seen = new Set<string>()
-
-    const raw1 = autowebUsersQuery.data?.data || []
-    for (const u of raw1) {
-      const email = u.email || u.username
-      if (email && !seen.has(email)) {
-        seen.add(email)
-        list.push({
-          id: email,
-          name: u.username ? `${u.username} (${email})` : email,
-        })
-      }
-    }
 
     const raw2 = Array.isArray(meetingsAssignQuery.data)
       ? meetingsAssignQuery.data
@@ -496,7 +494,7 @@ export function AutowebisionCustomersPage({
     }
 
     return list
-  }, [isDepartmentUser, autowebUsersQuery.data, meetingsAssignQuery.data, assigningUsersQuery.data])
+  }, [isDepartmentUser, meetingsAssignQuery.data, assigningUsersQuery.data])
 
   const filteredAssignees = useMemo(() => {
     if (!assignSearchQuery.trim()) return assignees
@@ -586,6 +584,87 @@ export function AutowebisionCustomersPage({
         : 'PENDING'
   }
 
+  // Update one sub-service status in the cached customer list (no refetch).
+  function updateCachedSubServiceStatus(newStatus: string, subServiceName?: string) {
+    if (!serviceFlowTarget?.customer) return
+    const targetCustomerId = Number(serviceFlowTarget.customer.id)
+
+    queryClient.setQueriesData(
+      { queryKey: ['autowebisionCustomers'] },
+      (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.content)) return oldData
+        return {
+          ...oldData,
+          content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
+            if (c.customerId !== targetCustomerId) return c
+
+            const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
+            const updatedSubList = prevSubList.map((sub: any) => {
+              const name =
+                sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+              if (
+                !subServiceName ||
+                name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+              ) {
+                return typeof sub === 'object' && 'name' in sub
+                  ? { ...sub, status: newStatus }
+                  : { [name]: newStatus }
+              }
+              return sub
+            })
+
+            const updatedServices = Array.isArray(c.services)
+              ? c.services.map((srv: any) => {
+                  if (Array.isArray(srv.subServiceInfo)) {
+                    return {
+                      ...srv,
+                      subServiceInfo: srv.subServiceInfo.map((sub: any) => {
+                        const name =
+                          sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+                        if (
+                          !subServiceName ||
+                          name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+                        ) {
+                          return typeof sub === 'object' && 'name' in sub
+                            ? { ...sub, status: newStatus }
+                            : { [name]: newStatus }
+                        }
+                        return sub
+                      }),
+                    }
+                  }
+                  return srv
+                })
+              : c.services
+
+            return {
+              ...c,
+              subServiceInfo: updatedSubList,
+              services: updatedServices,
+            }
+          }),
+        }
+      },
+    )
+  }
+
+  // Colour of the Website / Automation service pill. It follows ONLY the sub-services
+  // (completed from the Services column), never the main Status column:
+  // all sub-services done (completed / awaiting customer ack) -> COMPLETED,
+  // any started -> IN_PROGRESS, otherwise PENDING.
+  function getServicePillStatus(
+    c: AutowebsionCustomerLightDTO,
+    targetServiceType: 'WEBSITE' | 'AUTOMATION',
+  ): string {
+    const statuses = getSubServicesForCustomer(c, targetServiceType, false).map((s) =>
+      s.status.toUpperCase().replace(/-/g, '_'),
+    )
+    const isDone = (st: string) => st.includes('COMPLETE') || st.includes('ACK')
+    if (statuses.length > 0 && statuses.every(isDone)) return 'COMPLETED'
+    if (statuses.some((st) => isDone(st) || st.includes('PROGRESS'))) return 'IN_PROGRESS'
+    return 'PENDING'
+  }
+
   // Status style helpers matching Screenshot 1 (Pending: #fff8eb, text: #b45309, border: border-amber-200/80)
   function getStatusBadgeStyle(status: string): string {
     const s = String(status || 'PENDING').toUpperCase()
@@ -647,6 +726,8 @@ export function AutowebisionCustomersPage({
   function getSubServicesForCustomer(
     customer: AutowebsionCustomerLightDTO,
     targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+    // false: do not fall back to the main service status when there is no sub-service info
+    useMainStatusFallback = true,
   ): Array<{ name: string; status: string }> {
     const list: Array<{ name: string; status: string }> = []
 
@@ -692,7 +773,7 @@ export function AutowebisionCustomersPage({
     }
 
     // 3. Fallback: if no subServices found at all, check customer.services array itself
-    if (list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
+    if (useMainStatusFallback && list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
       for (const s of customer.services) {
         const st = String(s?.serviceType || '').toUpperCase()
         const matchesTarget =
@@ -865,6 +946,32 @@ export function AutowebisionCustomersPage({
     }
   }
 
+  // Fetches the internal remarks for one customer into the open Internal Remarks dialog.
+  const loadInternalRemarks = useCallback(
+    (customerId: number, departmentType: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT') =>
+      getCustomerInternalRemarks(customerId, departmentType, userEmail)
+        .then((data) => {
+          const list = Array.isArray(data) ? data : []
+          setViewingInternalRemarks((prev) =>
+            prev && prev.customerId === customerId
+              ? { ...prev, remarks: list, loading: false }
+              : prev,
+          )
+        })
+        .catch((err) => {
+          setViewingInternalRemarks((prev) =>
+            prev && prev.customerId === customerId
+              ? {
+                  ...prev,
+                  error: err instanceof Error ? err.message : 'Failed to fetch remarks',
+                  loading: false,
+                }
+              : prev,
+          )
+        }),
+    [userEmail],
+  )
+
   // Handle on-demand fetching of internal remarks for Website or Automation
   const handleOpenFullRemarkDialog = useCallback(
     (
@@ -883,29 +990,10 @@ export function AutowebisionCustomersPage({
       })
 
       if (!hasPreloaded) {
-        getCustomerInternalRemarks(customer.customerId, departmentType, userEmail)
-          .then((data) => {
-            const list = Array.isArray(data) ? data : []
-            setViewingInternalRemarks((prev) =>
-              prev && prev.customerId === customer.customerId
-                ? { ...prev, remarks: list, loading: false }
-                : prev,
-            )
-          })
-          .catch((err) => {
-            setViewingInternalRemarks((prev) =>
-              prev && prev.customerId === customer.customerId
-                ? {
-                    ...prev,
-                    error: err instanceof Error ? err.message : 'Failed to fetch remarks',
-                    loading: false,
-                  }
-                : prev,
-            )
-          })
+        void loadInternalRemarks(customer.customerId, departmentType)
       }
     },
-    [userEmail],
+    [loadInternalRemarks],
   )
 
   // Website Draft Handlers
@@ -1345,9 +1433,13 @@ export function AutowebisionCustomersPage({
 
           <button
             type="button"
-            onClick={() => {
-              customersQuery.refetch()
-              countsQuery.refetch()
+            onClick={async () => {
+              const [customersResult] = await Promise.all([
+                customersQuery.refetch(),
+                countsQuery.refetch(),
+              ])
+              // Drop optimistic status overrides so the freshly fetched statuses are shown.
+              if (customersResult.isSuccess) setLocalStatusMap({})
             }}
             disabled={customersQuery.isFetching}
             className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 transition-all shadow-none"
@@ -1470,7 +1562,12 @@ export function AutowebisionCustomersPage({
       </div>
 
       {/* Main Customers Table Card */}
-      <div className="autoweb-table-card">
+      <div
+        className={`autoweb-table-card transition-opacity${
+          customersQuery.isFetching && !customersQuery.isPending ? ' opacity-60 pointer-events-none' : ''
+        }`}
+        aria-busy={customersQuery.isFetching}
+      >
         {customersQuery.isPending ? (
           <LoadingState message="Loading Autowebsion customers..." />
         ) : customersQuery.isError ? (
@@ -1531,8 +1628,8 @@ export function AutowebisionCustomersPage({
                     localStatusMap[`${customer.customerId}_ALL`] ||
                     getAutomationServiceStatus(customer)
 
-                  const webPill = getServicePillStyle(websiteStatus)
-                  const autoPill = getServicePillStyle(automationStatus)
+                  const webPill = getServicePillStyle(getServicePillStatus(customer, 'WEBSITE'))
+                  const autoPill = getServicePillStyle(getServicePillStatus(customer, 'AUTOMATION'))
 
                   const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
                   const services = Array.isArray(customer.services) ? customer.services : []
@@ -2365,72 +2462,18 @@ export function AutowebisionCustomersPage({
               : permissionDepartmentType
         }
         serviceType={serviceFlowTarget?.serviceType}
-        onStepsUpdated={() => {
-          // No API refetch needed on flow step update
+        onStepsUpdated={(steps, subServiceName) => {
+          // No API refetch: the backend syncs sub_service_info from the flow the same way
+          // (all steps done -> PENDING_CUSTOMER_ACK, any done -> IN_PROGRESS), mirror it in the cache.
+          if (!subServiceName || steps.length === 0) return
+          const done = steps.filter((s) => s.status.toUpperCase() === 'COMPLETED').length
+          const newStatus =
+            done === steps.length ? 'PENDING_CUSTOMER_ACK' : done > 0 ? 'IN_PROGRESS' : 'PENDING'
+          updateCachedSubServiceStatus(newStatus, subServiceName)
         }}
         onSubServiceStatusUpdated={(newStatus, subServiceName) => {
           // Do NOT refetch customersQuery or countsQuery!
-          // Update local cache in-memory so UI knows this sub-service status immediately
-          if (!serviceFlowTarget?.customer) return
-          const targetCustomerId = Number(serviceFlowTarget.customer.id)
-
-          queryClient.setQueriesData(
-            { queryKey: ['autowebisionCustomers'] },
-            (oldData: any) => {
-              if (!oldData || !Array.isArray(oldData.content)) return oldData
-              return {
-                ...oldData,
-                content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
-                  if (c.customerId !== targetCustomerId) return c
-
-                  const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
-                  const updatedSubList = prevSubList.map((sub: any) => {
-                    const name =
-                      sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-                    if (
-                      !subServiceName ||
-                      name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
-                    ) {
-                      return typeof sub === 'object' && 'name' in sub
-                        ? { ...sub, status: newStatus }
-                        : { [name]: newStatus }
-                    }
-                    return sub
-                  })
-
-                  const updatedServices = Array.isArray(c.services)
-                    ? c.services.map((srv: any) => {
-                        if (Array.isArray(srv.subServiceInfo)) {
-                          return {
-                            ...srv,
-                            subServiceInfo: srv.subServiceInfo.map((sub: any) => {
-                              const name =
-                                sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-                              if (
-                                !subServiceName ||
-                                name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
-                              ) {
-                                return typeof sub === 'object' && 'name' in sub
-                                  ? { ...sub, status: newStatus }
-                                  : { [name]: newStatus }
-                              }
-                              return sub
-                            }),
-                          }
-                        }
-                        return srv
-                      })
-                    : c.services
-
-                  return {
-                    ...c,
-                    subServiceInfo: updatedSubList,
-                    services: updatedServices,
-                  }
-                }),
-              }
-            },
-          )
+          updateCachedSubServiceStatus(newStatus, subServiceName)
         }}
       />
 
@@ -2459,13 +2502,26 @@ export function AutowebisionCustomersPage({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => setViewingClientRemark(null)}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <RefreshButton
+                  onRefresh={() => {
+                    const customer = clientRemarkCustomerRef.current
+                    if (!customer || customer.customerId !== viewingClientRemark.customerId) return
+                    const targetDept = viewingClientRemark.departmentType
+                    setViewingClientRemark((prev) => (prev ? { ...prev, loading: true, error: null } : prev))
+                    return loadClientRemarks(customer, targetDept)
+                  }}
+                  isRefreshing={viewingClientRemark.loading}
+                  label="client remarks"
+                />
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setViewingClientRemark(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Add Remark Form */}
@@ -2642,13 +2698,24 @@ export function AutowebisionCustomersPage({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => setViewingInternalRemarks(null)}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <RefreshButton
+                  onRefresh={() => {
+                    const { customerId, departmentType } = viewingInternalRemarks
+                    setViewingInternalRemarks((prev) => (prev ? { ...prev, loading: true, error: null } : prev))
+                    return loadInternalRemarks(customerId, departmentType)
+                  }}
+                  isRefreshing={viewingInternalRemarks.loading}
+                  label="internal remarks"
+                />
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setViewingInternalRemarks(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Body */}

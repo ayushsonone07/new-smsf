@@ -11,6 +11,10 @@ interface DashboardChartCardProps {
   isEmpty?: boolean;
   emptyMessage?: string;
   className?: string;
+  /** Optional header controls, e.g. a refresh button for this card's data. */
+  actions?: ReactNode;
+  /** Dims the current content while a background refresh is running. */
+  refreshing?: boolean;
 }
 
 export function DashboardChartCard({
@@ -21,6 +25,8 @@ export function DashboardChartCard({
   isEmpty = false,
   emptyMessage = "No data available",
   className,
+  actions,
+  refreshing = false,
 }: DashboardChartCardProps) {
   return (
     <motion.div
@@ -35,6 +41,7 @@ export function DashboardChartCard({
           <span className="h-2 w-2 rounded-full bg-primary shadow-sm" />
           {title}
         </h3>
+        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </div>
       {error ? (
         <div className="flex items-center gap-2 rounded-md bg-danger-soft p-3 text-xs text-danger">
@@ -76,6 +83,10 @@ export function DashboardChartCard({
             <path d="m19 9-5 5-4-4-3 3" />
           </svg>
           <p className="text-xs text-muted-foreground">{emptyMessage}</p>
+        </div>
+      ) : refreshing ? (
+        <div className="pointer-events-none opacity-60 transition-opacity" aria-busy="true">
+          {children}
         </div>
       ) : (
         children

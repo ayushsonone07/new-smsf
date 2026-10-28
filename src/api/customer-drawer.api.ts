@@ -1,4 +1,4 @@
-import { authedApiRequest, authedFileRequest } from './client'
+import { apiRequest, authedApiRequest, authedFileRequest } from './client'
 import { getSession } from '../app/auth/session'
 
 export interface CustomerProfileDetails {
@@ -231,6 +231,47 @@ function requireData<T>(response: ApiEnvelope<T>, resource: string): T {
     throw new Error(response.message || `${resource} returned no data`)
   }
   return response.data
+}
+
+export async function saveCustomerProfileDetails(
+  details: Partial<CustomerProfileDetails>,
+  isDuplicate = false,
+  isSendEmail = false,
+): Promise<boolean> {
+  const session = getSession()
+  const rawToken =
+    session?.token ||
+    (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('token') : '') ||
+    ''
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (session?.token) {
+    headers.Authorization = `Bearer ${session.token}`
+    if (session.user?.email || session.user?.username) {
+      headers.username = session.user.email || session.user.username || ''
+    }
+  } else if (rawToken && rawToken.split('.').length === 3) {
+    headers.Authorization = `Bearer ${rawToken}`
+  }
+
+  const query = new URLSearchParams()
+  if (isDuplicate) query.set('isDuplicate', 'true')
+  if (isSendEmail) query.set('isSendEmail', 'true')
+  const qs = query.toString() ? `?${query.toString()}` : ''
+
+  const response = await apiRequest<ApiEnvelope<boolean> | boolean>(
+    `/api/common/customerDetails/save${qs}`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(details),
+    },
+  )
+
+  if (typeof response === 'boolean') return response
+  return Boolean(response?.data ?? response?.success ?? true)
 }
 
 export async function getCustomerProfileDetails(

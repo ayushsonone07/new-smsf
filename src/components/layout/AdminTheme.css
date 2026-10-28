@@ -1,0 +1,240 @@
+/* ===============================================================
+   SuperAdmin shell — same look as the department panels (head.css):
+   white sidebar, brand blue, yellow active bar, #f4f6fb background.
+   Colours and typography only; layout / responsive rules stay in
+   index.css (.app-shell, .sidebar, @media 900px).
+   =============================================================== */
+
+.app-shell {
+  --a-blue: #2459e0;
+  --a-blue-dark: #1a45b8;
+  --a-blue-soft: #eaf0ff;
+  --a-blue-hover: #f1f5ff;
+  --a-yellow: #ffc629;
+  --a-bg: #f4f6fb;
+  --a-border: #e6e9f0;
+  --a-text: #0f172a;
+  --a-text-2: #1e293b;
+  --a-muted: #475569;
+  --a-faint: #64748b;
+  --a-danger: #dc2626;
+
+  background: var(--a-bg);
+  color: var(--a-text);
+  font-family: var(--app-font-family);
+}
+
+.app-shell :focus-visible {
+  outline: 2px solid var(--a-blue);
+  outline-offset: 2px;
+}
+
+/* --- Sidebar ------------------------------------------------- */
+
+.app-shell .sidebar {
+  background: #fff;
+  border-right: 1px solid var(--a-border);
+  color: var(--a-text-2);
+}
+
+.app-shell .brand strong {
+  color: var(--a-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .brand span {
+  color: var(--a-blue);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app-shell .sidebar-close {
+  border-color: var(--a-border);
+  color: var(--a-faint);
+}
+
+.app-shell .sidebar-close:hover {
+  background: var(--a-blue-hover);
+  color: var(--a-blue-dark);
+}
+
+.app-shell .nav-label {
+  color: var(--a-faint);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-shell .nav-item {
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  color: var(--a-text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-shell .nav-item:hover {
+  background: var(--a-blue-hover);
+  color: var(--a-blue-dark);
+}
+
+.app-shell .nav-item.active {
+  border-left-color: var(--a-yellow);
+  background: var(--a-blue-soft);
+  color: var(--a-blue);
+}
+
+/* --- Account footer ------------------------------------------ */
+
+.app-shell .sidebar-footer {
+  margin: 6px 2px 0;
+  padding: 6px 8px;
+  border-top: 0;
+  border-radius: 10px;
+  background: var(--a-bg);
+  border: 1px solid var(--a-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-shell .sidebar-footer--clickable:hover,
+.app-shell .sidebar-footer:hover {
+  background: #e9eef7;
+  border-color: #cbd5e1;
+}
+
+.app-shell .sidebar-footer:focus-visible {
+  outline: 2px solid var(--a-blue);
+  outline-offset: 2px;
+}
+
+.app-shell .sidebar-footer .admin-avatar {
+  background: var(--a-blue);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(36, 89, 224, 0.25);
+}
+
+.app-shell .admin-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-shell .admin-info strong {
+  display: block;
+  color: var(--a-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .admin-info span {
+  display: block;
+  color: var(--a-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.app-shell .sidebar-footer__chevron {
+  color: var(--a-faint);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s ease, color 0.15s ease;
+  margin-right: 2px;
+}
+
+.app-shell .sidebar-footer:hover .sidebar-footer__chevron {
+  color: var(--a-text);
+}
+
+.app-shell .logout-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--a-danger);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.app-shell .logout-button:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* --- Top bar -------------------------------------------------- */
+
+.app-shell .shell-topbar {
+  border-bottom-color: var(--a-border);
+}
+
+.app-shell .menu-button {
+  border-color: var(--a-border);
+  color: var(--a-muted);
+}
+
+.app-shell .menu-button:hover {
+  background: var(--a-blue-hover);
+  color: var(--a-blue-dark);
+}
+
+.app-shell .shell-brand span {
+  color: var(--a-blue);
+  font-weight: 600;
+}
+
+.app-shell .admin-avatar.small {
+  background: var(--a-blue);
+}
+
+/* --- Page headings ------------------------------------------- */
+
+.app-shell .topbar h1 {
+  color: var(--a-text);
+  font-weight: 700;
+}
+
+.app-shell .breadcrumb a {
+  color: var(--a-blue);
+}
+
+.sidebar-profile-menu-popover {
+  border-radius: 12px;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 6px 16px rgba(15, 23, 42, 0.1);
+  animation: sidebarMenuFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sidebarMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

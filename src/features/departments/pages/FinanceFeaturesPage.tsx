@@ -6,6 +6,7 @@ import { PageLayout } from '../../../components/layout/PageLayout'
 import { Card } from '../../../components/ui/Card'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { Link } from '@tanstack/react-router'
 import { ProfileChip } from '../../../components/common/ProfileChip'
 import { DataTable } from '../../../components/ui/DataTable'
@@ -43,6 +44,7 @@ export function FinanceFeaturesPage() {
   }
 
   const routes = routesQuery.data ?? []
+  const isRefreshing = routesQuery.isFetching
 
   const columns = [
     { key: 'routeName', title: 'Route Name', render: (row: unknown) => (row as RouteInfo).routeName },
@@ -92,14 +94,25 @@ export function FinanceFeaturesPage() {
               Sidebar items of this department. Reorder, enable/disable and set Role A / Role B access.
             </p>
           </div>
+
+          <RefreshButton
+            onRefresh={() => routesQuery.refetch()}
+            isRefreshing={routesQuery.isFetching}
+            label="routes"
+          />
         </div>
 
-        <DataTable
-          rows={routes}
-          columns={columns}
-          rowKey={(row: RouteInfo) => row.routeId}
-          emptyState="No routes found for this department."
-        />
+        <div
+          className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={isRefreshing}
+        >
+          <DataTable
+            rows={routes}
+            columns={columns}
+            rowKey={(row: RouteInfo) => row.routeId}
+            emptyState="No routes found for this department."
+          />
+        </div>
       </Card>
 
       <Card className="mt-6">

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import { useDebounce } from '../../../../hooks/useDebounce'
 import { getSession } from '../../../../app/auth/session'
 import { useTaskHistory } from '../../hooks/useTaskHistory'
@@ -426,11 +427,20 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                   <Pill tone="neutral" size="sm">
                     {completedCount} completed
                   </Pill>
+                  <RefreshButton
+                    onRefresh={() => historyQuery.refetch()}
+                    isRefreshing={historyQuery.isFetching}
+                    label="task history"
+                  />
                 </>
               }
               hint={selectedUser ? `Filtered for ${selectedUser}` : isHead ? 'All users' : `History for ${userEmail}`}
             >
-              <div style={{ overflowX: 'auto' }}>
+              <div
+                className={`transition-opacity${historyQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+                style={{ overflowX: 'auto' }}
+                aria-busy={historyQuery.isFetching}
+              >
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
@@ -635,9 +645,16 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
           <SectionCard
             title="Status Change History"
             meta={
-              <Pill tone="info" size="sm">
-                {totalStatusElements} logs
-              </Pill>
+              <>
+                <Pill tone="info" size="sm">
+                  {totalStatusElements} logs
+                </Pill>
+                <RefreshButton
+                  onRefresh={() => statusHistoryQuery.refetch()}
+                  isRefreshing={statusHistoryQuery.isFetching}
+                  label="status history"
+                />
+              </>
             }
             hint="System status audit logs"
           >
@@ -650,7 +667,11 @@ export function HistoryPage(_props?: { feature?: FeaturePermission }) {
                 onRetry={handleRefresh}
               />
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div
+                className={`transition-opacity${statusHistoryQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+                style={{ overflowX: 'auto' }}
+                aria-busy={statusHistoryQuery.isFetching}
+              >
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>

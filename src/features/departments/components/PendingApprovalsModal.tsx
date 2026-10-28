@@ -8,6 +8,7 @@ import {
 import { Modal } from '../../../components/ui/Modal'
 import { Button } from '../../../components/ui/Button'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 interface PendingApprovalsModalProps {
   open: boolean
@@ -49,6 +50,8 @@ export function PendingApprovalsModal({
   }
 
   const pendingList = pendingTimelineQuery.data ?? []
+  const isRefreshing =
+    pendingTimelineQuery.isFetching && !pendingTimelineQuery.isLoading
 
   function handleDecision(
     req: PendingTimelineRequestItem,
@@ -99,11 +102,20 @@ export function PendingApprovalsModal({
           >
             {pendingList.length} Pending
           </span>
+          <RefreshButton
+            onRefresh={() => pendingTimelineQuery.refetch()}
+            isRefreshing={pendingTimelineQuery.isFetching}
+            label="pending approvals"
+          />
         </div>
       }
       description="Review and decide timeline change requests submitted by department heads."
     >
-      <div style={{ minHeight: '180px', marginTop: '0.5rem' }}>
+      <div
+        style={{ minHeight: '180px', marginTop: '0.5rem' }}
+        className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+        aria-busy={isRefreshing}
+      >
         {feedback && (
           <div
             style={{
