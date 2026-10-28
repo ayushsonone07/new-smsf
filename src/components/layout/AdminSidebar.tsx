@@ -9,6 +9,7 @@ import { ProfileMenu } from '../common/ProfileMenu'
 
 type NavPath =
   | '/admin'
+  | '/admin/overview'
   | '/admin/create-department'
   | '/admin/customers'
   | '/admin/services'
@@ -28,6 +29,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    to: '/admin/overview',
+    label: 'Overview',
+    icon: '📊',
+    roles: ['ADMIN'],
+    isActive: (pathname) => pathname.startsWith('/admin/overview'),
+  },
   {
     to: '/admin',
     label: 'Departments',
@@ -205,7 +213,7 @@ export function AdminSidebar({
 
       {panelOpen ? (
         <ProfileMenu
-          variant="dark"
+          variant="light"
           onNavigate={() => {
             setPanelOpen(false)
             onNavigate?.()

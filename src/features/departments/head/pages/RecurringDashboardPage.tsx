@@ -1,234 +1,146 @@
-import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
-  Users,
-  IndianRupee,
-  CalendarClock,
-  AlertTriangle,
-  CheckCircle2,
-  TrendingUp,
   AlertCircle,
+  AlertTriangle,
+  BellRing,
+  CalendarClock,
+  CheckCircle2,
+  History,
+  IndianRupee,
   Loader2,
+  Pencil,
   RefreshCw,
   Repeat,
+  Search,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react'
 import { getSession } from '../../../../app/auth/session'
-import { getDepartmentCustomerRows } from '../../../../api/department-users.api'
-import { fetchBillingCustomers } from '../../../../api/billing.api'
+import { useDebounce } from '../../../../hooks/useDebounce'
+import { TablePagination } from '../../../../components/ui/TablePagination'
+import {
+  RECURRING_STAGES,
+  getRecurringDues,
+  getRecurringSummary,
+  type RecurringDue,
+  type RecurringStage,
+} from '../../../../api/recurring.api'
+import {
+  RecordPaymentModal,
+  RecurringHistoryModal,
+  RecurringUpdateModal,
+} from '../components/recurring/RecurringModals'
+import { formatCurrency, formatDate } from '../components/recurring/recurringFormat'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 
 interface RecurringDashboardPageProps {
   feature?: FeaturePermission
 }
 
-interface RecurringCustomerRow {
-  id: string
-  businessName: string
-  ownerName: string
-  serviceType: string
-  amountPaid: number
-  amountPending: number
-  dueDate: string | null
-  status: string
-  assignedTo: string
+const STAGE_LABEL: Record<RecurringStage, string> = {
+  OVERDUE: 'Overdue',
+  DUE_TODAY: 'Due today',
+  UPCOMING: 'Upcoming',
+  NO_DUE_DATE: 'No due date',
+  PAID: 'Paid',
+  WRITTEN_OFF: 'Written off',
 }
 
-interface TeamPerformance {
-  name: string
-  customers: number
-  pending: number
+const STAGE_BADGE: Record<RecurringStage, string> = {
+  OVERDUE: 'bg-red-50 text-red-700 border-red-200',
+  DUE_TODAY: 'bg-orange-50 text-orange-700 border-orange-200',
+  UPCOMING: 'bg-amber-50 text-amber-700 border-amber-200',
+  NO_DUE_DATE: 'bg-slate-50 text-slate-600 border-slate-200',
+  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  WRITTEN_OFF: 'bg-slate-100 text-slate-500 border-slate-200',
 }
 
-const parseAmount = (value: unknown): number => {
-  const amount = Number(String(value ?? '').replace(/[^\d.-]/g, ''))
-  return Number.isFinite(amount) ? amount : 0
-}
+type ModalState = { kind: 'pay' | 'update' | 'history'; due: RecurringDue } | null
 
-const formatCurrency = (amount: number) =>
-  `₹${amount.toLocaleString('en-IN')}`
-
-const formatDate = (value: string | null | undefined): string => {
-  if (!value) return 'Not set'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Not set'
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-const getStatusBadgeClass = (status: string): string => {
-  const normalized = status.toUpperCase()
-  if (/(OVERDUE|FAILED|CANCELLED|CANCELED)/.test(normalized)) {
-    return 'bg-red-50 text-red-700 border-red-200'
-  }
-  if (/(PAID|COMPLETED|ACTIVE|DELIVERED|APPROVED)/.test(normalized)) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  }
-  if (/(PENDING|PROGRESS|IN_PROGRESS|WAITING)/.test(normalized)) {
-    return 'bg-amber-50 text-amber-700 border-amber-200'
-  }
-  return 'bg-slate-50 text-slate-700 border-slate-200'
-}
-
+/**
+ * Recurring department dashboard (payments follow-up).
+ * - Totals: GET /api/recurring/summary (all accounts, computed on the server)
+ * - Table:  GET /api/recurring/dues (paginated, most urgent first)
+ * - Actions: record payment, update due / follow-up / promise to pay, view history
+ */
 export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps) {
   const session = getSession()
   const isUserRole = session?.user.role === 'USER'
-  const userEmail = session?.user.email || session?.user.username || ''
-  const [refreshKey, setRefreshKey] = useState(0)
 
-  // 1. Fetch recurring customer rows via department customer rows or billing API
-  const recurringQuery = useQuery({
-    queryKey: ['recurring-dashboard-customers', userEmail, isUserRole, refreshKey],
-    queryFn: async () => {
-      try {
-        const res = await getDepartmentCustomerRows({
-          page: 0,
-          size: 50,
-          compatible: true,
-          userFilter: isUserRole ? userEmail : undefined,
-        })
-        const items = res?.customers || []
-        if (items.length > 0) {
-          return items.map((c: any): RecurringCustomerRow => {
-            const rawDetails = typeof c.customerDetails === 'string'
-              ? (() => { try { return JSON.parse(c.customerDetails) } catch { return {} } })()
-              : (c.customerDetails || {})
-            const billingDetails = typeof c.billingDetails === 'string'
-              ? (() => { try { return JSON.parse(c.billingDetails) } catch { return {} } })()
-              : (c.billingDetails || {})
+  const [stage, setStage] = useState<RecurringStage | ''>('')
+  const [followUpDue, setFollowUpDue] = useState(false)
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
+  const [page, setPage] = useState(0)
+  const [size, setSize] = useState(10)
+  const [modal, setModal] = useState<ModalState>(null)
 
-            const amountPaid = parseAmount(billingDetails.amountPaid || rawDetails.amountPaid || c.amountPaid)
-            const totalAmount = parseAmount(billingDetails.totalAmount || rawDetails.totalAmount || c.totalAmount)
-            const amountPending = parseAmount(billingDetails.amountRemaining || rawDetails.amountRemaining || (totalAmount > amountPaid ? totalAmount - amountPaid : 0))
-
-            return {
-              id: String(c.customerId ?? c.id ?? Math.random()),
-              businessName: c.businessName || rawDetails.businessName || 'Unnamed Business',
-              ownerName: c.ownerName || rawDetails.ownerName || 'N/A',
-              serviceType: c.serviceType || 'RECURRING',
-              amountPaid,
-              amountPending,
-              dueDate: rawDetails.remainingAmountDueDate || c.serviceExpiration || null,
-              status: String(c.onboardingStatus || c.status || 'PENDING').replace(/_/g, ' '),
-              assignedTo: c.assignedUserName || c.assignedUserEmail || 'Unassigned',
-            }
-          })
-        }
-      } catch (err) {
-        console.warn('Falling back to billing customers endpoint:', err)
-      }
-
-      // Fallback to billing customers (Recurring dept has full billing visibility)
-      const billingRes = await fetchBillingCustomers({ page: 0, size: 50 })
-      const dataObj = billingRes?.data
-      const list: any[] = Array.isArray(billingRes)
-        ? billingRes
-        : Array.isArray(billingRes?.content)
-          ? billingRes.content
-          : Array.isArray(billingRes?.customers)
-            ? billingRes.customers
-            : Array.isArray(dataObj)
-              ? dataObj
-              : (dataObj && typeof dataObj === 'object' && 'content' in dataObj && Array.isArray((dataObj as any).content))
-                ? (dataObj as any).content
-                : []
-      return list.map((b: any): RecurringCustomerRow => ({
-        id: String(b.customerId ?? b.id ?? Math.random()),
-        businessName: b.businessName || 'Unnamed Business',
-        ownerName: b.ownerName || 'N/A',
-        serviceType: b.serviceType || 'RECURRING',
-        amountPaid: parseAmount(b.amountPaid),
-        amountPending: parseAmount(b.amountRemaining),
-        dueDate: b.remainingAmountDueDate || null,
-        status: String(b.billStatus || b.status || 'PENDING').replace(/_/g, ' '),
-        assignedTo: b.assignedUser || 'Unassigned',
-      }))
-    },
+  const summaryQuery = useQuery({
+    queryKey: ['recurring-summary'],
+    queryFn: getRecurringSummary,
     staleTime: 30_000,
   })
 
-  const customers: RecurringCustomerRow[] = recurringQuery.data || []
-  const isLoading = recurringQuery.isLoading
-  const error = recurringQuery.error ? (recurringQuery.error as Error).message : null
+  const duesQuery = useQuery({
+    queryKey: ['recurring-dues', { stage, followUpDue, search: debouncedSearch, page, size }],
+    queryFn: () => getRecurringDues({ stage, followUpDue, searchParam: debouncedSearch, page, size }),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  })
 
-  // KPI calculations
-  const stats = useMemo(() => {
-    let totalPending = 0
-    let totalCollected = 0
-    let overdueCount = 0
-    let paidCount = 0
+  const summary = summaryQuery.data
+  const dues = duesQuery.data?.items ?? []
+  const error = summaryQuery.error ?? duesQuery.error
+  const isRefreshing = summaryQuery.isFetching || duesQuery.isFetching
 
-    customers.forEach((c) => {
-      totalPending += c.amountPending
-      totalCollected += c.amountPaid
-      const norm = c.status.toUpperCase()
-      if (norm.includes('OVERDUE') || norm.includes('FAILED')) {
-        overdueCount++
-      } else if (norm.includes('PAID') || norm.includes('COMPLETED')) {
-        paidCount++
-      }
-    })
+  const resetPage = <T,>(setter: (value: T) => void) => (value: T) => {
+    setter(value)
+    setPage(0)
+  }
 
-    return {
-      totalCustomers: customers.length,
-      totalPending,
-      totalCollected,
-      overdueCount,
-      paidCount,
-    }
-  }, [customers])
+  const maxAging = Math.max(
+    summary?.overdueAging['0-30'] ?? 0,
+    summary?.overdueAging['31-60'] ?? 0,
+    summary?.overdueAging['60+'] ?? 0,
+    1,
+  )
 
-  // Chart data: Pending collections by month
-  const paymentChartData = useMemo(() => {
-    const totalsByMonth = new Map<string, number>()
-
-    customers.forEach((customer) => {
-      const dueDate = customer.dueDate ? new Date(customer.dueDate) : null
-      const month =
-        dueDate && !Number.isNaN(dueDate.getTime())
-          ? dueDate.toLocaleDateString('en-IN', { month: 'short' })
-          : 'Unscheduled'
-      totalsByMonth.set(
-        month,
-        (totalsByMonth.get(month) ?? 0) + customer.amountPending,
-      )
-    })
-
-    return Array.from(totalsByMonth, ([month, amount]) => ({ month, amount }))
-  }, [customers])
-
-  const maxChartAmount = useMemo(() => {
-    const max = Math.max(...paymentChartData.map((d) => d.amount), 0)
-    return max > 0 ? max : 10000
-  }, [paymentChartData])
-
-  // Team performance breakdown
-  const teamPerformance = useMemo(() => {
-    const teamByUser = new Map<string, TeamPerformance>()
-
-    customers.forEach((customer) => {
-      const user = customer.assignedTo || 'Unassigned'
-      const existing = teamByUser.get(user) ?? {
-        name: user,
-        customers: 0,
-        pending: 0,
-      }
-
-      existing.customers += 1
-      existing.pending += customer.amountPending
-      teamByUser.set(user, existing)
-    })
-
-    return Array.from(teamByUser.values()).sort(
-      (a, b) => b.customers - a.customers,
-    )
-  }, [customers])
+  const kpis = [
+    {
+      label: 'Outstanding Dues',
+      value: formatCurrency(summary?.totalPending ?? 0),
+      hint: `${summary?.totalAccounts ?? 0} accounts`,
+      icon: <IndianRupee className="w-4 h-4" />,
+      tone: 'bg-amber-50 text-amber-600',
+    },
+    {
+      label: 'Overdue',
+      value: formatCurrency(summary?.overdueAmount ?? 0),
+      hint: `${summary?.overdueCount ?? 0} accounts`,
+      icon: <AlertTriangle className="w-4 h-4" />,
+      tone: 'bg-red-50 text-red-600',
+      valueClass: 'text-red-600',
+    },
+    {
+      label: 'Due in Next 7 Days',
+      value: formatCurrency(summary?.dueNext7DaysAmount ?? 0),
+      hint: `${summary?.dueTodayCount ?? 0} due today`,
+      icon: <CalendarClock className="w-4 h-4" />,
+      tone: 'bg-blue-50 text-blue-600',
+    },
+    {
+      label: 'Collected This Month',
+      value: formatCurrency(summary?.collectedThisMonth ?? 0),
+      hint: 'Payments recorded in Recurring',
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      tone: 'bg-emerald-50 text-emerald-600',
+    },
+  ]
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 font-['Jost']">
-      {/* Top Banner / Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
@@ -239,20 +151,20 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
               {feature?.name || (isUserRole ? 'My Recurring Dashboard' : 'Recurring Head Dashboard')}
             </h1>
             <p className="text-xs md:text-sm text-slate-500">
-              Track subscriptions, renewal milestones, and pending recurring dues
+              Pending payments, overdue follow-ups and renewals
             </p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => {
-            setRefreshKey((k) => k + 1)
-            void recurringQuery.refetch()
+            void summaryQuery.refetch()
+            void duesQuery.refetch()
           }}
-          disabled={recurringQuery.isFetching}
+          disabled={isRefreshing}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
         >
-          {recurringQuery.isFetching ? (
+          {isRefreshing ? (
             <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
           ) : (
             <RefreshCw className="w-4 h-4 text-slate-600" />
@@ -264,202 +176,269 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
       {error && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
+          <span>{error instanceof Error ? error.message : 'Could not load recurring data'}</span>
         </div>
       )}
 
-      {/* KPI Cards */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {isUserRole ? 'My Customers' : 'Total Accounts'}
-            </span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Users className="w-4 h-4" />
+        {kpis.map((kpi) => (
+          <div key={kpi.label} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{kpi.label}</span>
+              <div className={`p-2 rounded-lg ${kpi.tone}`}>{kpi.icon}</div>
             </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats.totalCustomers}
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Outstanding Dues
-            </span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-              <IndianRupee className="w-4 h-4" />
+            <div className={`text-2xl font-bold ${kpi.valueClass ?? 'text-slate-900'}`}>
+              {summaryQuery.isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : kpi.value}
             </div>
+            <div className="text-xs text-slate-500 mt-1">{kpi.hint}</div>
           </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(stats.totalPending)}
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Collected Revenue
-            </span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(stats.totalCollected)}
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Overdue Accounts
-            </span>
-            <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-red-600">
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats.overdueCount}
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Collections Chart & Team Breakdown (pure Tailwind/SVG, zero external dependencies) */}
+      {/* Aging, today, team */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <CalendarClock className="w-5 h-5 text-blue-600" />
-              Projected Collections by Month
-            </h2>
-          </div>
-          <div className="h-64 w-full flex flex-col justify-end">
-            {paymentChartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-slate-400">
-                No scheduled collections
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            Overdue by Age
+          </h2>
+          {(['0-30', '31-60', '60+'] as const).map((bucket) => {
+            const amount = summary?.overdueAging[bucket] ?? 0
+            return (
+              <div key={bucket} className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="font-semibold text-slate-600">{bucket} days</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(amount)}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className={`h-2 rounded-full ${bucket === '60+' ? 'bg-red-600' : bucket === '31-60' ? 'bg-red-400' : 'bg-amber-400'}`}
+                    style={{ width: `${Math.round((amount / maxAging) * 100)}%` }}
+                  />
+                </div>
               </div>
-            ) : (
-              <div className="h-full flex items-end justify-between gap-3 pt-6 pb-2 border-b border-slate-200">
-                {paymentChartData.map((item) => {
-                  const barHeightPercent = Math.min(
-                    100,
-                    Math.max(8, Math.round((item.amount / maxChartAmount) * 100)),
-                  )
-                  return (
-                    <div key={item.month} className="flex-1 flex flex-col items-center h-full justify-end group">
-                      <div className="text-[11px] font-semibold text-slate-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        {formatCurrency(item.amount)}
-                      </div>
-                      <div
-                        style={{ height: `${barHeightPercent}%` }}
-                        className="w-full max-w-[42px] bg-blue-500 hover:bg-blue-600 transition-all rounded-t-lg shadow-sm"
-                        title={`${item.month}: ${formatCurrency(item.amount)}`}
-                      />
-                      <div className="text-xs text-slate-500 mt-2 font-medium">{item.month}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            )
+          })}
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <BellRing className="w-5 h-5 text-blue-600" />
+            Today
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setFollowUpDue(true)
+              setStage('')
+              setPage(0)
+            }}
+            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between hover:bg-blue-50"
+          >
+            <span className="text-sm font-semibold text-slate-800">Follow-ups due</span>
+            <span className="text-sm font-bold text-blue-700">{summary?.followUpsDue ?? 0}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStage('DUE_TODAY')
+              setFollowUpDue(false)
+              setPage(0)
+            }}
+            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between hover:bg-blue-50"
+          >
+            <span className="text-sm font-semibold text-slate-800">Payments due today</span>
+            <span className="text-sm font-bold text-orange-700">{summary?.dueTodayCount ?? 0}</span>
+          </button>
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-800">Renewals in next 7 days</span>
+            <span className="text-sm font-bold text-slate-900">{summary?.renewalsNext7Days ?? 0}</span>
           </div>
         </div>
 
-        {/* Team breakdown */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-emerald-600" />
-            {isUserRole ? 'My Workload' : 'Team Assignments'}
+            Team Assignments
           </h2>
           <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-            {teamPerformance.map((member) => (
+            {(summary?.byAssignee ?? []).map((member) => (
               <div
                 key={member.name}
                 className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between"
               >
                 <div>
                   <div className="font-semibold text-sm text-slate-800">{member.name}</div>
-                  <div className="text-xs text-slate-500">{member.customers} accounts</div>
+                  <div className="text-xs text-slate-500">
+                    {member.accounts} accounts · {member.overdue} overdue
+                  </div>
                 </div>
                 <div className="text-xs font-bold text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
                   {formatCurrency(member.pending)}
                 </div>
               </div>
             ))}
-            {!isLoading && teamPerformance.length === 0 && (
+            {!summaryQuery.isLoading && (summary?.byAssignee.length ?? 0) === 0 && (
               <p className="text-sm text-slate-400 py-6 text-center">No assignments available</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Customer Quick Table */}
+      {/* Accounts table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 text-base">Recurring Accounts & Renewals</h3>
-          <span className="text-xs text-slate-500 font-medium">
-            Showing top {customers.length} records
-          </span>
+        <div className="p-5 border-b border-slate-100 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <h3 className="font-bold text-slate-900 text-base">Recurring Accounts</h3>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={followUpDue}
+                  onChange={(e) => resetPage(setFollowUpDue)(e.target.checked)}
+                />
+                Follow-ups due
+              </label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  value={search}
+                  onChange={(e) => resetPage(setSearch)(e.target.value)}
+                  placeholder="Search name, business, phone"
+                  className="w-56 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['', ...RECURRING_STAGES] as const).map((value) => {
+              const count = value ? summary?.stageCounts[value] : summary?.totalAccounts
+              const active = stage === value
+              return (
+                <button
+                  key={value || 'ALL'}
+                  type="button"
+                  onClick={() => resetPage(setStage)(value)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {value ? STAGE_LABEL[value] : 'All'}
+                  {count !== undefined && <span className="ml-1 opacity-75">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase">
               <tr>
                 <th className="px-5 py-3">Business</th>
-                <th className="px-5 py-3">Service</th>
-                <th className="px-5 py-3">Paid</th>
-                <th className="px-5 py-3">Pending</th>
-                <th className="px-5 py-3">Due Date</th>
-                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Amount</th>
+                <th className="px-5 py-3">Due</th>
+                <th className="px-5 py-3">Stage</th>
+                <th className="px-5 py-3">Follow-up</th>
                 <th className="px-5 py-3">Assigned To</th>
+                <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {isLoading ? (
+              {duesQuery.isLoading ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                     Loading accounts...
                   </td>
                 </tr>
-              ) : customers.length === 0 ? (
+              ) : dues.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-400">
                     No recurring accounts found.
                   </td>
                 </tr>
               ) : (
-                customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
+                dues.map((due) => (
+                  <tr key={`${due.customerId}-${due.serviceType}`} className="hover:bg-slate-50/70 transition-colors align-top">
                     <td className="px-5 py-3.5">
-                      <div className="font-semibold text-slate-900">{c.businessName}</div>
-                      <div className="text-xs text-slate-400">{c.ownerName}</div>
+                      <div className="font-semibold text-slate-900">{due.businessName || 'Unnamed Business'}</div>
+                      <div className="text-xs text-slate-400">
+                        {due.ownerName || '—'} · {due.phoneNumber || '—'}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {due.serviceType}
+                        {due.billingCycle && ` · ${due.billingCycle.replace(/_/g, ' ').toLowerCase()}`}
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5 text-xs font-medium text-slate-600">
-                      {c.serviceType}
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="font-semibold text-amber-700">{formatCurrency(due.amountPending)} pending</div>
+                      <div className="text-xs text-emerald-700">{formatCurrency(due.amountPaid)} paid</div>
+                      {due.totalAmount !== null && (
+                        <div className="text-[11px] text-slate-400">of {formatCurrency(due.totalAmount)}</div>
+                      )}
                     </td>
-                    <td className="px-5 py-3.5 font-medium text-emerald-700">
-                      {formatCurrency(c.amountPaid)}
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-amber-700">
-                      {formatCurrency(c.amountPending)}
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-slate-500">
-                      {formatDate(c.dueDate)}
+                    <td className="px-5 py-3.5 text-xs whitespace-nowrap">
+                      <div className="text-slate-700">{formatDate(due.dueDate)}</div>
+                      {due.overdueDays > 0 && (
+                        <div className="font-semibold text-red-600">{due.overdueDays} days late</div>
+                      )}
+                      {due.renewalDate && <div className="text-slate-400">Renews {formatDate(due.renewalDate)}</div>}
                     </td>
                     <td className="px-5 py-3.5">
                       <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadgeClass(
-                          c.status,
-                        )}`}
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STAGE_BADGE[due.stage]}`}
                       >
-                        {c.status}
+                        {STAGE_LABEL[due.stage]}
                       </span>
+                      {due.partiallyPaid && <div className="text-[11px] text-slate-500 mt-1">Partially paid</div>}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs">
+                      <div>{due.nextFollowUpDate ? formatDate(due.nextFollowUpDate) : '—'}</div>
+                      {due.promiseToPayDate && (
+                        <div className="text-blue-700">
+                          Promised {formatCurrency(due.promiseAmount)} on {formatDate(due.promiseToPayDate)}
+                        </div>
+                      )}
+                      {due.nonPaymentReason && (
+                        <div className="text-slate-500 max-w-[180px] truncate" title={due.nonPaymentReason}>
+                          {due.nonPaymentReason}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-xs text-slate-600">
-                      {c.assignedTo}
+                      {due.assignedUserName || due.assignedUserEmail || 'Unassigned'}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setModal({ kind: 'pay', due })}
+                          disabled={due.stage === 'WRITTEN_OFF'}
+                          title="Record payment"
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40"
+                        >
+                          <Wallet className="w-3.5 h-3.5" />
+                          Pay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModal({ kind: 'update', due })}
+                          title="Update due date, follow-up, promise to pay"
+                          className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModal({ kind: 'history', due })}
+                          title="Payments & history"
+                          className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -467,7 +446,23 @@ export function RecurringDashboardPage({ feature }: RecurringDashboardPageProps)
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={page}
+          pageSize={size}
+          totalResults={duesQuery.data?.total ?? 0}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setSize(newSize)
+            setPage(0)
+          }}
+          pageSizeOptions={[10, 20, 50]}
+          disabled={duesQuery.isFetching}
+        />
       </div>
+
+      {modal?.kind === 'pay' && <RecordPaymentModal due={modal.due} onClose={() => setModal(null)} />}
+      {modal?.kind === 'update' && <RecurringUpdateModal due={modal.due} onClose={() => setModal(null)} />}
+      {modal?.kind === 'history' && <RecurringHistoryModal due={modal.due} onClose={() => setModal(null)} />}
     </div>
   )
 }
