@@ -567,6 +567,87 @@ export function AutowebisionCustomersPage({
         : 'PENDING'
   }
 
+  // Update one sub-service status in the cached customer list (no refetch).
+  function updateCachedSubServiceStatus(newStatus: string, subServiceName?: string) {
+    if (!serviceFlowTarget?.customer) return
+    const targetCustomerId = Number(serviceFlowTarget.customer.id)
+
+    queryClient.setQueriesData(
+      { queryKey: ['autowebisionCustomers'] },
+      (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.content)) return oldData
+        return {
+          ...oldData,
+          content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
+            if (c.customerId !== targetCustomerId) return c
+
+            const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
+            const updatedSubList = prevSubList.map((sub: any) => {
+              const name =
+                sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+              if (
+                !subServiceName ||
+                name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+              ) {
+                return typeof sub === 'object' && 'name' in sub
+                  ? { ...sub, status: newStatus }
+                  : { [name]: newStatus }
+              }
+              return sub
+            })
+
+            const updatedServices = Array.isArray(c.services)
+              ? c.services.map((srv: any) => {
+                  if (Array.isArray(srv.subServiceInfo)) {
+                    return {
+                      ...srv,
+                      subServiceInfo: srv.subServiceInfo.map((sub: any) => {
+                        const name =
+                          sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
+                        if (
+                          !subServiceName ||
+                          name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
+                        ) {
+                          return typeof sub === 'object' && 'name' in sub
+                            ? { ...sub, status: newStatus }
+                            : { [name]: newStatus }
+                        }
+                        return sub
+                      }),
+                    }
+                  }
+                  return srv
+                })
+              : c.services
+
+            return {
+              ...c,
+              subServiceInfo: updatedSubList,
+              services: updatedServices,
+            }
+          }),
+        }
+      },
+    )
+  }
+
+  // Colour of the Website / Automation service pill. It follows ONLY the sub-services
+  // (completed from the Services column), never the main Status column:
+  // all sub-services done (completed / awaiting customer ack) -> COMPLETED,
+  // any started -> IN_PROGRESS, otherwise PENDING.
+  function getServicePillStatus(
+    c: AutowebsionCustomerLightDTO,
+    targetServiceType: 'WEBSITE' | 'AUTOMATION',
+  ): string {
+    const statuses = getSubServicesForCustomer(c, targetServiceType, false).map((s) =>
+      s.status.toUpperCase().replace(/-/g, '_'),
+    )
+    const isDone = (st: string) => st.includes('COMPLETE') || st.includes('ACK')
+    if (statuses.length > 0 && statuses.every(isDone)) return 'COMPLETED'
+    if (statuses.some((st) => isDone(st) || st.includes('PROGRESS'))) return 'IN_PROGRESS'
+    return 'PENDING'
+  }
+
   // Status style helpers matching Screenshot 1 (Pending: #fff8eb, text: #b45309, border: border-amber-200/80)
   function getStatusBadgeStyle(status: string): string {
     const s = String(status || 'PENDING').toUpperCase()
@@ -628,6 +709,8 @@ export function AutowebisionCustomersPage({
   function getSubServicesForCustomer(
     customer: AutowebsionCustomerLightDTO,
     targetServiceType?: 'WEBSITE' | 'AUTOMATION',
+    // false: do not fall back to the main service status when there is no sub-service info
+    useMainStatusFallback = true,
   ): Array<{ name: string; status: string }> {
     const list: Array<{ name: string; status: string }> = []
 
@@ -673,7 +756,7 @@ export function AutowebisionCustomersPage({
     }
 
     // 3. Fallback: if no subServices found at all, check customer.services array itself
-    if (list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
+    if (useMainStatusFallback && list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
       for (const s of customer.services) {
         const st = String(s?.serviceType || '').toUpperCase()
         const matchesTarget =
@@ -1512,8 +1595,8 @@ export function AutowebisionCustomersPage({
                     localStatusMap[`${customer.customerId}_ALL`] ||
                     getAutomationServiceStatus(customer)
 
-                  const webPill = getServicePillStyle(websiteStatus)
-                  const autoPill = getServicePillStyle(automationStatus)
+                  const webPill = getServicePillStyle(getServicePillStatus(customer, 'WEBSITE'))
+                  const autoPill = getServicePillStyle(getServicePillStatus(customer, 'AUTOMATION'))
 
                   const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
                   const services = Array.isArray(customer.services) ? customer.services : []
@@ -2346,72 +2429,18 @@ export function AutowebisionCustomersPage({
               : permissionDepartmentType
         }
         serviceType={serviceFlowTarget?.serviceType}
-        onStepsUpdated={() => {
-          // No API refetch needed on flow step update
+        onStepsUpdated={(steps, subServiceName) => {
+          // No API refetch: the backend syncs sub_service_info from the flow the same way
+          // (all steps done -> PENDING_CUSTOMER_ACK, any done -> IN_PROGRESS), mirror it in the cache.
+          if (!subServiceName || steps.length === 0) return
+          const done = steps.filter((s) => s.status.toUpperCase() === 'COMPLETED').length
+          const newStatus =
+            done === steps.length ? 'PENDING_CUSTOMER_ACK' : done > 0 ? 'IN_PROGRESS' : 'PENDING'
+          updateCachedSubServiceStatus(newStatus, subServiceName)
         }}
         onSubServiceStatusUpdated={(newStatus, subServiceName) => {
           // Do NOT refetch customersQuery or countsQuery!
-          // Update local cache in-memory so UI knows this sub-service status immediately
-          if (!serviceFlowTarget?.customer) return
-          const targetCustomerId = Number(serviceFlowTarget.customer.id)
-
-          queryClient.setQueriesData(
-            { queryKey: ['autowebisionCustomers'] },
-            (oldData: any) => {
-              if (!oldData || !Array.isArray(oldData.content)) return oldData
-              return {
-                ...oldData,
-                content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
-                  if (c.customerId !== targetCustomerId) return c
-
-                  const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
-                  const updatedSubList = prevSubList.map((sub: any) => {
-                    const name =
-                      sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-                    if (
-                      !subServiceName ||
-                      name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
-                    ) {
-                      return typeof sub === 'object' && 'name' in sub
-                        ? { ...sub, status: newStatus }
-                        : { [name]: newStatus }
-                    }
-                    return sub
-                  })
-
-                  const updatedServices = Array.isArray(c.services)
-                    ? c.services.map((srv: any) => {
-                        if (Array.isArray(srv.subServiceInfo)) {
-                          return {
-                            ...srv,
-                            subServiceInfo: srv.subServiceInfo.map((sub: any) => {
-                              const name =
-                                sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-                              if (
-                                !subServiceName ||
-                                name.trim().toLowerCase() === subServiceName.trim().toLowerCase()
-                              ) {
-                                return typeof sub === 'object' && 'name' in sub
-                                  ? { ...sub, status: newStatus }
-                                  : { [name]: newStatus }
-                              }
-                              return sub
-                            }),
-                          }
-                        }
-                        return srv
-                      })
-                    : c.services
-
-                  return {
-                    ...c,
-                    subServiceInfo: updatedSubList,
-                    services: updatedServices,
-                  }
-                }),
-              }
-            },
-          )
+          updateCachedSubServiceStatus(newStatus, subServiceName)
         }}
       />
 
