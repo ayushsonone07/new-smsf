@@ -29,6 +29,7 @@ import type {
   PlanWithDepartments,
 } from '../types/register-business.types'
 import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /* ─────────────────────────────────────────────────────────────────
    Single-page version of the "Register Your Business" form from SMSF
@@ -245,6 +246,10 @@ export function RegisterBusinessPage() {
   const plans: PlanWithDepartments[] = plansQuery.data ?? []
   const isLoadingPlans = plansQuery.isLoading
   const planAmounts: PlanAmount[] = amountsQuery.data ?? []
+  // Background refetch (refresh button) — keep showing packages but dim them.
+  const plansRefreshing =
+    (plansQuery.isFetching && !plansQuery.isLoading) ||
+    (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
   const [validationErrors, setValidationErrors] = useState({
@@ -1398,11 +1403,20 @@ export function RegisterBusinessPage() {
           locked={!businessComplete}
           lockedMessage="Please complete Business Details in Step 1 first."
           aside={
-            selectedCount > 0 ? (
-              <span className="text-xs font-semibold text-blue-600">
-                {selectedCount} selected
-              </span>
-            ) : null
+            <span className="flex items-center gap-2">
+              {selectedCount > 0 ? (
+                <span className="text-xs font-semibold text-blue-600">
+                  {selectedCount} selected
+                </span>
+              ) : null}
+              <RefreshButton
+                onRefresh={() =>
+                  Promise.all([plansQuery.refetch(), amountsQuery.refetch()])
+                }
+                isRefreshing={plansQuery.isFetching || amountsQuery.isFetching}
+                label="packages"
+              />
+            </span>
           }
         >
           {/* Note: First verify payment, then select package */}
@@ -1538,7 +1552,10 @@ export function RegisterBusinessPage() {
               No packages available. Please contact administrator.
             </div>
           ) : (
-            <>
+            <div
+              className={`transition-opacity ${plansRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+              aria-busy={plansRefreshing}
+            >
               {verifiedPaymentAmount != null && (
                 <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                   <span className="flex items-center gap-1.5 font-medium">
@@ -1728,7 +1745,7 @@ export function RegisterBusinessPage() {
                 })
               )}
               </div>
-            </>
+            </div>
           )}
         </Section>
 

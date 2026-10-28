@@ -133,7 +133,8 @@ export function DepartmentsPage() {
   async function refreshDepartments() {
     setIsRefreshing(true);
     try {
-      await dispatch(fetchDepartments({ force: true })).unwrap();
+      // Member counts / team sizes come from the employees query, so reload it with the list.
+      await Promise.all([dispatch(fetchDepartments({ force: true })).unwrap(), employees.refetch()]);
       toast.success("Departments refreshed", "The latest departments were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh departments", getApiErrorMessage(err));

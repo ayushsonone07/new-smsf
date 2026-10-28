@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import {
   CustomersList,
   type OnboardingAssignee,
@@ -182,6 +183,22 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
     }))
   }
 
+  // Reloads only this customer list. Status overrides were already saved to the API, so drop
+  // them to show the fresh server value; assignee / remark overrides are local-only and kept.
+  async function handleRefreshList() {
+    const result = await customersQuery.refetch()
+    if (!result.isSuccess) return
+    setOverrides((current) => {
+      const next: Record<string, OnboardingOverrides> = {}
+      for (const [id, override] of Object.entries(current)) {
+        const { status: _status, ...rest } = override
+        void _status
+        if (Object.keys(rest).length > 0) next[id] = rest
+      }
+      return next
+    })
+  }
+
   function resetFilters() {
     setSearch('')
     setActiveTab('all')
@@ -208,54 +225,66 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         }}
         onReset={resetFilters}
         showStatusTabs={isStatusVisible}
+        actionsSlot={
+          <RefreshButton
+            onRefresh={handleRefreshList}
+            isRefreshing={customersQuery.isFetching}
+            label="customers"
+          />
+        }
       />
-      <CustomersList
-        customers={filteredCustomers}
-        assignees={ASSIGNEES}
-        canEdit={canEdit}
-        showStatus={isStatusVisible}
-        canEditStatus={canEditStatus}
-        showAssignTo={isAssignToVisible}
-        canEditAssignTo={canEditAssignTo}
-        showRemark={isRemarkVisible}
-        canEditRemark={canEditRemark}
-        showContact={isContactVisible}
-        showBusiness={isBusinessVisible}
-        showUpdated={false}
-        onStatusChange={(id, status) => {
-          const currentCust =
-            filteredCustomers.find((c) => c.id === id) ||
-            onboardingCustomers.find((c) => c.id === id)
-          if (
-            currentCust?.status === 'completed' ||
-            (currentCust as any)?.onboardingStatus?.toLowerCase() === 'completed'
-          ) {
-            alert('Completed status cannot be changed.')
-            return
-          }
-          if (status === 'completed') {
-            const target =
+      <div
+        className={`transition-opacity${customersQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+        aria-busy={customersQuery.isFetching}
+      >
+        <CustomersList
+          customers={filteredCustomers}
+          assignees={ASSIGNEES}
+          canEdit={canEdit}
+          showStatus={isStatusVisible}
+          canEditStatus={canEditStatus}
+          showAssignTo={isAssignToVisible}
+          canEditAssignTo={canEditAssignTo}
+          showRemark={isRemarkVisible}
+          canEditRemark={canEditRemark}
+          showContact={isContactVisible}
+          showBusiness={isBusinessVisible}
+          showUpdated={false}
+          onStatusChange={(id, status) => {
+            const currentCust =
               filteredCustomers.find((c) => c.id === id) ||
               onboardingCustomers.find((c) => c.id === id)
-            if (target) {
-              setConfirmingCustomer(target)
+            if (
+              currentCust?.status === 'completed' ||
+              (currentCust as any)?.onboardingStatus?.toLowerCase() === 'completed'
+            ) {
+              alert('Completed status cannot be changed.')
               return
             }
-          }
-          patchCustomer(id, { status })
-          updateOnboardingStatus(id, status).catch(console.error)
-        }}
-        onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
-        onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
-        onOpenDetail={(cust, tab) => {
-          setSelectedCustomer(cust)
-          setModalTab(tab)
-        }}
-        onOpenDuplicate={(cust) => {
-          setSelectedCustomer(cust)
-          setModalTab('duplicates')
-        }}
-      />
+            if (status === 'completed') {
+              const target =
+                filteredCustomers.find((c) => c.id === id) ||
+                onboardingCustomers.find((c) => c.id === id)
+              if (target) {
+                setConfirmingCustomer(target)
+                return
+              }
+            }
+            patchCustomer(id, { status })
+            updateOnboardingStatus(id, status).catch(console.error)
+          }}
+          onAssigneeChange={(id, assigneeId) => patchCustomer(id, { assigneeId })}
+          onRemarkChange={(id, remark) => patchCustomer(id, { remark })}
+          onOpenDetail={(cust, tab) => {
+            setSelectedCustomer(cust)
+            setModalTab(tab)
+          }}
+          onOpenDuplicate={(cust) => {
+            setSelectedCustomer(cust)
+            setModalTab('duplicates')
+          }}
+        />
+      </div>
       <CustomersListModal
         customer={selectedCustomer}
         assignees={ASSIGNEES}

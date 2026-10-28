@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Check, CheckCircle, ChevronDown, Clock, CreditCard, ExternalLink, Eye, FileText, IndianRupee, Receipt, Search, Upload, User, Wallet, X } from 'lucide-react'
 import { getSession } from '../../../../app/auth/session'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import {
   getBillingCustomers,
   updateBillingInvoice,
@@ -352,9 +353,21 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
         >
           <div className="dynamic-route-toolbar">
             <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b' }}>Route Data</h3>
-            <span className="dynamic-route-count">
-              {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="dynamic-route-count">
+                {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
+              </span>
+              <RefreshButton
+                onRefresh={() =>
+                  Promise.all([
+                    rowsQuery.refetch(),
+                    ...(hasBillingActions ? [billingQuery.refetch()] : []),
+                  ])
+                }
+                isRefreshing={rowsQuery.isFetching || (hasBillingActions && billingQuery.isFetching)}
+                label="route data"
+              />
+            </div>
           </div>
           {/* <div className="dynamic-customer-filters">
             <label className="dynamic-search-field dynamic-search-field--full">
@@ -395,7 +408,11 @@ export function CustomFeaturePage({ feature }: { feature: FeaturePermission }) {
               <button className="primary-button" onClick={() => rowsQuery.refetch()}>Try Again</button>
             </div>
           ) : (
-            <div className="table-wrapper" style={{ width: '100%', overflowX: 'auto' }}>
+            <div
+              className={`table-wrapper transition-opacity${rowsQuery.isFetching ? ' opacity-60 pointer-events-none' : ''}`}
+              style={{ width: '100%', overflowX: 'auto' }}
+              aria-busy={rowsQuery.isFetching}
+            >
               <table>
                 <thead>
                   <tr>

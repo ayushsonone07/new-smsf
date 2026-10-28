@@ -17,6 +17,7 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import { Modal } from '../../../components/ui/Modal'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { useDepartments } from '../../departments/hooks/useDepartments'
 import { DynamicRouteColumnsCard } from '../components/DynamicRouteColumnsCard'
 import { DynamicRoutesTable } from '../components/DynamicRoutesTable'
@@ -58,6 +59,10 @@ export function FeaturePermissionsPage() {
   const [editingColumn, setEditingColumn] = useState<DynamicColumnResponse | null>(null)
   const [deletingColumn, setDeletingColumn] = useState<DynamicColumnResponse | null>(null)
   const [deleteColumnError, setDeleteColumnError] = useState('')
+
+  // Background refetches (refresh buttons) keep data on screen; dim it meanwhile.
+  const routesRefreshing = routesQuery.isFetching && !routesQuery.isPending
+  const columnsRefreshing = columnsQuery.isFetching && !columnsQuery.isPending
 
   function openColumnModal(routeId = '') {
     setColumnModalRouteId(routeId)
@@ -174,9 +179,16 @@ export function FeaturePermissionsPage() {
             <h2>Head Panel Menu</h2>
             <p>Routes available for this department's Head and User sidebars.</p>
           </div>
-          <Button variant="secondary" onClick={() => setShowRouteModal(true)}>
-            + Add Dynamic Route
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <RefreshButton
+              onRefresh={() => routesQuery.refetch()}
+              isRefreshing={routesQuery.isFetching}
+              label="routes"
+            />
+            <Button variant="secondary" onClick={() => setShowRouteModal(true)}>
+              + Add Dynamic Route
+            </Button>
+          </div>
         </div>
 
         {routesQuery.isError ? (
@@ -186,6 +198,10 @@ export function FeaturePermissionsPage() {
             onRetry={() => routesQuery.refetch()}
           />
         ) : (
+          <div
+            className={`transition-opacity ${routesRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={routesRefreshing}
+          >
           <DynamicRoutesTable
             routes={routesQuery.data ?? []}
             selectedRouteId={selectedRouteId}
@@ -202,13 +218,23 @@ export function FeaturePermissionsPage() {
             }
             onToggle={handleRouteToggle}
           />
+          </div>
         )}
       </Card>
 
       <Modal
         open={Boolean(selectedRoute)}
         onClose={() => setSelectedRouteId('')}
-        title="Route columns and components"
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+            Route columns and components
+            <RefreshButton
+              onRefresh={() => columnsQuery.refetch()}
+              isRefreshing={columnsQuery.isFetching}
+              label="columns"
+            />
+          </span>
+        }
         description={selectedRoute?.routeName}
         size="xl"
       >
@@ -219,6 +245,10 @@ export function FeaturePermissionsPage() {
             onRetry={() => columnsQuery.refetch()}
           />
         ) : selectedRoute ? (
+          <div
+            className={`transition-opacity ${columnsRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={columnsRefreshing}
+          >
           <DynamicRouteColumnsCard
             route={selectedRoute}
             columns={columnsByRoute.get(selectedRoute.routeId) ?? []}
@@ -245,6 +275,7 @@ export function FeaturePermissionsPage() {
             onToggleColumn={handleColumnToggle}
             onPermissionChange={handleColumnPermissionChange}
           />
+          </div>
         ) : null}
       </Modal>
 

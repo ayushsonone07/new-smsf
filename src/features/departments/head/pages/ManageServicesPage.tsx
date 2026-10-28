@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getSession } from '../../../../app/auth/session'
+import { RefreshButton } from '../../../../components/ui/RefreshButton'
 import type { FeaturePermission } from '../../../permissions/types/permission.types'
 import {
   fetchDepartmentServices,
@@ -157,19 +158,24 @@ export function ManageServicesPage({ feature: _feature }: Props) {
     }
   }
 
-  const handleViewPlans = async (service: DepartmentServiceEntity) => {
-    setSelectedService(service)
-    setPlansOpen(true)
+  // Loads the plans of one service into the Plans dialog (also used by its refresh button).
+  const loadPlans = async (serviceId: DepartmentServiceEntity['departmentServiceId']) => {
     setPlansLoading(true)
-    setPlans([])
     try {
-      const p = await getPlansForService(service.departmentServiceId)
+      const p = await getPlansForService(serviceId)
       setPlans(p)
     } catch {
       setPlans([])
     } finally {
       setPlansLoading(false)
     }
+  }
+
+  const handleViewPlans = async (service: DepartmentServiceEntity) => {
+    setSelectedService(service)
+    setPlansOpen(true)
+    setPlans([])
+    await loadPlans(service.departmentServiceId)
   }
 
   const openEdit = (service: DepartmentServiceEntity) => {
@@ -222,8 +228,8 @@ export function ManageServicesPage({ feature: _feature }: Props) {
       )}
 
       {/* Search */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="relative">
+      <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
           <input
             value={searchTerm}
@@ -232,6 +238,7 @@ export function ManageServicesPage({ feature: _feature }: Props) {
             className="w-full rounded-lg border border-slate-200 pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>
+        <RefreshButton onRefresh={loadServices} isRefreshing={loading} label="services" />
       </div>
 
       {/* Table */}
@@ -441,12 +448,19 @@ export function ManageServicesPage({ feature: _feature }: Props) {
                   Plans for &quot;{selectedService.departmentServiceName}&quot;
                 </p>
               </div>
-              <button
-                onClick={() => setPlansOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-xl"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <RefreshButton
+                  onRefresh={() => loadPlans(selectedService.departmentServiceId)}
+                  isRefreshing={plansLoading}
+                  label="plans"
+                />
+                <button
+                  onClick={() => setPlansOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {plansLoading ? (

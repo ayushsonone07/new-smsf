@@ -5,6 +5,7 @@ import {
   toLocalDateTimeParam,
   type AdminDepartmentSummary,
 } from '../../api/admin-summary.api'
+import { RefreshButton } from '../ui/RefreshButton'
 import './AdminOverview.css'
 
 type RangePreset = '7d' | '30d' | '90d' | '365d'
@@ -71,6 +72,12 @@ export function AdminOverview({ departmentTypes }: AdminOverviewProps) {
     .map((departmentType, index) => ({ departmentType, query: departmentQueries[index] }))
     .sort((a, b) => (b.query?.data?.totalCustomers ?? -1) - (a.query?.data?.totalCustomers ?? -1))
 
+  // Dim the already-loaded figures while a refresh is in flight (first load keeps its skeletons).
+  const isRefreshing =
+    (totalsQuery.isFetching && !totalsQuery.isPending) ||
+    departmentQueries.some((query) => query.isFetching && !query.isPending)
+  const refreshingClass = isRefreshing ? ' pointer-events-none opacity-60' : ''
+
   const totals = totalsQuery.data
   const tiles: { label: string; value: number | undefined; tone: string }[] = [
     { label: 'Customers', value: totals?.totalCustomers, tone: 'ink' },
@@ -88,16 +95,30 @@ export function AdminOverview({ departmentTypes }: AdminOverviewProps) {
           <h2 id="admin-overview-title">Overview</h2>
           <p>Services created in the selected period, across all departments</p>
         </div>
-        <label className="admin-overview__range">
-          <span className="sr-only">Period</span>
-          <select value={preset} onChange={(event) => setPreset(event.target.value as RangePreset)}>
-            {RANGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-center gap-2">
+          <RefreshButton
+            onRefresh={() =>
+              Promise.all([
+                totalsQuery.refetch(),
+                ...departmentQueries.map((query) => query.refetch()),
+              ])
+            }
+            isRefreshing={
+              totalsQuery.isFetching || departmentQueries.some((query) => query.isFetching)
+            }
+            label="overview"
+          />
+          <label className="admin-overview__range">
+            <span className="sr-only">Period</span>
+            <select value={preset} onChange={(event) => setPreset(event.target.value as RangePreset)}>
+              {RANGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {totalsQuery.isError ? (
@@ -111,7 +132,7 @@ export function AdminOverview({ departmentTypes }: AdminOverviewProps) {
           </button>
         </div>
       ) : (
-        <div className="admin-overview__tiles">
+        <div className={`admin-overview__tiles transition-opacity${refreshingClass}`}>
           {tiles.map((tile) => (
             <div key={tile.label} className={`admin-overview__tile admin-overview__tile--${tile.tone}`}>
               <span className="admin-overview__tile-label">{tile.label}</span>
@@ -128,7 +149,7 @@ export function AdminOverview({ departmentTypes }: AdminOverviewProps) {
       )}
 
       {departmentCards.length > 0 && (
-        <div className="admin-overview__departments">
+        <div className={`admin-overview__departments transition-opacity${refreshingClass}`}>
           {departmentCards.map(({ departmentType, query }) => (
             <DepartmentCard
               key={departmentType}

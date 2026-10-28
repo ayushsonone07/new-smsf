@@ -292,7 +292,10 @@ export function LeadsManagementPage() {
       </div>
 
       {/* 4 Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div
+        className={`grid grid-cols-2 lg:grid-cols-4 gap-3.5 transition-opacity ${refreshing ? 'opacity-60' : ''}`}
+        aria-busy={refreshing}
+      >
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs px-5 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Total Leads
@@ -512,7 +515,10 @@ export function LeadsManagementPage() {
         )}
 
         {/* Leads Table */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+        <div
+          className={`overflow-x-auto rounded-xl border border-slate-200/80 transition-opacity ${refreshing ? 'pointer-events-none opacity-60' : ''}`}
+          aria-busy={refreshing}
+        >
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50/90 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">

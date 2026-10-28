@@ -406,7 +406,10 @@ export function EntitlementManagement() {
             )}
           </div>
         ) : (
-          <div className="overflow-auto">
+          <div
+            className={`overflow-auto transition-opacity ${loading ? "pointer-events-none opacity-60" : ""}`}
+            aria-busy={loading}
+          >
             <table className="min-w-[700px] w-full text-sm">
               <thead className="sticky top-0 bg-surface-muted text-left text-xs uppercase text-muted-foreground">
                 <tr>

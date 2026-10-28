@@ -11,6 +11,7 @@ import { ProfileChip } from '../../../components/common/ProfileChip'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { LoadingState } from '../../../components/ui/LoadingState'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 export function AdminApprovalsPage() {
   const navigate = useNavigate()
@@ -45,6 +46,8 @@ export function AdminApprovalsPage() {
   }
 
   const pendingList = pendingTimelineQuery.data ?? []
+  const isRefreshing =
+    pendingTimelineQuery.isFetching && !pendingTimelineQuery.isLoading
 
   return (
     <PageLayout>
@@ -95,6 +98,11 @@ export function AdminApprovalsPage() {
             >
               {pendingList.length} Pending
             </span>
+            <RefreshButton
+              onRefresh={() => pendingTimelineQuery.refetch()}
+              isRefreshing={pendingTimelineQuery.isFetching}
+              label="pending requests"
+            />
           </div>
           <p>
             Requests submitted by Department Heads for changing the service
@@ -139,7 +147,10 @@ export function AdminApprovalsPage() {
             </span>
           </div>
         ) : (
-          <div className="table-wrapper">
+          <div
+            className={`table-wrapper transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isRefreshing}
+          >
             <table className="data-table">
               <thead>
                 <tr>

@@ -25,6 +25,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useToast } from "@shared/components/feedback";
 import { DatePicker, Dialog } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { hrService } from "../services";
 import {
@@ -103,20 +104,32 @@ export function EmployeeOnboardingPage() {
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-5">
-        <Link
-          to={backTo}
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-card-foreground"
-        >
-          <ArrowLeft size={16} />
-          {backLabel}
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            to={backTo}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-card-foreground"
+          >
+            <ArrowLeft size={16} />
+            {backLabel}
+          </Link>
+          <RefreshButton
+            onRefresh={() => onboarding.refetch()}
+            isRefreshing={onboarding.isFetching}
+            label="onboarding details"
+          />
+        </div>
 
         {onboarding.isLoading ? (
           <LoadingState />
         ) : onboarding.error ? (
           <ErrorState message={getApiErrorMessage(onboarding.error)} />
         ) : view ? (
-          <>
+          <div
+            className={`space-y-5 transition-opacity ${
+              onboarding.isFetching && !onboarding.isLoading ? "pointer-events-none opacity-60" : ""
+            }`}
+            aria-busy={onboarding.isFetching}
+          >
             <Header view={view} />
             <ActionPanel
               view={view}
@@ -156,7 +169,7 @@ export function EmployeeOnboardingPage() {
               }}
             />
             <ReviewGrid view={view} />
-          </>
+          </div>
         ) : null}
       </div>
     </>

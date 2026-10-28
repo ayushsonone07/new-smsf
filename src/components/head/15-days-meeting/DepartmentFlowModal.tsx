@@ -6,6 +6,7 @@ import { getCustomerServiceFlow } from '../../../api/service-flow.api'
 import { fetchCustomerServiceFlowDetail } from '../../../api/autowebsion.api'
 import { matchesDepartmentKey } from '../customers-list/ServiceFlowModal'
 import type { Meeting, MeetingDepartment } from './MeetingList'
+import { RefreshButton } from '../../ui/RefreshButton'
 import './DepartmentFlowModal.css'
 
 interface DepartmentFlowModalProps {
@@ -219,17 +220,29 @@ export function DepartmentFlowModal({ selection, onClose }: DepartmentFlowModalP
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              className="department-flow__close-icon"
-              aria-label="Close service details"
-              onClick={onClose}
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-1">
+              <RefreshButton
+                onRefresh={() => activeQuery.refetch()}
+                isRefreshing={activeQuery.isFetching}
+                label="service details"
+              />
+              <button
+                type="button"
+                className="department-flow__close-icon"
+                aria-label="Close service details"
+                onClick={onClose}
+              >
+                <X size={20} />
+              </button>
+            </div>
           </header>
 
-          <div className="department-flow__body">
+          <div
+            className={`department-flow__body transition-opacity ${
+              activeQuery.isFetching && !activeQuery.isPending ? 'pointer-events-none opacity-60' : ''
+            }`}
+            aria-busy={activeQuery.isFetching}
+          >
             {activeQuery.isPending ? (
               <div className="department-flow__loading" role="status" aria-label="Loading service details">
                 <div className="department-flow__skeleton department-flow__skeleton--heading" />

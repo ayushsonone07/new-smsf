@@ -1,92 +1,220 @@
-.delivery-confirmation-modal {
-  max-height: min(90vh, 760px);
-  overflow: hidden;
+.delivery-conf-modal {
+  max-width: 620px !important;
+  width: 95vw !important;
+  max-height: 92vh !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  padding: 0 !important;
 }
 
-.delivery-confirmation-form {
+.delivery-conf-container {
   display: flex;
   flex-direction: column;
-  max-height: calc(90vh - 110px);
+  max-height: 92vh;
+  background: #ffffff;
 }
 
-.delivery-confirmation-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 1.15rem 1.25rem;
-  overflow-y: auto;
+.delivery-conf-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.delivery-confirmation-fields label {
+.delivery-conf-header-title {
   display: flex;
-  flex-direction: column;
-  gap: .4rem;
-  color: #334155;
-  font-size: .8rem;
-  font-weight: 600;
+  align-items: center;
+  gap: 0.6rem;
 }
 
-.delivery-confirmation-fields input {
-  height: 40px;
-  padding: 0 .75rem;
-  border: 1px solid #dbe3ef;
+.delivery-conf-header-title h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.delivery-conf-header-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.delivery-conf-readonly-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 1.5rem 0;
+  padding: 0.65rem 0.9rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
-  outline: 0;
-  color: #172033;
-  font: inherit;
-  font-weight: 500;
+  color: #1e40af;
+  font-size: 0.82rem;
 }
 
-.delivery-confirmation-fields input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 12%);
-}
-
-.delivery-confirmation-error {
-  margin: 1rem 1.25rem 0;
-  padding: .65rem .8rem;
+.delivery-conf-error-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 1.5rem 0;
+  padding: 0.65rem 0.9rem;
+  background: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 8px;
-  background: #fef2f2;
   color: #b91c1c;
-  font-size: .8rem;
+  font-size: 0.82rem;
 }
 
-.delivery-confirmation-actions {
+.delivery-conf-body {
+  padding: 1rem 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-height: calc(92vh - 160px);
+}
+
+.delivery-conf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.delivery-conf-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.delivery-conf-input {
+  height: 42px;
+  padding: 0 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: all 0.15s ease-in-out;
+}
+
+.delivery-conf-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.delivery-conf-input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+/* Positive Review QR Card */
+.delivery-conf-qr-card {
+  padding: 1rem 1.15rem;
+  background: #f0f7ff;
+  border: 1px solid #d0e5ff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.delivery-conf-qr-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.delivery-conf-qr-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.delivery-conf-subfield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.delivery-conf-sublabel {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.delivery-conf-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 0.15rem;
+}
+
+/* Footer */
+.delivery-conf-footer {
   display: flex;
   justify-content: flex-end;
-  gap: .65rem;
-  padding: 1rem 1.25rem;
-  border-top: 1px solid #eef2f7;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
 }
 
-.delivery-confirmation-actions button {
-  min-width: 88px;
+.delivery-conf-btn-cancel {
   height: 38px;
+  padding: 0 1.25rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
   border-radius: 8px;
-  font: inherit;
-  font-size: .84rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.delivery-confirmation-actions .is-secondary {
-  border: 1px solid #dbe3ef;
-  background: #fff;
-  color: #475569;
+.delivery-conf-btn-cancel:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
-.delivery-confirmation-actions .is-primary {
+.delivery-conf-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 38px;
+  padding: 0 1.5rem;
   border: 1px solid #4f46e5;
   background: #4f46e5;
-  color: #fff;
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.delivery-confirmation-actions button:disabled {
-  cursor: wait;
-  opacity: .65;
+.delivery-conf-btn-submit:hover:not(:disabled) {
+  background: #4338ca;
+  border-color: #4338ca;
+}
+
+.delivery-conf-btn-submit:disabled,
+.delivery-conf-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 640px) {
-  .delivery-confirmation-fields { grid-template-columns: 1fr; }
+  .delivery-conf-qr-grid {
+    grid-template-columns: 1fr;
+  }
 }

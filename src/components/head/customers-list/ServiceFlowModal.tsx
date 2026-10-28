@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo } from 'react'
+﻿import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import {
@@ -16,6 +16,7 @@ import { getSession } from '../../../app/auth/session'
 import type { OnboardingCustomer } from './CustomersList'
 import { recordCustomerActivity } from '../../../utils/customerActivity'
 import { notifyServiceCompleted } from '../../../api/notification-factory'
+import { RefreshButton } from '../../ui/RefreshButton'
 import './ServiceFlowModal.css'
 
 export interface Phase1Step {
@@ -422,6 +423,13 @@ export function ServiceFlowModal({
   const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Refresh icon: bumping reloadKey re-runs the flow load below, which re-derives
+  // subServices and subServiceStatus from the fresh response.
+  const [reloadKey, setReloadKey] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  // Set by the refresh icon: keep the current list on screen (dimmed) instead of the
+  // first-load spinner, and stay on the sub-service tab the user was viewing.
+  const manualRefreshRef = useRef<{ subServiceName: string | null } | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Sub-service status
@@ -489,11 +497,15 @@ export function ServiceFlowModal({
       setError(null)
       setMessage(null)
       setIsLoading(false)
+      setIsRefreshing(false)
+      manualRefreshRef.current = null
       return
     }
 
     let isCancelled = false
-    setIsLoading(true)
+    const manualRefresh = manualRefreshRef.current
+    manualRefreshRef.current = null
+    if (!manualRefresh) setIsLoading(true)
     setError(null)
 
     const isAutowebsion =
@@ -521,6 +533,7 @@ export function ServiceFlowModal({
           // If initialSubServiceName is provided or customer has subServiceInfo, match active index
           let foundIndex = 0
           const targetName = (
+            manualRefresh?.subServiceName ||
             initialSubServiceName ||
             (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo[0]
               ? customer.subServiceInfo[0]?.name ||
@@ -568,13 +581,22 @@ export function ServiceFlowModal({
         setError(err?.message || 'Unable to load service flow details.')
       })
       .finally(() => {
-        if (!isCancelled) setIsLoading(false)
+        if (!isCancelled) {
+          setIsLoading(false)
+          setIsRefreshing(false)
+        }
       })
 
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer, effectiveDept, serviceType])
+  }, [isOpen, customer, effectiveDept, serviceType, reloadKey])
+
+  function handleRefreshFlow() {
+    manualRefreshRef.current = { subServiceName: currentSubService?.name ?? null }
+    setIsRefreshing(true)
+    setReloadKey((key) => key + 1)
+  }
 
   // Sub-service tab switch handler
   const handleSelectSubService = (index: number) => {
@@ -781,19 +803,29 @@ export function ServiceFlowModal({
                 {customer.businessName || customer.contactName}
               </p>
             </div>
-            <button
-              type="button"
-              className="ssd-close-icon-btn"
-              onClick={onClose}
-              title="Close modal"
-              aria-label="Close"
-            >
-              <Icon name="x" size={18} strokeWidth={2} />
-            </button>
+            <div className="flex items-center gap-1">
+              <RefreshButton
+                onRefresh={handleRefreshFlow}
+                isRefreshing={isLoading || isRefreshing}
+                label="service flow"
+              />
+              <button
+                type="button"
+                className="ssd-close-icon-btn"
+                onClick={onClose}
+                title="Close modal"
+                aria-label="Close"
+              >
+                <Icon name="x" size={18} strokeWidth={2} />
+              </button>
+            </div>
           </div>
 
           {/* Body */}
-          <div className="ssd-body">
+          <div
+            className={`ssd-body transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isLoading || isRefreshing}
+          >
             {message && (
               <div className={`ssd-status-msg ssd-status-msg--${message.type}`}>
                 {message.text}

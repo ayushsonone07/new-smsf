@@ -36,6 +36,7 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
   const {
     data: requestsData,
     isLoading,
+    isFetching: requestsFetching,
     error,
     refetch,
   } = useLeaveRequests({
@@ -50,6 +51,8 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
   });
 
   const totalPages = requestsData?.meta?.totalPages ?? 1;
+  const requestsRefreshing = requestsFetching && !isLoading;
+  const summaryRefreshing = summary.isFetching && !summary.isLoading;
   const totalElements = requestsData?.meta?.totalElements ?? requestsData?.data?.length ?? 0;
 
   async function handleRefresh() {
@@ -84,7 +87,13 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
         />
       </div>
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="Leave summary">
+      <section
+        className={`grid grid-cols-2 gap-4 transition-opacity lg:grid-cols-4 ${
+          summaryRefreshing ? "pointer-events-none opacity-60" : ""
+        }`}
+        aria-label="Leave summary"
+        aria-busy={summaryRefreshing}
+      >
         {[
           ["Pending", summary.data?.pending ?? "—", "text-warning"],
           ["Approved this month", summary.data?.approvedThisMonth ?? "—", "text-success"],
@@ -141,6 +150,10 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
         </div>
       </section>
 
+      <div
+        className={`transition-opacity ${requestsRefreshing ? "pointer-events-none opacity-60" : ""}`}
+        aria-busy={requestsRefreshing}
+      >
       <LeaveRequestTable
         requests={requestsData?.data}
         isLoading={isLoading}
@@ -175,6 +188,7 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
             }
           : {})}
       />
+      </div>
 
       {totalElements > 0 ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-5 py-3 text-xs sm:flex-row sm:items-center sm:justify-between shadow">

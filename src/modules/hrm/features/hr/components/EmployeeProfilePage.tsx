@@ -15,6 +15,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useToast } from "@shared/components/feedback";
 import { Card, DatePicker, StatusBadge } from "@shared/components/ui";
 import { ROUTES } from "@shared/constants";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 import type { EmployeeListItem } from "@features/hr";
 
 import { useAppDispatch, useAppSelector } from "@hrm/app/store/hooks";
@@ -87,23 +88,41 @@ export function EmployeeProfilePage() {
     }
   }, [dispatch, employeeId]);
 
+  // A manual refresh keeps the current profile on screen (dimmed) instead of the skeleton,
+  // so an open edit form is not thrown away while the latest record loads.
+  const hasCurrentEmployee = selectedEmployee?.id === employeeId;
+  const isRefreshing = isDetailLoading && hasCurrentEmployee;
+
+  function refreshEmployee() {
+    if (!Number.isFinite(employeeId) || employeeId <= 0) return undefined;
+    return dispatch(fetchEmployeeById(employeeId));
+  }
+
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-5">
-        <Link
-          to={ROUTES.employees}
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back to employees
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            to={ROUTES.employees}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft size={16} />
+            Back to employees
+          </Link>
+          <RefreshButton onRefresh={refreshEmployee} isRefreshing={isDetailLoading} label="employee profile" />
+        </div>
 
-        {isDetailLoading ? (
+        {isDetailLoading && !hasCurrentEmployee ? (
           <LoadingState />
         ) : error ? (
           <ErrorState message={error} />
         ) : selectedEmployee ? (
-          <EmployeeProfileContent employee={selectedEmployee} />
+          <div
+            className={`space-y-5 transition-opacity ${isRefreshing ? "pointer-events-none opacity-60" : ""}`}
+            aria-busy={isRefreshing}
+          >
+            <EmployeeProfileContent employee={selectedEmployee} />
+          </div>
         ) : null}
       </div>
     </>
@@ -158,7 +177,8 @@ function EmployeeProfileContent({ employee }: { employee: EmployeeListItem }) {
           )}
         </Card>
 
-        <StatusPanel employee={employee} />
+        {/* Re-seed the status form when a refresh brings a different status / exit date. */}
+        <StatusPanel key={`${employee.id}-${employee.status}-${employee.exitDate ?? ""}`} employee={employee} />
       </div>
     </>
   );

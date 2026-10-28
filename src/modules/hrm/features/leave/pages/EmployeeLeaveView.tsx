@@ -16,13 +16,17 @@ export function EmployeeLeaveView() {
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: balanceData, isLoading: balanceLoading, error: balanceError } = useLeaveBalances();
+  const balances = useLeaveBalances();
+  const { data: balanceData, isLoading: balanceLoading, error: balanceError } = balances;
   const {
     data: requestsData,
     isLoading: requestsLoading,
+    isFetching: requestsFetching,
     error: requestsError,
     refetch,
   } = useLeaveRequests({ page, size: 10, scope: "self" });
+  const balancesRefreshing = balances.isFetching && !balanceLoading;
+  const requestsRefreshing = requestsFetching && !requestsLoading;
   const cancelLeave = useCancelLeave();
   const toast = useToast();
 
@@ -47,7 +51,8 @@ export function EmployeeLeaveView() {
               onClick={async () => {
                 setRefreshing(true);
                 try {
-                  await refetch();
+                  // Reload both parts of the page: leave balances and the request list.
+                  await Promise.all([refetch(), balances.refetch()]);
                   toast.success("Refresh successfully");
                 } finally {
                   setRefreshing(false);
@@ -66,11 +71,19 @@ export function EmployeeLeaveView() {
         }
       />
 
-      <section aria-label="Leave balances">
+      <section
+        aria-label="Leave balances"
+        aria-busy={balancesRefreshing}
+        className={`transition-opacity ${balancesRefreshing ? "pointer-events-none opacity-60" : ""}`}
+      >
         <LeaveBalanceCards balances={balanceData} isLoading={balanceLoading} error={balanceError} />
       </section>
 
-      <section aria-label="Leave requests">
+      <section
+        aria-label="Leave requests"
+        aria-busy={requestsRefreshing}
+        className={`transition-opacity ${requestsRefreshing ? "pointer-events-none opacity-60" : ""}`}
+      >
         <LeaveRequestTable
           requests={requestsData?.data}
           isLoading={requestsLoading}

@@ -21,6 +21,7 @@ import {
   fetchAssignableDepartmentUsers,
 } from '../../../api/help-center.api'
 import { TicketStatusHistoryModal } from './TicketStatusHistoryModal'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 interface AssignedTicketsViewProps {
   tickets: EmployeeTicketWithCreator[]
@@ -112,6 +113,8 @@ export function AssignedTicketsView({
 
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  // Bumped by the refresh icon in the re-assign / assign-all modals to re-run the users load
+  const [usersReloadKey, setUsersReloadKey] = useState(0)
 
   // Infinite scroll states: 8 items initially, fetch next 8 on scroll
   const [visibleTicketsCount, setVisibleTicketsCount] = useState(8)
@@ -154,7 +157,7 @@ export function AssignedTicketsView({
     return () => {
       cancelled = true
     }
-  }, [departmentType])
+  }, [departmentType, usersReloadKey])
 
   // Compute status counts
   const computedStatusCounts = useMemo(() => {
@@ -921,13 +924,20 @@ export function AssignedTicketsView({
                   {selectedTicket.ticketNumber}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsReassignModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <RefreshButton
+                  onRefresh={() => setUsersReloadKey((key) => key + 1)}
+                  isRefreshing={isLoadingUsers}
+                  label="team members"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsReassignModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-5 py-5">
@@ -1068,13 +1078,20 @@ export function AssignedTicketsView({
                 <h3 className="text-base font-bold text-slate-900">Assign All Tickets</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Round-robin distribution</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAssignAllModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <RefreshButton
+                  onRefresh={() => setUsersReloadKey((key) => key + 1)}
+                  isRefreshing={isLoadingUsers}
+                  label="team members"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsAssignAllModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 py-4">

@@ -37,6 +37,7 @@ import {
   type AirtelPagination,
 } from '../../../api/airtel.api'
 import { DepartmentDateRangePicker } from './components/DepartmentDateRangePicker'
+import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -223,11 +224,14 @@ export function AdminAirtelServicePage() {
   const [pagination, setPagination] = useState<AirtelPagination | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Bumped by the refresh button to re-run the calls + analytics load below.
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Detail modal
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<AirtelCallDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailId, setDetailId] = useState<number | null>(null)
 
   const isAllCalls = selectedScope === ALL_CALLS
   const selectedDepartmentInfo = selectedScope && !isAllCalls ? getDepartmentInfo(selectedScope) : null
@@ -313,16 +317,21 @@ export function AdminAirtelServicePage() {
     return () => {
       cancelled = true
     }
-  }, [selectedScope, isAllCalls, buildQuery, analyticsQuery, page, pageSize])
+  }, [selectedScope, isAllCalls, buildQuery, analyticsQuery, page, pageSize, reloadKey])
 
-  const openDetail = (id: number) => {
-    setDetailOpen(true)
+  const loadDetail = (id: number) => {
     setDetailLoading(true)
     setDetail(null)
-    getAirtelCallDetail(id)
+    return getAirtelCallDetail(id)
       .then((res) => setDetail(res))
       .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false))
+  }
+
+  const openDetail = (id: number) => {
+    setDetailOpen(true)
+    setDetailId(id)
+    void loadDetail(id)
   }
 
   const resetFilters = () => {
@@ -534,6 +543,14 @@ export function AdminAirtelServicePage() {
           </div>
         </div>
 
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <RefreshButton
+          onRefresh={() => setReloadKey((key) => key + 1)}
+          isRefreshing={loading}
+          label="calls"
+          size={16}
+          className="rounded-xl p-2.5 shadow-sm"
+        />
         {!isAllCalls && (
           <button
             type="button"
@@ -545,10 +562,14 @@ export function AdminAirtelServicePage() {
             <span>Show All Calls</span>
           </button>
         )}
+        </div>
       </div>
 
       {/* Analytics KPI Stat Cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      <div
+        className={`grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 transition-opacity ${loading ? 'opacity-60' : ''}`}
+        aria-busy={loading}
+      >
         {cards.map((c) => (
           <StatCard key={c.label} {...c} />
         ))}
@@ -808,6 +829,14 @@ export function AdminAirtelServicePage() {
                   <p className="text-xs font-medium text-slate-500">Comprehensive Airtel call session metadata</p>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+              {detailId !== null && (
+                <RefreshButton
+                  onRefresh={() => loadDetail(detailId)}
+                  isRefreshing={detailLoading}
+                  label="call details"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => setDetailOpen(false)}
@@ -815,6 +844,7 @@ export function AdminAirtelServicePage() {
               >
                 <X className="h-5 w-5" />
               </button>
+              </div>
             </div>
 
             {/* Modal Content */}
