@@ -37,7 +37,7 @@ export interface ServiceFlowModalProps {
   isOpen: boolean
   onClose: () => void
   isEditable?: boolean
-  onStepsUpdated?: (updatedSteps: Phase1Step[]) => void
+  onStepsUpdated?: (updatedSteps: Phase1Step[], subServiceName?: string) => void
   onSubServiceStatusUpdated?: (newStatus: string, subServiceName?: string) => void
   departmentType?: string
   serviceType?: string
@@ -623,21 +623,21 @@ export function ServiceFlowModal({
       })
       notifyServiceCompleted(customer, confirmingStep.step.stepName, effectiveDept)
 
-      let updatedSubSteps: Phase1Step[] = []
+      const markCompleted = (steps: Phase1Step[]) =>
+        steps.map((s) =>
+          s.stepName === confirmingStep.step.stepName
+            ? { ...s, status: 'COMPLETED', updatedAt: new Date().toISOString() }
+            : s,
+        )
+      // Computed here, not inside the setState updater (React may run that later).
+      const updatedSubSteps = markCompleted(
+        subServices.find((sub) => sub.name === targetSubName)?.steps ?? [],
+      )
       setSubServices((prev) =>
-        prev.map((sub) => {
-          if (sub.name !== targetSubName) return sub
-          const updatedSteps = sub.steps.map((s) =>
-            s.stepName === confirmingStep.step.stepName
-              ? { ...s, status: 'COMPLETED', updatedAt: new Date().toISOString() }
-              : s,
-          )
-          updatedSubSteps = updatedSteps
-          return { ...sub, steps: updatedSteps }
-        }),
+        prev.map((sub) => (sub.name === targetSubName ? { ...sub, steps: markCompleted(sub.steps) } : sub)),
       )
 
-      onStepsUpdated?.(updatedSubSteps)
+      onStepsUpdated?.(updatedSubSteps, targetSubName)
       setMessage({
         type: 'success',
         text: `"${confirmingStep.step.stepName}" has been marked as completed!`,
