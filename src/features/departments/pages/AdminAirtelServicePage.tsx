@@ -73,18 +73,23 @@ const StatusBadge = ({ status }: { status?: string | null }) => {
   const s = (status || '').toLowerCase()
   if (s === 'answered')
     return (
-      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-sm shadow-emerald-500/10">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        </span>
         Answered
       </span>
     )
   if (s === 'missed')
     return (
-      <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200/80 px-2.5 py-1 text-xs font-bold text-rose-700 shadow-sm shadow-rose-500/10">
+        <span className="h-2 w-2 rounded-full bg-rose-500" />
         Missed
       </span>
     )
   return (
-    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+    <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200/60 px-2.5 py-1 text-xs font-semibold text-slate-600">
       {status || '—'}
     </span>
   )
@@ -94,17 +99,17 @@ const TypeBadge = ({ type }: { type?: string | null }) => {
   const t = (type || '').toUpperCase()
   if (t === 'INBOUND')
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700">
-        <PhoneIncoming className="h-3.5 w-3.5" /> Inbound
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200/80 px-2.5 py-1 text-xs font-bold text-sky-700 shadow-sm shadow-sky-500/10">
+        <PhoneIncoming className="h-3.5 w-3.5 text-sky-500" /> Inbound
       </span>
     )
   if (t === 'OUTBOUND')
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700">
-        <PhoneOutgoing className="h-3.5 w-3.5" /> Outbound
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200/80 px-2.5 py-1 text-xs font-bold text-violet-700 shadow-sm shadow-violet-500/10">
+        <PhoneOutgoing className="h-3.5 w-3.5 text-violet-500" /> Outbound
       </span>
     )
-  return <span className="text-xs text-slate-400">{type || '—'}</span>
+  return <span className="text-xs text-slate-400 font-medium">{type || '—'}</span>
 }
 
 const StatCard = ({
@@ -113,21 +118,26 @@ const StatCard = ({
   value,
   sub,
   accent,
+  glow = 'hover:border-indigo-200 hover:shadow-indigo-500/10',
+  topBar = 'bg-indigo-500',
 }: {
   icon: ReactNode
   label: string
   value: string | number
   sub?: string
   accent: string
+  glow?: string
+  topBar?: string
 }) => (
-  <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-slate-800">{value}</p>
-        {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+  <div className={`group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${glow}`}>
+    <div className={`absolute top-0 left-0 right-0 h-1.5 ${topBar} opacity-90`} />
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="mt-1.5 text-2xl font-black text-slate-800 tracking-tight">{value}</p>
+        {sub && <p className="mt-1 text-xs font-medium text-slate-500 truncate">{sub}</p>}
       </div>
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${accent}`}>
+      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${accent} transition-transform duration-300 group-hover:scale-110`}>
         {icon}
       </div>
     </div>
@@ -135,9 +145,9 @@ const StatCard = ({
 )
 
 const DetailField = ({ label, value }: { label: string; value?: string | null }) => (
-  <div>
-    <p className="text-xs font-medium text-slate-400">{label}</p>
-    <p className="text-sm font-semibold text-slate-700 break-all">{value || '—'}</p>
+  <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 hover:bg-slate-50 transition-colors">
+    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+    <p className="mt-0.5 text-sm font-bold text-slate-800 break-all">{value || '—'}</p>
   </div>
 )
 
@@ -341,36 +351,46 @@ export function AdminAirtelServicePage() {
         label: 'Total Calls',
         value: (analytics?.totalCalls ?? 0).toLocaleString(),
         sub: `${analytics?.uniqueCallers ?? 0} unique callers`,
-        icon: <PhoneCall className="h-5 w-5 text-indigo-600" />,
-        accent: 'bg-indigo-50',
+        icon: <PhoneCall className="h-5 w-5 text-white" />,
+        accent: 'bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-md shadow-indigo-500/25 text-white',
+        glow: 'hover:border-indigo-300 hover:shadow-indigo-500/15',
+        topBar: 'bg-gradient-to-r from-indigo-500 to-indigo-600',
       },
       {
         label: 'Answered',
         value: (analytics?.answeredCalls ?? 0).toLocaleString(),
         sub: `${analytics?.answerRate ?? 0}% answer rate`,
-        icon: <TrendingUp className="h-5 w-5 text-emerald-600" />,
-        accent: 'bg-emerald-50',
+        icon: <TrendingUp className="h-5 w-5 text-white" />,
+        accent: 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/25 text-white',
+        glow: 'hover:border-emerald-300 hover:shadow-emerald-500/15',
+        topBar: 'bg-gradient-to-r from-emerald-500 to-teal-600',
       },
       {
         label: 'Missed',
         value: (analytics?.missedCalls ?? 0).toLocaleString(),
         sub: `${analytics?.otherCalls ?? 0} other`,
-        icon: <PhoneMissed className="h-5 w-5 text-rose-600" />,
-        accent: 'bg-rose-50',
+        icon: <PhoneMissed className="h-5 w-5 text-white" />,
+        accent: 'bg-gradient-to-br from-rose-500 to-red-600 shadow-md shadow-rose-500/25 text-white',
+        glow: 'hover:border-rose-300 hover:shadow-rose-500/15',
+        topBar: 'bg-gradient-to-r from-rose-500 to-red-600',
       },
       {
         label: 'Avg Duration',
         value: formatMs(analytics?.avgDurationMs),
         sub: `Talk time ${formatMs(analytics?.totalConversationMs)}`,
-        icon: <Clock className="h-5 w-5 text-amber-600" />,
-        accent: 'bg-amber-50',
+        icon: <Clock className="h-5 w-5 text-white" />,
+        accent: 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-amber-500/25 text-white',
+        glow: 'hover:border-amber-300 hover:shadow-amber-500/15',
+        topBar: 'bg-gradient-to-r from-amber-400 to-orange-500',
       },
       {
         label: 'Recorded',
         value: (analytics?.recordedCalls ?? 0).toLocaleString(),
         sub: 'calls with audio',
-        icon: <Volume2 className="h-5 w-5 text-sky-600" />,
-        accent: 'bg-sky-50',
+        icon: <Volume2 className="h-5 w-5 text-white" />,
+        accent: 'bg-gradient-to-br from-sky-400 to-blue-600 shadow-md shadow-sky-500/25 text-white',
+        glow: 'hover:border-sky-300 hover:shadow-sky-500/15',
+        topBar: 'bg-gradient-to-r from-sky-400 to-blue-600',
       },
     ],
     [analytics],
@@ -490,22 +510,23 @@ export function AdminAirtelServicePage() {
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto">
       {/* Top action header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3.5">
           <button
             type="button"
             onClick={backToDepartments}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors cursor-pointer"
+            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md hover:shadow-indigo-500/10 transition-all duration-200 active:scale-95 cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" />
+            <span>Back</span>
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold text-slate-900">
+            <h1 className="truncate text-2xl font-black tracking-tight bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-800 bg-clip-text text-transparent">
               {isAllCalls
                 ? 'All Airtel Calls'
                 : `${selectedDepartmentInfo?.label ?? 'Department'} Airtel Calls`}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs font-medium text-slate-500 mt-0.5">
               {isAllCalls
                 ? 'Showing call records across every department.'
                 : selectedDepartmentInfo?.description}
@@ -517,9 +538,11 @@ export function AdminAirtelServicePage() {
           <button
             type="button"
             onClick={() => selectScope(ALL_CALLS)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 shadow-sm transition-colors cursor-pointer self-start sm:self-auto"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/35 hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer self-start sm:self-auto"
           >
-            <PhoneCall className="h-4 w-4" /> Show All Calls
+            <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <PhoneCall className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" />
+            <span>Show All Calls</span>
           </button>
         )}
       </div>
@@ -532,30 +555,30 @@ export function AdminAirtelServicePage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 sm:p-5 shadow-sm backdrop-blur-sm transition-all duration-200 hover:shadow-md">
+        <div className="flex flex-wrap items-end gap-3.5">
           {/* Search */}
           <div className="flex-1 min-w-[220px]">
-            <label className="text-xs font-medium text-slate-600">Search</label>
-            <div className="relative mt-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Search</label>
+            <div className="relative mt-1.5">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Number, customer or session id"
-                className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-3.5 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 transition-all shadow-sm"
               />
             </div>
           </div>
 
           {/* Status */}
-          <div className="min-w-[130px]">
-            <label className="text-xs font-medium text-slate-600">Status</label>
+          <div className="min-w-[140px]">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
             >
               <option value="ALL">All statuses</option>
               <option value="Answered">Answered</option>
@@ -564,12 +587,12 @@ export function AdminAirtelServicePage() {
           </div>
 
           {/* Type */}
-          <div className="min-w-[130px]">
-            <label className="text-xs font-medium text-slate-600">Type</label>
+          <div className="min-w-[140px]">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Type</label>
             <select
               value={callType}
               onChange={(e) => setCallType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
             >
               <option value="ALL">All types</option>
               <option value="INBOUND">Inbound</option>
@@ -579,7 +602,7 @@ export function AdminAirtelServicePage() {
 
           {/* Date range */}
           <div>
-            <label className="text-xs font-medium text-slate-600 block mb-1">Date range</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Date range</label>
             <DepartmentDateRangePicker
               startDate={startDate}
               endDate={endDate}
@@ -598,98 +621,120 @@ export function AdminAirtelServicePage() {
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
           >
-            <RefreshCw className="h-4 w-4" /> Reset
+            <RefreshCw className="h-4 w-4 transition-transform duration-500 group-hover:rotate-180 text-slate-500 group-hover:text-indigo-600" />
+            <span>Reset</span>
           </button>
         </div>
       </div>
 
       {/* Calls Table */}
-      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-slate-50/70 text-slate-600 text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 text-left font-semibold">Status</th>
-                <th className="px-4 py-3 text-left font-semibold">Type</th>
-                <th className="px-4 py-3 text-left font-semibold">Caller</th>
-                <th className="px-4 py-3 text-left font-semibold">Destination</th>
-                <th className="px-4 py-3 text-center font-semibold">Rec</th>
-                <th className="px-4 py-3 text-center font-semibold">Legs</th>
-                <th className="px-4 py-3 text-center font-semibold">View</th>
+              <tr className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50/90 via-indigo-50/30 to-slate-50/90 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-5 py-3.5 text-left">Status</th>
+                <th className="px-5 py-3.5 text-left">Type</th>
+                <th className="px-5 py-3.5 text-left">Caller</th>
+                <th className="px-5 py-3.5 text-left">Destination</th>
+                <th className="px-5 py-3.5 text-center">Rec</th>
+                <th className="px-5 py-3.5 text-center">Legs</th>
+                <th className="px-5 py-3.5 text-center">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 Array.from({ length: pageSize }).map((_, i) => (
-                  <tr key={i} className="border-b">
-                    <td colSpan={7} className="px-4 py-3">
-                      <div className="h-6 w-full animate-pulse rounded bg-slate-100" />
+                  <tr key={i}>
+                    <td colSpan={7} className="px-5 py-4">
+                      <div className="h-7 w-full animate-pulse rounded-lg bg-slate-100" />
                     </td>
                   </tr>
                 ))
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-rose-600">
-                    <AlertCircle className="mx-auto mb-2 h-6 w-6" />
-                    {error}
+                  <td colSpan={7} className="px-5 py-12 text-center text-rose-600">
+                    <AlertCircle className="mx-auto mb-2 h-7 w-7 text-rose-500 animate-bounce" />
+                    <p className="font-semibold">{error}</p>
                   </td>
                 </tr>
               ) : calls.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
-                    No calls found for the selected filters.
+                  <td colSpan={7} className="px-5 py-14 text-center text-slate-500">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                      <PhoneCall className="h-6 w-6" />
+                    </div>
+                    <p className="font-semibold text-slate-700">No calls found</p>
+                    <p className="mt-1 text-xs text-slate-400">Try adjusting your search filters or selected date range.</p>
                   </td>
                 </tr>
               ) : (
                 calls.map((c) => (
-                  <tr key={c.id} className="border-b hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={c.id}
+                    className="group transition-all duration-150 hover:bg-gradient-to-r hover:from-indigo-50/50 hover:via-sky-50/20 hover:to-transparent"
+                  >
+                    <td className="px-5 py-3.5 whitespace-nowrap">
                       <StatusBadge status={c.overallCallStatus} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-3.5 whitespace-nowrap">
                       <TypeBadge type={c.callType} />
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-700">{c.callerNumber || '—'}</div>
-                      {c.callerCircleName && (
-                        <div className="text-xs text-slate-400">{c.callerCircleName}</div>
-                      )}
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                          <Phone className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 tracking-tight">{c.callerNumber || '—'}</div>
+                          {c.callerCircleName && (
+                            <div className="text-[11px] font-medium text-slate-400">{c.callerCircleName}</div>
+                          )}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="text-slate-700 font-medium">{c.destinationNumber || '—'}</div>
-                      {c.destinationName && (
-                        <div className="text-xs text-slate-400">{c.destinationName}</div>
-                      )}
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 group-hover:bg-sky-100 group-hover:text-sky-600 transition-colors">
+                          <PhoneOutgoing className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 tracking-tight">{c.destinationNumber || '—'}</div>
+                          {c.destinationName && (
+                            <div className="text-[11px] font-medium text-slate-400">{c.destinationName}</div>
+                          )}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-5 py-3.5 text-center whitespace-nowrap">
                       {c.hasRecording && c.recordingUrl ? (
                         <a
                           href={c.recordingUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center justify-center text-sky-600 hover:text-sky-700 transition-colors"
-                          title="Open recording"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-sky-50 border border-sky-200/70 text-sky-600 hover:bg-sky-100 hover:text-sky-700 shadow-sm hover:shadow-sky-500/20 active:scale-90 transition-all duration-150"
+                          title="Play recording"
                         >
                           <Volume2 className="h-4 w-4" />
                         </a>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-slate-300 font-medium">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center text-slate-600">
-                      <span className="inline-flex items-center gap-1">
+                    <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-200/60 px-2.5 py-1 text-xs font-bold text-slate-700">
                         <Users className="h-3.5 w-3.5 text-slate-400" />
                         {c.participantCount ?? 0}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-5 py-3.5 text-center whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => openDetail(c.id)}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors cursor-pointer"
-                        title="View details"
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 shadow-sm hover:shadow-indigo-500/15 active:scale-90 transition-all duration-150 cursor-pointer"
+                        title="View Call Details"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -750,68 +795,88 @@ export function AdminAirtelServicePage() {
 
       {/* Detail Modal */}
       {detailOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <PhoneCall className="h-5 w-5 text-indigo-600" /> Call Details
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[88vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-indigo-50/40">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25">
+                  <PhoneCall className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight text-slate-900">Call Details</h3>
+                  <p className="text-xs font-medium text-slate-500">Comprehensive Airtel call session metadata</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setDetailOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 h-8 w-8 rounded-xl hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {detailLoading ? (
-              <div className="space-y-3 py-6">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-5 w-full animate-pulse rounded bg-slate-100" />
-                ))}
-              </div>
-            ) : !detail ? (
-              <p className="py-6 text-center text-slate-500">Could not load this call details.</p>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={detail.overallCallStatus} />
-                  <TypeBadge type={detail.callType} />
-                  <span className="text-xs text-slate-400 font-medium">
-                    {formatDateTime(detail.callTimestamp)}
-                  </span>
+            {/* Modal Content */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-6">
+              {detailLoading ? (
+                <div className="space-y-3 py-6">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-6 w-full animate-pulse rounded-xl bg-slate-100" />
+                  ))}
                 </div>
-
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <DetailField label="Caller" value={detail.callerNumber} />
-                  <DetailField label="Destination" value={detail.destinationNumber} />
-                  <DetailField label="Customer" value={detail.customerName} />
-                  <DetailField label="Caller ID" value={detail.airtelCallerId} />
-                  <DetailField label="Caller Circle" value={detail.callerCircleName} />
-                  <DetailField label="Dest Circle" value={detail.destinationCircleName} />
-                  <DetailField label="Operator" value={detail.callerOperatorName} />
-                  <DetailField label="Hangup Cause" value={detail.hangupCause} />
-                  <DetailField
-                    label="Total Duration"
-                    value={detail.overallCallDuration || formatMs(detail.durationMs)}
-                  />
-                  <DetailField label="Talk Time" value={formatMs(detail.conversationDurationMs)} />
-                  <DetailField label="Session ID" value={detail.sessionId} />
-                </div>
-
-                {detail.recordingUrl && (
-                  <div>
-                    <a
-                      href={detail.recordingUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-sky-50 px-3.5 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-colors"
-                    >
-                      <Volume2 className="h-4 w-4" /> Open Recording Audio
-                    </a>
+              ) : !detail ? (
+                <p className="py-6 text-center text-slate-500">Could not load this call details.</p>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <StatusBadge status={detail.overallCallStatus} />
+                    <TypeBadge type={detail.callType} />
+                    <span className="text-xs text-slate-500 font-semibold bg-slate-100 border border-slate-200/60 px-2.5 py-1 rounded-full">
+                      {formatDateTime(detail.callTimestamp)}
+                    </span>
                   </div>
-                )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <DetailField label="Caller" value={detail.callerNumber} />
+                    <DetailField label="Destination" value={detail.destinationNumber} />
+                    <DetailField label="Customer" value={detail.customerName} />
+                    <DetailField label="Caller ID" value={detail.airtelCallerId} />
+                    <DetailField label="Caller Circle" value={detail.callerCircleName} />
+                    <DetailField label="Dest Circle" value={detail.destinationCircleName} />
+                    <DetailField label="Operator" value={detail.callerOperatorName} />
+                    <DetailField label="Hangup Cause" value={detail.hangupCause} />
+                    <DetailField
+                      label="Total Duration"
+                      value={detail.overallCallDuration || formatMs(detail.durationMs)}
+                    />
+                    <DetailField label="Talk Time" value={formatMs(detail.conversationDurationMs)} />
+                    <div className="sm:col-span-2">
+                      <DetailField label="Session ID" value={detail.sessionId} />
+                    </div>
+                  </div>
+
+                  {detail.recordingUrl && (
+                    <div className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-indigo-50/40 to-sky-50 p-4 flex items-center justify-between gap-3 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-md shadow-sky-500/25">
+                          <Volume2 className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">Call Audio Recording Available</p>
+                          <p className="text-[11px] text-slate-500 font-medium">Listen to or download the full conversation</p>
+                        </div>
+                      </div>
+                      <a
+                        href={detail.recordingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-sky-500/25 hover:shadow-lg hover:shadow-sky-500/35 hover:brightness-105 active:scale-95 transition-all"
+                      >
+                        <Volume2 className="h-3.5 w-3.5" /> Play Recording
+                      </a>
+                    </div>
+                  )}
 
                 {(detail.participants?.length ?? 0) > 0 && (
                   <div className="pt-2">
@@ -855,6 +920,7 @@ export function AdminAirtelServicePage() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
