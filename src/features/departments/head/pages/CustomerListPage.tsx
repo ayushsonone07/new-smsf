@@ -951,6 +951,11 @@ export function CustomerListPage() {
         isGoogle={isGoogle}
         isDepartmentUser={isDeptUser}
         onOpenServiceFlow={(cust, subName) => {
+          if (currentDepartment === 'BILLING_DEPARTMENT') {
+            setSelectedCustomer(cust)
+            setModalTab('bill-upload')
+            return
+          }
           setServiceFlowCustomer(cust)
           setSelectedSubServiceName(subName)
         }}
@@ -1016,6 +1021,7 @@ export function CustomerListPage() {
         canEditRemark={canEditRemark}
         departmentType={currentDepartment}
         initialTab={modalTab}
+        onBillUploaded={() => activeCustomerQuery.refetch()}
         onClose={() => {
           setSelectedCustomer(null)
           setModalTab(undefined)
