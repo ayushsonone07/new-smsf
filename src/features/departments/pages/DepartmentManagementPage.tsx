@@ -18,6 +18,7 @@ import { DepartmentTable } from '../../../components/departments/DepartmentTable
 import { DepartmentFormModal } from '../../../components/departments/DepartmentFormModal'
 import { DeleteDepartmentDialog } from '../../../components/departments/DeleteDepartmentDialog'
 import { DepartmentFilters } from '../../../components/departments/DepartmentFilters'
+import { uniqueDepartmentHeads } from '../utils/departmentHeads'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { Card } from '../../../components/ui/Card'
@@ -45,20 +46,7 @@ export function DepartmentManagementPage() {
   )
 
   // Deduplicate: only show department heads, grouped by department type
-  const departments = useMemo(() => {
-    const headMap = new Map<string, Department>()
-
-    for (const dept of allDepartments) {
-      if (dept.role === 'DEPARTMENT_HEAD') {
-        const typeKey = dept.type || 'unknown'
-        if (!headMap.has(typeKey)) {
-          headMap.set(typeKey, dept)
-        }
-      }
-    }
-
-    return Array.from(headMap.values())
-  }, [allDepartments])
+  const departments = useMemo(() => uniqueDepartmentHeads(allDepartments), [allDepartments])
 
   const filteredDepartments = useMemo(() => {
     const value = search.trim().toLowerCase()

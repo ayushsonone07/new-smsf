@@ -26,7 +26,6 @@ import {
 import {
   updateDepartmentServiceStatus,
   extractServiceTags,
-  getDepartmentConfig,
   getServiceFlows,
 } from '../../../../api/service-flow.api'
 import '../../../../components/head/customers-list/CustomersList.css'
@@ -138,13 +137,6 @@ export function CustomerListPage() {
     const timeout = window.setTimeout(() => setToast(null), 4500)
     return () => window.clearTimeout(timeout)
   }, [toast])
-
-  // 1. Department Config: GET /api/dept-config/{departmentType}
-  useQuery({
-    queryKey: ['deptConfig', currentDepartment],
-    queryFn: () => getDepartmentConfig(currentDepartment),
-    enabled: useRowsEndpoint,
-  })
 
   const role = (session?.user?.role || '').toUpperCase()
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''

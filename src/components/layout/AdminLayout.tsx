@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { ProfileChip } from '../common/ProfileChip'
 import { useSuperAdminNotifications } from './useSuperAdminNotifications'
+import './AdminTheme.css'
 import {
   NotificationCenter,
   NotificationsMenu,
