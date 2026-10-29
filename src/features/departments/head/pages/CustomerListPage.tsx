@@ -1156,8 +1156,15 @@ export function CustomerListPage() {
 
       <ServiceTagsModal
         isOpen={Boolean(serviceTagsCustomer)}
-        customer={serviceTagsCustomer}
+        // Live row from the list, so a refresh / tag update shows the new tags.
+        customer={
+          (serviceTagsCustomer &&
+            onboardingCustomers.find((c) => c.id === serviceTagsCustomer.id)) ||
+          serviceTagsCustomer
+        }
         onClose={() => setServiceTagsCustomer(null)}
+        onRefresh={() => activeCustomerQuery.refetch()}
+        isRefreshing={activeCustomerQuery.isFetching}
         onTagsUpdated={() => {
           activeCustomerQuery.refetch()
         }}

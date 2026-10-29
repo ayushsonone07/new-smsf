@@ -33,6 +33,7 @@ const AutowebisionCustomersPage = lazyScreen(() => import('../pages/Autowebision
 const DeliveredCustomersPage = lazyScreen(() => import('../pages/DeliveredCustomersPage'), 'DeliveredCustomersPage')
 const RecurringDashboardPage = lazyScreen(() => import('../pages/RecurringDashboardPage'), 'RecurringDashboardPage')
 const LeadsManagementPage = lazyScreen(() => import('../../../sales/pages/LeadsManagementPage'), 'LeadsManagementPage')
+const PlanManagementPage = lazyScreen(() => import('../../../plans/pages/PlanManagementPage'), 'PlanManagementPage')
 
 interface ScreenEntry {
   component: ComponentType<{ feature: FeaturePermission }>
@@ -73,5 +74,7 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   billing: { component: CustomFeaturePage, title: 'Billing List' },
   'billing-list': { component: CustomFeaturePage, title: 'Billing List' },
   leads: { component: LeadsManagementPage as any, title: 'Leads Management' },
+  plans: { component: PlanManagementPage as any, title: 'Plan Management' },
+  'manage-plans': { component: PlanManagementPage as any, title: 'Plan Management' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>

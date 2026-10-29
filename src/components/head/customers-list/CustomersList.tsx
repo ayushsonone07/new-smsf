@@ -1323,17 +1323,17 @@ function CustomerRow({
 
               {/* 3. History Button (only shown if history exists) */}
               {(() => {
-                const hasHistory =
-                  deliveryStatusMap?.[customer.id] !== undefined
-                    ? deliveryStatusMap[customer.id]
-                    : Boolean(
-                        customer.rawCustomer?.hasServiceHistory ||
-                        customer.rawCustomer?.delivery?.hasServiceHistory ||
-                        customer.rawCustomer?.deliveryStatus?.hasServiceHistory ||
-                        customer.rawCustomer?.isDelivered ||
-                        customer.rawCustomer?.delivered ||
-                        customer.rawCustomer?.serviceDeliverySent,
-                      )
+                const hasHistory = Boolean(
+                  deliveryStatusMap?.[customer.id] ||
+                  (deliveryCompletionMap?.[customer.id] !== undefined && deliveryCompletionMap[customer.id] !== null) ||
+                  customer.rawCustomer?.hasServiceHistory ||
+                  (customer.rawCustomer?.completionPercentage !== null && customer.rawCustomer?.completionPercentage !== undefined) ||
+                  customer.rawCustomer?.delivery?.hasServiceHistory ||
+                  customer.rawCustomer?.deliveryStatus?.hasServiceHistory ||
+                  customer.rawCustomer?.isDelivered ||
+                  customer.rawCustomer?.delivered ||
+                  customer.rawCustomer?.serviceDeliverySent,
+                )
 
                 if (!hasHistory) return null
 
