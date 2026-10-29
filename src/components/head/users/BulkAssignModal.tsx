@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -145,6 +145,20 @@ export function BulkAssignModal({
     },
   })
 
+  // Prevent navigating away or closing window during transfer
+  useEffect(() => {
+    if (!transferMutation.isPending) return
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Transfer is currently in progress. Please do not leave or refresh the page.'
+      return e.returnValue
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [transferMutation.isPending])
+
   function handleClose() {
     if (transferMutation.isPending) return
     setFromEmail('')
@@ -176,6 +190,7 @@ export function BulkAssignModal({
       onClose={handleClose}
       size="md"
       closeOnEscape={!transferMutation.isPending}
+      showCloseButton={!transferMutation.isPending}
       title={
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
@@ -210,8 +225,35 @@ export function BulkAssignModal({
             : ''
         }`}
       >
-        {/* Success View */}
-        {successMessage ? (
+        {/* Transfer in Progress Loader View */}
+        {transferMutation.isPending ? (
+          <div className="flex flex-col items-center justify-center py-10 px-4 text-center animate-in fade-in duration-200">
+            <div className="relative mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-50 text-blue-600 ring-8 ring-blue-50/50 shadow-xs">
+              <LoaderCircle className="h-10 w-10 animate-spin text-blue-600" />
+              <ArrowRightLeft className="absolute h-5 w-5 text-blue-600" />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+              Transferring Customers...
+            </h3>
+
+            <p className="mt-1.5 max-w-sm text-xs text-slate-600 leading-relaxed font-medium">
+              Reassigning <strong className="text-slate-800">{totalCustomers}</strong> customer{totalCustomers === 1 ? '' : 's'} from{' '}
+              <strong className="text-slate-800">{sourceUser?.username || fromEmail}</strong> to{' '}
+              <strong className="text-slate-800">{destUser?.username || toEmail}</strong>.
+            </p>
+
+            {/* Prominent Warning Message */}
+            <div className="mt-5 flex items-center justify-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900 shadow-xs max-w-md w-full">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 animate-pulse" />
+              <span>Please do not go back, refresh, or close this window.</span>
+            </div>
+
+            <p className="mt-3 text-[11px] text-slate-400">
+              Processing customer reassignments and assignment audit logs. Please wait...
+            </p>
+          </div>
+        ) : successMessage ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/50 mb-3.5">
               <CheckCircle2 className="h-7 w-7" />
