@@ -605,6 +605,8 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
         member={selectedMember}
         workItems={selectedMemberWorkItems}
         isLoading={selectedMemberQuery.isLoading}
+        onRefresh={() => selectedMemberQuery.refetch()}
+        isRefreshing={selectedMemberQuery.isFetching && !selectedMemberQuery.isLoading}
         onClose={() => setSelectedMember(null)}
       />
     </motion.div>

@@ -14,10 +14,12 @@ type NavPath =
   | '/admin/create-department'
   | '/admin/customers'
   | '/admin/services'
+  | '/admin/plans'
   | '/admin/timelines'
   | '/admin/service-flow'
   | '/admin/notification-history'
   | '/manage-leads'
+  | '/manage-customers-payment'
   | '/head'
   | '/users'
 
@@ -65,6 +67,15 @@ const NAV_ITEMS: NavItem[] = [
       pathname === '/services',
   },
   {
+    to: '/admin/plans',
+    label: 'Plans',
+    icon: '💳',
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/plans') ||
+      pathname === '/plans',
+  },
+  {
     to: '/admin/timelines',
     label: 'Service Flow',
     icon: '🔄',
@@ -86,6 +97,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: '🏠',
     roles: ['ADMIN'],
     isActive: (pathname) => pathname.startsWith('/manage-leads') || pathname.startsWith('/leads'),
+  },
+  {
+    to: '/manage-customers-payment',
+    label: 'Payments',
+    icon: '💳',
+    roles: ['ADMIN'],
+    isActive: (pathname) => pathname.startsWith('/manage-customers-payment') || pathname.startsWith('/admin/payments'),
   },
   {
     to: '/admin/notification-history',
