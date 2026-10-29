@@ -34,6 +34,9 @@ import { LeadDetailsModal } from '../components/LeadDetailsModal'
 import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
 import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
+import { SalesSummaryView } from '../components/SalesSummaryView'
+import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
+import { TrendingUp, LayoutGrid } from 'lucide-react'
 
 const LEAD_STATUS_OPTIONS = [
   'PENDING',
@@ -53,7 +56,25 @@ const TELECALLER_STATUS_OPTIONS = [
 
 const LEAD_TYPE_OPTIONS = ['Webinar 999', 'Direct', 'Inbound', 'Referral', 'Campaign']
 
-export function LeadsManagementPage() {
+export interface LeadsManagementPageProps {
+  initialTab?: 'leads' | 'summary' | 'payments'
+  feature?: any
+  [key: string]: any
+}
+
+export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {}) {
+  const [activeMainTab, setActiveMainTab] = useState<'leads' | 'summary' | 'payments'>(() => {
+    if (initialTab) return initialTab
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const t = params.get('tab')?.toLowerCase()
+      if (t === 'summary' || t === 'sales-summary') return 'summary'
+      if (t === 'payments' || t === 'payment') return 'payments'
+      if (window.location.pathname.includes('payment')) return 'payments'
+      if (window.location.pathname.includes('sales-summary')) return 'summary'
+    }
+    return 'leads'
+  })
   const [leads, setLeads] = useState<LeadInfo[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)

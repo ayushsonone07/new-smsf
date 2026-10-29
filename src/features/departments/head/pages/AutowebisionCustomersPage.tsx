@@ -302,6 +302,8 @@ export function AutowebisionCustomersPage({
   const [serviceTagsTarget, setServiceTagsTarget] = useState<{
     customer: OnboardingCustomer
     serviceType: string
+    targetServiceType?: 'WEBSITE' | 'AUTOMATION'
+    index: number
   } | null>(null)
   const [viewingClientRemark, setViewingClientRemark] = useState<{
     customerId: number
@@ -346,6 +348,9 @@ export function AutowebisionCustomersPage({
   const [isSendingDraft, setIsSendingDraft] = useState(false)
   const [draftHistory, setDraftHistory] = useState<WebsiteDraftHistoryEntry[]>([])
   const [isLoadingDraftHistory, setIsLoadingDraftHistory] = useState(false)
+  const [isRefreshingDraftHistory, setIsRefreshingDraftHistory] = useState(false)
+  // Email of the customer whose draft history is open (guards late refresh responses).
+  const draftHistoryEmailRef = useRef('')
 
   // Assign dropdown & modal state matching screenshots
   const [openAssignDropdownId, setOpenAssignDropdownId] = useState<number | null>(null)
@@ -1046,6 +1051,7 @@ export function AutowebisionCustomersPage({
     setSelectedCustomerForDraft(customer)
     setDraftHistoryModalOpen(true)
     const clientEmail = customer.email || ''
+    draftHistoryEmailRef.current = clientEmail
     if (clientEmail) {
       setIsLoadingDraftHistory(true)
       fetchWebsiteDraftHistory(clientEmail)
@@ -1067,6 +1073,22 @@ export function AutowebisionCustomersPage({
     setDraftHistoryModalOpen(false)
     setSelectedCustomerForDraft(null)
     setDraftHistory([])
+    draftHistoryEmailRef.current = ''
+  }
+
+  // Refresh button in the Draft History modal: reloads only this customer's drafts,
+  // keeping the current list on screen (dimmed) until the new one arrives.
+  const refreshDraftHistory = async () => {
+    const clientEmail = selectedCustomerForDraft?.email || ''
+    if (!clientEmail) return
+    setIsRefreshingDraftHistory(true)
+    try {
+      const data = await fetchWebsiteDraftHistory(clientEmail)
+      // Ignore a late response if the modal was closed or switched to another customer.
+      if (draftHistoryEmailRef.current === clientEmail) setDraftHistory(data)
+    } finally {
+      setIsRefreshingDraftHistory(false)
+    }
   }
 
   // Low-level status update
@@ -1311,10 +1333,26 @@ export function AutowebisionCustomersPage({
     setServiceTagsTarget({
       customer: onboardingCust,
       serviceType: exactType,
+      targetServiceType,
+      index,
     })
   }
 
   const rawRows = customersQuery.data?.data || []
+
+  // Service Tags modal reads the live row, so a refresh / tag update shows the new tags.
+  const liveServiceTagsRow = serviceTagsTarget
+    ? rawRows.find((row) => String(row.customerId) === serviceTagsTarget.customer.id)
+    : undefined
+  // Memoised on the fetched row: the modal re-syncs its tags whenever customer.serviceTags changes identity.
+  const liveServiceTags = useMemo(
+    () => (liveServiceTagsRow ? extractServiceTags(liveServiceTagsRow) : null),
+    [liveServiceTagsRow],
+  )
+  const liveServiceTagsCustomer =
+    serviceTagsTarget && liveServiceTags
+      ? { ...serviceTagsTarget.customer, serviceTags: liveServiceTags }
+      : null
   const totalElements = customersQuery.data?.totalElements ?? 0
 
   return (
@@ -2937,6 +2975,8 @@ export function AutowebisionCustomersPage({
           onClose={handleCloseDraftHistoryModal}
           history={draftHistory}
           isLoading={isLoadingDraftHistory}
+          onRefresh={refreshDraftHistory}
+          isRefreshing={isRefreshingDraftHistory}
           customerName={
             selectedCustomerForDraft.businessName ||
             selectedCustomerForDraft.ownerName ||
@@ -3022,8 +3062,10 @@ export function AutowebisionCustomersPage({
       {serviceTagsTarget && (
         <ServiceTagsModal
           isOpen={Boolean(serviceTagsTarget)}
-          customer={serviceTagsTarget.customer}
+          customer={liveServiceTagsCustomer ?? serviceTagsTarget.customer}
           serviceType={serviceTagsTarget.serviceType}
+          onRefresh={() => customersQuery.refetch()}
+          isRefreshing={customersQuery.isFetching}
           readOnly={!canEditServices}
           onClose={() => setServiceTagsTarget(null)}
           onTagsUpdated={() => {

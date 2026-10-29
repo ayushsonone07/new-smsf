@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icon } from '../shared/Icon'
+import { RefreshButton } from '../../ui/RefreshButton'
 import { editServiceTag } from '../../../api/service-flow.api'
 import type { OnboardingCustomer } from './CustomersList'
 import './ServiceTagsModal.css'
@@ -12,6 +13,9 @@ export interface ServiceTagsModalProps {
   serviceType?: string
   onTagsUpdated?: () => void
   readOnly?: boolean
+  /** Reloads the customer's tags (the parent list query); the modal re-syncs from the new customer prop. */
+  onRefresh?: () => unknown
+  isRefreshing?: boolean
 }
 
 interface TagItem {
@@ -181,6 +185,8 @@ export function ServiceTagsModal({
   serviceType = 'GOOGLE SERVICE',
   onTagsUpdated,
   readOnly = false,
+  onRefresh,
+  isRefreshing = false,
 }: ServiceTagsModalProps) {
   const [search, setSearch] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -354,6 +360,14 @@ export function ServiceTagsModal({
                 <span className="stm-case-badge">CASE_INSENSITIVE</span>
               )}
             </div>
+            {onRefresh && (
+              <RefreshButton
+                onRefresh={onRefresh}
+                isRefreshing={isRefreshing}
+                label="service tags"
+                className="ml-auto mr-2"
+              />
+            )}
             <button
               type="button"
               className="stm-close-btn"

@@ -18,6 +18,7 @@ import {
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { useDepartments, useDesignations } from "@features/hr/hooks";
 import {
@@ -84,8 +85,21 @@ const summary = usePerformanceSummary(!isEmployee);
         <PageHeader
           title="Performance"
           description="Your performance reviews."
+          actions={
+            <RefreshButton
+              onRefresh={() => myReviews.refetch()}
+              isRefreshing={myReviews.isFetching}
+              label="performance reviews"
+              className="h-10 w-10 rounded-xl"
+            />
+          }
         />
-        <Card padding="none" className="overflow-hidden">
+        <Card
+          padding="none"
+          className={`overflow-hidden transition-opacity ${
+            myReviews.isFetching && !myReviews.isLoading ? "pointer-events-none opacity-60" : ""
+          }`}
+        >
           {myReviews.isLoading ? (
             <div className="p-5">
               <TableSkeleton rows={6} />
@@ -180,7 +194,11 @@ const summary = usePerformanceSummary(!isEmployee);
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div
+        className={`grid gap-4 transition-opacity md:grid-cols-5 ${
+          summary.isFetching && !summary.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         <Metric label="Total" value={summary.data?.totalReviews ?? 0} />
         <Metric label="Pending" value={summary.data?.pendingReviews ?? 0} tone="amber" />
         <Metric label="In Progress" value={summary.data?.inProgressReviews ?? 0} tone="sky" />
@@ -232,10 +250,21 @@ const summary = usePerformanceSummary(!isEmployee);
               className={inputClass}
             />
           </div>
+          <RefreshButton
+            onRefresh={() => Promise.all([reviews.refetch(), summary.refetch()])}
+            isRefreshing={reviews.isFetching || summary.isFetching}
+            label="performance reviews"
+            className="h-10 w-10 shrink-0 self-end rounded-xl lg:self-auto"
+          />
         </div>
       </Card>
 
-      <Card padding="none" className="overflow-hidden">
+      <Card
+        padding="none"
+        className={`overflow-hidden transition-opacity ${
+          reviews.isFetching && !reviews.isLoading ? "pointer-events-none opacity-60" : ""
+        }`}
+      >
         {reviews.isLoading ? (
           <div className="p-5">
             <TableSkeleton rows={6} />
@@ -475,6 +504,10 @@ function PerformanceDialog({
   }, [employees.data, open, review]);
 
   const pending = createReview.isPending || updateReview.isPending;
+  const lookupsRefreshing =
+    (departments.isFetching && !departments.isLoading) ||
+    (designations.isFetching && !designations.isLoading) ||
+    (employees.isFetching && !employees.isLoading);
 
   function update<K extends keyof PerformanceReviewInput>(
     key: K,
@@ -510,9 +543,19 @@ function PerformanceDialog({
       title={isEditing ? "Edit Review" : "Create Review"}
       description="Assign a reviewer and track goals, rating, and comments."
       size="lg"
+      headerActions={
+        <RefreshButton
+          onRefresh={() => Promise.all([departments.refetch(), designations.refetch(), employees.refetch()])}
+          isRefreshing={departments.isFetching || designations.isFetching || employees.isFetching}
+          label="departments, designations and employees"
+        />
+      }
     >
       <form onSubmit={submit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div
+          className={`grid gap-4 transition-opacity sm:grid-cols-2 ${lookupsRefreshing ? "opacity-60" : ""}`}
+          aria-busy={lookupsRefreshing}
+        >
           <Field label="Department" required>
             <Select
               value={departmentId || ""}

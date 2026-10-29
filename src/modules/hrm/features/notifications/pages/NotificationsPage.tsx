@@ -18,6 +18,12 @@ import {
   TableSkeleton,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
+import { RefreshButton } from "@/components/ui/RefreshButton";
+
+/** Dims one section while its query re-fetches in the background (not on first load). */
+function refreshingClass(query: { isFetching: boolean; isLoading: boolean }): string {
+  return query.isFetching && !query.isLoading ? "pointer-events-none opacity-60" : "";
+}
 
 const ANNOUNCEMENT_TONES: Record<string, string> = {
   GENERAL: "bg-primary-soft text-primary",
@@ -58,33 +64,36 @@ export function NotificationsPage() {
   const { role } = useAuth();
   const isHrRole = role === "ADMIN" || role === "HR" || role === "HR_HEAD" || role === "SUB_HR";
 
+  const announcementsQuery = useAnnouncements({ active: true, size: 50, sort: "createdAt,desc" });
   const {
     data: announcementsData,
     isLoading: loadingAnnouncements,
     error: announcementsError,
-  } = useAnnouncements({ active: true, size: 50, sort: "createdAt,desc" });
+  } = announcementsQuery;
   const announcements = announcementsData?.data ?? [];
 
-  const {
-    data: leavesData,
-    isLoading: loadingLeaves,
-    error: leavesError,
-  } = useLeaveRequests({
+  const leavesQuery = useLeaveRequests({
     status: "PENDING",
     scope: "accessible",
     size: 50,
     sort: "appliedDate,desc",
   });
+  const {
+    data: leavesData,
+    isLoading: loadingLeaves,
+    error: leavesError,
+  } = leavesQuery;
   const pendingLeaves = isHrRole ? (leavesData?.data ?? []) : [];
 
+  const holidaysQuery = useQuery({
+    queryKey: ["notifications", "holidays"],
+    queryFn: () => holidayService.list({ year: new Date().getFullYear(), active: true, size: 50 }),
+  });
   const {
     data: holidaysData,
     isLoading: loadingHolidays,
     error: holidaysError,
-  } = useQuery({
-    queryKey: ["notifications", "holidays"],
-    queryFn: () => holidayService.list({ year: new Date().getFullYear(), active: true, size: 50 }),
-  });
+  } = holidaysQuery;
 
   const upcomingHolidays = (holidaysData?.data ?? [])
     .filter((item) => new Date(`${item.holidayDate}T00:00:00`).getTime() >= Date.now() - 86_400_000)
@@ -94,29 +103,31 @@ export function NotificationsPage() {
   const { data: profile } = useMyProfile();
   const employeeId = profile?.id ?? 0;
 
-  const {
-    data: payslips,
-    isLoading: loadingPayslips,
-    error: payslipsError,
-  } = useQuery({
+  const payslipsQuery = useQuery({
     queryKey: ["notifications", "payslips", employeeId],
     queryFn: () => payrollService.employeePayslips(employeeId),
     enabled: employeeId > 0,
   });
+  const {
+    data: payslips,
+    isLoading: loadingPayslips,
+    error: payslipsError,
+  } = payslipsQuery;
 
   const publishedPayslips = (payslips ?? [])
     .filter((item) => item.status === "PAID" || item.status === "PROCESSED")
     .sort((a, b) => b.payrollYear - a.payrollYear || b.payrollMonth - a.payrollMonth)
     .slice(0, 5);
 
+  const reviewsQuery = useQuery({
+    queryKey: ["notifications", "my-reviews"],
+    queryFn: () => performanceService.myReviews(),
+  });
   const {
     data: reviewsData,
     isLoading: loadingReviews,
     error: reviewsError,
-  } = useQuery({
-    queryKey: ["notifications", "my-reviews"],
-    queryFn: () => performanceService.myReviews(),
-  });
+  } = reviewsQuery;
 
   const myReviews = (reviewsData ?? [])
     .filter((item) => item.status !== "CANCELLED")
@@ -133,7 +144,7 @@ export function NotificationsPage() {
 
       {isHrRole ? (
         <StaggerItem variant="card">
-        <Card padding="none" className="overflow-hidden">
+        <Card padding="none" className={`overflow-hidden transition-opacity ${refreshingClass(leavesQuery)}`}>
           <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
               <h2 className="flex items-center gap-2 font-extrabold text-card-foreground">
@@ -142,12 +153,19 @@ export function NotificationsPage() {
               </h2>
               <p className="text-sm text-muted-foreground">Requests waiting for your review.</p>
             </div>
-            <Link
-              to="/hrm/leave"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
-            >
-              Review leave
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <RefreshButton
+                onRefresh={() => leavesQuery.refetch()}
+                isRefreshing={leavesQuery.isFetching}
+                label="pending leave requests"
+              />
+              <Link
+                to="/hrm/leave"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+              >
+                Review leave
+              </Link>
+            </div>
           </div>
 
           {loadingLeaves ? (
@@ -219,7 +237,7 @@ export function NotificationsPage() {
       ) : null}
 
       <StaggerItem variant="card">
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className={`overflow-hidden transition-opacity ${refreshingClass(holidaysQuery)}`}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-extrabold text-card-foreground">
@@ -228,12 +246,19 @@ export function NotificationsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">Next holidays added by HR.</p>
           </div>
-          <Link
-            to="/hrm/holidays"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
-          >
-            View all holidays
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton
+              onRefresh={() => holidaysQuery.refetch()}
+              isRefreshing={holidaysQuery.isFetching}
+              label="upcoming holidays"
+            />
+            <Link
+              to="/hrm/holidays"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+            >
+              View all holidays
+            </Link>
+          </div>
         </div>
 
         {loadingHolidays ? (
@@ -293,7 +318,7 @@ export function NotificationsPage() {
       </StaggerItem>
 
       <StaggerItem variant="card">
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className={`overflow-hidden transition-opacity ${refreshingClass(payslipsQuery)}`}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-extrabold text-card-foreground">
@@ -302,12 +327,19 @@ export function NotificationsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">Your published payslips.</p>
           </div>
-          <Link
-            to="/hrm/payslips"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
-          >
-            View payslips
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton
+              onRefresh={() => (employeeId > 0 ? payslipsQuery.refetch() : undefined)}
+              isRefreshing={payslipsQuery.isFetching}
+              label="payslips"
+            />
+            <Link
+              to="/hrm/payslips"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+            >
+              View payslips
+            </Link>
+          </div>
         </div>
 
         {loadingPayslips ? (
@@ -360,7 +392,7 @@ export function NotificationsPage() {
       </StaggerItem>
 
       <StaggerItem variant="card">
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className={`overflow-hidden transition-opacity ${refreshingClass(reviewsQuery)}`}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-extrabold text-card-foreground">
@@ -369,12 +401,19 @@ export function NotificationsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">Reviews assigned to you by HR.</p>
           </div>
-          <Link
-            to="/hrm/performance"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
-          >
-            View reviews
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton
+              onRefresh={() => reviewsQuery.refetch()}
+              isRefreshing={reviewsQuery.isFetching}
+              label="performance reviews"
+            />
+            <Link
+              to="/hrm/performance"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+            >
+              View reviews
+            </Link>
+          </div>
         </div>
 
         {loadingReviews ? (
@@ -427,7 +466,7 @@ export function NotificationsPage() {
         )}
       </Card>
 
-      <Card padding="none" className="overflow-hidden">
+      <Card padding="none" className={`overflow-hidden transition-opacity ${refreshingClass(announcementsQuery)}`}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-extrabold text-card-foreground">
@@ -436,12 +475,19 @@ export function NotificationsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">Company notices, holidays and updates.</p>
           </div>
-          <Link
-            to="/hrm/announcements"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
-          >
-            View all announcements
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton
+              onRefresh={() => announcementsQuery.refetch()}
+              isRefreshing={announcementsQuery.isFetching}
+              label="announcements"
+            />
+            <Link
+              to="/hrm/announcements"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+            >
+              View all announcements
+            </Link>
+          </div>
         </div>
 
         {loadingAnnouncements ? (
