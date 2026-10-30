@@ -381,9 +381,13 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-columns: clamp(200px, 20vw, 320px) minmax(0, 1fr);
+  grid-template-columns: 0 minmax(0, 1fr);
   min-height: 100vh;
-  transition: grid-template-columns 0.2s ease;
+  transition: grid-template-columns 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-shell.sidebar-open {
+  grid-template-columns: 270px minmax(0, 1fr);
 }
 
 .main-content {
@@ -478,6 +482,21 @@ a {
   overflow-y: auto;
   background: #0f172a;
   color: #cbd5e1;
+  visibility: hidden;
+  transform: translateX(-100%);
+  opacity: 0;
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    visibility 0s linear 280ms;
+  will-change: transform;
+}
+
+.sidebar-open .sidebar {
+  visibility: visible;
+  transform: translateX(0);
+  opacity: 1;
+  transition-delay: 0s;
 }
 
 .brand {
@@ -1533,7 +1552,8 @@ tr.is-selected-row td {
 }
 
 @media (max-width: 900px) {
-  .app-shell {
+  .app-shell,
+  .app-shell.sidebar-open {
     grid-template-columns: 1fr;
   }
 
@@ -1555,15 +1575,19 @@ tr.is-selected-row td {
     z-index: 60;
     visibility: hidden;
     transform: translateX(-100%);
+    opacity: 0;
     transition:
-      transform 0.2s ease,
-      visibility 0.2s;
+      transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 180ms ease,
+      visibility 0s linear 280ms;
     box-shadow: 0 0 40px rgb(0 0 0 / 35%);
   }
 
   .sidebar-open .sidebar {
     visibility: visible;
     transform: translateX(0);
+    opacity: 1;
+    transition-delay: 0s;
   }
 
   .sidebar-open .sidebar-backdrop {
@@ -1572,6 +1596,7 @@ tr.is-selected-row td {
     inset: 0;
     z-index: 55;
     background: rgb(15 23 42 / 55%);
+    animation: adminSidebarBackdropIn 180ms ease both;
   }
 
   .page-content {
@@ -1602,6 +1627,18 @@ tr.is-selected-row td {
 
   .topbar-actions {
     flex-wrap: wrap;
+  }
+}
+
+@keyframes adminSidebarBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .sidebar {
+    transition-duration: 0.01ms;
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   getAdminCustomers,
@@ -149,10 +149,22 @@ const baseColumns: DataTableColumn<AdminCustomer>[] = [
 export function AdminCustomersPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<AdminCustomer | null>(null)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(0)
+    }, 300)
+
+    return () => window.clearTimeout(timeout)
+  }, [search])
+
   const customersQuery = useQuery({
-    queryKey: ['admin-customers', page, size],
-    queryFn: () => getAdminCustomers(page, size),
+    queryKey: ['admin-customers', page, size, debouncedSearch],
+    queryFn: () => getAdminCustomers(page, size, debouncedSearch),
     staleTime: 30_000,
   })
 
@@ -207,6 +219,17 @@ export function AdminCustomersPage() {
               <h2>Customers</h2>
               <p>{result?.totalElements ?? 0} customer accounts</p>
             </div>
+            <label className="admin-customers-search">
+              <Icon name="search" size={18} />
+              <span className="sr-only">Search customers</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search name, email, phone or business"
+                autoComplete="off"
+              />
+            </label>
           </div>
 
           {customersQuery.isPending ? (
@@ -227,7 +250,9 @@ export function AdminCustomersPage() {
                   <EmptyState
                     icon="♙"
                     title="No customers found"
-                    description="Customer accounts will appear here when they are registered."
+                    description={debouncedSearch
+                      ? `No customer matches “${debouncedSearch}”.`
+                      : 'Customer accounts will appear here when they are registered.'}
                   />
                 }
               />

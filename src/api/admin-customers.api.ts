@@ -51,6 +51,7 @@ type PageLike = {
 export async function getAdminCustomers(
   page = 0,
   size = 10,
+  search = '',
 ): Promise<AdminCustomersPage> {
   const session = getSession()
   const adminUsername =
@@ -59,8 +60,14 @@ export async function getAdminCustomers(
     session?.user.name ||
     ''
 
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  })
+  if (search.trim()) query.set('searchParam', search.trim())
+
   const response = await authedApiRequest<PageLike>(
-    `/api/auth/admin/customers?page=${page}&size=${size}`,
+    `/api/auth/admin/customers?${query.toString()}`,
     {
       headers: {
         adminUsername,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
@@ -24,19 +24,22 @@ export function AdminLayout({
       typeof window !== 'undefined' &&
       window.innerWidth > 900,
   )
-  const [lastPath, setLastPath] = useState(
-    location.pathname,
-  )
-
   const { items, markAllRead } = useSuperAdminNotifications()
 
-  if (location.pathname !== lastPath) {
-    setLastPath(location.pathname)
-
+  useEffect(() => {
     if (window.innerWidth <= 900) {
       setSidebarOpen(false)
     }
-  }
+  }, [location.pathname])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setSidebarOpen(false)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <NotificationCenter
@@ -54,12 +57,11 @@ export function AdminLayout({
           onClose={() => setSidebarOpen(false)}
         />
 
-        {sidebarOpen && (
-          <div
-            className="sidebar-backdrop"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+        <div
+          className="sidebar-backdrop"
+          aria-hidden="true"
+          onClick={() => setSidebarOpen(false)}
+        />
 
         <div className="main-content">
           <header className="shell-topbar">
@@ -67,6 +69,7 @@ export function AdminLayout({
               type="button"
               className="menu-button"
               aria-label="Open sidebar"
+              aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               ☰
