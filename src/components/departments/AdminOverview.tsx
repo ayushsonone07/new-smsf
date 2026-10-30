@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Maximize2,
   LogIn,
+  Check,
 } from 'lucide-react'
 import {
   getAdminDepartmentSummary,
@@ -103,6 +104,34 @@ export function AdminOverview({
 }: AdminOverviewProps) {
   const navigate = useNavigate()
   const [preset, setPreset] = useState<RangePreset>('30d')
+  const [isRangeDropdownOpen, setIsRangeDropdownOpen] = useState(false)
+  const rangeDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isRangeDropdownOpen) return
+
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        rangeDropdownRef.current &&
+        !rangeDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsRangeDropdownOpen(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsRangeDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isRangeDropdownOpen])
   const [sortFilter, setSortFilter] = useState<SortFilter>('delayed')
   const [loggingInEmail, setLoggingInEmail] = useState<string | null>(null)
   const range = useRange(preset)
@@ -331,21 +360,47 @@ export function AdminOverview({
         </div>
 
         <div className="overview-welcome-actions">
-          {/* Date Range Selector Pill */}
-          <div className="overview-range-pill">
-            <Calendar className="w-3.5 h-3.5 text-blue-200" />
-            <select
-              value={preset}
-              onChange={(e) => setPreset(e.target.value as RangePreset)}
-              aria-label="Select Date Range"
+          {/* Custom Modern Date Range Dropdown */}
+          <div className="overview-range-dropdown-wrapper" ref={rangeDropdownRef}>
+            <button
+              type="button"
+              className={`overview-range-pill-btn ${isRangeDropdownOpen ? 'is-open' : ''}`}
+              onClick={() => setIsRangeDropdownOpen((prev) => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={isRangeDropdownOpen}
             >
-              {RANGE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-blue-200 pointer-events-none" />
+              <Calendar className="w-3.5 h-3.5 text-blue-200" />
+              <span>{activeRangeLabel}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-blue-200 transition-transform duration-200 ${
+                  isRangeDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isRangeDropdownOpen && (
+              <div className="overview-range-menu" role="listbox">
+                {RANGE_OPTIONS.map((opt) => {
+                  const isSelected = opt.value === preset
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`overview-range-menu-item ${isSelected ? 'is-selected' : ''}`}
+                      onClick={() => {
+                        setPreset(opt.value)
+                        setIsRangeDropdownOpen(false)
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Refresh Button */}
