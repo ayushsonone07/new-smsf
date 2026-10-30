@@ -14,7 +14,6 @@ import {
   TeamTargetPerformance,
   type TeamMemberPerformance,
 } from '../../../../components/head/dashboard/TeamTargetPerformance'
-import { LinedUpMeetings } from '../../../../components/head/dashboard/LinedUpMeetings'
 import { PerformanceOverview } from '../../../../components/head/dashboard/PerformanceOverview'
 import {
   TopPerformers,
@@ -587,12 +586,7 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
         />
       </motion.div>
 
-      {/* 6. Lined-up Meetings Grid */}
-      <motion.div variants={sectionVariants}>
-        <LinedUpMeetings />
-      </motion.div>
-
-      {/* 7. Bottom Row: Performance Overview & Top Performers */}
+      {/* 6. Bottom Row: Performance Overview & Top Performers */}
       <motion.div variants={sectionVariants}>
         <div className="hdb-row-bottom">
           <PerformanceOverview />
@@ -600,7 +594,7 @@ function HeadDashboard({ overrideDepartment }: { overrideDepartment?: string } =
         </div>
       </motion.div>
 
-      {/* 8. Member Details Modal */}
+      {/* 7. Member Details Modal */}
       <MemberDetailsModal
         member={selectedMember}
         workItems={selectedMemberWorkItems}

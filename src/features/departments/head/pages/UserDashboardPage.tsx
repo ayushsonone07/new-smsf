@@ -13,7 +13,6 @@ import { TeamTargetAchievement } from '../../../../components/head/dashboard/Tea
 import { StatusBreakdown } from '../../../../components/head/dashboard/StatusBreakdown'
 import { MostActiveDay } from '../../../../components/head/dashboard/MostActiveDay'
 import { DelayWhoseSide } from '../../../../components/head/dashboard/DelayWhoseSide'
-import { LinedUpMeetings } from '../../../../components/head/dashboard/LinedUpMeetings'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryKpis } from '../../types/onboarding-dashboard.types'
@@ -1097,9 +1096,6 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         </motion.div>
       )}
 
-      <motion.div variants={sectionVariants}>
-        <LinedUpMeetings />
-      </motion.div>
     </motion.div>
   )
 }

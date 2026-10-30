@@ -334,6 +334,14 @@ font-weight: var(--app-font-weight-heading); /* 700 */
 3. Grids ≤900px par 1-col; toolbars `flex-wrap`.
 4. Tap targets ≥34px. Plain CSS ho to `@media` rule saath likho.
 
+### Mobile-first UI rule (mandatory for every new or changed screen)
+- Har UI desktop ke saath phone par bhi fully usable honi chahiye; minimum verification widths: **320, 375, 768, 1440px**.
+- Mobile list/table rows compact summary cards dikhayengi: sirf identity, primary status aur essential context. Row tap/keyboard action full-details drawer ya expandable details kholega.
+- Mobile par full desktop table ko squeeze mat karo. Non-essential columns default hide/collapse karo; data delete mat karo aur full details accessible rakho.
+- Viewport horizontal scroll, clipped controls, overlapping content aur off-screen menus allowed nahi hain.
+- Interactive targets minimum **44px** preferred (34px absolute minimum), keyboard focus visible, aur drawers small phones par full-screen honge.
+- Responsive behavior same change/PR me implement aur verify karna mandatory hai; “desktop now, mobile later” acceptable nahi hai.
+
 ---
 
 ## Mock Data Layer
