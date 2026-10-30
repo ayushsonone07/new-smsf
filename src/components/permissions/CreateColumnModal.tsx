@@ -117,7 +117,7 @@ export function CreateColumnModal({
         {/* Department Type */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-color, #334155)' }}>
-            Department Type (from DepartmentType.java)
+            Department
           </label>
           <ScrollableSelect
             value={selectedDept}

@@ -1,6 +1,13 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import {
+  Compass,
+  Plus,
+  RotateCw,
+  CheckCircle2,
+  AlertCircle,
+  Zap,
+} from 'lucide-react'
 import { Modal } from '../ui/Modal'
-import { Button } from '../ui/Button'
 import { ScrollableSelect } from '../ui/ScrollableSelect'
 import {
   useDepartmentTypes,
@@ -8,6 +15,7 @@ import {
 } from '../../features/permissions/hooks/useDynamicPermissions'
 import { normalizeInputRoute } from '../../features/departments/head/utils/routeUtils'
 import { normalizeDepartmentSlug } from '../../api/dynamic-permission.api'
+import './CreateRouteModal.css'
 
 interface CreateRouteModalProps {
   open: boolean
@@ -25,6 +33,17 @@ const PRESET_SCREENS = [
   { label: '❓ Help Center', slug: 'help-center' },
   { label: '🔄 Service Flow', slug: 'service-flow' },
 ]
+
+function formatDeptName(deptType: string): string {
+  if (!deptType) return 'General'
+  const clean = deptType.replace(/_DEPARTMENT$/i, '')
+  if (clean.toUpperCase() === 'SMO') return 'SMO'
+  if (clean.toUpperCase() === 'SEO') return 'SEO'
+  return clean
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
 
 export function CreateRouteModal({
   open,
@@ -76,7 +95,7 @@ export function CreateRouteModal({
       {
         onSuccess: (res) => {
           setSuccessMessage(
-            `Route "${res.routeName}" created successfully and linked to ${selectedDept}! (Stored in access_routes)`,
+            `Route "${res.routeName}" created successfully and linked to ${formatDeptName(selectedDept)}!`,
           )
           setRouteName('')
           setTimeout(() => {
@@ -95,91 +114,71 @@ export function CreateRouteModal({
     onClose()
   }
 
+  // Format department options for ScrollableSelect
+  const deptOptions = useMemo(() => {
+    return departmentTypes.map((dt) => {
+      const val = typeof dt === 'string' ? dt : String(dt)
+      return {
+        label: `${formatDeptName(val)} (${val})`,
+        value: val,
+      }
+    })
+  }, [departmentTypes])
+
   return (
     <Modal
       open={open}
       onClose={handleModalClose}
       title="Create Dynamic Route"
-      description="Create a new route in access_routes and assign it to a department."
+      description="Register a new accessible route and assign permissions for this department."
       size="md"
     >
-      <form
-        className="dynamic-permission-form"
-        onSubmit={handleSubmit}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          marginTop: '0.75rem',
-        }}
-      >
+      <form className="crm-route-modal-form" onSubmit={handleSubmit}>
+        {/* Success Alert */}
         {successMessage && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#ecfdf5',
-              border: '1px solid #10b981',
-              borderRadius: '8px',
-              color: '#065f46',
-              fontSize: '0.875rem',
-            }}
-          >
-            ✓ {successMessage}
+          <div className="crm-route-alert is-success">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successMessage}</span>
           </div>
         )}
 
+        {/* Error Alert */}
         {createRouteMutation.isError && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #ef4444',
-              borderRadius: '8px',
-              color: '#991b1b',
-              fontSize: '0.875rem',
-            }}
-          >
-            {createRouteMutation.error?.message || 'Failed to create route'}
+          <div className="crm-route-alert is-error">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{createRouteMutation.error?.message || 'Failed to create route'}</span>
           </div>
         )}
 
-        {/* Department Type */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          <label
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--text-color, #334155)',
-            }}
-          >
-            Department Type (from DepartmentType.java)
-          </label>
+        {/* 1. Department Type Field */}
+        <div className="crm-route-field">
+          <div className="crm-route-field-header">
+            <label className="crm-route-label">
+              Department
+              <span className="crm-route-badge-subtle">Required</span>
+            </label>
+          </div>
           <ScrollableSelect
             value={selectedDept}
             onChange={(val) => setSelectedDept(val)}
-            options={departmentTypes}
+            options={deptOptions.length > 0 ? deptOptions : departmentTypes}
             disabled={isLoadingDepts || createRouteMutation.isPending}
             searchable={true}
             maxHeight={200}
             width="100%"
           />
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Select the department enum this route will be registered under.
+          <span className="crm-route-helper">
+            Select the department this route will be registered under.
           </span>
         </div>
 
-        {/* Quick Presets */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          <label
-            style={{
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              color: '#475569',
-            }}
-          >
-            ⚡ Quick Screen Presets (1-Click Fill)
+        {/* 2. Quick Screen Presets */}
+        <div className="crm-route-field">
+          <label className="crm-route-label">
+            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            Quick Screen Presets (1-Click Fill)
           </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          <div className="crm-preset-chips-wrap">
             {PRESET_SCREENS.map((p) => {
               const targetPath = `/${deptSlug}/head/${p.slug}`
               const isSelected = routeName === targetPath
@@ -189,19 +188,7 @@ export function CreateRouteModal({
                   type="button"
                   onClick={() => setRouteName(targetPath)}
                   disabled={createRouteMutation.isPending}
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    borderRadius: '6px',
-                    border: isSelected
-                      ? '1.5px solid #2563eb'
-                      : '1px solid #cbd5e1',
-                    backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
-                    color: isSelected ? '#1d4ed8' : '#334155',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
+                  className={`crm-preset-chip-btn ${isSelected ? 'is-active' : ''}`}
                 >
                   {p.label}
                 </button>
@@ -210,103 +197,79 @@ export function CreateRouteModal({
           </div>
         </div>
 
-        {/* Route Path Input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          <label
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--text-color, #334155)',
-            }}
-          >
-            Route Path / Name
-          </label>
-          <input
-            type="text"
-            placeholder="Paste any browser URL or e.g. /head/meeting"
-            value={routeName}
-            onChange={(e) => setRouteName(e.target.value)}
-            onPaste={handlePaste}
-            disabled={createRouteMutation.isPending}
-            required
-            style={{
-              padding: '0.625rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color, #cbd5e1)',
-              backgroundColor: 'var(--bg-surface, #ffffff)',
-              color: 'var(--text-color, #1e293b)',
-              fontSize: '0.875rem',
-            }}
-          />
+        {/* 3. Route Path / Name Field */}
+        <div className="crm-route-field">
+          <div className="crm-route-field-header">
+            <label className="crm-route-label">
+              Route Path / URL
+              <span className="crm-route-badge-subtle">Clean Path</span>
+            </label>
+          </div>
+          <div className="crm-route-input-wrap">
+            <Compass className="w-4 h-4 crm-route-input-icon" />
+            <input
+              type="text"
+              placeholder="e.g. /head/meeting or paste any browser URL"
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+              onPaste={handlePaste}
+              disabled={createRouteMutation.isPending}
+              required
+              className="crm-route-text-input"
+            />
+          </div>
 
           {/* Auto-converted Preview Badge */}
           {normalizedInfo.wasAutoConverted && routeName.trim() && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginTop: '0.25rem',
-                padding: '0.45rem 0.75rem',
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '6px',
-                fontSize: '0.8125rem',
-                color: '#1e40af',
-              }}
-            >
-              <span>⚡ Auto-converted to standard format:</span>
-              <code style={{ fontWeight: 700, color: '#1d4ed8' }}>
-                {normalizedInfo.normalized}
-              </code>
+            <div className="crm-route-converted-box">
+              <div className="flex items-center gap-1.5 truncate">
+                <span>⚡ Auto-converted to:</span>
+                <span className="crm-route-converted-code">
+                  {normalizedInfo.normalized}
+                </span>
+              </div>
               <button
                 type="button"
+                className="crm-route-apply-btn"
                 onClick={() => setRouteName(normalizedInfo.normalized)}
-                style={{
-                  marginLeft: 'auto',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '2px 8px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
               >
                 Apply
               </button>
             </div>
           )}
 
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+          <span className="crm-route-helper">
             Tip: You can paste any browser URL directly; it will automatically convert to the clean standard format.
           </span>
         </div>
 
-        <div
-          className="dynamic-permission-form__actions"
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '0.75rem',
-            marginTop: '1rem',
-          }}
-        >
-          <Button
+        {/* 4. Modal Actions */}
+        <div className="crm-route-modal-actions">
+          <button
             type="button"
-            variant="secondary"
+            className="crm-route-btn-cancel"
             onClick={handleModalClose}
             disabled={createRouteMutation.isPending}
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             type="submit"
+            className="crm-route-btn-submit"
             disabled={createRouteMutation.isPending || !routeName.trim()}
           >
-            {createRouteMutation.isPending ? 'Saving...' : 'Submit Route'}
-          </Button>
+            {createRouteMutation.isPending ? (
+              <>
+                <RotateCw className="w-4 h-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>Submit Route</span>
+              </>
+            )}
+          </button>
         </div>
       </form>
     </Modal>
