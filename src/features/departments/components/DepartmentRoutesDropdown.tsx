@@ -29,6 +29,7 @@ import {
   readDynamicColumnOrder,
   saveDynamicColumnOrder,
 } from '../../../utils/dynamicColumnOrder'
+import './DepartmentRoutesDropdown.css'
 
 interface DepartmentRoutesDropdownProps {
   departmentType: string
@@ -109,7 +110,14 @@ export function DepartmentRoutesDropdown({
   const createRouteColumnsMutation = useCreateColumnsForRoute()
   const provisionedRouteRef = useRef('')
   const routes = routesQuery.data ?? []
-  const selectedRoute = routes.find((route) => route.routeId === selectedRouteId)
+  // Auto-select first route if none selected
+  useEffect(() => {
+    if (!selectedRouteId && routes.length > 0) {
+      setSelectedRouteId(routes[0].routeId)
+    }
+  }, [routes, selectedRouteId])
+
+  const selectedRoute = routes.find((route) => route.routeId === selectedRouteId) || (routes.length > 0 ? routes[0] : null)
 
   const routeColumns = useMemo(
     () =>
@@ -288,21 +296,30 @@ export function DepartmentRoutesDropdown({
     updateColumnPermissionMutation.error?.message
 
   return (
-    <div className="department-route-dropdown">
-      <div className="department-route-dropdown-heading">
-        <div>
-          <strong>Department routes</strong>
-          <span>Select a route to see its columns.</span>
+    <div className="dept-routes-dropdown-wrap">
+      {/* 1. TOP TOOLBAR */}
+      <div className="dept-routes-toolbar">
+        <div className="dept-routes-toolbar-title">
+          <strong>Department routes & columns</strong>
+          <span>Select a route on the left to view and configure its columns on the right.</span>
         </div>
-        <div className="department-route-dropdown-actions">
-          <Button variant="secondary" onClick={() => setShowRouteModal(true)}>
+        <div className="dept-routes-toolbar-actions">
+          <button
+            type="button"
+            className="dept-route-add-btn"
+            onClick={() => setShowRouteModal(true)}
+          >
             <span aria-hidden="true">＋</span> Add Dynamic Route
-          </Button>
-          <Button variant="secondary" onClick={() => setShowColumnModal(true)}>
+          </button>
+          <button
+            type="button"
+            className="dept-route-add-btn"
+            onClick={() => setShowColumnModal(true)}
+          >
             <span aria-hidden="true">＋</span> Add Dynamic Column
-          </Button>
+          </button>
           {!routesQuery.isPending ? (
-            <span className="department-route-count">{routes.length} routes</span>
+            <span className="dept-routes-count-badge">{routes.length} routes</span>
           ) : null}
           <RefreshButton
             onRefresh={() =>
@@ -315,295 +332,284 @@ export function DepartmentRoutesDropdown({
       </div>
 
       {updateErrorMessage ? (
-        <p className="department-route-state is-error" role="alert">
+        <p className="p-3 bg-red-50 text-red-600 rounded-lg text-xs" role="alert">
           Could not update permissions: {updateErrorMessage}
         </p>
       ) : null}
 
-      {routesQuery.isPending ? (
-        <p className="department-route-state">Loading routes…</p>
-      ) : routesQuery.isError ? (
-        <p className="department-route-state is-error">
-          Could not load routes: {routesQuery.error.message}
-        </p>
-      ) : routes.length === 0 ? (
-        <p className="department-route-state">No routes are configured for this department.</p>
-      ) : (
-        <div
-          className={`department-route-list transition-opacity${refreshingClass}`}
-          aria-busy={isRefreshing}
-          onScroll={() => setHoveredRoute(null)}
-        >
-          {routes.map((route) => (
-            <div
-              key={route.routeId}
-              className={`department-route-option${selectedRouteId === route.routeId ? ' is-selected' : ''}`}
-            >
-              <button
-                type="button"
-                className="department-route-select"
-                aria-pressed={selectedRouteId === route.routeId}
-                onClick={() => setSelectedRouteId(route.routeId)}
-                onMouseEnter={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  const showBelow = rect.top < 45
-                  setHoveredRoute({
-                    name: route.routeName,
-                    x: Math.max(12, rect.left + 16),
-                    y: showBelow ? rect.bottom + 6 : rect.top - 6,
-                    showBelow,
-                  })
-                }}
-                onMouseLeave={() => setHoveredRoute(null)}
-              >
-                <span className="department-route-option-icon" aria-hidden="true">↳</span>
-                <span className="department-route-option-name">{route.routeName}</span>
-                <span className="department-route-option-arrow" aria-hidden="true">›</span>
-              </button>
-              <div className="department-route-role-toggles">
-                <div className="department-route-role-toggle">
-                  <span>Head</span>
-                  <PermissionToggle
-                    checked={route.enableHead === true}
-                    disabled={
-                      updateRouteStatusMutation.isPending ||
-                      updateColumnStatusMutation.isPending ||
-                      columnsQuery.isPending ||
-                      columnsQuery.isError
-                    }
-                    label={`Enable ${route.routeName} for department head`}
-                    onChange={(enabled) =>
-                      updateRouteEnabled(route, 'DEPARTMENT_HEAD', enabled)
-                    }
-                  />
-                </div>
-                <div className="department-route-role-toggle">
-                  <span>User</span>
-                  <PermissionToggle
-                    checked={route.enableUser === true}
-                    disabled={
-                      updateRouteStatusMutation.isPending ||
-                      updateColumnStatusMutation.isPending ||
-                      columnsQuery.isPending ||
-                      columnsQuery.isError
-                    }
-                    label={`Enable ${route.routeName} for department user`}
-                    onChange={(enabled) =>
-                      updateRouteEnabled(route, 'DEPARTMENT_USER', enabled)
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="department-item-actions">
-                <button
-                  type="button"
-                  className="department-icon-action-btn is-edit"
-                  title={`Edit route ${route.routeName}`}
-                  aria-label={`Edit route ${route.routeName}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setEditingRoute(route)
-                  }}
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="department-icon-action-btn is-delete"
-                  title={`Delete route ${route.routeName}`}
-                  aria-label={`Delete route ${route.routeName}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setDeleteRouteError('')
-                    setDeletingRoute(route)
-                  }}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {selectedRoute ? (
-        <section
-          className={`department-route-columns transition-opacity${refreshingClass}`}
-          aria-live="polite"
-          aria-busy={isRefreshing}
-        >
-          <div className="department-route-columns-heading">
-            <div>
-              <span>Columns for</span>
-              <strong
-                onMouseEnter={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  const showBelow = rect.top < 45
-                  setHoveredRoute({
-                    name: selectedRoute.routeName,
-                    x: Math.max(12, rect.left),
-                    y: showBelow ? rect.bottom + 6 : rect.top - 6,
-                    showBelow,
-                  })
-                }}
-                onMouseLeave={() => setHoveredRoute(null)}
-              >
-                {selectedRoute.routeName}
-              </strong>
-            </div>
-            {!columnsQuery.isPending && !columnsQuery.isError ? (
-              <span className="department-route-count">{routeColumns.length} columns</span>
-            ) : null}
-          </div>
-
-          {columnsQuery.isPending ? (
-            <p className="department-route-state">Loading columns…</p>
-          ) : columnsQuery.isError ? (
-            <p className="department-route-state is-error">
-              Could not load columns: {columnsQuery.error.message}
+      {/* 2. TWO-COLUMN SPLIT PANEL (ROUTES ON LEFT, COLUMNS ON RIGHT) */}
+      <div className="dept-routes-split-layout">
+        {/* Left Panel: Routes List */}
+        <div className="dept-routes-left-card">
+          {routesQuery.isPending ? (
+            <p className="text-xs text-slate-400 p-6 text-center">Loading routes…</p>
+          ) : routesQuery.isError ? (
+            <p className="text-xs text-red-500 p-6 text-center">
+              Could not load routes: {routesQuery.error.message}
             </p>
-          ) : routeColumns.length === 0 ? (
-            <p className="department-route-state">No columns are linked to this route.</p>
+          ) : routes.length === 0 ? (
+            <p className="text-xs text-slate-400 p-6 text-center">
+              No routes are configured for this department.
+            </p>
           ) : (
-            <ul className="department-column-list">
-              {routeColumns.map((column, index) => (
-                <li key={column.columnId} className="department-column-item">
-                  <div className="department-column-identity">
-                    <span className="department-column-icon" aria-hidden="true">▤</span>
-                    <div>
-                      <strong>{column.columnName}</strong>
-                      <span>{column.columnId}</span>
-                    </div>
+            routes.map((route) => {
+              const isSelected = selectedRoute?.routeId === route.routeId
+              return (
+                <div
+                  key={route.routeId}
+                  className={`dept-route-row-item ${isSelected ? 'is-selected' : ''}`}
+                  onClick={() => setSelectedRouteId(route.routeId)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setSelectedRouteId(route.routeId)
+                    }
+                  }}
+                >
+                  {/* Left: Branch Icon + Route Name + Arrow */}
+                  <div className="dept-route-row-left">
+                    <span className="dept-route-branch-icon" aria-hidden="true">↳</span>
+                    <span className="dept-route-name-text" title={route.routeName}>
+                      {route.routeName}
+                    </span>
+                    <span className="dept-route-chevron" aria-hidden="true">›</span>
                   </div>
 
-                  <div className="department-column-order" aria-label={`Reorder ${column.columnName}`}>
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      title="Move column up"
-                      aria-label={`Move ${column.columnName} up`}
-                      onClick={() => moveColumn(column.columnId, -1)}
-                    >
-                      ↑
-                    </button>
-                    <span>{index + 1}</span>
-                    <button
-                      type="button"
-                      disabled={index === routeColumns.length - 1}
-                      title="Move column down"
-                      aria-label={`Move ${column.columnName} down`}
-                      onClick={() => moveColumn(column.columnId, 1)}
-                    >
-                      ↓
-                    </button>
-                  </div>
-
-                  <div className="department-column-permissions">
-                    <div className="department-column-permission">
-                      <div className="department-permission-control">
-                        <span className="department-permission-role">Head</span>
+                  {/* Right: Head & User Toggles + Edit & Delete Buttons */}
+                  <div className="dept-route-row-right">
+                    <div className="dept-role-toggle-group">
+                      <div className="dept-role-toggle-item">
+                        <span className="dept-role-toggle-label">Head</span>
                         <PermissionToggle
-                          checked={column.enableHead === true}
+                          checked={route.enableHead === true}
                           disabled={
-                            selectedRoute.enableHead !== true ||
-                            updateColumnStatusMutation.isPending
+                            updateRouteStatusMutation.isPending ||
+                            updateColumnStatusMutation.isPending ||
+                            columnsQuery.isPending ||
+                            columnsQuery.isError
                           }
-                          label={`Enable ${column.columnName} for department head`}
+                          label={`Enable ${route.routeName} for department head`}
                           onChange={(enabled) =>
-                            updateColumnEnabled(column, 'DEPARTMENT_HEAD', enabled)
+                            updateRouteEnabled(route, 'DEPARTMENT_HEAD', enabled)
                           }
                         />
                       </div>
-                      <Select
-                        className="department-permission-select"
-                        aria-label={`${column.columnName} head access`}
-                        value={getAccessValue(column.roleAPermission)}
-                        disabled={
-                          selectedRoute.enableHead !== true ||
-                          column.enableHead !== true ||
-                          updateColumnPermissionMutation.isPending
-                        }
-                        onChange={(event) =>
-                          updateColumnAccess(
-                            column,
-                            'DEPARTMENT_HEAD',
-                            event.target.value as '1' | '12',
-                          )
-                        }
-                      >
-                        <option value="1">Read Only</option>
-                        <option value="12">Read + Write</option>
-                      </Select>
-                    </div>
-
-                    <div className="department-column-permission">
-                      <div className="department-permission-control">
-                        <span className="department-permission-role">User</span>
+                      <div className="dept-role-toggle-item">
+                        <span className="dept-role-toggle-label">User</span>
                         <PermissionToggle
-                          checked={column.enableUser === true}
+                          checked={route.enableUser === true}
                           disabled={
-                            selectedRoute.enableUser !== true ||
-                            updateColumnStatusMutation.isPending
+                            updateRouteStatusMutation.isPending ||
+                            updateColumnStatusMutation.isPending ||
+                            columnsQuery.isPending ||
+                            columnsQuery.isError
                           }
-                          label={`Enable ${column.columnName} for department user`}
+                          label={`Enable ${route.routeName} for department user`}
                           onChange={(enabled) =>
-                            updateColumnEnabled(column, 'DEPARTMENT_USER', enabled)
+                            updateRouteEnabled(route, 'DEPARTMENT_USER', enabled)
                           }
                         />
                       </div>
-                      <Select
-                        className="department-permission-select"
-                        aria-label={`${column.columnName} user access`}
-                        value={getAccessValue(column.roleBPermission)}
-                        disabled={
-                          selectedRoute.enableUser !== true ||
-                          column.enableUser !== true ||
-                          updateColumnPermissionMutation.isPending
-                        }
-                        onChange={(event) =>
-                          updateColumnAccess(
-                            column,
-                            'DEPARTMENT_USER',
-                            event.target.value as '1' | '12',
-                          )
-                        }
-                      >
-                        <option value="1">Read Only</option>
-                        <option value="12">Read + Write</option>
-                      </Select>
                     </div>
-                  </div>
 
-                  <div className="department-item-actions">
                     <button
                       type="button"
-                      className="department-icon-action-btn is-edit"
-                      title={`Edit column ${column.columnName}`}
-                      aria-label={`Edit column ${column.columnName}`}
-                      onClick={() => setEditingColumn(column)}
+                      className="dept-route-btn-action"
+                      title={`Edit route ${route.routeName}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingRoute(route)
+                      }}
                     >
                       <Pencil size={12} />
                     </button>
                     <button
                       type="button"
-                      className="department-icon-action-btn is-delete"
-                      title={`Delete column ${column.columnName}`}
-                      aria-label={`Delete column ${column.columnName}`}
-                      onClick={() => {
-                        setDeleteColumnError('')
-                        setDeletingColumn(column)
+                      className="dept-route-btn-action is-delete"
+                      title={`Delete route ${route.routeName}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteRouteError('')
+                        setDeletingRoute(route)
                       }}
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )
+            })
           )}
-        </section>
-      ) : null}
+        </div>
+
+        {/* Right Panel: Columns for Selected Route */}
+        <div className="dept-columns-right-card">
+          {selectedRoute ? (
+            <>
+              <div className="dept-columns-header">
+                <div>
+                  <span className="dept-columns-header-label">Columns for</span>
+                  <strong className="dept-columns-header-route">
+                    {selectedRoute.routeName}
+                  </strong>
+                </div>
+                {!columnsQuery.isPending && !columnsQuery.isError ? (
+                  <span className="dept-routes-count-badge">
+                    {routeColumns.length} columns
+                  </span>
+                ) : null}
+              </div>
+
+              {columnsQuery.isPending ? (
+                <p className="text-xs text-slate-400 p-8 text-center">Loading columns…</p>
+              ) : columnsQuery.isError ? (
+                <p className="text-xs text-red-500 p-8 text-center">
+                  Could not load columns: {columnsQuery.error.message}
+                </p>
+              ) : routeColumns.length === 0 ? (
+                <div className="dept-columns-empty-text">
+                  No columns are linked to this route.
+                </div>
+              ) : (
+                <ul className="dept-columns-list">
+                  {routeColumns.map((column, index) => (
+                    <li key={column.columnId} className="dept-column-row-item">
+                      <div className="dept-column-info">
+                        <span className="text-indigo-600 font-bold text-sm">▤</span>
+                        <div>
+                          <div className="dept-column-name">{column.columnName}</div>
+                          <div className="dept-column-id-badge">{column.columnId}</div>
+                        </div>
+                      </div>
+
+                      <div className="dept-column-order-controls">
+                        <button
+                          type="button"
+                          className="dept-column-order-btn"
+                          disabled={index === 0}
+                          onClick={() => moveColumn(column.columnId, -1)}
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <span className="text-xs font-bold text-slate-600 px-1">
+                          {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="dept-column-order-btn"
+                          disabled={index === routeColumns.length - 1}
+                          onClick={() => moveColumn(column.columnId, 1)}
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                      </div>
+
+                      <div className="dept-column-perm-controls">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-slate-600">Head</span>
+                          <PermissionToggle
+                            checked={column.enableHead === true}
+                            disabled={
+                              selectedRoute.enableHead !== true ||
+                              updateColumnStatusMutation.isPending
+                            }
+                            label={`Enable ${column.columnName} for head`}
+                            onChange={(enabled) =>
+                              updateColumnEnabled(column, 'DEPARTMENT_HEAD', enabled)
+                            }
+                          />
+                          <Select
+                            className="department-permission-select text-xs py-1 px-1.5"
+                            value={getAccessValue(column.roleAPermission)}
+                            disabled={
+                              selectedRoute.enableHead !== true ||
+                              column.enableHead !== true ||
+                              updateColumnPermissionMutation.isPending
+                            }
+                            onChange={(e) =>
+                              updateColumnAccess(
+                                column,
+                                'DEPARTMENT_HEAD',
+                                e.target.value as '1' | '12',
+                              )
+                            }
+                          >
+                            <option value="1">Read Only</option>
+                            <option value="12">Read + Write</option>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-slate-600">User</span>
+                          <PermissionToggle
+                            checked={column.enableUser === true}
+                            disabled={
+                              selectedRoute.enableUser !== true ||
+                              updateColumnStatusMutation.isPending
+                            }
+                            label={`Enable ${column.columnName} for user`}
+                            onChange={(enabled) =>
+                              updateColumnEnabled(column, 'DEPARTMENT_USER', enabled)
+                            }
+                          />
+                          <Select
+                            className="department-permission-select text-xs py-1 px-1.5"
+                            value={getAccessValue(column.roleBPermission)}
+                            disabled={
+                              selectedRoute.enableUser !== true ||
+                              column.enableUser !== true ||
+                              updateColumnPermissionMutation.isPending
+                            }
+                            onChange={(e) =>
+                              updateColumnAccess(
+                                column,
+                                'DEPARTMENT_USER',
+                                e.target.value as '1' | '12',
+                              )
+                            }
+                          >
+                            <option value="1">Read Only</option>
+                            <option value="12">Read + Write</option>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="dept-route-btn-action"
+                            title={`Edit ${column.columnName}`}
+                            onClick={() => setEditingColumn(column)}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="dept-route-btn-action is-delete"
+                            title={`Delete ${column.columnName}`}
+                            onClick={() => {
+                              setDeleteColumnError('')
+                              setDeletingColumn(column)
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <div className="dept-columns-empty-text">
+              Select a route on the left to see and manage its columns.
+            </div>
+          )}
+        </div>
+      </div>
 
       <CreateRouteModal
         key={`route-${departmentType}`}

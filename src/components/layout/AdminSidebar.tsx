@@ -100,7 +100,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     to: '/admin/timelines',
-    label: 'Service Flow',
+    label: 'Services & SOP',
     icon: Workflow,
     roles: ['ADMIN'],
     isActive: (pathname) =>

@@ -3069,3 +3069,11 @@ button.profile-chip--clickable:focus-visible {
 .action-group button {
   flex-shrink: 0;
 }
+
+
+/* Global search input focus reset */
+input[type="search"]:focus,
+input[type="search"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}

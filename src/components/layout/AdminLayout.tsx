@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { ProfileChip } from '../common/ProfileChip'
@@ -17,8 +16,6 @@ interface AdminLayoutProps {
 export function AdminLayout({
   children,
 }: AdminLayoutProps) {
-  const location = useLocation()
-
   const [sidebarOpen, setSidebarOpen] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -26,12 +23,7 @@ export function AdminLayout({
   )
   const { items, markAllRead } = useSuperAdminNotifications()
 
-  useEffect(() => {
-    if (window.innerWidth <= 900) {
-      setSidebarOpen(false)
-    }
-  }, [location.pathname])
-
+  // Only close on Escape key or explicit user action (button click / backdrop)
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') setSidebarOpen(false)
@@ -53,7 +45,6 @@ export function AdminLayout({
         }`}
       >
         <AdminSidebar
-          onNavigate={() => setSidebarOpen(false)}
           onClose={() => setSidebarOpen(false)}
         />
 
