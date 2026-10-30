@@ -1,13 +1,34 @@
+
 import { useState, useRef, useEffect } from 'react'
-import { Icon } from '../shared/Icon'
+
+import {
+  LayoutDashboard,
+  UsersRound,
+  UserRoundCheck,
+  BriefcaseBusiness,
+  History,
+  Workflow,
+  ChartNoAxesColumnIncreasing,
+  Clock3,
+  ChartColumnIncreasing,
+  CircleHelp,
+  Menu,
+  X,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react'
+
 import { Avatar } from '../shared/Avatar'
 import { SegmentedControl } from '../shared/SegmentedControl'
 import { ProfileMenu } from '../../common/ProfileMenu'
+
 import type {
   HeadAccount,
   HeadNavItem,
   HeadRole,
 } from '../../../features/departments/head/types/head.types'
+
+import './HeadSidebar.css'
 
 interface HeadSidebarProps {
   open: boolean
@@ -17,7 +38,6 @@ interface HeadSidebarProps {
   isLoading?: boolean
   loadError?: string
   onRetry?: () => void
-  /** Second group shown under a "Customer-facing" heading (user role). */
   secondaryItems?: HeadNavItem[]
   activeKey: string
   onSelect: (item: HeadNavItem) => void
@@ -27,13 +47,30 @@ interface HeadSidebarProps {
   onLogout: () => void
 }
 
-/**
- * Collapsible white sidebar: brand, nav, account card
- * with Head/User switch and logout. Clicking the
- * account row expands the SMSF-style profile
- * settings menu (Profile Update, My Airtel Calls,
- * Manage Services, Salary Management).
+/*
+ * Map dynamic menu labels to Lucide icons.
+ * Existing HeadNavItem data and navigation keys
+ * remain unchanged.
  */
+const MENU_ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  'department user': UsersRound,
+  'customer list': UserRoundCheck,
+  'billing list': BriefcaseBusiness,
+  history: History,
+  'service flow': Workflow,
+  'member performance': ChartNoAxesColumnIncreasing,
+  attendance: Clock3,
+  analytics: ChartColumnIncreasing,
+  'help & support': CircleHelp,
+}
+
+function getMenuIcon(item: HeadNavItem): LucideIcon {
+  const normalizedLabel = item.label.toLowerCase().trim()
+
+  return MENU_ICONS[normalizedLabel] ?? CircleHelp
+}
+
 export function HeadSidebar({
   open,
   onToggle,
@@ -55,106 +92,160 @@ export function HeadSidebar({
 
   useEffect(() => {
     if (!panelOpen) return
+
     function handleClickOutside(event: MouseEvent) {
-      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+      if (
+        accountRef.current &&
+        !accountRef.current.contains(event.target as Node)
+      ) {
         setPanelOpen(false)
       }
     }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setPanelOpen(false)
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [panelOpen])
 
+  function handleSelect(item: HeadNavItem) {
+    setPanelOpen(false)
+    onSelect(item)
+  }
+
   function renderItem(item: HeadNavItem) {
-    const on = item.key === activeKey
+    const active = item.key === activeKey
+    const NavIcon = getMenuIcon(item)
 
     return (
       <button
         key={item.key}
         type="button"
-        className={`hnav__item${on ? ' is-on' : ''}`}
-        aria-current={on ? 'page' : undefined}
+        className={`hnav__item${active ? ' is-on' : ''}`}
+        aria-current={active ? 'page' : undefined}
         title={item.label}
-        onClick={() => onSelect(item)}
+        onClick={() => handleSelect(item)}
       >
-        <span className="hnav__bar" />
-        <Icon name={item.icon} />
-        {open ? <span className="hnav__label">{item.label}</span> : null}
+        <NavIcon
+          className="hnav__icon"
+          size={19}
+          strokeWidth={1.9}
+          aria-hidden="true"
+        />
+
+        <span className="hnav__label" aria-hidden={!open}>
+          {item.label}
+        </span>
       </button>
     )
   }
 
   return (
-    <>
-    <aside className={`hside${open ? '' : ' is-collapsed'}`}>
+    <aside
+      className={`hside head-sidebar-v2${
+        open ? '' : ' is-collapsed'
+      }`}
+      aria-label="Department navigation"
+    >
+      {/* Brand Header */}
       <div className="hbrand">
-        {open ? (
-          <>
-            <img className="hbrand__mark" src="/mbg-card-logo.svg" alt="MBG Card" />
+        <img
+          className="hbrand__mark"
+          src="/mbg-card-logo.svg"
+          alt="MBG Card"
+          aria-hidden={!open}
+        />
 
-            <div className="hbrand__text">
-              <strong>MBG Card</strong>
-              <span>{roleLabel}</span>
-            </div>
-          </>
-        ) : null}
+        <div className="hbrand__text" aria-hidden={!open}>
+          <strong>MBG Card</strong>
+          <span>{roleLabel}</span>
+        </div>
 
         <button
           type="button"
           className="hbrand__toggle"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
-          onClick={onToggle}
+          aria-label={open ? 'Close sidebar' : 'Open sidebar'}
+          title={open ? 'Close sidebar' : 'Open sidebar'}
+          aria-expanded={open}
+          onClick={() => {
+            setPanelOpen(false)
+            onToggle()
+          }}
         >
-          <Icon name="menu" />
+          {open ? <X size={19} /> : <Menu size={19} />}
         </button>
       </div>
 
-      <nav className="hnav" aria-label="Main" aria-busy={isLoading}>
+      {/* Main Navigation */}
+      <nav
+        className="hnav"
+        aria-label="Main navigation"
+        aria-busy={isLoading}
+      >
+        <p className="hnav__heading" aria-hidden={!open}>
+          MAIN MENU
+        </p>
+
         {isLoading ? (
-          <div className="hnav__skeletons" role="status" aria-label="Loading navigation">
+          <div
+            className="hnav__skeletons"
+            role="status"
+            aria-label="Loading navigation"
+          >
             {Array.from({ length: 9 }, (_, index) => (
-              <div className="hnav__skeleton" key={index}>
+              <div
+                className="hnav__skeleton"
+                key={index}
+              >
                 <span className="hnav__skeleton-icon" />
-                {open ? <span className="hnav__skeleton-label" /> : null}
+                <span className="hnav__skeleton-label" />
               </div>
             ))}
           </div>
         ) : loadError ? (
           <div className="hnav__error" role="alert">
             <span>Unable to load menu</span>
-            {onRetry ? (
+
+            {onRetry && (
               <button type="button" onClick={onRetry}>
                 Try again
               </button>
-            ) : null}
+            )}
           </div>
         ) : (
           <>
             {items.map(renderItem)}
 
-            {secondaryItems.length > 0 ? (
+            {secondaryItems.length > 0 && (
               <>
-                {open ? (
-                  <div className="hnav__group">Customer-facing</div>
-                ) : null}
+                <div className="hnav__group" aria-hidden={!open}>
+                  Customer-facing
+                </div>
+
                 {secondaryItems.map(renderItem)}
               </>
-            ) : null}
+            )}
           </>
         )}
       </nav>
 
-      {open ? (
-        <div ref={accountRef} className="haccount" style={{ position: "relative" }}>
+      {/* Profile Footer */}
+      <div
+        ref={accountRef}
+        className="haccount"
+        aria-hidden={!open}
+        inert={!open}
+        style={{ position: 'relative' }}
+      >
           <button
             type="button"
             className="haccount__row haccount__row--clickable"
@@ -170,19 +261,26 @@ export function HeadSidebar({
             />
 
             <span className="haccount__text">
-              <span className="haccount__name">{account.label}</span>
-              <span className="haccount__role">{account.roleLabel}</span>
+              <span className="haccount__name">
+                {account.label}
+              </span>
+
+              <span className="haccount__role">
+                {account.roleLabel}
+              </span>
             </span>
 
             <span
-              className={`haccount__chevron${panelOpen ? ' is-open' : ''}`}
+              className={`haccount__chevron${
+                panelOpen ? ' is-open' : ''
+              }`}
               aria-hidden="true"
             >
               ›
             </span>
           </button>
 
-          {panelOpen ? (
+          {open && panelOpen && (
             <div
               className="sidebar-profile-menu-popover"
               style={{
@@ -191,7 +289,7 @@ export function HeadSidebar({
                 left: 0,
                 right: 0,
                 zIndex: 100,
-                maxHeight: 'calc(100vh - 160px)',
+                maxHeight: 'calc(100dvh - 160px)',
                 overflowY: 'auto',
               }}
             >
@@ -199,9 +297,9 @@ export function HeadSidebar({
                 onNavigate={() => setPanelOpen(false)}
               />
             </div>
-          ) : null}
+          )}
 
-          {role && onRoleChange ? (
+          {role && onRoleChange && (
             <SegmentedControl
               fill
               size="sm"
@@ -214,19 +312,17 @@ export function HeadSidebar({
                 { value: 'USER', label: 'User' },
               ]}
             />
-          ) : null}
+          )}
 
           <button
             type="button"
             className="haccount__logout"
             onClick={onLogout}
           >
-            <Icon name="logout" size={16} />
-            Log out
+            <LogOut size={16} strokeWidth={1.9} />
+            <span>Log out</span>
           </button>
-        </div>
-      ) : null}
+      </div>
     </aside>
-    </>
   )
 }
