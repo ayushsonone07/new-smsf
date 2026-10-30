@@ -531,6 +531,10 @@
   pointer-events: none;
 }
 
+.head-sidebar-v2:not(.is-collapsed) .haccount {
+  overflow: visible;
+}
+
 .head-sidebar-v2 .haccount__row {
   display: flex;
   align-items: center;

@@ -1072,7 +1072,22 @@ function CustomerRow({
   ])
 
   return (
-    <motion.tr className="cl-row" variants={rowVariants}>
+    <motion.tr
+      className="cl-row"
+      variants={rowVariants}
+      tabIndex={0}
+      aria-label={`Open details for ${customer.businessName}`}
+      onClick={(event) => {
+        const target = event.target as HTMLElement
+        if (target.closest('button, a, input, select, textarea, [role="button"]')) return
+        onOpenDetail()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onOpenDetail()
+      }}
+    >
 
       {/* # */}
       <td className="cl-td cl-td--num" data-label="#">{customer.rowIndex}</td>
