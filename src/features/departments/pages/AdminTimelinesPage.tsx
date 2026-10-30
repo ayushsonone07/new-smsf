@@ -1,28 +1,53 @@
 import { useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  RotateCw,
+  Bell,
+  Search,
+  Plus,
+  Clock,
+} from 'lucide-react'
 import {
   fetchAdminServiceFlows,
   updateAdminServiceTimeline,
   getAdminServices,
   fetchPendingTimelineRequests,
+  type AdminServiceFlowItem,
 } from '../../../api/admin-services.api'
-import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
-import { Button } from '../../../components/ui/Button'
-import { Card } from '../../../components/ui/Card'
 import { LoadingState } from '../../../components/ui/LoadingState'
-import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { PendingApprovalsModal } from '../components/PendingApprovalsModal'
+import { AddAdminServiceModal } from '../../../components/departments/AddAdminServiceModal'
+import { FlowBuilderModal } from '../head/components/FlowBuilderModal'
+import type { ServiceFlowItem } from '../../../api/service-flow.api'
+import './AdminTimelinesPage.css'
+
+function formatDeptName(deptType: string): string {
+  if (!deptType) return 'General'
+  const clean = deptType.replace(/_DEPARTMENT$/i, '')
+  if (clean.toUpperCase() === 'SMO') return 'SMO'
+  if (clean.toUpperCase() === 'SEO') return 'SEO'
+  return clean
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
 
 export function AdminTimelinesPage() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [deptFilter, setDeptFilter] = useState('ALL')
   const [serviceSearch, setServiceSearch] = useState('')
   const [customDaysMap, setCustomDaysMap] = useState<Record<string, number>>({})
   const [processingId, setProcessingId] = useState<string | null>(null)
+
+  // Modals
   const [isApprovalsModalOpen, setIsApprovalsModalOpen] = useState(false)
+  const [isAddServiceOpen, setIsAddServiceOpen] = useState(false)
+  const [editingFlow, setEditingFlow] = useState<ServiceFlowItem | null>(null)
+
   const [feedback, setFeedback] = useState<{
     msg: string
     type: 'ok' | 'err'
@@ -31,6 +56,7 @@ export function AdminTimelinesPage() {
   const pendingTimelineQuery = useQuery({
     queryKey: ['pending-timeline-requests'],
     queryFn: fetchPendingTimelineRequests,
+    staleTime: 60_000,
   })
 
   const pendingCount = pendingTimelineQuery.data?.length ?? 0
@@ -38,6 +64,7 @@ export function AdminTimelinesPage() {
   const servicesQuery = useQuery({
     queryKey: ['admin-services'],
     queryFn: getAdminServices,
+    staleTime: 60_000,
   })
 
   const flowsQuery = useQuery({
@@ -46,6 +73,7 @@ export function AdminTimelinesPage() {
       fetchAdminServiceFlows({
         departmentType: deptFilter !== 'ALL' ? deptFilter : undefined,
       }),
+    staleTime: 60_000,
   })
 
   const updateTimelineMutation = useMutation({
@@ -93,325 +121,349 @@ export function AdminTimelinesPage() {
     }
   }
 
-  const isRefreshing = flowsQuery.isFetching && !flowsQuery.isLoading
+  const isRefreshing =
+    (flowsQuery.isFetching && !flowsQuery.isLoading) ||
+    pendingTimelineQuery.isFetching
+
+  const allFlows = flowsQuery.data ?? []
 
   const flowsList = useMemo(() => {
     const q = serviceSearch.trim().toLowerCase()
-    return (flowsQuery.data ?? []).filter((item) => {
+    return allFlows.filter((item) => {
       if (!q) return true
       return (
         item.departmentServiceName?.toLowerCase().includes(q) ||
         item.departmentType?.toLowerCase().includes(q)
       )
     })
-  }, [flowsQuery.data, serviceSearch])
+  }, [allFlows, serviceSearch])
 
   return (
     <PageLayout>
-      <PageHeader
-        breadcrumb={
-          <>
-            <Link to="/admin">Administration</Link>
-            {' / '}
-            <span>Service Flow</span>
-          </>
-        }
-        title="Service Flow Management"
-        description="SuperAdmin direct control: Set or update turnaround timeline (in days) for any department service."
-      />
-
-      <Card>
-        <div
-          style={{
-            backgroundColor: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: '8px',
-            padding: '0.75rem 1rem',
-            fontSize: '0.85rem',
-            color: '#0369a1',
-            marginBottom: '1.25rem',
-            lineHeight: 1.5,
-          }}
-        >
-          <strong>⚡ SuperAdmin Authority:</strong> When you set or update a
-          timeline here, it is applied and marked as <strong>APPROVED</strong>{' '}
-          immediately in the database for that department service. No secondary
-          approval is needed.
-        </div>
-
-        {feedback && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              marginBottom: '1rem',
-              backgroundColor: feedback.type === 'ok' ? '#ecfdf5' : '#fef2f2',
-              color: feedback.type === 'ok' ? '#065f46' : '#991b1b',
-              border: `1px solid ${feedback.type === 'ok' ? '#a7f3d0' : '#fecaca'}`,
-            }}
-          >
-            {feedback.type === 'ok' ? '✓ ' : '✕ '}
-            {feedback.msg}
+      <div className="sop-page-container">
+        {/* 1. Header Bar */}
+        <header className="sop-page-header">
+          <div className="sop-page-title-wrap">
+            <h1 className="sop-page-title">Services &amp; SOP</h1>
+            <span className="sop-page-subtitle">
+              Services, SOP statuses and turnaround times
+            </span>
           </div>
-        )}
 
-        {/* Filter and Search Bar */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.75rem',
-            flexWrap: 'wrap',
-            marginBottom: '1.25rem',
-            alignItems: 'center',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label
-              style={{
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                color: '#334155',
+          <div className="sop-header-actions">
+            {pendingCount > 0 && (
+              <button
+                type="button"
+                className="sop-header-icon-btn"
+                onClick={() => setIsApprovalsModalOpen(true)}
+                title={`${pendingCount} Pending Timeline Approvals`}
+              >
+                <Clock className="w-4 h-4 text-amber-600" />
+                <span className="sop-pending-badge">{pendingCount}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="sop-header-icon-btn"
+              onClick={() => {
+                flowsQuery.refetch()
+                pendingTimelineQuery.refetch()
               }}
+              title="Refresh services"
+              disabled={isRefreshing}
             >
-              Department:
-            </label>
+              <RotateCw className={`w-4 h-4 text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              className="sop-header-icon-btn"
+              onClick={() => navigate({ to: '/admin/notification-history' as any })}
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+        </header>
+
+        {/* 2. Toolbar Row: Tabs, Search & Actions */}
+        <div className="sop-toolbar">
+          <div className="sop-toolbar-left">
+            {/* Service List vs SOP & timeline tabs */}
+            <div className="sop-nav-tabs">
+              <button
+                type="button"
+                className="sop-nav-tab"
+                onClick={() => navigate({ to: '/admin/services' as any })}
+              >
+                Service List
+              </button>
+              <button
+                type="button"
+                className="sop-nav-tab is-active"
+              >
+                SOP &amp; timeline
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="sop-search-wrap">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={serviceSearch}
+                onChange={(e) => setServiceSearch(e.target.value)}
+                placeholder="Search services"
+                className="sop-search-input"
+              />
+            </div>
+          </div>
+
+          <div className="sop-toolbar-right">
+            {/* Department Filter Dropdown */}
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              style={{
-                padding: '0.5rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.875rem',
-                background: '#fff',
-              }}
+              className="sop-dept-select"
             >
-              <option value="ALL">All Departments</option>
+              <option value="ALL">All departments</option>
               {availableDepartmentTypes.map((dt) => (
                 <option key={dt} value={dt}>
-                  {dt}
+                  {formatDeptName(dt)}
                 </option>
               ))}
             </select>
+
+            {/* + Add Service Button */}
+            <button
+              type="button"
+              className="sop-add-service-btn"
+              onClick={() => setIsAddServiceOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Service</span>
+            </button>
           </div>
-
-          <input
-            type="search"
-            value={serviceSearch}
-            onChange={(e) => setServiceSearch(e.target.value)}
-            placeholder="Search services by name..."
-            style={{
-              flex: '1 1 200px',
-              maxWidth: '340px',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.875rem',
-            }}
-          />
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setIsApprovalsModalOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 0.85rem',
-              fontSize: '0.875rem',
-            }}
-          >
-            <span>📋 Pending Approvals</span>
-            {pendingCount > 0 && (
-              <span
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: '#ffffff',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  lineHeight: '1.2',
-                }}
-              >
-                {pendingCount}
-              </span>
-            )}
-          </Button>
-
-          <RefreshButton
-            onRefresh={() =>
-              Promise.all([
-                flowsQuery.refetch(),
-                pendingTimelineQuery.refetch(),
-              ])
-            }
-            isRefreshing={
-              flowsQuery.isFetching || pendingTimelineQuery.isFetching
-            }
-            label="service timelines"
-          />
         </div>
 
-        {flowsQuery.isLoading ? (
-          <LoadingState message="Loading department services and timelines..." />
-        ) : flowsQuery.isError ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
-            Failed to load services: {(flowsQuery.error as Error)?.message}
-          </div>
-        ) : flowsList.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-            No department services found matching your criteria.
-          </div>
-        ) : (
-          <div
-            className={`table-wrapper transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
-            aria-busy={isRefreshing}
-          >
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Service Name</th>
-                  <th>Department</th>
-                  <th>Current Timeline</th>
-                  <th>Status</th>
-                  <th style={{ width: '130px' }}>New TAT (Days)</th>
-                  <th className="align-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {flowsList.map((flow) => {
-                  const timeline = flow.serviceTimeline?.timeline
-                  const currentDays = timeline?.time ?? 0
-                  const status = timeline?.updation?.status
-                  const inputVal =
-                    customDaysMap[flow.departmentServiceId] ??
-                    (currentDays > 0 ? currentDays : 3)
-                  const isBusy = processingId === flow.departmentServiceId
+        {/* 3. Pale Yellow Authority Banner */}
+        <div className="sop-authority-banner">
+          <span>⚡</span>
+          <span>
+            <strong>Super Admin authority:</strong> timelines you set here are approved immediately — no second approval needed.
+          </span>
+        </div>
 
-                  return (
-                    <tr key={flow.departmentServiceId}>
-                      <td>
-                        <strong>{flow.departmentServiceName}</strong>
-                      </td>
-                      <td>
-                        <span className="dept-type-badge">
-                          {flow.departmentType}
-                        </span>
-                      </td>
-                      <td>
-                        {currentDays > 0 ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              fontWeight: 600,
-                              fontSize: '0.8125rem',
-                            }}
-                          >
-                            ⏱ {currentDays} {currentDays === 1 ? 'Day' : 'Days'}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>
-                            — Not set
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {status ? (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              backgroundColor:
-                                status === 'APPROVED'
-                                  ? '#dcfce7'
-                                  : status === 'PENDING'
-                                    ? '#fef3c7'
-                                    : '#fee2e2',
-                              color:
-                                status === 'APPROVED'
-                                  ? '#15803d'
-                                  : status === 'PENDING'
-                                    ? '#b45309'
-                                    : '#b91c1c',
-                            }}
-                          >
-                            {status}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94a3b8' }}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min="1"
-                          max="365"
-                          value={inputVal}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10)
-                            setCustomDaysMap((prev) => ({
-                              ...prev,
-                              [flow.departmentServiceId]: isNaN(val) ? 0 : val,
-                            }))
-                          }}
-                          style={{
-                            width: '85px',
-                            padding: '0.35rem 0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.875rem',
-                            textAlign: 'center',
-                          }}
-                        />
-                      </td>
-                      <td className="align-right">
-                        <Button
-                          type="button"
-                          disabled={isBusy || inputVal < 1}
-                          onClick={() =>
-                            handleSetTimeline(
-                              flow.departmentServiceId,
-                              inputVal,
-                              flow.departmentServiceName,
-                            )
-                          }
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            fontSize: '0.8125rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {isBusy ? 'Saving...' : '⚡ Set Timeline'}
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        {/* Toast Feedback */}
+        {feedback && (
+          <div className={`sop-feedback-alert ${feedback.type === 'ok' ? 'is-ok' : 'is-err'}`}>
+            <span>{feedback.type === 'ok' ? '✓' : '✕'}</span>
+            <span>{feedback.msg}</span>
           </div>
         )}
-      </Card>
 
-      <PendingApprovalsModal
-        open={isApprovalsModalOpen}
-        onClose={() => setIsApprovalsModalOpen(false)}
-      />
+        {/* 4. Main White Card */}
+        <div className="sop-main-card">
+          <div className="sop-card-header">
+            <h2 className="sop-card-title">SOP &amp; turnaround time</h2>
+            <span className="sop-count-pill">
+              {flowsList.length} of {allFlows.length}
+            </span>
+          </div>
+
+          {flowsQuery.isLoading ? (
+            <LoadingState message="Loading department services and SOP timelines..." />
+          ) : flowsQuery.isError ? (
+            <div className="sop-empty-state text-red-500">
+              Failed to load services: {(flowsQuery.error as Error)?.message}
+            </div>
+          ) : flowsList.length === 0 ? (
+            <div className="sop-empty-state">
+              No services found matching your criteria.
+            </div>
+          ) : (
+            <div
+              className={`sop-table-wrap transition-opacity duration-200 ${
+                isRefreshing ? 'pointer-events-none opacity-60' : ''
+              }`}
+              aria-busy={isRefreshing}
+            >
+              <table className="sop-table">
+                <thead>
+                  <tr>
+                    <th className="sop-th-service">SERVICE</th>
+                    <th className="sop-th-dept">DEPARTMENT</th>
+                    <th className="sop-th-statuses">SOP STATUSES</th>
+                    <th className="sop-th-tat">CURRENT TAT</th>
+                    <th className="sop-th-settat">SET TAT (DAYS)</th>
+                    <th className="sop-th-action" aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {flowsList.map((flow) => {
+                    const timeline = flow.serviceTimeline?.timeline
+                    const currentDays = timeline?.time ?? 0
+                    const status = timeline?.updation?.status
+                    const isApproved = status === 'APPROVED' || currentDays > 0
+
+                    const inputVal =
+                      customDaysMap[flow.departmentServiceId] ??
+                      (currentDays > 0 ? currentDays : 3)
+                    const isBusy = processingId === flow.departmentServiceId
+
+                    // Extract SOP flow step names in order
+                    const stepEntries = Object.entries(flow.serviceFlow ?? {})
+                      .sort((a, b) => (a[1]?.order ?? 0) - (b[1]?.order ?? 0))
+                      .map(([name]) => name)
+
+                    const visibleSteps = stepEntries.slice(0, 3)
+                    const extraCount = stepEntries.length - visibleSteps.length
+
+                    const handleOpenFlowModal = () => {
+                      const asItem: ServiceFlowItem = {
+                        departmentServiceId: flow.departmentServiceId,
+                        departmentServiceName: flow.departmentServiceName,
+                        departmentType: flow.departmentType,
+                        serviceFlow: (flow.serviceFlow ?? {}) as any,
+                        serviceTimeline: flow.serviceTimeline as any,
+                      }
+                      setEditingFlow(asItem)
+                    }
+
+                    return (
+                      <tr key={flow.departmentServiceId} className="sop-row">
+                        {/* 1. Service Name */}
+                        <td>
+                          <span className="sop-service-name">
+                            {flow.departmentServiceName}
+                          </span>
+                        </td>
+
+                        {/* 2. Department */}
+                        <td>
+                          <span className="sop-dept-name">
+                            {formatDeptName(flow.departmentType)}
+                          </span>
+                        </td>
+
+                        {/* 3. SOP Statuses Pills */}
+                        <td>
+                          <div className="sop-statuses-wrap">
+                            {visibleSteps.length > 0 ? (
+                              <>
+                                {visibleSteps.map((step) => (
+                                  <span key={step} className="sop-status-pill">
+                                    {step}
+                                  </span>
+                                ))}
+                                <button
+                                  type="button"
+                                  className="sop-status-edit-btn"
+                                  onClick={handleOpenFlowModal}
+                                >
+                                  {extraCount > 0 ? `+${extraCount} Edit` : 'Edit'}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className="sop-status-edit-btn"
+                                onClick={handleOpenFlowModal}
+                              >
+                                + Add SOP
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. Current TAT */}
+                        <td>
+                          {currentDays > 0 ? (
+                            <span className="sop-tat-badge-approved">
+                              {currentDays} {currentDays === 1 ? 'day' : 'days'}
+                              {isApproved ? ' · Approved' : ''}
+                            </span>
+                          ) : (
+                            <span className="sop-tat-not-set">Not set</span>
+                          )}
+                        </td>
+
+                        {/* 5. Set TAT (Days) Input */}
+                        <td className="text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            value={inputVal}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10)
+                              setCustomDaysMap((prev) => ({
+                                ...prev,
+                                [flow.departmentServiceId]: isNaN(val) ? 0 : val,
+                              }))
+                            }}
+                            className="sop-days-input"
+                          />
+                        </td>
+
+                        {/* 6. Action: Set Button */}
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            className="sop-set-btn"
+                            disabled={isBusy || inputVal < 1}
+                            onClick={() =>
+                              handleSetTimeline(
+                                flow.departmentServiceId,
+                                inputVal,
+                                flow.departmentServiceName,
+                              )
+                            }
+                          >
+                            {isBusy ? 'Saving...' : 'Set'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Modal 1: Flow Builder (SOP steps edit) */}
+        {editingFlow && (
+          <FlowBuilderModal
+            isOpen={Boolean(editingFlow)}
+            onClose={() => setEditingFlow(null)}
+            flow={editingFlow}
+            departmentType={editingFlow.departmentType}
+            onSuccess={() => {
+              flowsQuery.refetch()
+              setEditingFlow(null)
+            }}
+          />
+        )}
+
+        {/* Modal 2: Add Service */}
+        <AddAdminServiceModal
+          open={isAddServiceOpen}
+          onClose={() => setIsAddServiceOpen(false)}
+          onCreated={() => {
+            setIsAddServiceOpen(false)
+            flowsQuery.refetch()
+            servicesQuery.refetch()
+          }}
+        />
+
+        {/* Modal 3: Pending Approvals */}
+        <PendingApprovalsModal
+          open={isApprovalsModalOpen}
+          onClose={() => setIsApprovalsModalOpen(false)}
+        />
+      </div>
     </PageLayout>
   )
 }
-
