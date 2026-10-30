@@ -1,0 +1,461 @@
+
+/* Admin Sidebar — Reference Image Style */
+
+.admin-sidebar-v2 {
+  width: 354px;
+  max-width: 100%;
+  min-height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+  border-right: 1px solid #edf0f5;
+
+  padding: 20px 8px 14px 16px;
+  overflow: hidden;
+}
+
+/* Brand section */
+
+.admin-sidebar-v2 .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Navigation */
+
+.admin-sidebar-v2 .navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding: 0;
+  margin: 0;
+  scrollbar-width: thin;
+}
+
+/* Each navigation item */
+
+.admin-sidebar-v2 .nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 18px;
+
+  width: 100%;
+  min-height: 57px;
+  box-sizing: border-box;
+
+  padding: 0 15px;
+  margin: 0;
+
+  border: none;
+  border-radius: 16px;
+
+  background: transparent;
+  color: #34445f;
+  text-decoration: none;
+
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  cursor: pointer;
+
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+/* Icons */
+
+.admin-sidebar-v2 .nav-item-icon {
+  flex-shrink: 0;
+  width: 25px;
+  height: 25px;
+  color: currentColor;
+}
+
+/* Label */
+
+.admin-sidebar-v2 .nav-item-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Hover state */
+
+.admin-sidebar-v2 .nav-item:not(.active):hover {
+  background: #f3f6fc;
+  color: #2450b5;
+}
+
+/* Active item */
+
+.admin-sidebar-v2 .nav-item.active {
+  background: #e9eeff;
+  color: #2450b5;
+  font-weight: 600;
+}
+
+/* Remove any old pseudo-element active indicators */
+
+.admin-sidebar-v2 .nav-item::before,
+.admin-sidebar-v2 .nav-item::after {
+  content: none;
+}
+
+.admin-sidebar-v2 .nav-item.active::before,
+.admin-sidebar-v2 .nav-item.active::after {
+  content: none;
+}
+
+/* Yellow notification badge */
+
+.admin-sidebar-v2 .nav-item-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  min-width: 32px;
+  height: 25px;
+  padding: 0 8px;
+
+  box-sizing: border-box;
+  border-radius: 999px;
+
+  background: #ffc52e;
+  color: #14213a;
+
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Keyboard accessibility */
+
+.admin-sidebar-v2 .nav-item:focus-visible {
+  outline: 2px solid #2450b5;
+  outline-offset: -2px;
+}
+
+/* Footer */
+
+.admin-sidebar-v2 .sidebar-footer-container {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* Smaller screens */
+
+@media (max-width: 768px) {
+  .admin-sidebar-v2 {
+    width: min(354px, 100vw);
+  }
+
+  .admin-sidebar-v2 .nav-item {
+    font-size: 16px;
+    min-height: 55px;
+  }
+}
+
+
+
+/* Compact Admin Sidebar */
+
+.admin-sidebar-v2 {
+  width: 270px;
+  max-width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  padding: 12px 10px;
+  box-sizing: border-box;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #edf0f5;
+}
+
+/* Brand */
+.admin-sidebar-v2 .brand {
+  gap: 9px;
+  margin-bottom: 16px;
+  padding: 4px 2px;
+}
+
+.admin-sidebar-v2 .brand-mark {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.admin-sidebar-v2 .brand strong {
+  font-size: 15px;
+}
+
+.admin-sidebar-v2 .brand span {
+  font-size: 10px;
+}
+
+/* Navigation container */
+.admin-sidebar-v2 .navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Smaller menu items */
+.admin-sidebar-v2 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+
+  padding: 0 12px;
+  margin: 0;
+  box-sizing: border-box;
+
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+
+  color: #34445f;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Smaller icons */
+.admin-sidebar-v2 .nav-item-icon {
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  flex-shrink: 0;
+  stroke-width: 1.9;
+}
+
+/* Labels */
+.admin-sidebar-v2 .nav-item-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Active state */
+.admin-sidebar-v2 .nav-item.active {
+  background: #e9eeff;
+  color: #2450b5;
+  font-weight: 600;
+}
+
+/* Hover state */
+.admin-sidebar-v2 .nav-item:not(.active):hover {
+  background: #f3f6fc;
+  color: #2450b5;
+}
+
+/* Remove older active indicators */
+.admin-sidebar-v2 .nav-item::before,
+.admin-sidebar-v2 .nav-item::after {
+  content: none;
+}
+
+/* Compact yellow badge */
+.admin-sidebar-v2 .nav-item-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+
+  border-radius: 20px;
+  background: #ffc52e;
+  color: #172033;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Compact footer */
+.admin-sidebar-v2 .sidebar-footer-container {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.admin-sidebar-v2 .sidebar-footer {
+  min-height: 54px;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.admin-sidebar-v2 .admin-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.admin-sidebar-v2 .admin-info strong {
+  font-size: 12px;
+}
+
+.admin-sidebar-v2 .admin-info span {
+  font-size: 10px;
+}
+
+/* Keyboard focus */
+.admin-sidebar-v2 .nav-item:focus-visible {
+  outline: 2px solid #2450b5;
+  outline-offset: -2px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .admin-sidebar-v2 {
+    width: 260px;
+  }
+}
+
+
+/* ========================================
+   MOBILE FULL SCREEN ADMIN SIDEBAR
+======================================== */
+
+@media (max-width: 768px) {
+
+  .admin-sidebar-v2 {
+    position: fixed !important;
+
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+
+    width: 100vw !important;
+    max-width: none !important;
+    min-width: 0 !important;
+
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+
+    margin: 0 !important;
+    padding: 16px 20px !important;
+
+    display: flex;
+    flex-direction: column;
+
+    background: #ffffff;
+    border: none;
+    border-radius: 0;
+
+    box-sizing: border-box;
+    overflow: hidden;
+
+    z-index: 9999;
+  }
+
+  /* Brand header */
+  .admin-sidebar-v2 .brand {
+    flex-shrink: 0;
+    margin-bottom: 20px;
+  }
+
+  /* Scrollable navigation */
+  .admin-sidebar-v2 .navigation {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+  }
+
+  /* Compact menu items */
+  .admin-sidebar-v2 .nav-item {
+    width: 100%;
+    min-height: 46px;
+    height: 46px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .admin-sidebar-v2 .nav-item-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Profile footer always at bottom */
+  .admin-sidebar-v2 .sidebar-footer-container {
+    margin-top: auto;
+    flex-shrink: 0;
+    padding-top: 10px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Close button */
+  .admin-sidebar-v2 .sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+
+    margin-left: auto;
+    flex-shrink: 0;
+
+    cursor: pointer;
+  }
+}
+
+/* Remove left-side active border from all sidebar routes */
+
+.admin-sidebar-v2 .nav-item,
+.admin-sidebar-v2 .nav-item.active {
+  border-left: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove yellow active indicator */
+.admin-sidebar-v2 .nav-item::before,
+.admin-sidebar-v2 .nav-item.active::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Keep clean active background */
+.admin-sidebar-v2 .nav-item.active {
+  background: #e9eeff;
+  color: #2450b5;
+  border-radius: 10px;
+  font-weight: 600;
+}
