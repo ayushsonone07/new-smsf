@@ -16,6 +16,7 @@ import { env } from "@config/env";
 import { useAuth, useMyProfile } from "@features/auth";
 import { PageHeader, Card, CardSkeleton, ErrorDisplay, StatusBadge, StaggerContainer, StaggerItem } from "@shared/components/ui";
 import { cn } from "@/lib/utils";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 
 
@@ -170,11 +171,43 @@ function renderTabContent(tab: SettingsTab) {
   }
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+interface SectionQuery {
+  refetch: () => Promise<unknown>;
+  isFetching: boolean;
+  isLoading: boolean;
+}
+
+function SectionCard({
+  title,
+  children,
+  query,
+  refreshLabel,
+}: {
+  title: string;
+  children: React.ReactNode;
+  /** The query behind this section; adds a refresh button that reloads only it. */
+  query?: SectionQuery;
+  refreshLabel?: string;
+}) {
+  const refreshing = Boolean(query && query.isFetching && !query.isLoading);
   return (
     <Card padding="md">
-      <h3 className="mb-4 text-base font-semibold text-card-foreground">{title}</h3>
-      {children}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-card-foreground">{title}</h3>
+        {query ? (
+          <RefreshButton
+            onRefresh={() => query.refetch()}
+            isRefreshing={query.isFetching}
+            label={refreshLabel ?? title.toLowerCase()}
+          />
+        ) : null}
+      </div>
+      <div
+        className={cn("transition-opacity", refreshing && "pointer-events-none opacity-60")}
+        aria-busy={refreshing}
+      >
+        {children}
+      </div>
     </Card>
   );
 }
@@ -201,12 +234,13 @@ function BoolBadge({ value }: { value: boolean }) {
 }
 
 function CompanySection() {
-  const { data, isLoading } = useCompanyProfile();
+  const query = useCompanyProfile();
+  const { data, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   const profile = data ?? (DEMO_ENABLED ? COMPANY_DEMO : null);
   if (!profile) return <ErrorDisplay message="Company profile could not be loaded from the server." />;
   return (
-    <SectionCard title="Company Profile">
+    <SectionCard title="Company Profile" query={query} refreshLabel="company profile">
       <div className="space-y-3">
         <Field label="Company Name" value={profile.companyName} />
         <Field label="Email" value={profile.email} />
@@ -221,12 +255,13 @@ function CompanySection() {
 }
 
 function WorkingHoursSection() {
-  const { data, isLoading } = useWorkingHours();
+  const query = useWorkingHours();
+  const { data, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   const hours = data ?? (DEMO_ENABLED ? HOURS_DEMO : null);
   if (!hours) return <ErrorDisplay message="Working-hours settings could not be loaded from the server." />;
   return (
-    <SectionCard title="Working Hours">
+    <SectionCard title="Working Hours" query={query} refreshLabel="working hours">
       <div className="space-y-3">
         <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
           <span className="w-44 shrink-0 text-sm font-medium text-muted-foreground">Working Days</span>
@@ -270,12 +305,13 @@ function HolidaysSection() {
 }
 
 function NotificationSection() {
-  const { data, isLoading } = useNotifications();
+  const query = useNotifications();
+  const { data, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   const notifications = data ?? (DEMO_ENABLED ? NOTIFICATIONS_DEMO : null);
   if (!notifications) return <ErrorDisplay message="Notification preferences could not be loaded from the server." />;
   return (
-    <SectionCard title="Notification Preferences">
+    <SectionCard title="Notification Preferences" query={query} refreshLabel="notification preferences">
       <div className="space-y-4">
         <div>
           <p className="mb-2 text-sm font-medium text-card-foreground">Channels</p>
@@ -299,11 +335,12 @@ function NotificationSection() {
 
 function ProfileSection() {
   const { user } = useAuth();
-  const { data: profile, isLoading } = useMyProfile();
+  const query = useMyProfile();
+  const { data: profile, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   if (!profile) return <ErrorDisplay message="Profile details could not be loaded from the server." />;
   return (
-    <SectionCard title="Profile">
+    <SectionCard title="Profile" query={query} refreshLabel="profile">
       <div className="space-y-3">
         <Field label="Name" value={profile.name} />
         <Field label="Email" value={profile.email} />
@@ -319,12 +356,13 @@ function ProfileSection() {
 }
 
 function SecuritySection() {
-  const { data, isLoading } = useSecuritySettings();
+  const query = useSecuritySettings();
+  const { data, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   const security = data ?? (DEMO_ENABLED ? SECURITY_DEMO : null);
   if (!security) return <ErrorDisplay message="Security settings could not be loaded from the server." />;
   return (
-    <SectionCard title="Security">
+    <SectionCard title="Security" query={query} refreshLabel="security settings">
       <div className="space-y-3">
         <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
           <span className="w-44 shrink-0 text-sm font-medium text-muted-foreground">Two-Factor Auth</span>
@@ -344,12 +382,13 @@ function SecuritySection() {
 
 
 function LanguageSection() {
-  const { data, isLoading } = useLanguageSettings();
+  const query = useLanguageSettings();
+  const { data, isLoading } = query;
   if (isLoading) return <CardSkeleton count={1} />;
   const language = data ?? (DEMO_ENABLED ? LANGUAGE_DEMO : null);
   if (!language) return <ErrorDisplay message="Language settings could not be loaded from the server." />;
   return (
-    <SectionCard title="Language & Region">
+    <SectionCard title="Language & Region" query={query} refreshLabel="language settings">
       <div className="space-y-3">
         <Field label="Language" value={language.language} />
         <Field label="Timezone" value={language.timezone} />

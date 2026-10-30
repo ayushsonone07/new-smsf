@@ -16,7 +16,8 @@ export function MyPayrollView() {
   const [page, setPage] = useState(1);
   const [details, setDetails] = useState<Payroll | null>(null);
 
-  const { data, isLoading, error, refetch } = usePayrolls({ page, size: 10, sort: "createdAt,desc" });
+  const { data, isLoading, isFetching, error, refetch } = usePayrolls({ page, size: 10, sort: "createdAt,desc" });
+  const payrollsRefreshing = isFetching && !isLoading;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const toast = useToast();
 
@@ -61,12 +62,17 @@ export function MyPayrollView() {
         Payroll records are snapshots — past months never change when your salary structure is updated.
       </div>
 
-      <PayrollTable
-        payrolls={data?.data}
-        loading={isLoading}
-        onDetails={(p) => setDetails(p)}
-        emptyMessage="No payroll records found for your scope yet."
-      />
+      <div
+        className={`transition-opacity ${payrollsRefreshing ? "pointer-events-none opacity-60" : ""}`}
+        aria-busy={payrollsRefreshing}
+      >
+        <PayrollTable
+          payrolls={data?.data}
+          loading={isLoading}
+          onDetails={(p) => setDetails(p)}
+          emptyMessage="No payroll records found for your scope yet."
+        />
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">

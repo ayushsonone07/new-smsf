@@ -13,7 +13,6 @@ import { TeamTargetAchievement } from '../../../../components/head/dashboard/Tea
 import { StatusBreakdown } from '../../../../components/head/dashboard/StatusBreakdown'
 import { MostActiveDay } from '../../../../components/head/dashboard/MostActiveDay'
 import { DelayWhoseSide } from '../../../../components/head/dashboard/DelayWhoseSide'
-import { LinedUpMeetings } from '../../../../components/head/dashboard/LinedUpMeetings'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { ErrorState } from '../../../../components/ui/ErrorState'
 import type { OnboardingSummaryKpis } from '../../types/onboarding-dashboard.types'
@@ -611,7 +610,7 @@ function AutowebsionUserDashboard({ rawDepartment }: { rawDepartment: string }) 
       </motion.div>
 
       {/* Quick Action Navigation Links */}
-      <motion.div variants={sectionVariants} className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity${countsDimClass}`}>
+      <motion.div variants={sectionVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {hasWebsiteAssigned && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/70 rounded-xl p-5 flex items-center justify-between">
             <div className="flex items-center gap-3.5">
@@ -1097,9 +1096,6 @@ function StandardUserDashboard({ rawDepartment }: { rawDepartment: string }) {
         </motion.div>
       )}
 
-      <motion.div variants={sectionVariants}>
-        <LinedUpMeetings />
-      </motion.div>
     </motion.div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { CustomerWelcomeBanner } from './CustomerWelcomeBanner'
 import { UpcomingMeetingBanner } from './UpcomingMeetingBanner'
 import { CustomerServicesSection } from './CustomerServicesSection'
@@ -32,43 +32,40 @@ export function CustomerDashboardView() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isDownloadingBill, setIsDownloadingBill] = useState(false)
+  // Refresh icon: bumping reloadKey re-runs the load below; the current data stays on screen (dimmed).
+  const [reloadKey, setReloadKey] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
-
-  // Shared by the first load and the refresh icon; isActive guards against updates after unmount.
-  const loadData = useCallback(async (isActive: () => boolean = () => true) => {
-    try {
-      const res = await fetchCustomerDashboardData()
-      if (isActive()) {
-        setData(res)
-        setLoadError('')
-      }
-    } catch (err) {
-      console.error('Failed to load customer dashboard data:', err)
-      if (isActive()) {
-        setLoadError(err instanceof Error ? err.message : 'Failed to load dashboard data.')
-      }
-    } finally {
-      if (isActive()) {
-        setIsLoading(false)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     let isMounted = true
-    void loadData(() => isMounted)
+    async function loadData() {
+      try {
+        const res = await fetchCustomerDashboardData()
+        if (isMounted) {
+          setData(res)
+          setLoadError('')
+        }
+      } catch (err) {
+        console.error('Failed to load customer dashboard data:', err)
+        if (isMounted) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load dashboard data.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+          setIsRefreshing(false)
+        }
+      }
+    }
+    loadData()
     return () => {
       isMounted = false
     }
-  }, [loadData])
+  }, [reloadKey])
 
-  async function refreshDashboard() {
+  function refreshDashboard() {
     setIsRefreshing(true)
-    try {
-      await loadData()
-    } finally {
-      setIsRefreshing(false)
-    }
+    setReloadKey((key) => key + 1)
   }
 
   async function handleTicketSubmit(input: CreateTicketInput) {

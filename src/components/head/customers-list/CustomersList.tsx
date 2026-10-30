@@ -1072,7 +1072,22 @@ function CustomerRow({
   ])
 
   return (
-    <motion.tr className="cl-row" variants={rowVariants}>
+    <motion.tr
+      className="cl-row"
+      variants={rowVariants}
+      tabIndex={0}
+      aria-label={`Open details for ${customer.businessName}`}
+      onClick={(event) => {
+        const target = event.target as HTMLElement
+        if (target.closest('button, a, input, select, textarea, [role="button"]')) return
+        onOpenDetail()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onOpenDetail()
+      }}
+    >
 
       {/* # */}
       <td className="cl-td cl-td--num" data-label="#">{customer.rowIndex}</td>
@@ -1323,17 +1338,17 @@ function CustomerRow({
 
               {/* 3. History Button (only shown if history exists) */}
               {(() => {
-                const hasHistory =
-                  deliveryStatusMap?.[customer.id] !== undefined
-                    ? deliveryStatusMap[customer.id]
-                    : Boolean(
-                        customer.rawCustomer?.hasServiceHistory ||
-                        customer.rawCustomer?.delivery?.hasServiceHistory ||
-                        customer.rawCustomer?.deliveryStatus?.hasServiceHistory ||
-                        customer.rawCustomer?.isDelivered ||
-                        customer.rawCustomer?.delivered ||
-                        customer.rawCustomer?.serviceDeliverySent,
-                      )
+                const hasHistory = Boolean(
+                  deliveryStatusMap?.[customer.id] ||
+                  (deliveryCompletionMap?.[customer.id] !== undefined && deliveryCompletionMap[customer.id] !== null) ||
+                  customer.rawCustomer?.hasServiceHistory ||
+                  (customer.rawCustomer?.completionPercentage !== null && customer.rawCustomer?.completionPercentage !== undefined) ||
+                  customer.rawCustomer?.delivery?.hasServiceHistory ||
+                  customer.rawCustomer?.deliveryStatus?.hasServiceHistory ||
+                  customer.rawCustomer?.isDelivered ||
+                  customer.rawCustomer?.delivered ||
+                  customer.rawCustomer?.serviceDeliverySent,
+                )
 
                 if (!hasHistory) return null
 

@@ -1167,6 +1167,8 @@ export function DepartmentUsersPage() {
           target={target}
           summary={reportSummary}
           hint={memberDetailsQuery.isLoading ? 'Loading the last 7 days…' : 'Showing customer activity from the last 7 days'}
+          onRefresh={() => memberDetailsQuery.refetch()}
+          isRefreshing={memberDetailsQuery.isFetching && !memberDetailsQuery.isLoading}
         />
       ) : null}
 

@@ -10,6 +10,8 @@ import {
   StaggerItem,
 } from "@shared/components/ui";
 
+import { RefreshButton } from "@/components/ui/RefreshButton";
+
 import { AttendanceLineChart } from "../components/AttendanceLineChart";
 import { LeaveTrendChart } from "../components/LeaveTrendChart";
 import { RecruitmentFunnelChart } from "../components/RecruitmentFunnelChart";
@@ -18,15 +20,29 @@ import { REPORTS_DEMO_DATA } from "../data/reports.demo";
 import { useReportsData } from "../hooks";
 
 export function ReportsPage() {
-  const { data, isLoading, error } = useReportsData();
+  const reportsQuery = useReportsData();
+  const { data, isLoading, error } = reportsQuery;
   const reportData = data ?? (env.enableDemoData ? REPORTS_DEMO_DATA : undefined);
   const loading = isLoading && !data;
+  const refreshing = reportsQuery.isFetching && !isLoading;
+  const refreshButton = (
+    <RefreshButton
+      onRefresh={() => reportsQuery.refetch()}
+      isRefreshing={reportsQuery.isFetching}
+      label="reports"
+      className="h-10 w-10 rounded-xl"
+    />
+  );
 
   if (!loading && (!reportData || error)) {
     return (
       <StaggerContainer className="space-y-6">
         <StaggerItem>
-          <PageHeader title="Reports & Analytics" description="Key metrics and trends across the organization." />
+          <PageHeader
+            title="Reports & Analytics"
+            description="Key metrics and trends across the organization."
+            actions={refreshButton}
+          />
         </StaggerItem>
         <StaggerItem>
           <ErrorDisplay message="Reports could not be loaded from the server." />
@@ -43,18 +59,25 @@ export function ReportsPage() {
           title="Reports & Analytics"
           description="Key metrics and trends across the organization."
           actions={
-            <button
-              type="button"
-              onClick={() => window.print()}
-              title="Print or save this report"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-card-foreground shadow transition hover:bg-muted"
-            >
-              <Download size={16} /> Export
-            </button>
+            <>
+              {refreshButton}
+              <button
+                type="button"
+                onClick={() => window.print()}
+                title="Print or save this report"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-card-foreground shadow transition hover:bg-muted"
+              >
+                <Download size={16} /> Export
+              </button>
+            </>
           }
         />
       </StaggerItem>
 
+      <div
+        className={`space-y-6 transition-opacity ${refreshing ? "pointer-events-none opacity-60" : ""}`}
+        aria-busy={refreshing}
+      >
       <StaggerItem variant="card">
         <ReportKPICards kpis={reportData.kpis} isLoading={loading} error={null} />
       </StaggerItem>
@@ -105,6 +128,7 @@ export function ReportsPage() {
           )}
         </Card>
       </StaggerItem>
+      </div>
     </StaggerContainer>
   );
 }

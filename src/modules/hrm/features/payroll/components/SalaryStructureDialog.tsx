@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 
 import { useToast } from "@shared/components/feedback";
 import { Dialog } from "@shared/components/ui";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { useSalaryStructure, useSaveSalaryStructure } from "../hooks";
@@ -45,7 +46,11 @@ export function SalaryStructureDialog({
   const [effectiveFrom, setEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const { data: structure, isLoading } = useSalaryStructure(employeeId === "" ? 0 : employeeId);
+  const structureQuery = useSalaryStructure(employeeId === "" ? 0 : employeeId);
+  const { data: structure, isLoading } = structureQuery;
+  // When a refresh returns a changed structure, the effect below re-seeds the form from it;
+  // an unchanged structure keeps the same reference, so unsaved edits are not discarded.
+  const structureRefreshing = structureQuery.isFetching && !isLoading;
   const save = useSaveSalaryStructure();
   const toast = useToast();
 
@@ -122,8 +127,26 @@ export function SalaryStructureDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Salary Structure" size="md">
-      <form onSubmit={handleSubmit} className="space-y-5 p-6">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Salary Structure"
+      size="md"
+      headerActions={
+        employeeId !== "" ? (
+          <RefreshButton
+            onRefresh={() => structureQuery.refetch()}
+            isRefreshing={structureQuery.isFetching}
+            label="salary structure"
+          />
+        ) : undefined
+      }
+    >
+      <form
+        onSubmit={handleSubmit}
+        className={`space-y-5 p-6 transition-opacity ${structureRefreshing ? "pointer-events-none opacity-60" : ""}`}
+        aria-busy={structureRefreshing}
+      >
         <div>
           <label htmlFor="structure-employee" className="mb-1.5 block text-sm font-semibold text-foreground">
             Employee <span className="text-danger">*</span>

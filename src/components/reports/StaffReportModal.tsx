@@ -8,6 +8,7 @@ import { StatTileRow, StatValue } from '../ui/StatTile'
 import type { StatTileProps } from '../ui/StatTile'
 import { ProfileHeader } from '../common/ProfileHeader'
 import { WorkReportTable } from './WorkReportTable'
+import { RefreshButton } from '../ui/RefreshButton'
 import type {
   StaffReportPerson,
   StaffReportSummary,
@@ -32,6 +33,9 @@ interface StaffReportModalProps {
   /** Text shown right of the tabs. */
   hint?: ReactNode
   initialFilter?: WorkReportFilter
+  /** Reloads only this person's work items (the parent's query). */
+  onRefresh?: () => unknown
+  isRefreshing?: boolean
 }
 
 /**
@@ -52,6 +56,8 @@ export function StaffReportModal({
   stats: statsOverride,
   hint = 'Hover a remark to read it in full',
   initialFilter = 'ALL',
+  onRefresh,
+  isRefreshing = false,
 }: StaffReportModalProps) {
   const [filter, setFilter] =
     useState<WorkReportFilter>(initialFilter)
@@ -213,23 +219,31 @@ export function StaffReportModal({
         avatarSrc={person.avatarSrc}
         onClose={onClose}
         actions={
-          person.attendance ? (
-            <Pill
-              tone={
-                person.attendance === 'PRESENT'
-                  ? 'success'
-                  : 'danger'
-              }
-            >
-              {person.attendance === 'PRESENT'
-                ? 'Present'
-                : 'Absent'}
-            </Pill>
-          ) : null
+          <>
+            {onRefresh ? (
+              <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} label="work report" />
+            ) : null}
+            {person.attendance ? (
+              <Pill
+                tone={
+                  person.attendance === 'PRESENT'
+                    ? 'success'
+                    : 'danger'
+                }
+              >
+                {person.attendance === 'PRESENT'
+                  ? 'Present'
+                  : 'Absent'}
+              </Pill>
+            ) : null}
+          </>
         }
       />
 
-      <div className="staff-report-modal__body">
+      <div
+        className={`staff-report-modal__body transition-opacity ${isRefreshing ? 'opacity-60 pointer-events-none' : ''}`}
+        aria-busy={isRefreshing}
+      >
         <StatTileRow items={stats} />
 
         <FilterTabs

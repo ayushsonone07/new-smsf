@@ -110,6 +110,36 @@ export function ProfileMenu({ onNavigate, variant = 'light' }: ProfileMenuProps)
     })
   }
 
+  // Department Performance — ADMIN + HEAD (SMSF reference: /department-performance)
+  if (role === 'ADMIN' || role === 'HEAD') {
+    entries.push({
+      icon: '📊',
+      label: 'Department Performance',
+      description: 'Department performance and completion metrics',
+      to: '/department-performance',
+    })
+  }
+
+  // Service Flows — ADMIN + HEAD
+  if (role === 'ADMIN' || role === 'HEAD') {
+    entries.push({
+      icon: '🔄',
+      label: 'Service Flows',
+      description: 'Defined department workflows and step sequences',
+      to: '/admin/service-flows',
+    })
+  }
+
+  // Plan Management — ADMIN + HEAD
+  if (role === 'ADMIN' || role === 'HEAD') {
+    entries.push({
+      icon: '💳',
+      label: 'Plan Management',
+      description: 'Manage subscription plans, pricing and department tiers',
+      to: '/admin/plans',
+    })
+  }
+
   // Salary Management — everyone except CUSTOMER (SMSF reference)
   entries.push({
     icon: '₹',

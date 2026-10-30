@@ -1,28 +1,32 @@
 import { useMemo } from 'react'
-import { Link } from '@tanstack/react-router'
 import { useDepartments } from '../hooks/useDepartments'
 import { uniqueDepartmentHeads } from '../utils/departmentHeads'
 import { AdminOverview } from '../../../components/departments/AdminOverview'
-import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { ErrorState } from '../../../components/ui/ErrorState'
 import { LoadingState } from '../../../components/ui/LoadingState'
-import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /**
- * SuperAdmin Overview tab (/admin/overview): company-wide service totals and one
- * card per department, from GET /api/auth/admin/summary. Read-only.
+ * SuperAdmin Overview tab (/admin/overview):
+ * Modern company-wide dashboard featuring real-time KPIs, department health,
+ * delay rankings, and department head performance rankings.
  */
 export function AdminOverviewPage() {
   const departmentsQuery = useDepartments()
 
+  // Extract unique department heads
+  const heads = useMemo(
+    () => uniqueDepartmentHeads(departmentsQuery.data ?? []),
+    [departmentsQuery.data],
+  )
+
   // One card per department that has a head (same departments as the Departments list)
   const departmentTypes = useMemo(
     () =>
-      uniqueDepartmentHeads(departmentsQuery.data ?? [])
+      heads
         .map((department) => department.type)
         .filter((type): type is string => Boolean(type) && type !== 'unknown'),
-    [departmentsQuery.data],
+    [heads],
   )
 
   // Refresh keeps the cards on screen; dim them while the refetch runs.
@@ -30,27 +34,8 @@ export function AdminOverviewPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        breadcrumb={
-          <>
-            <Link to="/admin">Administration</Link>
-            {' / '}
-            <span>Overview</span>
-          </>
-        }
-        title="Overview"
-        description="Service totals across all departments."
-        actions={
-          <RefreshButton
-            onRefresh={() => departmentsQuery.refetch()}
-            isRefreshing={departmentsQuery.isFetching}
-            label="departments"
-          />
-        }
-      />
-
       {departmentsQuery.isPending ? (
-        <LoadingState message="Loading departments..." />
+        <LoadingState message="Loading overview..." />
       ) : departmentsQuery.isError ? (
         <ErrorState
           title="Unable to load departments"
@@ -59,10 +44,16 @@ export function AdminOverviewPage() {
         />
       ) : (
         <div
-          className={`transition-opacity ${isRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+          className={`transition-opacity duration-200 ${
+            isRefreshing ? 'pointer-events-none opacity-60' : ''
+          }`}
           aria-busy={isRefreshing}
         >
-          <AdminOverview departmentTypes={departmentTypes} />
+          <AdminOverview
+            departments={departmentsQuery.data ?? []}
+            departmentTypes={departmentTypes}
+            onRefreshAll={() => departmentsQuery.refetch()}
+          />
         </div>
       )}
     </PageLayout>

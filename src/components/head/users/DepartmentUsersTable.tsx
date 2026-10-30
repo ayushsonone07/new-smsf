@@ -478,6 +478,19 @@ function UserRow({
       <motion.tr
         variants={rowVariants}
         className={expanded ? 'is-expanded' : undefined}
+        tabIndex={onToggle ? 0 : undefined}
+        aria-expanded={onToggle ? expanded : undefined}
+        onClick={(event) => {
+          if (!onToggle) return
+          const target = event.target as HTMLElement
+          if (target.closest('button, a, input, select, textarea, [role="button"]')) return
+          onToggle()
+        }}
+        onKeyDown={(event) => {
+          if (!onToggle || (event.key !== 'Enter' && event.key !== ' ')) return
+          event.preventDefault()
+          onToggle()
+        }}
       >
         {onToggle ? (
           <td className="users-table__chevron users-table__expand-column" data-label="Details">

@@ -224,7 +224,10 @@ export default function InterviewsPage() {
         </div>
      
 <div className="mt-5 border-t border-border/70" />
-<div className="pt-5">
+<div
+  className={`pt-5 transition-opacity ${isFetching && !isLoading ? "pointer-events-none opacity-60" : ""}`}
+  aria-busy={isFetching && !isLoading}
+>
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (

@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   Building2,
   Check,
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   Eye,
   EyeOff,
@@ -32,10 +30,11 @@ import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /* ─────────────────────────────────────────────────────────────────
-   Single-page version of the "Register Your Business" form from SMSF
-   (RegisterBusiness.tsx). Exact copy of UI, layout, step-locking,
-   payment verification, GST toggle, package selection, and passkey
-   submission directly to backend.
+   Single-page "Register Your Business" form.
+   UI: step-wizard layout (left stepper rail, one step card at a time,
+   docked features panel, Previous / Continue footer).
+   Logic: unchanged — step-locking, payment verification, GST toggle,
+   package selection, validation and passkey submission.
    ───────────────────────────────────────────────────────────────── */
 
 const INDIAN_CITIES = Object.freeze([
@@ -104,12 +103,26 @@ interface ToastMessage {
   variant: ToastVariant
 }
 
-const SECTIONS: { id: SectionId; label: string; icon: typeof Building2 }[] = [
-  { id: 'business', label: 'Business Details', icon: Building2 },
-  { id: 'packages', label: 'Packages', icon: Package },
-  { id: 'financial', label: 'Financial Info', icon: Wallet },
-  { id: 'final', label: 'Final Details', icon: ClipboardList },
+const SECTIONS: {
+  id: SectionId
+  label: string
+  title: string
+  icon: typeof Building2
+}[] = [
+  { id: 'business', label: 'Business', title: 'Business Details', icon: Building2 },
+  { id: 'packages', label: 'Packages', title: 'Select Packages', icon: Package },
+  { id: 'financial', label: 'Financial', title: 'Financial Information', icon: Wallet },
+  { id: 'final', label: 'Final', title: 'Final Details', icon: ClipboardList },
 ]
+
+/* UI only: steps that move on by themselves a moment after they become complete. */
+const AUTO_ADVANCE: Record<SectionId, boolean> = {
+  business: true,
+  packages: false,
+  financial: true,
+  final: false,
+}
+const AUTO_ADVANCE_DELAY_MS = 1400
 
 const validateEmail = (email: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -227,6 +240,17 @@ function departmentDot(label: string) {
   return DOT_COLORS[hash % DOT_COLORS.length]
 }
 
+/* Keyframes used by the wizard UI (step card, docked panel, completed-step pop). */
+const WIZARD_STYLES = `
+@keyframes rbStepIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes rbPanelIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes rbPop{0%{transform:scale(.5)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.rb-step-in{animation:rbStepIn .35s cubic-bezier(.2,.7,.2,1) both}
+.rb-panel-in{animation:rbPanelIn .3s cubic-bezier(.2,.7,.2,1) both}
+.rb-pop{animation:rbPop .4s}
+@media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
+`
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
 
@@ -268,32 +292,33 @@ export function RegisterBusinessPage() {
 
   const [paymentCheck, setPaymentCheck] = useState<PaymentCheck | null>(null)
 
+  /* Wizard: which step card is currently shown */
+  const [activeStep, setActiveStep] = useState<SectionId>('business')
+
   /* Plan duration filter. null = default 15-months plans if exist. */
   const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
   /* Toggle 18% GST addition on packages */
   const [includeGst, setIncludeGst] = useState(true)
 
-  /* Currently viewed plan's features in side drawer */
-  const [viewingFeaturesPlan, setViewingFeaturesPlan] = useState<{
-    name: string
-    features: string[]
-    departments?: string[]
-    cost?: number
-    isExceedingPayment?: boolean
-  } | null>(null)
+  /* Plan whose features are shown in the docked side panel */
+  const [viewingPlanId, setViewingPlanId] = useState<string | null>(null)
 
-  const featuresDrawerRef = useRef<HTMLDivElement>(null)
-  const featuresListRef = useRef<HTMLDivElement>(null)
+  const featuresPanelRef = useRef<HTMLElement>(null)
 
+  /* Escape closes the panel; on narrow screens (panel is an overlay) clicking outside closes it too. */
   useEffect(() => {
-    if (!viewingFeaturesPlan) return
+    if (!viewingPlanId) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (featuresDrawerRef.current && !featuresDrawerRef.current.contains(e.target as Node)) {
-        setViewingFeaturesPlan(null)
+      if (window.innerWidth > 1100) return
+      if (
+        featuresPanelRef.current &&
+        !featuresPanelRef.current.contains(e.target as Node)
+      ) {
+        setViewingPlanId(null)
       }
     }
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setViewingFeaturesPlan(null)
+      if (e.key === 'Escape') setViewingPlanId(null)
     }
     document.addEventListener('mousedown', handleClickOutside)
     window.addEventListener('keydown', handleKeyDown)
@@ -301,7 +326,7 @@ export function RegisterBusinessPage() {
       document.removeEventListener('mousedown', handleClickOutside)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [viewingFeaturesPlan])
+  }, [viewingPlanId])
 
   // Internal toast notification
   const [toast, setToast] = useState<ToastMessage | null>(null)
@@ -326,20 +351,24 @@ export function RegisterBusinessPage() {
     }
   }, [])
 
-  const businessRef = useRef<HTMLDivElement>(null)
-  const packagesRef = useRef<HTMLDivElement>(null)
-  const financialRef = useRef<HTMLDivElement>(null)
-  const finalRef = useRef<HTMLDivElement>(null)
+  /* ─── Wizard navigation ─── */
+  const skipAutoAdvanceRef = useRef(true)
+  const autoAdvanceArmed = useRef<Record<SectionId, boolean>>({
+    business: true,
+    packages: true,
+    financial: true,
+    final: true,
+  })
+  const autoAdvanceTimer = useRef<number | null>(null)
 
-  const scrollToSection = useCallback((id: SectionId) => {
-    const refs: Record<SectionId, React.RefObject<HTMLDivElement | null>> = {
-      business: businessRef,
-      packages: packagesRef,
-      financial: financialRef,
-      final: finalRef,
-    }
-    refs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const goToStep = useCallback((id: SectionId) => {
+    skipAutoAdvanceRef.current = true
+    setActiveStep(id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  /* Kept under its old name so validation code below reads the same. */
+  const scrollToSection = goToStep
 
   const shouldShowError = (field: string): boolean =>
     touchedFields.has(field) &&
@@ -474,9 +503,16 @@ export function RegisterBusinessPage() {
     setPasskey('')
     setDurationFilter(null)
     setIncludeGst(true)
-    setViewingFeaturesPlan(null)
+    setViewingPlanId(null)
     setPaymentCheck(null)
-  }, [])
+    autoAdvanceArmed.current = {
+      business: true,
+      packages: true,
+      financial: true,
+      final: true,
+    }
+    goToStep('business')
+  }, [goToStep])
 
   /* ─── Payment ID verification. Tied to exact phone + payment ID checked. ─── */
   const paymentPhone = formData.phoneNumber.trim()
@@ -752,7 +788,7 @@ export function RegisterBusinessPage() {
       ? new Date(currentPaymentCheck.paidAt)
       : null
 
-  /* ─── Section completion (drives sticky nav checkmarks & locking) ─── */
+  /* ─── Section completion (drives stepper checkmarks & locking) ─── */
   const businessComplete =
     !!formData.ownerName &&
     !!formData.businessName &&
@@ -794,11 +830,86 @@ export function RegisterBusinessPage() {
     final: finalComplete,
   }
 
+  /* A step opens only once the one before it is complete. */
+  const unlocked: Record<SectionId, boolean> = {
+    business: true,
+    packages: businessComplete,
+    financial: packagesComplete,
+    final: financialComplete,
+  }
+
+  const lockedMessages: Record<SectionId, string> = {
+    business: '',
+    packages: 'Please complete Business Details in Step 1 first.',
+    financial: 'Please verify payment and select your package in Step 2 first.',
+    final: 'Please complete Financial Information in Step 3 first.',
+  }
+
   const completedCount = Object.values(sectionStatus).filter(Boolean).length
   const progressPct = Math.round((completedCount / SECTIONS.length) * 100)
   const selectedCount = formData.selectedPackages?.length || 0
 
-  /* ─── Combined validation — same rules/order/messages as SMSF ─── */
+  const activeIndex = SECTIONS.findIndex((s) => s.id === activeStep)
+  const activeSection = SECTIONS[activeIndex]
+  const isLastStep = activeIndex === SECTIONS.length - 1
+  const activeComplete = sectionStatus[activeStep]
+
+  const handleStepClick = useCallback(
+    (id: SectionId) => {
+      if (!unlocked[id]) {
+        showToast({
+          title: 'Step locked',
+          description: 'Finish the previous step to open this one.',
+          variant: 'default',
+        })
+        return
+      }
+      goToStep(id)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [businessComplete, packagesComplete, financialComplete, goToStep, showToast],
+  )
+
+  /* Auto-advance (UI only): once a step becomes complete and the user has been
+     typing in it, move on after a short pause. Re-arms when the step is incomplete again. */
+  useEffect(() => {
+    if (autoAdvanceTimer.current) {
+      window.clearTimeout(autoAdvanceTimer.current)
+      autoAdvanceTimer.current = null
+    }
+    if (!activeComplete) {
+      autoAdvanceArmed.current[activeStep] = true
+      return
+    }
+    if (
+      !skipAutoAdvanceRef.current &&
+      AUTO_ADVANCE[activeStep] &&
+      !isLastStep &&
+      autoAdvanceArmed.current[activeStep]
+    ) {
+      const nextId = SECTIONS[activeIndex + 1].id
+      autoAdvanceTimer.current = window.setTimeout(() => {
+        autoAdvanceArmed.current[activeStep] = false
+        goToStep(nextId)
+      }, AUTO_ADVANCE_DELAY_MS)
+    }
+    return () => {
+      if (autoAdvanceTimer.current) {
+        window.clearTimeout(autoAdvanceTimer.current)
+        autoAdvanceTimer.current = null
+      }
+    }
+  }, [
+    activeStep,
+    activeIndex,
+    activeComplete,
+    isLastStep,
+    formData,
+    cityInput,
+    goToStep,
+  ])
+
+  /* ─── Combined validation — same rules/order/messages as before ─── */
   const handleFinalSubmit = useCallback(() => {
     // 1. Business details
     const errors = { ...INITIAL_VALIDATION_ERRORS }
@@ -983,7 +1094,8 @@ export function RegisterBusinessPage() {
         description: 'Please enter the payment ID and verify it',
         variant: 'destructive',
       })
-      scrollToSection('financial')
+      // The Payment ID field lives in the Packages step.
+      scrollToSection('packages')
       return
     }
 
@@ -1045,7 +1157,7 @@ export function RegisterBusinessPage() {
         variant: 'destructive',
       })
       setShowPasskeyModal(false)
-      scrollToSection('financial')
+      scrollToSection('packages')
       return
     }
 
@@ -1134,62 +1246,84 @@ export function RegisterBusinessPage() {
   ])
 
   const inputClass = (hasError?: boolean) =>
-    `h-9 w-full rounded-md border bg-white px-3 py-1 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-      hasError ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 hover:border-slate-300'
+    `h-9 w-full rounded-md border bg-white px-3 py-1 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+      hasError
+        ? 'border-red-500 ring-1 ring-red-200 focus:ring-red-200'
+        : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-200'
     }`
 
+  const textareaClass =
+    'w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200'
+
+  /* Footer hint text */
+  const footerHint = isLastStep
+    ? 'By registering, you agree to our Terms of Service and Privacy Policy.'
+    : activeStep === 'packages' && selectedCount > 0
+      ? `${selectedCount} selected · ₹${autoTotal.toLocaleString('en-IN')}${includeGst ? ' incl. GST' : ''}`
+      : activeComplete
+        ? 'All details filled'
+        : 'Fill all required fields to continue'
+
+  /* Plan shown in the docked features panel (derived live so it follows selection / GST changes) */
+  const viewingPlan = viewingPlanId
+    ? (plans.find((p) => p.id === viewingPlanId) ?? null)
+    : null
+  const panelOpen = activeStep === 'packages' && !!viewingPlan
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-sm text-slate-900">
+      <style>{WIZARD_STYLES}</style>
+
       {/* ─── Sticky header: back, title, progress ─── */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (window.history.length > 1) {
-                  window.history.back()
-                } else {
-                  navigate({ to: '/login' as never })
-                }
-              }}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
-              aria-label="Back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back</span>
-            </button>
-            <div className="flex min-w-0 items-center gap-2">
-              <img
-                src="https://www.mbgcard.in/mbg_logo.png"
-                alt="MBG logo"
-                className="h-7 w-7 flex-shrink-0 rounded-lg"
-              />
-              <h1 className="truncate font-bold text-slate-900">
-                Register Your Business
-              </h1>
-            </div>
+        <div className="flex h-14 items-center gap-3 px-3 sm:px-6">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                window.history.back()
+              } else {
+                navigate({ to: '/login' as never })
+              }
+            }}
+            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </button>
+          <div className="flex min-w-0 items-center gap-2">
+            <img
+              src="https://www.mbgcard.in/mbg_logo.png"
+              alt="MBG logo"
+              className="h-7 w-7 flex-shrink-0 rounded-lg"
+            />
+            <h1 className="truncate text-base font-bold text-slate-900">
+              Register Your Business
+            </h1>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <span className="hidden sm:inline-block whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500">
-              {completedCount}/{SECTIONS.length} done
-            </span>
-            <button
-              type="button"
-              onClick={() => { window.location.href = '/hrm/login' }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all hover:bg-blue-700 cursor-pointer"
-            >
-              HRM Login
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate({ to: '/login' as never })}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all hover:bg-blue-700 cursor-pointer"
-            >
-              Login
-            </button>
-          </div>
+          <span className="flex-1" />
+
+          <span className="hidden whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500 sm:inline-block">
+            {completedCount}/{SECTIONS.length} done
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = '/hrm/login'
+            }}
+            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+          >
+            HRM Login
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/login' as never })}
+            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+          >
+            Login
+          </button>
         </div>
         <div className="h-0.5 bg-slate-100">
           <div
@@ -1199,981 +1333,1124 @@ export function RegisterBusinessPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-5 sm:px-6">
-        {/* ═══ 1 — Business Details ═══ */}
-        <Section
-          innerRef={businessRef}
-          index={1}
-          title="Business Details"
-          complete={businessComplete}
-        >
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Client Name" htmlFor="ownerName" required>
-              <input
-                id="ownerName"
-                value={formData.ownerName}
-                onChange={(e) => handleInputChange('ownerName', e.target.value)}
-                placeholder="Enter client name"
-                className={inputClass()}
-              />
-            </Field>
-            <Field label="Business Name" htmlFor="businessName" required>
-              <input
-                id="businessName"
-                value={formData.businessName}
-                onChange={(e) =>
-                  handleInputChange('businessName', e.target.value)
-                }
-                placeholder="Enter business name"
-                className={inputClass()}
-              />
-            </Field>
-            <Field
-              label="Email"
-              htmlFor="email"
-              required
-              error={
-                shouldShowError('email') ? validationErrors.email : ''
-              }
-            >
-              <input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                onBlur={(e) => handleFieldBlur('email', e.target.value)}
-                placeholder="name@company.com"
-                className={inputClass(shouldShowError('email'))}
-              />
-            </Field>
-            <Field
-              label="Phone Number"
-              htmlFor="phoneNumber"
-              required
-              error={
-                shouldShowError('phoneNumber')
-                  ? validationErrors.phoneNumber
-                  : ''
-              }
-            >
-              <input
-                id="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={(e) =>
-                  handleInputChange('phoneNumber', e.target.value)
-                }
-                onBlur={(e) => handleFieldBlur('phoneNumber', e.target.value)}
-                placeholder="10-digit mobile number"
-                className={inputClass(shouldShowError('phoneNumber'))}
-              />
-            </Field>
-            <Field
-              label="City"
-              htmlFor="city"
-              required
-              error={
-                shouldShowError('city')
-                  ? validationErrors.city || 'City field is required'
-                  : ''
-              }
-            >
-              <div className="relative" ref={cityDropdownRef}>
-                <input
-                  id="city"
-                  value={cityInput}
-                  onChange={(e) => handleCityChange(e.target.value)}
-                  onBlur={() => {
-                    setTouchedFields((prev) => new Set(prev).add('city'))
-                    setValidationErrors((prev) => ({
-                      ...prev,
-                      city:
-                        !formData.city || !formData.city.trim()
-                          ? 'City field is required'
-                          : '',
-                    }))
-                  }}
-                  onFocus={() => setShowCityDropdown(!!cityInput)}
-                  placeholder="Search or enter city"
-                  className={inputClass(shouldShowError('city'))}
-                />
-                {showCityDropdown && filteredCities.length > 0 && (
-                  <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-                    {filteredCities.slice(0, 10).map((city) => (
-                      <div
-                        key={city}
-                        onClick={() => handleCitySelect(city)}
-                        className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-blue-50"
-                      >
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                        {city}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Field>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
-                Onboarding City <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {ONBOARDING_CITIES.map((city) => (
-                  <ChoiceCard
-                    key={city}
-                    id={`onboarding-city-${city}`}
-                    value={city}
-                    selected={formData.onboardingCity === city}
-                    label={city}
-                    onSelect={(val) => handleInputChange('onboardingCity', val)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
-                Website Included <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <ChoiceCard
-                  id="website-yes"
-                  value="yes"
-                  selected={formData.websiteRequired === 'yes'}
-                  label="Yes"
-                  onSelect={(val) => handleInputChange('websiteRequired', val)}
-                />
-                <ChoiceCard
-                  id="website-no"
-                  value="no"
-                  selected={formData.websiteRequired === 'no'}
-                  label="No"
-                  onSelect={(val) => handleInputChange('websiteRequired', val)}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
-                Is Webinar Client?
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <ChoiceCard
-                  id="webinar-yes"
-                  value="yes"
-                  selected={formData.isWebinarClient.toLowerCase() === 'yes'}
-                  label="Yes"
-                  onSelect={(val) =>
-                    handleInputChange('isWebinarClient', val.toUpperCase())
-                  }
-                />
-                <ChoiceCard
-                  id="webinar-no"
-                  value="no"
-                  selected={formData.isWebinarClient.toLowerCase() === 'no'}
-                  label="No"
-                  onSelect={(val) =>
-                    handleInputChange('isWebinarClient', val.toUpperCase())
-                  }
-                />
-              </div>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <Field
-                label="Remark (optional)"
-                htmlFor="remark"
-                hint={`${formData.remark.length}/1000`}
-              >
-                <textarea
-                  id="remark"
-                  value={formData.remark}
-                  onChange={(e) => handleInputChange('remark', e.target.value)}
-                  placeholder="Any additional information"
-                  rows={2}
-                  className="w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </Field>
-            </div>
-          </div>
-        </Section>
-
-        {/* ═══ 2 — Select Packages & Verify Payment ═══ */}
-        <Section
-          innerRef={packagesRef}
-          index={2}
-          title="Select Packages"
-          complete={packagesComplete}
-          locked={!businessComplete}
-          lockedMessage="Please complete Business Details in Step 1 first."
-          aside={
-            <span className="flex items-center gap-2">
-              {selectedCount > 0 ? (
-                <span className="text-xs font-semibold text-blue-600">
-                  {selectedCount} selected
-                </span>
-              ) : null}
-              <RefreshButton
-                onRefresh={() =>
-                  Promise.all([plansQuery.refetch(), amountsQuery.refetch()])
-                }
-                isRefreshing={plansQuery.isFetching || amountsQuery.isFetching}
-                label="packages"
-              />
-            </span>
-          }
-        >
-          {/* Note: First verify payment, then select package */}
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200/80 bg-blue-50/90 p-3.5 text-xs text-blue-900 shadow-sm">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
-            <div className="space-y-0.5">
-              <p className="font-bold text-blue-950">
-                Note: Firstly verify payment, then select package
-              </p>
-              <p className="leading-relaxed text-blue-700">
-                Please enter and verify the customer's payment ID first. Once
-                verified, you will be able to select packages within your
-                verified payment amount.
-              </p>
-            </div>
-          </div>
-
-          {/* Payment Verification Box */}
-          <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
-            <Field
-              label="Payment ID"
-              htmlFor="paymentId"
-              required
-              error={paymentError}
-              hint={
-                !canEnterPaymentId
-                  ? 'A valid 10-digit phone number in Step 1 is required to verify payment'
-                  : paymentVerified
-                    ? undefined
-                    : isVerifyingPayment
-                      ? 'Verifying payment with payment gateway…'
-                      : `Enter payment ID (e.g. pay_…) for phone number ${paymentPhone}`
-              }
-            >
-              <div className="flex gap-2">
-                <input
-                  id="paymentId"
-                  value={formData.paymentId}
-                  disabled={!canEnterPaymentId || isVerifyingPayment}
-                  onChange={(e) =>
-                    handleInputChange(
-                      'paymentId',
-                      e.target.value.replace(/\s/g, ''),
-                    )
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void handleVerifyPayment()
-                    }
-                  }}
-                  placeholder={
-                    canEnterPaymentId
-                      ? 'Enter payment ID (e.g. pay_...)'
-                      : 'Enter phone number in Step 1 first'
-                  }
-                  className={`${inputClass(!!paymentError)} flex-1 ${
-                    !canEnterPaymentId ? 'cursor-not-allowed bg-slate-100' : ''
-                  } ${paymentVerified ? 'border-emerald-400 bg-emerald-50/40' : ''}`}
-                />
+      <div className="flex flex-1">
+        {/* ─── Left stepper rail ─── */}
+        <aside className="sticky top-[58px] flex h-[calc(100vh-58px)] w-14 flex-none flex-col items-center border-r border-slate-200 bg-white py-6 sm:w-[76px]">
+          {SECTIONS.map((s, k) => {
+            const done = sectionStatus[s.id]
+            const isActive = activeStep === s.id
+            const isLocked = !unlocked[s.id]
+            const Icon = s.icon
+            return (
+              <div key={s.id} className="flex flex-col items-center">
                 <button
                   type="button"
-                  onClick={() => void handleVerifyPayment()}
-                  disabled={
-                    !canEnterPaymentId ||
-                    !paymentIdInput ||
-                    isVerifyingPayment ||
-                    paymentVerified
-                  }
-                  className={`h-9 shrink-0 rounded-md px-4 text-sm font-semibold transition-colors ${
-                    paymentVerified
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-600 disabled:opacity-100'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  title={s.title}
+                  onClick={() => handleStepClick(s.id)}
+                  aria-current={isActive ? 'step' : undefined}
+                  className={`group flex flex-col items-center gap-1.5 p-0.5 ${
+                    isLocked ? 'cursor-not-allowed' : 'cursor-pointer'
                   }`}
                 >
-                  {paymentVerified ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Check className="h-4 w-4" />
-                      Verified
-                    </span>
-                  ) : isVerifyingPayment ? (
-                    'Verifying…'
-                  ) : (
-                    'Verify Payment'
-                  )}
+                  <span
+                    className={`grid h-9 w-9 place-items-center rounded-full border-2 transition-all duration-200 ${
+                      done
+                        ? `rb-pop border-emerald-500 bg-emerald-500 text-white ${
+                            isActive ? 'shadow-[0_0_0_4px_#d1fae5]' : ''
+                          }`
+                        : isActive
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_#dbeafe]'
+                          : isLocked
+                            ? 'border-slate-200 bg-slate-50 text-slate-300'
+                            : 'border-slate-300 bg-white text-slate-500 group-hover:border-blue-400 group-hover:text-blue-600'
+                    }`}
+                  >
+                    {done ? (
+                      <Check className="h-4 w-4 stroke-[3]" />
+                    ) : isLocked ? (
+                      <Lock className="h-4 w-4" />
+                    ) : (
+                      <Icon className="h-4 w-4" />
+                    )}
+                  </span>
+                  <span
+                    className={`hidden w-16 text-center text-[10px] font-semibold leading-tight sm:block ${
+                      isActive
+                        ? 'text-slate-900'
+                        : isLocked
+                          ? 'text-slate-300'
+                          : 'text-slate-500'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
                 </button>
-              </div>
-              {paymentVerified && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-                  <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
-                  <span>
-                    Payment Verified:{' '}
-                    <strong>
-                      ₹{verifiedPaymentAmount != null && formatVerifiedRupees(verifiedPaymentAmount)}
-                    </strong>{' '}
-                    paid
-                    {paidOn &&
-                      !isNaN(paidOn.getTime()) &&
-                      ` on ${paidOn.toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}`}
-                  </span>
-                </div>
-              )}
-            </Field>
-          </div>
-
-          {!paymentVerified ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center text-sm text-slate-500">
-              <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
-              <p className="font-semibold text-slate-700">
-                Packages are locked
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Please enter and verify the Payment ID above to view and select
-                available packages.
-              </p>
-            </div>
-          ) : isLoadingPlans && plans.length === 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-[76px] animate-pulse rounded-xl border border-slate-200 bg-slate-50"
-                />
-              ))}
-            </div>
-          ) : plans.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 text-slate-400" />
-              No packages available. Please contact administrator.
-            </div>
-          ) : (
-            <div
-              className={`transition-opacity ${plansRefreshing ? 'pointer-events-none opacity-60' : ''}`}
-              aria-busy={plansRefreshing}
-            >
-              {verifiedPaymentAmount != null && (
-                <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
-                    Verified Payment:{' '}
-                    <strong>
-                      ₹{formatVerifiedRupees(verifiedPaymentAmount)}
-                    </strong>
-                    . Only packages within this amount can be selected.
-                  </span>
-                </div>
-              )}
-              {durationOptions.length > 0 && (
-                <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-xs font-medium text-slate-500">
-                    Duration
-                  </span>
-                  {durationOptions.map((months) => (
-                    <FilterChip
-                      key={months}
-                      active={activeDuration === months}
-                      label={monthsLabel(months)}
-                      onClick={() => setDurationFilter(months)}
-                    />
-                  ))}
-                  <FilterChip
-                    active={activeDuration === 'all'}
-                    label="All plans"
-                    onClick={() => setDurationFilter('all')}
+                {k < SECTIONS.length - 1 && (
+                  <span
+                    className={`my-2.5 h-10 w-0.5 rounded-sm transition-colors duration-500 ${
+                      done ? 'bg-emerald-400' : 'bg-slate-200'
+                    }`}
                   />
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {visiblePlans.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center text-sm text-slate-500 sm:col-span-2">
-                    No packages found for{' '}
-                    <span className="font-semibold text-slate-700">
-                      {typeof activeDuration === 'number'
-                        ? monthsLabel(activeDuration)
-                        : 'this selection'}
-                    </span>
-                    .
-                  </div>
+                )}
+              </div>
+            )
+          })}
+        </aside>
+
+        {/* ─── Step card ─── */}
+        <main className="min-w-0 flex-1 p-3 sm:p-6">
+          <div
+            key={activeStep}
+            onInputCapture={() => {
+              skipAutoAdvanceRef.current = false
+            }}
+            onChangeCapture={() => {
+              skipAutoAdvanceRef.current = false
+            }}
+            className="rb-step-in flex min-h-[calc(100vh-106px)] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm"
+          >
+            {/* Card header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+              <span
+                className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
+                  activeComplete ? 'bg-emerald-500' : 'bg-blue-600'
+                }`}
+              >
+                {activeComplete ? (
+                  <Check className="h-3.5 w-3.5 stroke-[3]" />
                 ) : (
-                  visiblePlans.map((pkg) => {
-                  const isSelected = !!formData.selectedPackages?.includes(
-                    pkg.id,
-                  )
-                  const price = priceOf(pkg.name)
-                  const pkgCost = includeGst ? price.withGst : price.amount
-                  const isExceedingPayment =
-                    verifiedPaymentAmount != null &&
-                    pkgCost > verifiedPaymentAmount
-                  const isViewingFeatures = viewingFeaturesPlan?.name === pkg.name
-                  return (
-                    <div
-                      key={pkg.id}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={() => {
-                        // Always open the feature list for review
-                        setViewingFeaturesPlan({
-                          name: pkg.name,
-                          features: price.featureList || [],
-                          departments: pkg.departments || [],
-                          cost: pkgCost,
-                          isExceedingPayment,
-                        })
+                  activeIndex + 1
+                )}
+              </span>
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-slate-900">
+                  {activeSection.title}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Step {activeIndex + 1} of {SECTIONS.length}
+                </p>
+              </div>
+              {activeStep === 'packages' && unlocked.packages && (
+                <span className="ml-auto flex items-center gap-2">
+                  {selectedCount > 0 && (
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
+                      {selectedCount} selected
+                    </span>
+                  )}
+                  <RefreshButton
+                    onRefresh={() =>
+                      Promise.all([
+                        plansQuery.refetch(),
+                        amountsQuery.refetch(),
+                      ])
+                    }
+                    isRefreshing={
+                      plansQuery.isFetching || amountsQuery.isFetching
+                    }
+                    label="packages"
+                  />
+                </span>
+              )}
+            </div>
 
-                        if (isExceedingPayment) {
-                          showToast({
-                            title: 'Reviewing Package Features',
-                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
-                            variant: 'default',
-                          })
-                          return
-                        }
-
-                        handlePackageToggle(pkg.id)
-                      }}
-                      className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
-                        isExceedingPayment
-                          ? 'cursor-not-allowed border-slate-200 bg-slate-100/70 opacity-60'
-                          : isSelected
-                            ? 'cursor-pointer border-blue-500 bg-blue-50/50 ring-1 ring-blue-500'
-                            : isViewingFeatures
-                              ? 'cursor-pointer border-emerald-400 bg-emerald-50/40 ring-1 ring-emerald-400'
-                              : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={isSelected}
-                        disabled={isExceedingPayment}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setViewingFeaturesPlan({
-                            name: pkg.name,
-                            features: price.featureList || [],
-                            departments: pkg.departments || [],
-                            cost: pkgCost,
-                            isExceedingPayment,
-                          })
-                          if (!isExceedingPayment) {
-                            handlePackageToggle(pkg.id)
+            {/* Card body */}
+            <div className="flex-1 p-4 sm:p-6">
+              {!unlocked[activeStep] ? (
+                <LockedNotice message={lockedMessages[activeStep]} />
+              ) : (
+                <>
+                  {/* ═══ 1 — Business Details ═══ */}
+                  {activeStep === 'business' && (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                      <Field label="Client Name" htmlFor="ownerName" required>
+                        <input
+                          id="ownerName"
+                          value={formData.ownerName}
+                          onChange={(e) =>
+                            handleInputChange('ownerName', e.target.value)
                           }
-                        }}
-                        className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
-                          isSelected
-                            ? 'border-blue-600 bg-blue-600 text-white'
-                            : 'border-slate-300 bg-white hover:border-blue-400'
-                        }`}
-                        aria-label={`Select ${pkg.name}`}
+                          placeholder="Enter client name"
+                          className={inputClass()}
+                        />
+                      </Field>
+                      <Field label="Business Name" htmlFor="businessName" required>
+                        <input
+                          id="businessName"
+                          value={formData.businessName}
+                          onChange={(e) =>
+                            handleInputChange('businessName', e.target.value)
+                          }
+                          placeholder="Enter business name"
+                          className={inputClass()}
+                        />
+                      </Field>
+                      <div className="sm:col-span-2">
+                        <Field
+                          label="Email"
+                          htmlFor="email"
+                          required
+                          error={
+                            shouldShowError('email') ? validationErrors.email : ''
+                          }
+                        >
+                          <input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                              handleInputChange('email', e.target.value)
+                            }
+                            onBlur={(e) => handleFieldBlur('email', e.target.value)}
+                            placeholder="name@company.com"
+                            className={inputClass(shouldShowError('email'))}
+                          />
+                        </Field>
+                      </div>
+                      <Field
+                        label="Phone Number"
+                        htmlFor="phoneNumber"
+                        required
+                        error={
+                          shouldShowError('phoneNumber')
+                            ? validationErrors.phoneNumber
+                            : ''
+                        }
                       >
-                        {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
-                            {pkg.name}
-                          </h3>
-                          {isExceedingPayment && (
-                            <span className="flex-shrink-0 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                              Exceeds payment
-                            </span>
+                        <input
+                          id="phoneNumber"
+                          value={formData.phoneNumber}
+                          onChange={(e) =>
+                            handleInputChange('phoneNumber', e.target.value)
+                          }
+                          onBlur={(e) =>
+                            handleFieldBlur('phoneNumber', e.target.value)
+                          }
+                          placeholder="10-digit mobile number"
+                          className={inputClass(shouldShowError('phoneNumber'))}
+                        />
+                      </Field>
+                      <Field
+                        label="City"
+                        htmlFor="city"
+                        required
+                        error={
+                          shouldShowError('city')
+                            ? validationErrors.city || 'City field is required'
+                            : ''
+                        }
+                      >
+                        <div className="relative" ref={cityDropdownRef}>
+                          <input
+                            id="city"
+                            value={cityInput}
+                            onChange={(e) => handleCityChange(e.target.value)}
+                            onBlur={() => {
+                              setTouchedFields((prev) => new Set(prev).add('city'))
+                              setValidationErrors((prev) => ({
+                                ...prev,
+                                city:
+                                  !formData.city || !formData.city.trim()
+                                    ? 'City field is required'
+                                    : '',
+                              }))
+                            }}
+                            onFocus={() => setShowCityDropdown(!!cityInput)}
+                            placeholder="Search or enter city"
+                            className={inputClass(shouldShowError('city'))}
+                          />
+                          {showCityDropdown && filteredCities.length > 0 && (
+                            <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                              {filteredCities.slice(0, 10).map((city) => (
+                                <div
+                                  key={city}
+                                  onClick={() => handleCitySelect(city)}
+                                  className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-blue-50"
+                                >
+                                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                  {city}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
-                        {(price.hasPrice || price.months > 0) && (
-                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
-                            {price.hasPrice && (
-                              <span>
-                                <span className="text-sm font-bold text-emerald-600">
-                                  ₹{price.amount.toLocaleString('en-IN')}
-                                </span>{' '}
-                                +18% = ₹{price.withGst.toLocaleString('en-IN')}
-                              </span>
-                            )}
-                            {price.months > 0 && (
-                              <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                                {monthsLabel(price.months)}
-                              </span>
-                            )}
-                          </p>
-                        )}
-                        {(pkg.departments?.length || 0) > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {pkg.departments.map((dept) => {
-                              const label = departmentLabel(dept)
-                              return (
-                                <span
-                                  key={dept}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700"
-                                >
-                                  <span
-                                    className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
-                                  />
-                                  {label}
-                                </span>
-                              )
-                            })}
+                      </Field>
+                      <div>
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Onboarding City <span className="text-red-500">*</span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {ONBOARDING_CITIES.map((city) => (
+                            <ChoiceCard
+                              key={city}
+                              id={`onboarding-city-${city}`}
+                              value={city}
+                              selected={formData.onboardingCity === city}
+                              label={city}
+                              onSelect={(val) =>
+                                handleInputChange('onboardingCity', val)
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Website Included <span className="text-red-500">*</span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ChoiceCard
+                            id="website-yes"
+                            value="yes"
+                            selected={formData.websiteRequired === 'yes'}
+                            label="Yes"
+                            onSelect={(val) =>
+                              handleInputChange('websiteRequired', val)
+                            }
+                          />
+                          <ChoiceCard
+                            id="website-no"
+                            value="no"
+                            selected={formData.websiteRequired === 'no'}
+                            label="No"
+                            onSelect={(val) =>
+                              handleInputChange('websiteRequired', val)
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Is Webinar Client?
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ChoiceCard
+                            id="webinar-yes"
+                            value="yes"
+                            selected={formData.isWebinarClient.toLowerCase() === 'yes'}
+                            label="Yes"
+                            onSelect={(val) =>
+                              handleInputChange('isWebinarClient', val.toUpperCase())
+                            }
+                          />
+                          <ChoiceCard
+                            id="webinar-no"
+                            value="no"
+                            selected={formData.isWebinarClient.toLowerCase() === 'no'}
+                            label="No"
+                            onSelect={(val) =>
+                              handleInputChange('isWebinarClient', val.toUpperCase())
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2 min-[1100px]:col-span-4">
+                        <Field
+                          label="Remark (optional)"
+                          htmlFor="remark"
+                          hint={`${formData.remark.length}/1000`}
+                        >
+                          <textarea
+                            id="remark"
+                            value={formData.remark}
+                            onChange={(e) =>
+                              handleInputChange('remark', e.target.value)
+                            }
+                            placeholder="Any additional information"
+                            rows={3}
+                            className={textareaClass}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ═══ 2 — Select Packages & Verify Payment ═══ */}
+                  {activeStep === 'packages' && (
+                    <div className="flex items-start gap-6">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-5 grid grid-cols-1 gap-4 min-[1100px]:grid-cols-2">
+                          {/* Note: First verify payment, then select package */}
+                          <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/90 p-3.5 text-xs text-blue-900">
+                            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-blue-950">
+                                Note: Firstly verify payment, then select package
+                              </p>
+                              <p className="leading-relaxed text-blue-700">
+                                Please enter and verify the customer's payment ID
+                                first. Once verified, you will be able to select
+                                packages within your verified payment amount.
+                              </p>
+                            </div>
                           </div>
-                        )}
-                        {price.featureList && price.featureList.length > 0 && (
-                          <div
-                            className="mt-2.5 border-t border-slate-200/60 pt-2"
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setViewingFeaturesPlan({
-                                  name: pkg.name,
-                                  features: price.featureList,
-                                })
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-100"
+
+                          {/* Payment Verification Box */}
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                            <Field
+                              label="Payment ID"
+                              htmlFor="paymentId"
+                              required
+                              error={paymentError}
+                              hint={
+                                !canEnterPaymentId
+                                  ? 'A valid 10-digit phone number in Step 1 is required to verify payment'
+                                  : paymentVerified
+                                    ? undefined
+                                    : isVerifyingPayment
+                                      ? 'Verifying payment with payment gateway…'
+                                      : `Enter payment ID (e.g. pay_…) for phone number ${paymentPhone}`
+                              }
                             >
-                              <Check className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>Features ({price.featureList.length})</span>
-                            </button>
+                              <div className="flex gap-2">
+                                <input
+                                  id="paymentId"
+                                  value={formData.paymentId}
+                                  disabled={!canEnterPaymentId || isVerifyingPayment}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      'paymentId',
+                                      e.target.value.replace(/\s/g, ''),
+                                    )
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      void handleVerifyPayment()
+                                    }
+                                  }}
+                                  placeholder={
+                                    canEnterPaymentId
+                                      ? 'Enter payment ID (e.g. pay_...)'
+                                      : 'Enter phone number in Step 1 first'
+                                  }
+                                  className={`${inputClass(!!paymentError)} min-w-0 flex-1 ${
+                                    paymentVerified
+                                      ? 'border-emerald-400 bg-emerald-50/40'
+                                      : ''
+                                  }`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => void handleVerifyPayment()}
+                                  disabled={
+                                    !canEnterPaymentId ||
+                                    !paymentIdInput ||
+                                    isVerifyingPayment ||
+                                    paymentVerified
+                                  }
+                                  className={`h-9 shrink-0 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors ${
+                                    paymentVerified
+                                      ? 'bg-emerald-600 text-white disabled:opacity-100'
+                                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400'
+                                  }`}
+                                >
+                                  {paymentVerified ? (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <Check className="h-4 w-4" />
+                                      Verified
+                                    </span>
+                                  ) : isVerifyingPayment ? (
+                                    'Verifying…'
+                                  ) : (
+                                    'Verify Payment'
+                                  )}
+                                </button>
+                              </div>
+                              {paymentVerified && (
+                                <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                                  <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+                                  <span>
+                                    Payment Verified:{' '}
+                                    <strong>
+                                      ₹
+                                      {verifiedPaymentAmount != null &&
+                                        formatVerifiedRupees(verifiedPaymentAmount)}
+                                    </strong>{' '}
+                                    paid
+                                    {paidOn &&
+                                      !isNaN(paidOn.getTime()) &&
+                                      ` on ${paidOn.toLocaleDateString('en-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })}`}
+                                  </span>
+                                </div>
+                              )}
+                            </Field>
+                          </div>
+                        </div>
+
+                        {!paymentVerified ? (
+                          <div className="rounded-xl border-[1.5px] border-dashed border-slate-300 bg-slate-50/60 p-10 text-center text-sm text-slate-500">
+                            <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
+                            <p className="font-semibold text-slate-700">
+                              Packages are locked
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Please enter and verify the Payment ID above to view
+                              and select available packages.
+                            </p>
+                          </div>
+                        ) : isLoadingPlans && plans.length === 0 ? (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {[0, 1, 2, 3].map((i) => (
+                              <div
+                                key={i}
+                                className="h-[76px] animate-pulse rounded-xl border border-slate-200 bg-slate-50"
+                              />
+                            ))}
+                          </div>
+                        ) : plans.length === 0 ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                            No packages available. Please contact administrator.
+                          </div>
+                        ) : (
+                          <div
+                            className={`transition-opacity ${plansRefreshing ? 'pointer-events-none opacity-60' : ''}`}
+                            aria-busy={plansRefreshing}
+                          >
+                            {verifiedPaymentAmount != null && (
+                              <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                                <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+                                <span>
+                                  Verified Payment:{' '}
+                                  <strong>
+                                    ₹{formatVerifiedRupees(verifiedPaymentAmount)}
+                                  </strong>
+                                  . Only packages within this amount can be selected.
+                                </span>
+                              </div>
+                            )}
+                            {durationOptions.length > 0 && (
+                              <div className="my-3 flex flex-wrap items-center gap-1.5">
+                                <span className="mr-1 text-xs font-semibold text-slate-500">
+                                  Duration
+                                </span>
+                                {durationOptions.map((months) => (
+                                  <FilterChip
+                                    key={months}
+                                    active={activeDuration === months}
+                                    label={monthsLabel(months)}
+                                    onClick={() => setDurationFilter(months)}
+                                  />
+                                ))}
+                                <FilterChip
+                                  active={activeDuration === 'all'}
+                                  label="All plans"
+                                  onClick={() => setDurationFilter('all')}
+                                />
+                              </div>
+                            )}
+                            <div
+                              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+                                panelOpen ? '' : 'min-[1100px]:grid-cols-4'
+                              }`}
+                            >
+                              {visiblePlans.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center text-sm text-slate-500 sm:col-span-2 min-[1100px]:col-span-full">
+                                  No packages found for{' '}
+                                  <span className="font-semibold text-slate-700">
+                                    {typeof activeDuration === 'number'
+                                      ? monthsLabel(activeDuration)
+                                      : 'this selection'}
+                                  </span>
+                                  .
+                                </div>
+                              ) : (
+                                visiblePlans.map((pkg) => {
+                                  const isSelected =
+                                    !!formData.selectedPackages?.includes(pkg.id)
+                                  const price = priceOf(pkg.name)
+                                  const pkgCost = includeGst
+                                    ? price.withGst
+                                    : price.amount
+                                  const isExceedingPayment =
+                                    verifiedPaymentAmount != null &&
+                                    pkgCost > verifiedPaymentAmount
+                                  const isViewingFeatures = viewingPlanId === pkg.id
+                                  return (
+                                    <div
+                                      key={pkg.id}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onClick={() => {
+                                        // Always open the feature list for review
+                                        setViewingPlanId(pkg.id)
+
+                                        if (isExceedingPayment) {
+                                          showToast({
+                                            title: 'Reviewing Package Features',
+                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
+                                            variant: 'default',
+                                          })
+                                          return
+                                        }
+
+                                        handlePackageToggle(pkg.id)
+                                      }}
+                                      className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
+                                        isExceedingPayment
+                                          ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-65'
+                                          : isSelected
+                                            ? 'cursor-pointer border-blue-500 bg-blue-50/50 shadow-[0_0_0_1px_#3b82f6]'
+                                            : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white'
+                                      } ${
+                                        isViewingFeatures
+                                          ? 'shadow-[0_0_0_2px_#60a5fa,0_4px_10px_rgba(15,23,42,0.1)]'
+                                          : ''
+                                      }`}
+                                    >
+                                      <button
+                                        type="button"
+                                        role="checkbox"
+                                        aria-checked={isSelected}
+                                        disabled={isExceedingPayment}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setViewingPlanId(pkg.id)
+                                          if (!isExceedingPayment) {
+                                            handlePackageToggle(pkg.id)
+                                          }
+                                        }}
+                                        className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                          isSelected
+                                            ? 'border-blue-600 bg-blue-600 text-white'
+                                            : 'border-slate-300 bg-white hover:border-blue-400'
+                                        }`}
+                                        aria-label={`Select ${pkg.name}`}
+                                      >
+                                        {isSelected && (
+                                          <Check className="h-[11px] w-[11px] stroke-[3]" />
+                                        )}
+                                      </button>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
+                                            {pkg.name}
+                                          </h3>
+                                          {isExceedingPayment && (
+                                            <span className="flex-shrink-0 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                              Exceeds payment
+                                            </span>
+                                          )}
+                                        </div>
+                                        {(price.hasPrice || price.months > 0) && (
+                                          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
+                                            {price.hasPrice && (
+                                              <span>
+                                                <span className="text-sm font-bold text-emerald-600">
+                                                  ₹{price.amount.toLocaleString('en-IN')}
+                                                </span>{' '}
+                                                +18% = ₹
+                                                {price.withGst.toLocaleString('en-IN')}
+                                              </span>
+                                            )}
+                                            {price.months > 0 && (
+                                              <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                                                {monthsLabel(price.months)}
+                                              </span>
+                                            )}
+                                          </p>
+                                        )}
+                                        {(pkg.departments?.length || 0) > 0 && (
+                                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                            {pkg.departments.map((dept) => {
+                                              const label = departmentLabel(dept)
+                                              return (
+                                                <span
+                                                  key={dept}
+                                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                                                >
+                                                  <span
+                                                    className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
+                                                  />
+                                                  {label}
+                                                </span>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                        {price.featureList &&
+                                          price.featureList.length > 0 && (
+                                            <div
+                                              className="mt-2.5"
+                                              onClick={(e) => e.stopPropagation()}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                              <button
+                                                type="button"
+                                                onClick={() => setViewingPlanId(pkg.id)}
+                                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 transition-colors hover:border-emerald-400 hover:bg-emerald-100"
+                                              >
+                                                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                                <span>
+                                                  Features ({price.featureList.length})
+                                                </span>
+                                              </button>
+                                            </div>
+                                          )}
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
+
+                      {/* ─── Docked features panel (overlay on narrow screens) ─── */}
+                      {panelOpen && viewingPlan && (
+                        <FeaturesPanel
+                          panelRef={featuresPanelRef}
+                          name={viewingPlan.name}
+                          departments={viewingPlan.departments || []}
+                          features={priceOf(viewingPlan.name).featureList || []}
+                          amount={priceOf(viewingPlan.name).amount}
+                          withGst={priceOf(viewingPlan.name).withGst}
+                          hasPrice={priceOf(viewingPlan.name).hasPrice}
+                          months={priceOf(viewingPlan.name).months}
+                          cost={
+                            includeGst
+                              ? priceOf(viewingPlan.name).withGst
+                              : priceOf(viewingPlan.name).amount
+                          }
+                          verifiedAmount={verifiedPaymentAmount}
+                          selected={!!formData.selectedPackages?.includes(viewingPlan.id)}
+                          onToggle={() => handlePackageToggle(viewingPlan.id)}
+                          onClose={() => setViewingPlanId(null)}
+                        />
+                      )}
                     </div>
-                  )
-                })
-              )}
-              </div>
-            </div>
-          )}
-        </Section>
+                  )}
 
-        {/* ═══ 3 — Financial Information ═══ */}
-        <Section
-          innerRef={financialRef}
-          index={3}
-          title="Financial Information"
-          complete={financialComplete}
-          locked={!packagesComplete}
-          lockedMessage="Please verify payment and select your package in Step 2 first."
-        >
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <label
-                  htmlFor="expirationInMonths"
-                  className="text-xs font-medium text-slate-600"
-                >
-                  Service Months <span className="text-red-500">*</span>
-                </label>
-              </div>
-              <input
-                id="expirationInMonths"
-                type="number"
-                min="1"
-                max="60"
-                value={formData.expirationInMonths}
-                disabled={monthsLocked}
-                onChange={(e) =>
-                  handleInputChange('expirationInMonths', e.target.value)
-                }
-                placeholder="1 to 60"
-                className={`${inputClass()} ${
-                  monthsLocked ? 'cursor-not-allowed bg-slate-100' : ''
-                }`}
-              />
-              <p className="text-[11px] text-slate-400">
-                {monthsLocked
-                  ? selectedPlans.length > 1
-                    ? 'Longest duration among the selected plans'
-                    : "From the selected plan's duration"
-                  : 'Fills automatically when the selected plan has a duration'}
-              </p>
-            </div>
+                  {/* ═══ 3 — Financial Information ═══ */}
+                  {activeStep === 'financial' && (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="expirationInMonths"
+                          className="block text-xs font-semibold text-slate-600"
+                        >
+                          Service Months <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="expirationInMonths"
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={formData.expirationInMonths}
+                          disabled={monthsLocked}
+                          onChange={(e) =>
+                            handleInputChange('expirationInMonths', e.target.value)
+                          }
+                          placeholder="1 to 60"
+                          className={inputClass()}
+                        />
+                        <p className="text-[11px] text-slate-400">
+                          {monthsLocked
+                            ? selectedPlans.length > 1
+                              ? 'Longest duration among the selected plans'
+                              : "From the selected plan's duration"
+                            : 'Fills automatically when the selected plan has a duration'}
+                        </p>
+                      </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <label
-                  htmlFor="totalAmount"
-                  className="text-xs font-medium text-slate-600"
-                >
-                  Total Amount (₹) <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 transition-colors hover:bg-slate-200/70">
-                  <span className="cursor-pointer select-none text-[11px] font-medium text-slate-600">
-                    18% GST
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={includeGst}
-                    onClick={() => setIncludeGst(!includeGst)}
-                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      includeGst ? 'bg-blue-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        includeGst ? 'translate-x-3' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                  <span
-                    className={`select-none text-[10px] font-bold ${
-                      includeGst ? 'text-emerald-600' : 'text-slate-400'
-                    }`}
-                  >
-                    {includeGst ? 'ON' : 'OFF'}
-                  </span>
-                </div>
-              </div>
-              <input
-                id="totalAmount"
-                type="number"
-                min="0"
-                value={formData.totalAmount}
-                disabled={totalLocked}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (
-                    value === '' ||
-                    (/^\d+$/.test(value) && value.length <= 12)
-                  ) {
-                    handleInputChange('totalAmount', value)
-                    const total = parseInt(value) || 0
-                    const paid =
-                      verifiedPaymentAmount != null
-                        ? verifiedPaymentAmount
-                        : parseInt(formData.amountPaid) || 0
-                    const remaining = total - paid
-                    handleInputChange(
-                      'amountRemaining',
-                      remaining > 0 ? remaining.toString() : '',
-                    )
-                    if (
-                      formData.paymentType === 'full-time' &&
-                      verifiedPaymentAmount == null
-                    )
-                      handleInputChange('amountPaid', value)
-                  } else if (value.length > 12) {
-                    showToast({
-                      title: 'Amount Limit Exceeded',
-                      description: 'Total amount cannot exceed 12 digits',
-                      variant: 'destructive',
-                    })
-                  }
-                }}
-                placeholder={
-                  selectedPlans.length === 0
-                    ? 'Select a package'
-                    : 'Enter total amount'
-                }
-                className={`${inputClass()} ${
-                  totalLocked ? 'cursor-not-allowed bg-slate-100' : ''
-                }`}
-              />
-              <p className="text-[11px] text-slate-400">
-                {totalLocked
-                  ? includeGst
-                    ? 'Auto-calculated from the selected plans (incl. 18% GST)'
-                    : 'Auto-calculated from the selected plans (excl. GST)'
-                  : hasUnpricedSelection && selectedPlans.length > 0
-                    ? 'A selected plan has no price set — enter the total'
-                    : undefined}
-              </p>
-            </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <label
+                            htmlFor="totalAmount"
+                            className="block text-xs font-semibold text-slate-600"
+                          >
+                            Total Amount (₹) <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-[11px] font-medium text-slate-600">
+                            <span className="select-none">18% GST</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={includeGst}
+                              aria-label="Toggle 18% GST"
+                              onClick={() => setIncludeGst(!includeGst)}
+                              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-0 transition-colors duration-200 focus:outline-none ${
+                                includeGst ? 'bg-blue-600' : 'bg-slate-300'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-200 ${
+                                  includeGst ? 'translate-x-3' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                            <span
+                              className={`select-none text-[10px] font-bold ${
+                                includeGst ? 'text-emerald-600' : 'text-slate-400'
+                              }`}
+                            >
+                              {includeGst ? 'ON' : 'OFF'}
+                            </span>
+                          </div>
+                        </div>
+                        <input
+                          id="totalAmount"
+                          type="number"
+                          min="0"
+                          value={formData.totalAmount}
+                          disabled={totalLocked}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            if (
+                              value === '' ||
+                              (/^\d+$/.test(value) && value.length <= 12)
+                            ) {
+                              handleInputChange('totalAmount', value)
+                              const total = parseInt(value) || 0
+                              const paid =
+                                verifiedPaymentAmount != null
+                                  ? verifiedPaymentAmount
+                                  : parseInt(formData.amountPaid) || 0
+                              const remaining = total - paid
+                              handleInputChange(
+                                'amountRemaining',
+                                remaining > 0 ? remaining.toString() : '',
+                              )
+                              if (
+                                formData.paymentType === 'full-time' &&
+                                verifiedPaymentAmount == null
+                              )
+                                handleInputChange('amountPaid', value)
+                            } else if (value.length > 12) {
+                              showToast({
+                                title: 'Amount Limit Exceeded',
+                                description: 'Total amount cannot exceed 12 digits',
+                                variant: 'destructive',
+                              })
+                            }
+                          }}
+                          placeholder={
+                            selectedPlans.length === 0
+                              ? 'Select a package'
+                              : 'Enter total amount'
+                          }
+                          className={inputClass()}
+                        />
+                        <p className="text-[11px] text-slate-400">
+                          {totalLocked
+                            ? includeGst
+                              ? 'Auto-calculated from the selected plans (incl. 18% GST)'
+                              : 'Auto-calculated from the selected plans (excl. GST)'
+                            : hasUnpricedSelection && selectedPlans.length > 0
+                              ? 'A selected plan has no price set — enter the total'
+                              : undefined}
+                        </p>
+                      </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">
-                Payment Type <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <ChoiceCard
-                  id="payment-full"
-                  value="full-time"
-                  selected={formData.paymentType === 'full-time'}
-                  label="Full Time"
-                  onSelect={(value) => {
-                    handleInputChange('paymentType', value)
-                    const fullPaid =
-                      verifiedPaymentAmount != null
-                        ? String(verifiedPaymentAmount)
-                        : formData.totalAmount || ''
-                    handleInputChange('amountPaid', fullPaid)
-                    handleInputChange('amountRemaining', '')
-                    handleInputChange('remainingAmountDueDate', '')
-                  }}
-                />
-                <ChoiceCard
-                  id="payment-part"
-                  value="part-time"
-                  selected={formData.paymentType === 'part-time'}
-                  label="Part Time"
-                  onSelect={(value) => {
-                    handleInputChange('paymentType', value)
-                    const initialPaid =
-                      formData.amountPaid ||
-                      (verifiedPaymentAmount != null
-                        ? String(verifiedPaymentAmount)
-                        : '')
-                    handleInputChange('amountPaid', initialPaid)
-                    const total = parseInt(formData.totalAmount) || 0
-                    const remaining = total - (parseInt(initialPaid) || 0)
-                    handleInputChange(
-                      'amountRemaining',
-                      remaining > 0 ? remaining.toString() : '',
-                    )
-                  }}
-                />
-              </div>
-            </div>
+                      <div>
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Payment Type <span className="text-red-500">*</span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ChoiceCard
+                            id="payment-full"
+                            value="full-time"
+                            selected={formData.paymentType === 'full-time'}
+                            label="Full Time"
+                            onSelect={(value) => {
+                              handleInputChange('paymentType', value)
+                              const fullPaid =
+                                verifiedPaymentAmount != null
+                                  ? String(verifiedPaymentAmount)
+                                  : formData.totalAmount || ''
+                              handleInputChange('amountPaid', fullPaid)
+                              handleInputChange('amountRemaining', '')
+                              handleInputChange('remainingAmountDueDate', '')
+                            }}
+                          />
+                          <ChoiceCard
+                            id="payment-part"
+                            value="part-time"
+                            selected={formData.paymentType === 'part-time'}
+                            label="Part Time"
+                            onSelect={(value) => {
+                              handleInputChange('paymentType', value)
+                              const initialPaid =
+                                formData.amountPaid ||
+                                (verifiedPaymentAmount != null
+                                  ? String(verifiedPaymentAmount)
+                                  : '')
+                              handleInputChange('amountPaid', initialPaid)
+                              const total = parseInt(formData.totalAmount) || 0
+                              const remaining = total - (parseInt(initialPaid) || 0)
+                              handleInputChange(
+                                'amountRemaining',
+                                remaining > 0 ? remaining.toString() : '',
+                              )
+                            }}
+                          />
+                        </div>
+                      </div>
 
-            {(() => {
-              const isPartTime = formData.paymentType === 'part-time'
-              const paidNum = isPartTime
-                ? parseInt(formData.amountPaid) || 0
-                : verifiedPaymentAmount != null
-                  ? verifiedPaymentAmount
-                  : parseInt(formData.amountPaid) || 0
-              const remainingNum =
-                (parseInt(formData.totalAmount) || 0) - paidNum
-              const isPartTimeInvalid =
-                isPartTime &&
-                paidNum > 0 &&
-                remainingNum >= 0 &&
-                paidNum > remainingNum
-              const displayPaidValue = isPartTime
-                ? formData.amountPaid
-                : verifiedPaymentAmount != null
-                  ? String(verifiedPaymentAmount)
-                  : formData.totalAmount || ''
-              const isPaidDisabled = !isPartTime
-              return (
-                <Field
-                  label="Amount Paid (₹)"
-                  htmlFor="amountPaid"
-                  required
-                  error={
-                    isPartTimeInvalid
-                      ? `Amount Paid (₹${paidNum.toLocaleString('en-IN')}) must be ≤ Amount Remaining (₹${remainingNum.toLocaleString('en-IN')})`
-                      : undefined
-                  }
-                  hint={
-                    isPartTime
-                      ? verifiedPaymentAmount != null
-                        ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
-                        : undefined
-                      : verifiedPaymentAmount != null
-                        ? 'Auto-filled from verified Payment ID'
-                        : 'Same as total for full payment'
-                  }
-                >
-                  <input
-                    id="amountPaid"
-                    type="number"
-                    min="0"
-                    value={displayPaidValue}
-                    disabled={isPaidDisabled}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === '' || /^\d+$/.test(value)) {
-                        handleInputChange('amountPaid', value)
-                        const total = parseInt(formData.totalAmount) || 0
-                        const paid = parseInt(value) || 0
-                        const remaining = total - paid
-                        handleInputChange(
-                          'amountRemaining',
-                          remaining > 0 ? remaining.toString() : '',
+                      {(() => {
+                        const isPartTime = formData.paymentType === 'part-time'
+                        const paidNum = isPartTime
+                          ? parseInt(formData.amountPaid) || 0
+                          : verifiedPaymentAmount != null
+                            ? verifiedPaymentAmount
+                            : parseInt(formData.amountPaid) || 0
+                        const remainingNum =
+                          (parseInt(formData.totalAmount) || 0) - paidNum
+                        const isPartTimeInvalid =
+                          isPartTime &&
+                          paidNum > 0 &&
+                          remainingNum >= 0 &&
+                          paidNum > remainingNum
+                        const displayPaidValue = isPartTime
+                          ? formData.amountPaid
+                          : verifiedPaymentAmount != null
+                            ? String(verifiedPaymentAmount)
+                            : formData.totalAmount || ''
+                        const isPaidDisabled = !isPartTime
+                        return (
+                          <Field
+                            label="Amount Paid (₹)"
+                            htmlFor="amountPaid"
+                            required
+                            error={
+                              isPartTimeInvalid
+                                ? `Amount Paid (₹${paidNum.toLocaleString('en-IN')}) must be ≤ Amount Remaining (₹${remainingNum.toLocaleString('en-IN')})`
+                                : undefined
+                            }
+                            hint={
+                              isPartTime
+                                ? verifiedPaymentAmount != null
+                                  ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
+                                  : undefined
+                                : verifiedPaymentAmount != null
+                                  ? 'Auto-filled from verified Payment ID'
+                                  : 'Same as total for full payment'
+                            }
+                          >
+                            <input
+                              id="amountPaid"
+                              type="number"
+                              min="0"
+                              value={displayPaidValue}
+                              disabled={isPaidDisabled}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                if (value === '' || /^\d+$/.test(value)) {
+                                  handleInputChange('amountPaid', value)
+                                  const total = parseInt(formData.totalAmount) || 0
+                                  const paid = parseInt(value) || 0
+                                  const remaining = total - paid
+                                  handleInputChange(
+                                    'amountRemaining',
+                                    remaining > 0 ? remaining.toString() : '',
+                                  )
+                                }
+                              }}
+                              placeholder="Enter paid amount"
+                              className={inputClass(isPartTimeInvalid)}
+                            />
+                          </Field>
                         )
-                      }
-                    }}
-                    placeholder="Enter paid amount"
-                    className={`${inputClass(isPartTimeInvalid)} ${
-                      isPaidDisabled
-                        ? 'cursor-not-allowed bg-slate-100'
-                        : ''
-                    }`}
-                  />
-                </Field>
-              )
-            })()}
+                      })()}
 
-            {formData.paymentType === 'part-time' && (
-              <>
-                <Field
-                  label="Amount Remaining (₹)"
-                  htmlFor="amountRemaining"
-                  required
-                  hint="Auto-calculated"
-                >
-                  <input
-                    id="amountRemaining"
-                    type="number"
-                    value={calculatedRemaining}
-                    disabled
-                    className={`${inputClass()} cursor-not-allowed bg-slate-100`}
-                  />
-                </Field>
-                <Field
-                  label="Remaining Amount Due Date"
-                  htmlFor="remainingAmountDueDate"
-                  required
-                >
-                  <input
-                    id="remainingAmountDueDate"
-                    type="date"
-                    value={formData.remainingAmountDueDate}
-                    onChange={(e) =>
-                      handleInputChange('remainingAmountDueDate', e.target.value)
-                    }
-                    className={`${inputClass()} w-full`}
-                  />
-                </Field>
-              </>
-            )}
+                      {formData.paymentType === 'part-time' && (
+                        <>
+                          <Field
+                            label="Amount Remaining (₹)"
+                            htmlFor="amountRemaining"
+                            required
+                            hint="Auto-calculated"
+                          >
+                            <input
+                              id="amountRemaining"
+                              type="number"
+                              value={calculatedRemaining}
+                              disabled
+                              className={inputClass()}
+                            />
+                          </Field>
+                          <Field
+                            label="Remaining Amount Due Date"
+                            htmlFor="remainingAmountDueDate"
+                            required
+                          >
+                            <input
+                              id="remainingAmountDueDate"
+                              type="date"
+                              value={formData.remainingAmountDueDate}
+                              onChange={(e) =>
+                                handleInputChange(
+                                  'remainingAmountDueDate',
+                                  e.target.value,
+                                )
+                              }
+                              className={inputClass()}
+                            />
+                          </Field>
+                        </>
+                      )}
 
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600">
-                  Invoice Details <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <ChoiceCard
-                    id="invoice-gstin"
-                    value="gstin"
-                    selected={formData.invoiceOption === 'gstin'}
-                    label="GSTIN"
-                    onSelect={(value) => {
-                      handleInputChange('invoiceOption', value)
-                      handleInputChange('completeAddress', '')
-                    }}
-                  />
-                  <ChoiceCard
-                    id="invoice-address"
-                    value="address"
-                    selected={formData.invoiceOption === 'address'}
-                    label="Address"
-                    onSelect={(value) => {
-                      handleInputChange('invoiceOption', value)
-                      handleInputChange('gstinForInvoice', '')
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="sm:col-span-2">
-                {formData.invoiceOption === 'gstin' && (
-                  <Field
-                    label="GSTIN Number"
-                    htmlFor="gstinForInvoice"
-                    required
-                    hint="15 characters, uppercase"
-                    error={
-                      shouldShowError('gstin')
-                        ? validationErrors.gstin
-                        : ''
-                    }
-                  >
-                    <input
-                      id="gstinForInvoice"
-                      value={formData.gstinForInvoice}
-                      onChange={(e) =>
-                        handleInputChange('gstinForInvoice', e.target.value)
-                      }
-                      onBlur={(e) =>
-                        handleFieldBlur('gstinForInvoice', e.target.value)
-                      }
-                      placeholder="e.g. 22AAAAA0000A1Z5"
-                      className={inputClass(shouldShowError('gstin'))}
-                    />
-                  </Field>
-                )}
-                {formData.invoiceOption === 'address' && (
-                  <Field
-                    label="Complete Address"
-                    htmlFor="completeAddress"
-                    required
-                  >
-                    <textarea
-                      id="completeAddress"
-                      value={formData.completeAddress}
-                      onChange={(e) =>
-                        handleInputChange('completeAddress', e.target.value)
-                      }
-                      placeholder="Enter complete billing address"
-                      rows={2}
-                      className="w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </Field>
-                )}
+                      <div>
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Invoice Details <span className="text-red-500">*</span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ChoiceCard
+                            id="invoice-gstin"
+                            value="gstin"
+                            selected={formData.invoiceOption === 'gstin'}
+                            label="GSTIN"
+                            onSelect={(value) => {
+                              handleInputChange('invoiceOption', value)
+                              handleInputChange('completeAddress', '')
+                            }}
+                          />
+                          <ChoiceCard
+                            id="invoice-address"
+                            value="address"
+                            selected={formData.invoiceOption === 'address'}
+                            label="Address"
+                            onSelect={(value) => {
+                              handleInputChange('invoiceOption', value)
+                              handleInputChange('gstinForInvoice', '')
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {formData.invoiceOption === 'gstin' && (
+                        <div className="sm:col-span-2">
+                          <Field
+                            label="GSTIN Number"
+                            htmlFor="gstinForInvoice"
+                            required
+                            hint="15 characters, uppercase"
+                            error={
+                              shouldShowError('gstin') ? validationErrors.gstin : ''
+                            }
+                          >
+                            <input
+                              id="gstinForInvoice"
+                              value={formData.gstinForInvoice}
+                              onChange={(e) =>
+                                handleInputChange('gstinForInvoice', e.target.value)
+                              }
+                              onBlur={(e) =>
+                                handleFieldBlur('gstinForInvoice', e.target.value)
+                              }
+                              placeholder="e.g. 22AAAAA0000A1Z5"
+                              className={inputClass(shouldShowError('gstin'))}
+                            />
+                          </Field>
+                        </div>
+                      )}
+                      {formData.invoiceOption === 'address' && (
+                        <div className="sm:col-span-2">
+                          <Field
+                            label="Complete Address"
+                            htmlFor="completeAddress"
+                            required
+                          >
+                            <textarea
+                              id="completeAddress"
+                              value={formData.completeAddress}
+                              onChange={(e) =>
+                                handleInputChange('completeAddress', e.target.value)
+                              }
+                              placeholder="Enter complete billing address"
+                              rows={3}
+                              className={textareaClass}
+                            />
+                          </Field>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ═══ 4 — Final Details ═══ */}
+                  {activeStep === 'final' && (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-3">
+                      <Field
+                        label="Sales Person Name"
+                        htmlFor="salesPersonName"
+                        required
+                      >
+                        <input
+                          id="salesPersonName"
+                          value={formData.salesPersonName}
+                          onChange={(e) =>
+                            handleInputChange('salesPersonName', e.target.value)
+                          }
+                          placeholder="Enter sales person's name"
+                          className={inputClass()}
+                        />
+                      </Field>
+                      <Field label="Lead Type" htmlFor="leadType" required>
+                        <input
+                          id="leadType"
+                          value={formData.leadType}
+                          onChange={(e) =>
+                            handleInputChange('leadType', e.target.value)
+                          }
+                          placeholder="e.g. 99, 699, 999"
+                          className={inputClass()}
+                        />
+                      </Field>
+                      <Field
+                        label="WhatsApp Group Link (optional)"
+                        htmlFor="groupLink"
+                      >
+                        <input
+                          id="groupLink"
+                          type="url"
+                          value={formData.groupLink}
+                          onChange={(e) =>
+                            handleInputChange('groupLink', e.target.value)
+                          }
+                          placeholder="https://chat.whatsapp.com/…"
+                          className={inputClass()}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Card footer: Previous / hint / Continue (or Complete Registration) */}
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-4 sm:px-6">
+              <button
+                type="button"
+                onClick={() => goToStep(SECTIONS[activeIndex - 1].id)}
+                className={`cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${
+                  activeIndex === 0 ? 'invisible' : ''
+                }`}
+              >
+                ← Previous
+              </button>
+              <div className="flex items-center gap-4">
+                <p className="hidden text-xs text-slate-400 sm:block">
+                  {footerHint}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    isLastStep
+                      ? handleFinalSubmit()
+                      : goToStep(SECTIONS[activeIndex + 1].id)
+                  }
+                  disabled={!isLastStep && !activeComplete}
+                  className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  {isLastStep ? 'Complete Registration' : 'Continue →'}
+                </button>
               </div>
             </div>
           </div>
-        </Section>
-
-        {/* ═══ 4 — Final Details ═══ */}
-        <Section
-          innerRef={finalRef}
-          index={4}
-          title="Final Details"
-          complete={finalComplete}
-          locked={!financialComplete}
-          lockedMessage="Please complete Financial Information in Step 3 first."
-        >
-          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-            <Field
-              label="Sales Person Name"
-              htmlFor="salesPersonName"
-              required
-            >
-              <input
-                id="salesPersonName"
-                value={formData.salesPersonName}
-                onChange={(e) =>
-                  handleInputChange('salesPersonName', e.target.value)
-                }
-                placeholder="Enter sales person's name"
-                className={inputClass()}
-              />
-            </Field>
-            <Field label="Lead Type" htmlFor="leadType" required>
-              <input
-                id="leadType"
-                value={formData.leadType}
-                onChange={(e) => handleInputChange('leadType', e.target.value)}
-                placeholder="e.g. 99, 699, 999"
-                className={inputClass()}
-              />
-            </Field>
-            <Field
-              label="WhatsApp Group Link (optional)"
-              htmlFor="groupLink"
-            >
-              <input
-                id="groupLink"
-                type="url"
-                value={formData.groupLink}
-                onChange={(e) => handleInputChange('groupLink', e.target.value)}
-                placeholder="https://chat.whatsapp.com/…"
-                className={inputClass()}
-              />
-            </Field>
-          </div>
-        </Section>
-
-        {/* ─── Submit button ─── */}
-        <div className="pb-6">
-          <button
-            type="button"
-            onClick={handleFinalSubmit}
-            className="h-11 w-full rounded-xl bg-blue-600 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
-          >
-            Complete Registration
-          </button>
-          <p className="mt-2 text-center text-[11px] text-slate-400">
-            By registering, you agree to our Terms of Service and Privacy Policy.
-          </p>
-        </div>
+        </main>
       </div>
 
       {/* ─── Passkey modal ─── */}
@@ -2200,7 +2477,7 @@ export function RegisterBusinessPage() {
                 onChange={(e) => setPasskey(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handlePasskeySubmit()}
                 placeholder="Enter passkey"
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 autoFocus
               />
               <button
@@ -2241,151 +2518,12 @@ export function RegisterBusinessPage() {
         </div>
       )}
 
-      {/* ─── Features Floating Side Panel (Shows 10 Features in Single Page, Scroll for More) ─── */}
-      {viewingFeaturesPlan && (
-        <div
-          ref={featuresDrawerRef}
-          role="dialog"
-          aria-modal="false"
-          aria-label="Included Features"
-          className="fixed right-4 sm:right-6 top-20 z-50 w-[calc(100vw-32px)] sm:w-[410px] max-h-[calc(100vh-100px)] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 p-3.5 px-4 bg-slate-50/80 flex-shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0 shadow-xs">
-                <Check className="h-4 w-4 stroke-[2.5]" />
-              </span>
-              <div className="min-w-0">
-                <h3 className="truncate text-sm font-bold text-slate-900">
-                  {viewingFeaturesPlan.name}
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  {viewingFeaturesPlan.features.length > 0
-                    ? `Included Features (${viewingFeaturesPlan.features.length})`
-                    : `${viewingFeaturesPlan.departments?.length || 0} Departments Included`}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setViewingFeaturesPlan(null)}
-              aria-label="Close features"
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Informational Notice if package exceeds payment */}
-          {viewingFeaturesPlan.isExceedingPayment && verifiedPaymentAmount != null && (
-            <div className="mx-3.5 mt-2.5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900 shadow-xs flex-shrink-0">
-              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-amber-950">Package exceeds verified payment</p>
-                <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
-                  Price: ₹{viewingFeaturesPlan.cost?.toLocaleString('en-IN')} (verified: ₹{formatVerifiedRupees(verifiedPaymentAmount)}). Review only.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Features List: Shows 10 features in a single page, scrolls for additional items */}
-          <div
-            ref={featuresListRef}
-            className="max-h-[500px] overflow-y-auto p-3.5 space-y-2 overscroll-contain select-text [scrollbar-width:thin] [scrollbar-color:#94a3b8_#f1f5f9] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400"
-          >
-            {viewingFeaturesPlan.features.length > 0 ? (
-              viewingFeaturesPlan.features.map((feature, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 p-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-100/60"
-                >
-                  <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
-                    <Check className="h-2.5 w-2.5 stroke-[3]" />
-                  </span>
-                  <span className="break-words font-medium leading-relaxed">
-                    {feature}
-                  </span>
-                </div>
-              ))
-            ) : viewingFeaturesPlan.departments && viewingFeaturesPlan.departments.length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-slate-600">
-                  Included Departments with full service access:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {viewingFeaturesPlan.departments.map((dept) => {
-                    const label = departmentLabel(dept)
-                    return (
-                      <span
-                        key={dept}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800"
-                      >
-                        <span className={`h-2 w-2 rounded-full ${departmentDot(label)}`} />
-                        {label}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs text-slate-500">
-                No specific features listed for this package.
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/90 p-2.5 px-4 flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[11px] text-slate-500 font-medium truncate">
-                {viewingFeaturesPlan.features.length > 10
-                  ? `Showing 10 of ${viewingFeaturesPlan.features.length} · Scroll for more`
-                  : viewingFeaturesPlan.features.length > 0
-                  ? `Showing all ${viewingFeaturesPlan.features.length} features`
-                  : viewingFeaturesPlan.departments && viewingFeaturesPlan.departments.length > 0
-                  ? `${viewingFeaturesPlan.departments.length} departments included`
-                  : 'Click outside or press ESC to close'}
-              </span>
-              {viewingFeaturesPlan.features.length > 10 && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    type="button"
-                    title="Scroll up"
-                    onClick={() => featuresListRef.current?.scrollBy({ top: -220, behavior: 'smooth' })}
-                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                  >
-                    <ChevronUp className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Scroll down"
-                    onClick={() => featuresListRef.current?.scrollBy({ top: 220, behavior: 'smooth' })}
-                    className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setViewingFeaturesPlan(null)}
-              className="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 flex-shrink-0 ml-2"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ─── Toast notification ─── */}
       {toast && (
         <div
           role="status"
           aria-live="polite"
-          className={`fixed right-4 top-4 z-[60] max-w-sm rounded-xl border px-4 py-3 shadow-lg transition-all ${
+          className={`rb-panel-in fixed right-4 top-4 z-[80] max-w-sm rounded-xl border px-4 py-3 shadow-lg ${
             toast.variant === 'destructive'
               ? 'border-red-200 bg-red-50 text-red-900'
               : toast.variant === 'success'
@@ -2430,7 +2568,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+      className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
         active
           ? 'border-blue-600 bg-blue-600 text-white'
           : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
@@ -2441,75 +2579,174 @@ function FilterChip({
   )
 }
 
-function Section({
-  innerRef,
-  index,
-  title,
-  complete,
-  aside,
-  locked,
-  lockedMessage,
-  children,
-}: {
-  innerRef: React.RefObject<HTMLDivElement | null>
-  index: number
-  title: string
-  complete: boolean
-  aside?: React.ReactNode
-  locked?: boolean
-  lockedMessage?: string
-  children: React.ReactNode
-}) {
+function LockedNotice({ message }: { message: string }) {
   return (
-    <section
-      ref={innerRef}
-      className={`scroll-mt-20 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all sm:p-5 ${
-        locked ? 'border-slate-200/70 bg-slate-50/60' : ''
-      }`}
+    <div className="rounded-xl border-[1.5px] border-dashed border-slate-300 bg-slate-50/60 p-10 text-center text-sm text-slate-500">
+      <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
+      <p className="font-semibold text-slate-700">
+        {message || 'Please complete the previous step first.'}
+      </p>
+      <p className="mt-1 text-xs text-slate-400">
+        This step will unlock automatically once previous step details are
+        filled.
+      </p>
+    </div>
+  )
+}
+
+function FeaturesPanel({
+  panelRef,
+  name,
+  departments,
+  features,
+  amount,
+  withGst,
+  hasPrice,
+  months,
+  cost,
+  verifiedAmount,
+  selected,
+  onToggle,
+  onClose,
+}: {
+  panelRef: React.RefObject<HTMLElement | null>
+  name: string
+  departments: string[]
+  features: string[]
+  amount: number
+  withGst: number
+  hasPrice: boolean
+  months: number
+  cost: number
+  verifiedAmount: number | null
+  selected: boolean
+  onToggle: () => void
+  onClose: () => void
+}) {
+  const exceeding = verifiedAmount != null && cost > verifiedAmount
+  return (
+    <aside
+      ref={panelRef}
+      role="dialog"
+      aria-modal="false"
+      aria-label="Included Features"
+      className="rb-panel-in sticky top-[82px] z-10 flex h-[calc(100vh-120px)] w-[380px] flex-none flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_25px_rgba(15,23,42,0.1)] max-[1100px]:fixed max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:top-0 max-[1100px]:z-50 max-[1100px]:h-auto max-[1100px]:w-[88vw] max-[1100px]:max-w-[400px] max-[1100px]:rounded-none"
     >
-      <div className="mb-3.5 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-              complete
-                ? 'bg-emerald-500 text-white'
-                : locked
-                  ? 'bg-slate-200 text-slate-400'
-                  : 'bg-blue-600 text-white'
-            }`}
-          >
-            {complete ? <Check className="h-3.5 w-3.5" /> : index}
-          </span>
-          <h2
-            className={`truncate text-sm font-bold ${
-              locked ? 'text-slate-400' : 'text-slate-900'
-            }`}
-          >
-            {title}
-          </h2>
-          {locked && (
-            <span className="flex select-none items-center gap-1 rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-              <Lock className="h-3 w-3 text-slate-400" /> Locked
-            </span>
+      {/* Header */}
+      <div className="flex justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3.5">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-bold text-slate-900">{name}</h3>
+          {(hasPrice || months > 0) && (
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
+              {hasPrice && (
+                <span>
+                  <span className="text-sm font-bold text-emerald-600">
+                    ₹{amount.toLocaleString('en-IN')}
+                  </span>{' '}
+                  +18% = ₹{withGst.toLocaleString('en-IN')}
+                </span>
+              )}
+              {months > 0 && (
+                <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                  {monthsLabel(months)}
+                </span>
+              )}
+            </p>
           )}
         </div>
-        {aside}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close features"
+          className="flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-      {locked ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500">
-          <Lock className="mx-auto mb-2 h-5 w-5 text-slate-400" />
-          <p className="font-semibold text-slate-700">
-            {lockedMessage || 'Please complete the previous step first.'}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            This section will unlock automatically once previous step details
-            are filled.
-          </p>
-        </div>
-      ) : (
-        children
-      )}
-    </section>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto overscroll-contain p-4 select-text [scrollbar-width:thin]">
+        {exceeding && verifiedAmount != null && (
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-900">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-amber-950">
+                Package exceeds verified payment
+              </p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
+                Price: ₹{cost.toLocaleString('en-IN')} (verified: ₹
+                {formatVerifiedRupees(verifiedAmount)}). Review only.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {departments.length > 0 && (
+          <>
+            <p className="mb-1.5 text-[11px] font-semibold text-slate-500">
+              Departments
+            </p>
+            <div className="mb-3.5 flex flex-wrap gap-1.5">
+              {departments.map((dept) => {
+                const label = departmentLabel(dept)
+                return (
+                  <span
+                    key={dept}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
+                    />
+                    {label}
+                  </span>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        <p className="mb-1.5 text-[11px] font-semibold text-slate-500">
+          {features.length} features included
+        </p>
+        {features.length > 0 ? (
+          features.map((feature, idx) => (
+            <div
+              key={idx}
+              className="mb-1.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 text-xs font-medium text-slate-700"
+            >
+              <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Check className="h-2 w-2 stroke-[3.5]" />
+              </span>
+              <span className="break-words leading-relaxed">{feature}</span>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-2.5 text-xs text-slate-400">
+            No features are listed for this plan.
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-slate-100 bg-slate-50/80 p-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={exceeding && !selected}
+          className={`h-9 w-full cursor-pointer rounded-xl text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${
+            selected
+              ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {selected
+            ? 'Remove from selection'
+            : exceeding
+              ? 'Exceeds verified payment'
+              : 'Select this plan'}
+        </button>
+      </div>
+    </aside>
   )
 }
 
@@ -2532,7 +2769,7 @@ function Field({
     <div className="space-y-1">
       <label
         htmlFor={htmlFor}
-        className="block text-xs font-medium text-slate-600"
+        className="block text-xs font-semibold text-slate-600"
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -2566,7 +2803,7 @@ function ChoiceCard({
     <label
       htmlFor={id}
       onClick={() => onSelect(value)}
-      className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 transition-colors ${
+      className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-[13px] font-medium transition-colors ${
         selected
           ? 'border-blue-500 bg-blue-50 text-blue-900'
           : 'border-slate-200 text-slate-700 hover:border-blue-300'
@@ -2579,9 +2816,9 @@ function ChoiceCard({
         value={value}
         checked={selected}
         onChange={() => onSelect(value)}
-        className="h-4 w-4 accent-blue-600"
+        className="m-0 h-4 w-4 accent-blue-600"
       />
-      <span className="truncate text-sm font-medium">{label}</span>
+      <span className="truncate">{label}</span>
     </label>
   )
 }

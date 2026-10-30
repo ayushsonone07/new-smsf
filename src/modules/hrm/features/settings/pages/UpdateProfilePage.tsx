@@ -13,6 +13,7 @@ import { getApiErrorMessage } from "@shared/lib";
 import { Button } from "@hrm/components/ui/button";
 import { Input } from "@hrm/components/ui/input";
 import { cn } from "@hrm/lib/utils";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 function formatRole(role: string): string {
   if (role === "SUB_HR") return "Sub HR";
@@ -35,7 +36,10 @@ export function UpdateProfilePage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { data: profile, isLoading, isError, error, refetch } = useMyProfile();
+  const { data: profile, isLoading, isFetching, isError, error, refetch } = useMyProfile();
+  // After a refresh, the effect below re-seeds the form only when the saved name/email/phone
+  // actually changed on the server, so unchanged data never wipes what the user is typing.
+  const profileRefreshing = isFetching && !isLoading;
   const updateProfile = useUpdateMyProfile();
 
   const initialValues = useMemo<ProfileForm>(
@@ -164,13 +168,24 @@ export function UpdateProfilePage() {
         title="Update Profile"
         description="Review and update your personal account details."
         actions={
-          <Button type="button" variant="outline" onClick={() => void navigate(ROUTES.dashboard)}>
-            Back to Dashboard
-          </Button>
+          <>
+            <RefreshButton
+              onRefresh={() => refetch()}
+              isRefreshing={isFetching}
+              label="profile"
+              className="h-10 w-10 rounded-xl"
+            />
+            <Button type="button" variant="outline" onClick={() => void navigate(ROUTES.dashboard)}>
+              Back to Dashboard
+            </Button>
+          </>
         }
       />
 
-      <Card padding="lg">
+      <Card
+        padding="lg"
+        className={`transition-opacity ${profileRefreshing ? "pointer-events-none opacity-60" : ""}`}
+      >
         <form className="space-y-6" onSubmit={handleSubmit} noValidate>
           <div className="flex items-center gap-4 border-b border-border pb-5">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-primary text-lg font-extrabold text-white shadow">

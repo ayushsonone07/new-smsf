@@ -62,7 +62,7 @@ export function PayrollManagementView() {
 
   const canManage = useRole(["HR_HEAD", "HR", "ADMIN"]);
 
-  const { data, isLoading, error, refetch } = usePayrolls({
+  const { data, isLoading, isFetching, error, refetch } = usePayrolls({
     page,
     size: 10,
     month,
@@ -72,6 +72,8 @@ export function PayrollManagementView() {
   });
   const summary = usePayrollSummary(month === "" ? today.month : month, year === "" ? today.year : year);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const payrollsRefreshing = isFetching && !isLoading;
+  const summaryRefreshing = summary.isFetching && !summary.isLoading;
 
   async function handleRefresh() {
     setIsRefreshing(true);
@@ -147,10 +149,13 @@ export function PayrollManagementView() {
       />
 
       {summary.data ? (
-        <>
+        <div
+          className={`space-y-6 transition-opacity ${summaryRefreshing ? "pointer-events-none opacity-60" : ""}`}
+          aria-busy={summaryRefreshing}
+        >
           <PayrollSummaryCards summary={summary.data} />
           <PayrollStagePills summary={summary.data} />
-        </>
+        </div>
       ) : null}
 
      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4 lg:flex-row lg:items-center">
@@ -218,6 +223,10 @@ export function PayrollManagementView() {
 
       {error ? <ErrorDisplay message={getApiErrorMessage(error, "Failed to load payrolls.")} /> : null}
 
+      <div
+        className={`transition-opacity ${payrollsRefreshing ? "pointer-events-none opacity-60" : ""}`}
+        aria-busy={payrollsRefreshing}
+      >
       <PayrollTable
         payrolls={data?.data}
         loading={isLoading}
@@ -236,6 +245,7 @@ export function PayrollManagementView() {
         }
         emptyMessage="No payroll records match the current filters. Generate payroll for a month to get started."
       />
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">

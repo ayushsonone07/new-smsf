@@ -9,9 +9,11 @@ export function useDeleteDepartment() {
     mutationFn: (id: string) => deleteDepartment(id),
 
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: departmentsQueryKey,
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: departmentsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['admin-departments-users-count'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-department-summary'] }),
+      ])
     },
   })
 }

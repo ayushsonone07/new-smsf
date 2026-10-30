@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import type { WebsiteDraftHistoryEntry } from '../../../api/website-draft.api'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 export interface DraftHistoryModalProps {
   isOpen: boolean
@@ -17,6 +18,9 @@ export interface DraftHistoryModalProps {
   isLoading: boolean
   customerName: string
   customerEmail: string
+  /** Reloads only this customer's draft history. */
+  onRefresh?: () => unknown
+  isRefreshing?: boolean
 }
 
 export const DraftHistoryModal: React.FC<DraftHistoryModalProps> = ({
@@ -26,6 +30,8 @@ export const DraftHistoryModal: React.FC<DraftHistoryModalProps> = ({
   isLoading,
   customerName,
   customerEmail,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const formatDate = (dateString?: string): string => {
     if (!dateString) return '—'
@@ -76,17 +82,25 @@ export const DraftHistoryModal: React.FC<DraftHistoryModalProps> = ({
               View all website draft emails sent to {customerName} ({customerEmail})
             </p>
           </div>
-          <button
-            type="button"
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} label="draft history" />
+            )}
+            <button
+              type="button"
+              className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
-        <div className="py-4 overflow-y-auto flex-1">
+        <div
+          className={`py-4 overflow-y-auto flex-1 transition-opacity ${isRefreshing ? 'opacity-60 pointer-events-none' : ''}`}
+          aria-busy={isRefreshing}
+        >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />

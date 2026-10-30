@@ -1,3 +1,4 @@
+import path from 'path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
@@ -5,6 +6,16 @@ import { defineConfig } from 'vitest/config'
 // CSS imports are stubbed (css: false) so styles never affect assertions.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+      '@hrm': path.resolve(import.meta.dirname, './src/modules/hrm'),
+      '@app': path.resolve(import.meta.dirname, './src/modules/hrm/app'),
+      '@features': path.resolve(import.meta.dirname, './src/modules/hrm/features'),
+      '@shared': path.resolve(import.meta.dirname, './src/modules/hrm/shared'),
+      '@config': path.resolve(import.meta.dirname, './src/modules/hrm/config'),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TeamMemberPerformance } from './TeamTargetPerformance'
+import { RefreshButton } from '../../ui/RefreshButton'
 
 export interface MemberWorkItem {
   id: string
@@ -16,6 +17,9 @@ export interface MemberDetailsModalProps {
   member: TeamMemberPerformance | null
   workItems?: MemberWorkItem[]
   isLoading?: boolean
+  /** Reloads only this member's work items (the parent's member-details query). */
+  onRefresh?: () => unknown
+  isRefreshing?: boolean
   onClose: () => void
 }
 
@@ -29,6 +33,8 @@ export function MemberDetailsModal({
   member,
   workItems = [],
   isLoading = false,
+  onRefresh,
+  isRefreshing = false,
   onClose,
 }: MemberDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<ModalTab>('all')
@@ -110,6 +116,9 @@ export function MemberDetailsModal({
               {member.attendance}
             </span>
 
+            {onRefresh && (
+              <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} label="member details" />
+            )}
             <button
               type="button"
               className="hdb-modal__close"
@@ -252,7 +261,10 @@ export function MemberDetailsModal({
                 <th style={{ width: '32%' }}>REASON / REMARK</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody
+              className={`transition-opacity ${isRefreshing ? 'opacity-60 pointer-events-none' : ''}`}
+              aria-busy={isRefreshing}
+            >
               {isLoading ? (
                 <tr>
                   <td colSpan={4} className="hdb-modal__empty">Loading customer activity…</td>

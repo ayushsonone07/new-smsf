@@ -6,6 +6,7 @@ import { useMyProfile } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
 import { ErrorDisplay, EmptyState, PageHeader, Card, Skeleton } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { PayrollStatusBadge } from "../components/PayrollStatusBadge";
 import { PayslipDownloadButton } from "../components/PayrollTable";
@@ -19,7 +20,9 @@ export function PayslipsPage() {
   const { data: profile } = useMyProfile();
   const employeeId = profile?.id ?? 0;
 
-  const { data: payslips, isLoading, error } = useEmployeePayslips(employeeId);
+  const payslipsQuery = useEmployeePayslips(employeeId);
+  const { data: payslips, isLoading, error } = payslipsQuery;
+  const payslipsRefreshing = payslipsQuery.isFetching && !isLoading;
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const toast = useToast();
@@ -47,6 +50,14 @@ export function PayslipsPage() {
         eyebrow="Self service"
         title="My Payslips"
         description="Download your monthly payslips as PDFs."
+        actions={
+          <RefreshButton
+            onRefresh={() => (employeeId > 0 ? payslipsQuery.refetch() : undefined)}
+            isRefreshing={payslipsQuery.isFetching}
+            label="payslips"
+            className="h-10 w-10 rounded-xl"
+          />
+        }
       />
 
       {error ? (
@@ -66,7 +77,12 @@ export function PayslipsPage() {
           description="Payslips appear here once payroll is generated for your months. Ask your HR team if you expected a payslip."
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={`grid grid-cols-1 gap-4 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${
+            payslipsRefreshing ? "pointer-events-none opacity-60" : ""
+          }`}
+          aria-busy={payslipsRefreshing}
+        >
           {payslips.map((payslip) => (
             <Card key={payslip.payrollId} padding="lg" className="flex flex-col">
               <div className="flex items-start justify-between gap-3">

@@ -57,6 +57,12 @@ vi.mock('../../../utils/customerActivity', () => ({
   getCustomerActivities: () => [],
 }))
 
+// Notification events are fire-and-forget network calls; keep the component
+// test focused on the billing flow instead of hitting a relative API URL.
+vi.mock('../../../api/notification-factory', () => ({
+  notifyBillGenerated: vi.fn(),
+}))
+
 vi.mock('../../../app/auth/session', () => ({
   getSession: () => ({
     token: 'test-token',

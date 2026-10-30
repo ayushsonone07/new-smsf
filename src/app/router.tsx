@@ -129,6 +129,21 @@ const CustomerHelpSupportPage = lazy(() =>
 const AdminCustomersPage = lazy(() =>
   import('../features/customers/pages/AdminCustomersPage').then((module) => ({ default: module.AdminCustomersPage })),
 )
+const DepartmentPerformancePage = lazy(() =>
+  import('../features/departments/pages/DepartmentPerformancePage').then((module) => ({ default: module.DepartmentPerformancePage })),
+)
+const ServiceFlowsDirectoryPage = lazy(() =>
+  import('../features/departments/pages/ServiceFlowsDirectoryPage').then((module) => ({ default: module.ServiceFlowsDirectoryPage })),
+)
+const PlanManagementPage = lazy(() =>
+  import('../features/plans/pages/PlanManagementPage').then((module) => ({ default: module.PlanManagementPage })),
+)
+const CustomerPaymentPage = lazy(() =>
+  import('../features/payment/pages/CustomerPaymentPage').then((module) => ({ default: module.CustomerPaymentPage })),
+)
+const SalesSummaryPage = lazy(() =>
+  import('../features/sales/pages/SalesSummaryPage').then((module) => ({ default: module.SalesSummaryPage })),
+)
 const ProfileUpdatePage = lazy(() =>
   import('../features/profile/pages/ProfileUpdatePage').then((module) => ({ default: module.ProfileUpdatePage })),
 )
@@ -405,6 +420,76 @@ const departmentFinanceRoute = createRoute({
   path: '/admin/departments/$departmentId/finance',
   component: FinanceFeaturesPage,
   beforeLoad: requireRole('ADMIN'),
+})
+
+const adminDepartmentPerformanceRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/department-performance',
+  component: DepartmentPerformancePage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const departmentPerformanceAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/department-performance',
+  component: DepartmentPerformancePage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const adminServiceFlowsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/service-flows',
+  component: ServiceFlowsDirectoryPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const serviceFlowsAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/service-flows',
+  component: ServiceFlowsDirectoryPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const adminPaymentsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/payments',
+  component: CustomerPaymentPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const manageCustomerPaymentsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/manage-customers-payment',
+  component: CustomerPaymentPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const adminPlansRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/plans',
+  component: PlanManagementPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const plansAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/plans',
+  component: PlanManagementPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const adminSalesSummaryRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/sales-summary',
+  component: SalesSummaryPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const salesSummaryAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/sales-summary',
+  component: SalesSummaryPage,
+  beforeLoad: requireRole('ADMIN', 'HEAD'),
 })
 
 const fetchRcRoute = createRoute({
@@ -796,6 +881,16 @@ const routeTree = rootRoute.addChildren([
     departmentFeaturesRoute,
     departmentFinanceRoute,
     fetchRcRoute,
+    adminDepartmentPerformanceRoute,
+    departmentPerformanceAliasRoute,
+    adminServiceFlowsRoute,
+    serviceFlowsAliasRoute,
+    adminPaymentsRoute,
+    manageCustomerPaymentsRoute,
+    adminSalesSummaryRoute,
+    salesSummaryAliasRoute,
+    adminPlansRoute,
+    plansAliasRoute,
     forbiddenRoute,
   ]),
   customerLayoutRoute.addChildren([
