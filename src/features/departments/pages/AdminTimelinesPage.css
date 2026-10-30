@@ -148,16 +148,19 @@
 }
 
 .sop-search-wrap:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 1px #2563eb;
+  border-color: #94a3b8;
+  box-shadow: none;
 }
 
-.sop-search-input {
-  border: none;
+.sop-search-input,
+.sop-search-input:focus,
+.sop-search-input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   background: transparent;
   font-size: 0.78rem;
   color: #0f172a;
-  outline: none;
   width: 100%;
 }
 

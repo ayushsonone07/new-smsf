@@ -108,9 +108,11 @@
   transition: all 0.15s ease;
 }
 
-.dept-search-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+.dept-search-input:focus,
+.dept-search-input:focus-visible {
+  border-color: #94a3b8;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .dept-search-input::placeholder {
