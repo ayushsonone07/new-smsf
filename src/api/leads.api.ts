@@ -194,6 +194,29 @@ export async function assignLeadToUser(
 /**
  * Update lead sales status: PATCH /api/leads/update/status
  */
+
+export interface BulkAssignLeadsPayload {
+  leadIds: string[]
+  salesMembers: string[]
+  assignmentType?: string
+  roundrobinStatus?: boolean
+}
+
+/**
+ * Bulk assign / transfer multiple leads: PATCH /api/leads/assign
+ */
+export async function bulkAssignLeads(payload: BulkAssignLeadsPayload): Promise<any> {
+  return authedApiRequest<any>('/api/leads/assign', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      leadIds: payload.leadIds,
+      salesMembers: payload.salesMembers,
+      assignmentType: payload.assignmentType || 'manual',
+      roundrobinStatus: payload.roundrobinStatus || false,
+    }),
+  })
+}
+
 export async function updateLeadStatus(payload: UpdateLeadStatusPayload): Promise<any> {
   return authedApiRequest<any>('/api/leads/update/status', {
     method: 'PATCH',

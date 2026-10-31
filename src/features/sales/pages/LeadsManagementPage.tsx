@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Loader2,
   Trash2,
+  ArrowRightLeft,
 } from 'lucide-react'
 import {
   getLeads,
@@ -34,6 +35,7 @@ import { LeadDetailsModal } from '../components/LeadDetailsModal'
 import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
 import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
+import { TransferLeadModal } from '../components/TransferLeadModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
 import { TrendingUp, LayoutGrid } from 'lucide-react'
@@ -105,6 +107,8 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<LeadInfo | null>(null)
 
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [leadsToTransfer, setLeadsToTransfer] = useState<LeadInfo[]>([])
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [selectedLeadForPayment, setSelectedLeadForPayment] = useState<LeadInfo | null>(null)
 
@@ -874,6 +878,23 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
       </div>
 
       {/* Modals */}
+      <TransferLeadModal
+        isOpen={transferModalOpen}
+        onClose={() => setTransferModalOpen(false)}
+        leads={leadsToTransfer}
+        assignableUsers={assignableUsers}
+        onTransferred={() => {
+          showToast(
+            leadsToTransfer.length > 1
+              ? `${leadsToTransfer.length} leads transferred successfully!`
+              : 'Lead transferred successfully!',
+            'success',
+          )
+          fetchLeadsData()
+          setSelectedLeads([])
+        }}
+      />
+
       <UploadLeadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
@@ -887,6 +908,10 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
         lead={selectedLeadForDetails}
+        onTransferClick={(lead) => {
+          setLeadsToTransfer([lead])
+          setTransferModalOpen(true)
+        }}
       />
 
       <GeneratePaymentModal
