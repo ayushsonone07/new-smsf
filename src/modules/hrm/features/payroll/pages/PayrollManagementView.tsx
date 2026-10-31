@@ -1,12 +1,13 @@
 import { useState } from "react";
 
-import { CalendarRange, Plus, RefreshCw, Search, SlidersHorizontal, Wallet } from "lucide-react";
+import { CalendarRange, CheckCircle2, Loader2, Plus, RefreshCw, Search, SlidersHorizontal, Wallet } from "lucide-react";
 
 import { useRole } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
 import { AnimatedFilterSelect, ErrorDisplay, PageHeader } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
+import { BulkPaymentDialog } from "../components/BulkPaymentDialog";
 import { GeneratePayrollDialog } from "../components/GeneratePayrollDialog";
 import { MarkPaidDialog } from "../components/MarkPaidDialog";
 import { PayrollDetailsDialog } from "../components/PayrollDetailsDialog";
@@ -15,6 +16,7 @@ import { payrollActionButtons, PayrollTable } from "../components/PayrollTable";
 import { SalaryStructureDialog } from "../components/SalaryStructureDialog";
 import {
   useApprovePayroll,
+  useBulkApprovePayroll,
   useCancelPayroll,
   usePayrollSummary,
   usePayrolls,
@@ -59,6 +61,8 @@ export function PayrollManagementView() {
   const [showStructure, setShowStructure] = useState(false);
   const [details, setDetails] = useState<Payroll | null>(null);
   const [paying, setPaying] = useState<Payroll | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showBulkPay, setShowBulkPay] = useState(false);
 
   const canManage = useRole(["HR_HEAD", "HR", "ADMIN"]);
 
@@ -88,11 +92,47 @@ export function PayrollManagementView() {
   }
 
   const approve = useApprovePayroll();
+  const bulkApprove = useBulkApprovePayroll();
   const process = useProcessPayroll();
   const cancel = useCancelPayroll();
   const toast = useToast();
 
   const totalPages = Math.max(1, data?.meta.totalPages ?? 1);
+
+  const selectedPayrolls = (data?.data ?? []).filter((p) => selectedIds.includes(p.id));
+
+  function handleToggleSelect(id: number) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleToggleSelectAll() {
+    const pageItems = data?.data ?? [];
+    if (selectedIds.length === pageItems.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(pageItems.map((p) => p.id));
+    }
+  }
+
+  function handleBulkApprove() {
+    if (selectedIds.length === 0) return;
+    bulkApprove.mutate(
+      { payrollIds: selectedIds },
+      {
+        onSuccess: (res) => {
+          toast.success(res.message || `Approved ${selectedIds.length} payroll(s).`);
+          setSelectedIds([]);
+          void refetch();
+          void summary.refetch();
+        },
+        onError: (err) => {
+          toast.error(getApiErrorMessage(err, "Failed to bulk approve payrolls."));
+        },
+      },
+    );
+  }
 
   function runTransition<T>(mutation: { mutate: (v: T, o: { onSuccess: () => void; onError: (e: unknown) => void }) => void }, value: T, message: string) {
     mutation.mutate(value, {

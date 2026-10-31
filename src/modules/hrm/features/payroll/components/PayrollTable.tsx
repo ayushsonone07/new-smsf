@@ -13,6 +13,9 @@ import type { Payroll, PayrollStatus } from "../types";
 interface PayrollTableProps {
   payrolls?: Payroll[] | undefined;
   loading?: boolean;
+  selectedIds?: number[];
+  onToggleSelect?: (id: number) => void;
+  onToggleSelectAll?: () => void;
   /** Optional overlay of actions rendered per row. */
   renderActions?: (payroll: Payroll) => ReactNode;
   onDetails?: (payroll: Payroll) => void;
@@ -22,6 +25,9 @@ interface PayrollTableProps {
 export function PayrollTable({
   payrolls,
   loading = false,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll,
   renderActions,
   onDetails,
   emptyMessage = "No payroll records found.",
@@ -44,11 +50,24 @@ export function PayrollTable({
     );
   }
 
+  const allSelected = payrolls.length > 0 && selectedIds.length === payrolls.length;
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-border bg-card">
       <table className="w-full min-w-[720px] text-sm">
         <thead className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
+            {onToggleSelect && (
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={onToggleSelectAll}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                  aria-label="Select all payrolls"
+                />
+              </th>
+            )}
             <th className="px-4 py-3 font-medium">Employee</th>
             <th className="px-4 py-3 font-medium">Period</th>
             <th className="px-4 py-3 text-right font-medium">Gross</th>
@@ -59,45 +78,71 @@ export function PayrollTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {payrolls.map((payroll) => (
-            <tr key={payroll.id} className="transition-colors hover:bg-muted/30">
-              <td className="px-4 py-3">
-                <p className="font-semibold text-foreground">{payroll.employeeName}</p>
-                <p className="text-xs text-muted-foreground">{payroll.employeeCode}</p>
-              </td>
-              <td className="px-4 py-3 text-foreground">
-                {periodShort(payroll.payrollMonth, payroll.payrollYear)}
-              </td>
-              <td className="px-4 py-3 text-right tabular-nums text-foreground">
-                {formatMoney(payroll.grossSalary)}
-              </td>
-              <td className="px-4 py-3 text-right tabular-nums text-foreground">
-                {formatMoney(payroll.totalDeductions)}
-              </td>
-              <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
-                {formatMoney(payroll.netSalary)}
-              </td>
-              <td className="px-4 py-3">
-                <PayrollStatusBadge status={payroll.status} />
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-1">
-                  {renderActions?.(payroll)}
-                  {onDetails ? (
-                    <button
-                      type="button"
-                      onClick={() => onDetails(payroll)}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      aria-label={`View details of ${payroll.employeeName}`}
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span className="hidden md:inline">View</span>
-                    </button>
-                  ) : null}
-                </div>
-              </td>
-            </tr>
-          ))}
+          {payrolls.map((payroll) => {
+            const isSelected = selectedIds.includes(payroll.id);
+            const isZeroSalary = Number(payroll.netSalary) <= 0;
+
+            return (
+              <tr
+                key={payroll.id}
+                className={`transition-colors hover:bg-muted/30 ${
+                  isSelected ? "bg-primary/5" : ""
+                }`}
+              >
+                {onToggleSelect && (
+                  <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelect(payroll.id)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                      aria-label={`Select ${payroll.employeeName}`}
+                    />
+                  </td>
+                )}
+                <td className="px-4 py-3">
+                  <p className="font-semibold text-foreground">{payroll.employeeName}</p>
+                  <p className="text-xs text-muted-foreground">{payroll.employeeCode}</p>
+                </td>
+                <td className="px-4 py-3 text-foreground">
+                  {periodShort(payroll.payrollMonth, payroll.payrollYear)}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                  {formatMoney(payroll.grossSalary)}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                  {formatMoney(payroll.totalDeductions)}
+                </td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
+                  {formatMoney(payroll.netSalary)}
+                  {isZeroSalary && (
+                    <span className="ml-1.5 inline-flex items-center rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                      ₹0 Pay
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <PayrollStatusBadge status={payroll.status} />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    {renderActions?.(payroll)}
+                    {onDetails ? (
+                      <button
+                        type="button"
+                        onClick={() => onDetails(payroll)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        aria-label={`View details of ${payroll.employeeName}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="hidden md:inline">View</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

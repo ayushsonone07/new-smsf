@@ -140,7 +140,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/notification-history'),
-    badge: 4,
   },
 ]
 
