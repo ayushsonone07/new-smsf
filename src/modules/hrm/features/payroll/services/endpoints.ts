@@ -5,6 +5,8 @@ export const PAYROLL_ENDPOINTS = {
   summary: "/api/v1/payroll/summary",
   payslips: "/api/v1/payroll/payslips",
   payments: "/api/v1/payroll/payments",
+  bulkApprove: "/api/v1/payroll/bulk-approve",
+  bulkPay: "/api/v1/payroll/bulk-pay",
 } as const;
 
 export const PAYROLL_ENDPOINT_BUILDERS = {

@@ -103,6 +103,15 @@ interface ToastMessage {
   variant: ToastVariant
 }
 
+interface RegistrationSuccess {
+  businessName: string
+  registrationId: string
+  plan: string
+  total: number
+  paid: number
+  balance: number
+}
+
 const SECTIONS: {
   id: SectionId
   label: string
@@ -248,6 +257,10 @@ const WIZARD_STYLES = `
 .rb-step-in{animation:rbStepIn .35s cubic-bezier(.2,.7,.2,1) both}
 .rb-panel-in{animation:rbPanelIn .3s cubic-bezier(.2,.7,.2,1) both}
 .rb-pop{animation:rbPop .4s}
+.rb-registration{font-family:var(--app-font-family);background:#f4f6fb}
+.rb-registration input,.rb-registration textarea,.rb-registration select{font-weight:var(--app-font-weight-body)}
+.rb-registration input::placeholder,.rb-registration textarea::placeholder{color:#94a3b8}
+.rb-registration ::selection{background:#ffe08a}
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
@@ -330,6 +343,8 @@ export function RegisterBusinessPage() {
 
   // Internal toast notification
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [registrationSuccess, setRegistrationSuccess] =
+    useState<RegistrationSuccess | null>(null)
   const toastTimer = useRef<number | null>(null)
 
   const showToast = useCallback(
@@ -496,6 +511,7 @@ export function RegisterBusinessPage() {
   )
 
   const resetForm = useCallback(() => {
+    setRegistrationSuccess(null)
     setFormData({ ...INITIAL_FORM_DATA })
     setValidationErrors({ ...INITIAL_VALIDATION_ERRORS })
     setTouchedFields(new Set())
@@ -850,9 +866,28 @@ export function RegisterBusinessPage() {
   const selectedCount = formData.selectedPackages?.length || 0
 
   const activeIndex = SECTIONS.findIndex((s) => s.id === activeStep)
-  const activeSection = SECTIONS[activeIndex]
   const isLastStep = activeIndex === SECTIONS.length - 1
   const activeComplete = sectionStatus[activeStep]
+  const isFirstPage = activeIndex < 2
+  const pageNumber = isFirstPage ? 1 : 2
+  const pageComplete = isFirstPage
+    ? businessComplete && packagesComplete
+    : financialComplete && finalComplete
+  const pageTitle = isFirstPage ? 'Business & package' : 'Payment & final details'
+  const pageSubtitle = isFirstPage
+    ? 'Customer details, payment verification and plan'
+    : 'Amounts, invoice, sales info and review'
+  const requiredFieldsLeft = isFirstPage
+    ? [
+        !formData.ownerName.trim(),
+        !formData.businessName.trim(),
+        !validateEmail(formData.email),
+        !validatePhoneNumber(formData.phoneNumber),
+        !(formData.city || cityInput).trim(),
+        !paymentVerified,
+        selectedCount === 0,
+      ].filter(Boolean).length
+    : [!financialComplete, !formData.salesPersonName, !formData.leadType].filter(Boolean).length
 
   const handleStepClick = useCallback(
     (id: SectionId) => {
@@ -1215,12 +1250,25 @@ export function RegisterBusinessPage() {
 
       await registerCustomer(customerData)
 
+      const submittedTotal = Number(formData.totalAmount) || autoTotal
+      const submittedPaid =
+        formData.paymentType === 'part-time'
+          ? Number(formData.amountPaid) || 0
+          : (verifiedPaymentAmount ?? Number(formData.amountPaid)) || 0
+      setRegistrationSuccess({
+        businessName: formData.businessName,
+        registrationId: `MBG-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+        plan: packageNames || 'Selected plan',
+        total: submittedTotal,
+        paid: submittedPaid,
+        balance: Math.max(0, submittedTotal - submittedPaid),
+      })
+
       showToast({
         title: 'Registration Successful',
         description: 'Customer has been registered successfully!',
         variant: 'success',
       })
-      resetForm()
       setIsSubmitting(false)
       setShowPasskeyModal(false)
     } catch (error: any) {
@@ -1242,21 +1290,24 @@ export function RegisterBusinessPage() {
     resetForm,
     paymentVerified,
     verifiedPaymentAmount,
+    autoTotal,
     scrollToSection,
   ])
 
   const inputClass = (hasError?: boolean) =>
-    `h-9 w-full rounded-md border bg-white px-3 py-1 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+    `h-10 w-full rounded-[10px] border bg-white px-3 py-1 text-[13px] font-semibold text-slate-900 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-[3px] disabled:cursor-not-allowed disabled:bg-slate-100 ${
       hasError
-        ? 'border-red-500 ring-1 ring-red-200 focus:ring-red-200'
-        : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-200'
+        ? 'border-red-400 bg-red-50/30 ring-1 ring-red-100 focus:ring-red-100'
+        : 'border-[#e2e6ee] hover:border-slate-300 focus:border-[#2459e0] focus:ring-[#dde7ff]'
     }`
 
   const textareaClass =
-    'w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200'
+    'w-full resize-none rounded-[10px] border border-[#e2e6ee] bg-white p-3 text-[13px] font-semibold text-slate-900 transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-[#2459e0] focus:outline-none focus:ring-[3px] focus:ring-[#dde7ff]'
 
   /* Footer hint text */
-  const footerHint = isLastStep
+  const footerHint = requiredFieldsLeft > 0
+    ? `${requiredFieldsLeft} required field${requiredFieldsLeft === 1 ? '' : 's'} left`
+    : isLastStep
     ? 'By registering, you agree to our Terms of Service and Privacy Policy.'
     : activeStep === 'packages' && selectedCount > 0
       ? `${selectedCount} selected · ₹${autoTotal.toLocaleString('en-IN')}${includeGst ? ' incl. GST' : ''}`
@@ -1270,13 +1321,68 @@ export function RegisterBusinessPage() {
     : null
   const panelOpen = activeStep === 'packages' && !!viewingPlan
 
+  if (registrationSuccess) {
+    const facts = [
+      ['Plan', registrationSuccess.plan],
+      ['Total', `₹${registrationSuccess.total.toLocaleString('en-IN')}`],
+      ['Paid', `₹${registrationSuccess.paid.toLocaleString('en-IN')}`],
+      [
+        'Balance',
+        registrationSuccess.balance
+          ? `₹${registrationSuccess.balance.toLocaleString('en-IN')}`
+          : 'Nil',
+      ],
+    ]
+
+    return (
+      <div className="rb-registration grid min-h-screen place-items-center bg-[#f4f6fb] p-4 text-slate-900">
+        <style>{WIZARD_STYLES}</style>
+        <section className="rb-step-in w-full max-w-[840px] rounded-[22px] border border-[#dfe4ed] bg-white px-6 py-10 sm:px-8 sm:py-11">
+          <div className="mx-auto grid h-[108px] w-[108px] place-items-center rounded-full bg-[#dcfce7] text-[#16a34a]">
+            <Check className="h-12 w-12 stroke-[2.4]" />
+          </div>
+          <div className="mt-5 text-center leading-tight">
+            <h1 className="break-words text-[26px] font-bold text-slate-950">
+              {registrationSuccess.businessName} is registered
+            </h1>
+            <p className="mt-1 text-base font-semibold text-slate-500">
+              Registration ID{' '}
+              <strong className="font-bold text-slate-950">
+                {registrationSuccess.registrationId}
+              </strong>
+            </p>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {facts.map(([label, value]) => (
+              <div key={label} className="min-h-[78px] rounded-2xl bg-[#f7f9fd] px-5 py-3.5 leading-tight">
+                <p className="text-sm font-semibold text-slate-500">{label}</p>
+                <p className="mt-1 break-words text-lg font-bold text-slate-950">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 rounded-2xl border border-[#ffe19a] bg-[#fffbea] px-5 py-4 text-base font-semibold leading-relaxed text-[#8a5a00]">
+            Assigned to an onboarding executive by round robin. The customer gets the confirmation link on WhatsApp and email.
+          </div>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <button type="button" onClick={resetForm} className="h-[62px] rounded-2xl border border-[#dfe4ed] bg-white px-6 text-base font-bold text-slate-900 transition-colors hover:bg-[#f7f9fd]">
+              Register another business
+            </button>
+            <button type="button" onClick={() => navigate({ to: '/onboarding-head/customers' as never })} className="h-[62px] rounded-2xl bg-[#2459e0] px-6 text-base font-bold text-white transition-colors hover:bg-[#1a45b8]">
+              Go to Customer List
+            </button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-sm text-slate-900">
+    <div className="rb-registration flex min-h-screen flex-col text-sm text-slate-900">
       <style>{WIZARD_STYLES}</style>
 
       {/* ─── Sticky header: back, title, progress ─── */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="flex h-14 items-center gap-3 px-3 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-[#e6e9f0] bg-white/95 backdrop-blur">
+        <div className="flex min-h-[58px] items-center gap-2.5 px-3 py-2 sm:px-4">
           <button
             type="button"
             onClick={() => {
@@ -1286,80 +1392,79 @@ export function RegisterBusinessPage() {
                 navigate({ to: '/login' as never })
               }
             }}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] border border-[#e6e9f0] text-slate-500 transition-colors hover:bg-[#f4f6fb] hover:text-slate-900"
             aria-label="Back"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back</span>
           </button>
-          <div className="flex min-w-0 items-center gap-2">
-            <img
-              src="https://www.mbgcard.in/mbg_logo.png"
-              alt="MBG logo"
-              className="h-7 w-7 flex-shrink-0 rounded-lg"
-            />
-            <h1 className="truncate text-base font-bold text-slate-900">
-              Register Your Business
-            </h1>
+          <div
+            aria-label="MBG"
+            className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[10px] bg-[#2459e0] text-[12px] font-bold text-white shadow-[inset_0_-3px_0_#ffc629]"
+          >
+            <span aria-hidden="true">M<span className="text-[#ffc629]">B</span>G</span>
           </div>
-
-          <span className="flex-1" />
-
-          <span className="hidden whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500 sm:inline-block">
-            {completedCount}/{SECTIONS.length} done
-          </span>
+          <div className="mr-auto min-w-0 leading-tight">
+            <h1 className="truncate text-base font-bold text-slate-900">Register your business</h1>
+            <p className="truncate text-xs font-semibold text-slate-500">MBG Card · New customer</p>
+          </div>
+          <div className="hidden items-center gap-2 rounded-full bg-[#f4f6fb] px-2.5 py-1.5 sm:flex">
+            <span className="h-1.5 w-[60px] overflow-hidden rounded-full bg-[#e2e6ee]">
+              <span className="block h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+            </span>
+            <span className="whitespace-nowrap text-xs font-bold tabular-nums text-[#1a45b8]">{completedCount}/{SECTIONS.length} done</span>
+          </div>
           <button
             type="button"
             onClick={() => {
               window.location.href = '/hrm/login'
             }}
-            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+            className="hidden h-[34px] cursor-pointer items-center rounded-[10px] border border-[#e2e6ee] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] md:inline-flex"
           >
             HRM Login
           </button>
           <button
             type="button"
             onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+            className="inline-flex h-[34px] cursor-pointer items-center rounded-[10px] bg-[#2459e0] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] sm:px-4"
           >
             Login
           </button>
         </div>
-        <div className="h-0.5 bg-slate-100">
+        <div className="h-0.5 bg-[#eef1f6] sm:hidden">
           <div
-            className="h-full bg-blue-600 transition-all duration-500"
+            className="h-full bg-[#2459e0] transition-all duration-500"
             style={{ width: `${progressPct}%` }}
           />
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 p-2.5 sm:p-4 lg:py-5">
         {/* ─── Left stepper rail ─── */}
-        <aside className="sticky top-[58px] flex h-[calc(100vh-58px)] w-14 flex-none flex-col items-center border-r border-slate-200 bg-white py-6 sm:w-[76px]">
+        <aside className="hidden">
           {SECTIONS.map((s, k) => {
             const done = sectionStatus[s.id]
             const isActive = activeStep === s.id
             const isLocked = !unlocked[s.id]
             const Icon = s.icon
             return (
-              <div key={s.id} className="flex flex-col items-center">
+              <div key={s.id} className="flex min-w-[118px] flex-1 items-center lg:min-w-0 lg:flex-none lg:flex-col">
                 <button
                   type="button"
                   title={s.title}
                   onClick={() => handleStepClick(s.id)}
                   aria-current={isActive ? 'step' : undefined}
-                  className={`group flex flex-col items-center gap-1.5 p-0.5 ${
+                  className={`group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
                     isLocked ? 'cursor-not-allowed' : 'cursor-pointer'
-                  }`}
+                  } ${isActive ? 'bg-[#eaf0ff]' : 'hover:bg-[#f7f9fd]'}`}
                 >
                   <span
-                    className={`grid h-9 w-9 place-items-center rounded-full border-2 transition-all duration-200 ${
+                    className={`grid h-[30px] w-[30px] flex-none place-items-center rounded-full border-[1.5px] transition-all duration-200 ${
                       done
                         ? `rb-pop border-emerald-500 bg-emerald-500 text-white ${
                             isActive ? 'shadow-[0_0_0_4px_#d1fae5]' : ''
                           }`
                         : isActive
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_#dbeafe]'
+                          ? 'border-[#2459e0] bg-[#2459e0] text-white shadow-[0_0_0_4px_#dde7ff]'
                           : isLocked
                             ? 'border-slate-200 bg-slate-50 text-slate-300'
                             : 'border-slate-300 bg-white text-slate-500 group-hover:border-blue-400 group-hover:text-blue-600'
@@ -1374,7 +1479,7 @@ export function RegisterBusinessPage() {
                     )}
                   </span>
                   <span
-                    className={`hidden w-16 text-center text-[10px] font-semibold leading-tight sm:block ${
+                    className={`min-w-0 truncate text-[13px] font-semibold leading-tight ${
                       isActive
                         ? 'text-slate-900'
                         : isLocked
@@ -1382,12 +1487,12 @@ export function RegisterBusinessPage() {
                           : 'text-slate-500'
                     }`}
                   >
-                    {s.label}
+                    {s.title}
                   </span>
                 </button>
                 {k < SECTIONS.length - 1 && (
                   <span
-                    className={`my-2.5 h-10 w-0.5 rounded-sm transition-colors duration-500 ${
+                    className={`mx-1 h-0.5 flex-1 rounded-sm transition-colors duration-500 lg:my-0.5 lg:ml-[24px] lg:h-3 lg:w-0.5 lg:flex-none ${
                       done ? 'bg-emerald-400' : 'bg-slate-200'
                     }`}
                   />
@@ -1398,7 +1503,7 @@ export function RegisterBusinessPage() {
         </aside>
 
         {/* ─── Step card ─── */}
-        <main className="min-w-0 flex-1 p-3 sm:p-6">
+        <main className="min-w-0 flex-1">
           <div
             key={activeStep}
             onInputCapture={() => {
@@ -1407,30 +1512,30 @@ export function RegisterBusinessPage() {
             onChangeCapture={() => {
               skipAutoAdvanceRef.current = false
             }}
-            className="rb-step-in flex min-h-[calc(100vh-106px)] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm"
+            className="rb-step-in flex min-h-[calc(100vh-100px)] flex-col overflow-hidden rounded-2xl border border-[#e6e9f0] bg-white"
           >
             {/* Card header */}
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+            <div className="relative flex items-center gap-3 border-b border-[#eef1f6] px-4 pb-5 pt-3.5 sm:px-[18px]">
               <span
-                className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
-                  activeComplete ? 'bg-emerald-500' : 'bg-blue-600'
+                className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-base font-bold text-white ${
+                  pageComplete ? 'bg-emerald-500' : 'bg-[#2459e0]'
                 }`}
               >
-                {activeComplete ? (
+                {pageComplete ? (
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 ) : (
-                  activeIndex + 1
+                  pageNumber
                 )}
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-base font-bold text-slate-900">
-                  {activeSection.title}
+                <h2 className="truncate text-[19px] font-bold text-slate-900">
+                  {pageTitle}
                 </h2>
-                <p className="text-xs text-slate-400">
-                  Step {activeIndex + 1} of {SECTIONS.length}
+                <p className="text-xs font-semibold text-slate-500">
+                  Page {pageNumber} of 2 · {pageSubtitle}
                 </p>
               </div>
-              {activeStep === 'packages' && unlocked.packages && (
+              {isFirstPage && unlocked.packages && (
                 <span className="ml-auto flex items-center gap-2">
                   {selectedCount > 0 && (
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
@@ -1451,17 +1556,23 @@ export function RegisterBusinessPage() {
                   />
                 </span>
               )}
+              <div className="absolute bottom-2 left-[18px] right-[18px] grid grid-cols-2 gap-1.5">
+                <span className="h-1 rounded-full bg-[#2459e0]" />
+                <span className={`h-1 rounded-full ${pageNumber === 2 ? 'bg-[#2459e0]' : 'bg-[#e6e9f0]'}`} />
+              </div>
             </div>
 
             {/* Card body */}
-            <div className="flex-1 p-4 sm:p-6">
+            <div className="flex-1 p-4 sm:p-[18px]">
               {!unlocked[activeStep] ? (
                 <LockedNotice message={lockedMessages[activeStep]} />
               ) : (
                 <>
                   {/* ═══ 1 — Business Details ═══ */}
-                  {activeStep === 'business' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                  {isFirstPage && (
+                    <section className="space-y-4 pt-2">
+                      <SectionHeading number={1} title="Business details" subtitle="Who the customer is" />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <Field label="Client Name" htmlFor="ownerName" required>
                         <input
                           id="ownerName"
@@ -1490,7 +1601,11 @@ export function RegisterBusinessPage() {
                           htmlFor="email"
                           required
                           error={
-                            shouldShowError('email') ? validationErrors.email : ''
+                            shouldShowError('email')
+                              ? validationErrors.email
+                              : formData.email && !validateEmail(formData.email)
+                                ? 'This email looks incomplete'
+                                : ''
                           }
                         >
                           <input
@@ -1502,7 +1617,10 @@ export function RegisterBusinessPage() {
                             }
                             onBlur={(e) => handleFieldBlur('email', e.target.value)}
                             placeholder="name@company.com"
-                            className={inputClass(shouldShowError('email'))}
+                            className={inputClass(
+                              shouldShowError('email') ||
+                                (!!formData.email && !validateEmail(formData.email)),
+                            )}
                           />
                         </Field>
                       </div>
@@ -1661,12 +1779,14 @@ export function RegisterBusinessPage() {
                           />
                         </Field>
                       </div>
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 2 — Select Packages & Verify Payment ═══ */}
-                  {activeStep === 'packages' && (
-                    <div className="flex items-start gap-6">
+                  {isFirstPage && (
+                    <section className="mt-5 border-t border-[#eef1f6] pt-5">
+                      <SectionHeading number={2} title="Payment & package" subtitle="Verify the customer's payment ID first — only plans within the verified amount can be selected." />
+                    <div className="mt-4 flex items-start gap-6">
                       <div className="min-w-0 flex-1">
                         <div className="mb-5 grid grid-cols-1 gap-4 min-[1100px]:grid-cols-2">
                           {/* Note: First verify payment, then select package */}
@@ -1844,9 +1964,7 @@ export function RegisterBusinessPage() {
                               </div>
                             )}
                             <div
-                              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
-                                panelOpen ? '' : 'min-[1100px]:grid-cols-4'
-                              }`}
+                              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
                             >
                               {visiblePlans.length === 0 ? (
                                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center text-sm text-slate-500 sm:col-span-2 min-[1100px]:col-span-full">
@@ -1929,21 +2047,30 @@ export function RegisterBusinessPage() {
                                           <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
                                             {pkg.name}
                                           </h3>
-                                          {isExceedingPayment && (
+                                          {isSelected ? (
+                                            <span className="flex-shrink-0 rounded-full bg-[#2459e0] px-3 py-1 text-xs font-bold text-white">
+                                              Selected
+                                            </span>
+                                          ) : isExceedingPayment ? (
                                             <span className="flex-shrink-0 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                                               Exceeds payment
+                                            </span>
+                                          ) : (
+                                            <span className="flex-shrink-0 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-bold text-[#15803d]">
+                                              Fits payment
                                             </span>
                                           )}
                                         </div>
                                         {(price.hasPrice || price.months > 0) && (
                                           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
                                             {price.hasPrice && (
-                                              <span>
-                                                <span className="text-sm font-bold text-emerald-600">
-                                                  ₹{price.amount.toLocaleString('en-IN')}
-                                                </span>{' '}
-                                                +18% = ₹
-                                                {price.withGst.toLocaleString('en-IN')}
+                                              <span className="flex flex-wrap items-baseline gap-2">
+                                                <span className="text-2xl font-bold text-slate-950">
+                                                  ₹{price.withGst.toLocaleString('en-IN')}
+                                                </span>
+                                                <span className="text-xs font-semibold text-slate-400">
+                                                  ₹{price.amount.toLocaleString('en-IN')} + 18% GST
+                                                </span>
                                               </span>
                                             )}
                                             {price.months > 0 && (
@@ -1960,7 +2087,7 @@ export function RegisterBusinessPage() {
                                               return (
                                                 <span
                                                   key={dept}
-                                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-xs font-semibold text-slate-700"
                                                 >
                                                   <span
                                                     className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
@@ -2022,12 +2149,14 @@ export function RegisterBusinessPage() {
                           onClose={() => setViewingPlanId(null)}
                         />
                       )}
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 3 — Financial Information ═══ */}
-                  {activeStep === 'financial' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                  {!isFirstPage && (
+                    <section className="space-y-4 pt-2">
+                      <SectionHeading number={3} title="Payment details" subtitle="Amounts, payment type and invoice information" />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1">
                         <label
                           htmlFor="expirationInMonths"
@@ -2065,7 +2194,7 @@ export function RegisterBusinessPage() {
                           >
                             Total Amount (₹) <span className="text-red-500">*</span>
                           </label>
-                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-[11px] font-medium text-slate-600">
+                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-xs font-semibold text-slate-600">
                             <span className="select-none">18% GST</span>
                             <button
                               type="button"
@@ -2367,12 +2496,14 @@ export function RegisterBusinessPage() {
                           </Field>
                         </div>
                       )}
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 4 — Final Details ═══ */}
-                  {activeStep === 'final' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-3">
+                  {!isFirstPage && (
+                    <section className="mt-5 border-t border-[#eef1f6] pt-5">
+                      <SectionHeading number={4} title="Sales & handoff" subtitle="Final details before registration" />
+                    <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-3">
                       <Field
                         label="Sales Person Name"
                         htmlFor="salesPersonName"
@@ -2414,19 +2545,19 @@ export function RegisterBusinessPage() {
                           className={inputClass()}
                         />
                       </Field>
-                    </div>
+                    </div></section>
                   )}
                 </>
               )}
             </div>
 
             {/* Card footer: Previous / hint / Continue (or Complete Registration) */}
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-4 sm:px-6">
+            <div className="flex items-center justify-between gap-3 border-t border-[#eef1f6] px-4 py-3 sm:px-[18px]">
               <button
                 type="button"
-                onClick={() => goToStep(SECTIONS[activeIndex - 1].id)}
-                className={`cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${
-                  activeIndex === 0 ? 'invisible' : ''
+                onClick={() => goToStep('packages')}
+                className={`h-10 cursor-pointer rounded-xl border border-[#e2e6ee] bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] ${
+                  isFirstPage ? 'invisible' : ''
                 }`}
               >
                 ← Previous
@@ -2438,14 +2569,14 @@ export function RegisterBusinessPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    isLastStep
+                    !isFirstPage
                       ? handleFinalSubmit()
-                      : goToStep(SECTIONS[activeIndex + 1].id)
+                      : goToStep('financial')
                   }
-                  disabled={!isLastStep && !activeComplete}
-                  className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  disabled={!pageComplete}
+                  className="h-10 cursor-pointer rounded-xl bg-[#2459e0] px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
                 >
-                  {isLastStep ? 'Complete Registration' : 'Continue →'}
+                  {!isFirstPage ? 'Complete Registration' : 'Continue →'}
                 </button>
               </div>
             </div>
@@ -2553,6 +2684,28 @@ export function RegisterBusinessPage() {
 /* ─────────────────────────────────────────────────────────────────
    Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
+
+function SectionHeading({
+  number,
+  title,
+  subtitle,
+}: {
+  number: number
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-[#e8efff] text-[13px] font-bold text-[#1a45b8]">
+        {number}
+      </span>
+      <div className="min-w-0 leading-tight">
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        <p className="text-xs font-semibold text-slate-500">{subtitle}</p>
+      </div>
+    </div>
+  )
+}
 
 function FilterChip({
   active,
@@ -2692,7 +2845,7 @@ function FeaturesPanel({
                 return (
                   <span
                     key={dept}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-xs font-semibold text-slate-700"
                   >
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
@@ -2712,7 +2865,7 @@ function FeaturesPanel({
           features.map((feature, idx) => (
             <div
               key={idx}
-              className="mb-1.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 text-xs font-medium text-slate-700"
+              className="mb-1.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 text-xs font-semibold text-slate-700"
             >
               <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="h-2 w-2 stroke-[3.5]" />
@@ -2803,10 +2956,10 @@ function ChoiceCard({
     <label
       htmlFor={id}
       onClick={() => onSelect(value)}
-      className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-[13px] font-medium transition-colors ${
+      className={`flex h-10 cursor-pointer items-center gap-2 rounded-[10px] border px-3 text-[13px] font-semibold transition-all ${
         selected
-          ? 'border-blue-500 bg-blue-50 text-blue-900'
-          : 'border-slate-200 text-slate-700 hover:border-blue-300'
+          ? 'border-[#2459e0] bg-[#f4f7ff] text-[#1a45b8] shadow-[0_0_0_3px_#e8efff]'
+          : 'border-[#e2e6ee] bg-white text-slate-700 hover:border-blue-300'
       }`}
     >
       <input

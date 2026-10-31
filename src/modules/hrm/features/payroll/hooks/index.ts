@@ -1,6 +1,8 @@
 export {
   payrollKeys,
   useApprovePayroll,
+  useBulkApprovePayroll,
+  useBulkPayPayroll,
   useCancelPayroll,
   useEmployeePayrolls,
   useEmployeePayslips,

@@ -16,6 +16,7 @@ import {
   TrendingUp,
   LayoutGrid,
   CreditCard,
+  UserPlus,
 } from 'lucide-react'
 import {
   getLeads,
@@ -28,10 +29,12 @@ import {
   type FunnelItem,
 } from '../../../api/leads.api'
 import { UploadLeadModal } from '../components/UploadLeadModal'
+import { AddLeadModal } from '../components/AddLeadModal'
 import { LeadDetailsModal } from '../components/LeadDetailsModal'
 import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
 import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
+import { TransferLeadModal } from '../components/TransferLeadModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
 import '../../customers/pages/AdminCustomersPage.css'
@@ -136,9 +139,12 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [addLeadModalOpen, setAddLeadModalOpen] = useState(false)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<LeadInfo | null>(null)
 
+  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [leadsToTransfer, setLeadsToTransfer] = useState<LeadInfo[]>([])
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [selectedLeadForPayment, setSelectedLeadForPayment] = useState<LeadInfo | null>(null)
 
@@ -291,7 +297,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const end = Math.min((currentPage + 1) * pageSize, totalElements)
 
   return (
-    <div className="space-y-4 font-sans">
+    <div className="space-y-4 px-3 py-4 font-sans sm:px-5 lg:px-6 xl:px-8">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-6 right-6 z-50 flex items-start gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl max-w-sm animate-in fade-in slide-in-from-top-4">
@@ -422,6 +428,15 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
                 <span>Filters</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAddLeadModalOpen(true)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Add Lead</span>
               </button>
 
               <button
@@ -796,6 +811,36 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
       )}
 
       {/* Modals */}
+      <TransferLeadModal
+        isOpen={transferModalOpen}
+        onClose={() => setTransferModalOpen(false)}
+        leads={leadsToTransfer}
+        assignableUsers={assignableUsers}
+        onTransferred={() => {
+          showToast(
+            leadsToTransfer.length > 1
+              ? `${leadsToTransfer.length} leads transferred successfully!`
+              : 'Lead transferred successfully!',
+            'success',
+          )
+          fetchLeadsData()
+          setSelectedLeads([])
+        }}
+      />
+
+      <AddLeadModal
+        isOpen={addLeadModalOpen}
+        onClose={() => setAddLeadModalOpen(false)}
+        onSuccess={() => {
+          showToast('Lead added successfully!', 'success')
+          void fetchLeadsData()
+        }}
+        funnels={funnels}
+        leadStatusOptions={LEAD_STATUS_OPTIONS}
+        platformOptions={LEAD_TYPE_OPTIONS}
+        assignableUsers={assignableUsers}
+      />
+
       <UploadLeadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
@@ -809,6 +854,10 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
         lead={selectedLeadForDetails}
+        onTransferClick={(lead) => {
+          setLeadsToTransfer([lead])
+          setTransferModalOpen(true)
+        }}
       />
 
       <GeneratePaymentModal

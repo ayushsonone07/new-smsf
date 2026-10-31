@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
-  BarChart3,
+  AlertTriangle,
+  Ticket,
   CheckCircle2,
   Clock,
   RefreshCw,
@@ -26,12 +27,12 @@ interface HelpCenterAnalyticsViewProps {
 }
 
 const statusCardConfig = [
-  { key: 'open', label: 'Open', borderClass: 'border-amber-200' },
-  { key: 'inProgress', label: 'In Progress', borderClass: 'border-blue-200' },
-  { key: 'waitingOnCustomer', label: 'Waiting', borderClass: 'border-purple-200' },
-  { key: 'resolved', label: 'Resolved', borderClass: 'border-green-200' },
-  { key: 'closed', label: 'Closed', borderClass: 'border-slate-200' },
-  { key: 'escalated', label: 'Escalated', borderClass: 'border-rose-200' },
+  { key: 'open', label: 'Open', barClass: 'bg-amber-400', pillClass: 'bg-amber-100 text-amber-800' },
+  { key: 'inProgress', label: 'In Progress', barClass: 'bg-blue-500', pillClass: 'bg-blue-100 text-blue-700' },
+  { key: 'waitingOnCustomer', label: 'Waiting', barClass: 'bg-purple-400', pillClass: 'bg-purple-100 text-purple-700' },
+  { key: 'resolved', label: 'Resolved', barClass: 'bg-emerald-500', pillClass: 'bg-emerald-100 text-emerald-700' },
+  { key: 'closed', label: 'Closed', barClass: 'bg-slate-400', pillClass: 'bg-slate-100 text-slate-700' },
+  { key: 'escalated', label: 'Escalated', barClass: 'bg-rose-500', pillClass: 'bg-rose-100 text-rose-700' },
 ]
 
 export function HelpCenterAnalyticsView({
@@ -225,35 +226,39 @@ export function HelpCenterAnalyticsView({
     )
   }
 
+  const escalatedCount = selectedUser ? selectedUser.escalated : analytics.overallEscalated
+  const kpiCards = [
+    { key: 'total', label: 'Total tickets', value: overallTotal, sub: selectedUser ? selectedUser.userEmail : 'Across the department', icon: Ticket, tone: 'bg-blue-50 text-blue-600' },
+    { key: 'solved', label: 'Solved', value: solved, sub: `${solvedPercent.toFixed(1)}% of total`, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-600' },
+    { key: 'unsolved', label: 'Not solved', value: notSolved, sub: `${notSolvedPercent.toFixed(1)}% of total`, icon: Clock, tone: 'bg-amber-50 text-amber-600' },
+    { key: 'escalated', label: 'Escalated', value: escalatedCount, sub: 'Needs attention', icon: AlertTriangle, tone: 'bg-rose-50 text-rose-600' },
+  ]
+  const memberMax = Math.max(...userList.map((x) => x.totalTickets), 1)
+
   return (
-    <div className="space-y-5">
+    <div className={`space-y-4 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-            <BarChart3 className="h-5 w-5" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+              {selectedUser ? `${selectedUser.userName}'s analytics` : 'Help Center analytics'}
+            </h2>
+            {selectedUser && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                <Users className="h-3 w-3" />
+                Individual view
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                {selectedUser ? `${selectedUser.userName}'s Analytics` : 'Help Center Analytics'}
-              </h2>
-              {selectedUser && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  <Users className="h-3 w-3" />
-                  Individual View
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {selectedUser
-                ? `Showing ticket metrics for ${selectedUser.userEmail}`
-                : 'Ticket metrics and workload distribution across department'}
-            </p>
-          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {selectedUser
+              ? `Ticket metrics for ${selectedUser.userEmail}`
+              : 'Ticket metrics and workload across your team'}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {selectedUser && (
             <button
               type="button"
@@ -261,181 +266,117 @@ export function HelpCenterAnalyticsView({
                 setSelectedUser(null)
                 setSearchQuery('')
               }}
-              className="px-3.5 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-lg inline-flex items-center gap-1.5 transition-colors"
+              className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Department</span>
+              <span>Back to team</span>
             </button>
           )}
-
           <button
             type="button"
             onClick={onRefresh}
             disabled={isLoading || isRefreshing}
-            className="h-9 px-3.5 inline-flex items-center gap-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors disabled:opacity-60"
+            className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors disabled:opacity-60"
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`}
-            />
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
-      {/* ── Status Metrics Cards (7 Cards) ── */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
-          Overview: {overallTotal} Total Tickets
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
-            <p className="text-xs font-medium text-slate-500">Total</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{overallTotal}</p>
-          </div>
-          {statusCardConfig.map((cfg) => {
-            const val = getStatusValue(cfg.key)
-            return (
-              <div
-                key={cfg.key}
-                className={`p-4 rounded-xl border ${cfg.borderClass} bg-white shadow-2xs`}
-              >
-                <p className="text-xs font-medium text-slate-500">{cfg.label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{val}</p>
-              </div>
-            )
-          })}
-        </div>
+      {/* ── KPI cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpiCards.map((card) => {
+          const CardIcon = card.icon
+          return (
+            <div key={card.key} className="flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-slate-200">
+              <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${card.tone}`}>
+                <CardIcon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-2xl font-bold leading-none text-slate-900">{card.value}</span>
+                <span className="mt-1 block text-xs font-medium text-slate-600">{card.label}</span>
+                <span className="block text-[11px] text-slate-400 truncate">{card.sub}</span>
+              </span>
+            </div>
+          )
+        })}
       </div>
 
-      {/* ── Solved vs Not Solved Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
-              Solved
-            </p>
+      {/* ── Status breakdown + team workload ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="p-5 rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900">Status breakdown</h3>
+            <span className="text-xs text-slate-400">{overallTotal} tickets</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-950 mt-1">{solved}</p>
-          <p className="text-xs text-emerald-700 mt-0.5 font-medium">
-            {solvedPercent.toFixed(1)}% of total tickets
-          </p>
-        </div>
 
-        <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/60 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-rose-600" />
-            <p className="text-xs font-semibold text-rose-800 uppercase tracking-wider">
-              Not Solved
-            </p>
-          </div>
-          <p className="text-2xl font-bold text-rose-950 mt-1">{notSolved}</p>
-          <p className="text-xs text-rose-700 mt-0.5 font-medium">
-            {notSolvedPercent.toFixed(1)}% of total tickets
-          </p>
-        </div>
-      </div>
-
-      {/* ── Charts: Donut Pie & Bar Chart ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Solved vs Not Solved Donut Chart */}
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">Solved vs Not Solved</h3>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-2">
-            {/* SVG Donut */}
-            <div className="relative w-44 h-44 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                {/* Background circle */}
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3.8"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                {/* Solved stroke */}
-                {overallTotal > 0 && (
-                  <path
-                    className="text-emerald-500"
-                    strokeDasharray={`${solvedPercent}, 100`}
-                    strokeWidth="3.8"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            {overallTotal > 0 &&
+              statusCardConfig.map((cfg) => {
+                const val = getStatusValue(cfg.key)
+                if (!val) return null
+                return (
+                  <div
+                    key={cfg.key}
+                    className={`${cfg.barClass} h-full`}
+                    style={{ width: `${(val / overallTotal) * 100}%` }}
+                    title={`${cfg.label}: ${val}`}
                   />
-                )}
-                {/* Not solved stroke */}
-                {overallTotal > 0 && notSolved > 0 && (
-                  <path
-                    className="text-rose-500"
-                    strokeDasharray={`${notSolvedPercent}, 100`}
-                    strokeDashoffset={`-${solvedPercent}`}
-                    strokeWidth="3.8"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                )}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                <span className="text-xl font-bold text-slate-900">{overallTotal}</span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
-                  Tickets
-                </span>
-              </div>
-            </div>
+                )
+              })}
+          </div>
 
-            {/* Legend */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-3.5 h-3.5 rounded-full bg-emerald-500" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">
-                    Solved: <span className="font-bold">{solved}</span>
-                  </p>
-                  <p className="text-[11px] text-slate-500">{solvedPercent.toFixed(1)}%</p>
+          <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {statusCardConfig.map((cfg) => {
+              const val = getStatusValue(cfg.key)
+              const pct = overallTotal > 0 ? (val / overallTotal) * 100 : 0
+              return (
+                <div key={cfg.key} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${cfg.barClass}`} />
+                    <span className="text-[11px] font-medium text-slate-500">{cfg.label}</span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-lg font-bold text-slate-900">{val}</span>
+                    <span className="text-[11px] text-slate-400">{pct.toFixed(0)}%</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-3.5 h-3.5 rounded-full bg-rose-500" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">
-                    Not Solved: <span className="font-bold">{notSolved}</span>
-                  </p>
-                  <p className="text-[11px] text-slate-500">{notSolvedPercent.toFixed(1)}%</p>
-                </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
         </div>
 
-        {/* Tickets by User Bar Chart */}
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">
-            {selectedUser ? 'User Ticket Breakdown' : 'Tickets by Team Member'}
-          </h3>
-          <div className="space-y-3 max-h-52 overflow-y-auto pr-1">
+        <div className="p-5 rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900">
+              {selectedUser ? 'Ticket breakdown' : 'Tickets by team member'}
+            </h3>
+            <span className="text-xs text-slate-400">{userList.length} members</span>
+          </div>
+          <div className="space-y-3.5 max-h-60 overflow-y-auto pr-1">
             {userList.length === 0 ? (
               <p className="text-xs text-slate-400 py-8 text-center">No member data available</p>
             ) : (
               userList.slice(0, 8).map((u) => {
-                const max = Math.max(...userList.map((x) => x.totalTickets), 1)
-                const widthPercent = Math.max((u.totalTickets / max) * 100, 4)
-
+                const solvedShare = u.totalTickets > 0 ? ((u.resolved + u.closed) / u.totalTickets) * 100 : 0
                 return (
-                  <div key={u.userEmail} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-800 truncate max-w-[180px]">
-                        {u.userName}
+                  <div key={u.userEmail}>
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">
+                          {u.userName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="font-medium text-slate-800 truncate">{u.userName}</span>
                       </span>
-                      <span className="font-bold text-slate-900">{u.totalTickets}</span>
+                      <span className="flex-shrink-0 text-slate-500">
+                        <span className="font-bold text-slate-900">{u.totalTickets}</span> · {solvedShare.toFixed(0)}% solved
+                      </span>
                     </div>
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className="bg-indigo-600 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${widthPercent}%` }}
+                        className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                        style={{ width: `${Math.max((u.totalTickets / memberMax) * 100, 4)}%` }}
                       />
                     </div>
                   </div>
@@ -446,51 +387,49 @@ export function HelpCenterAnalyticsView({
         </div>
       </div>
 
-      {/* ── User-wise Analytics Table ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      {/* ── Team table ── */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              {selectedUser ? 'User Details' : 'Team Member Analytics'}
+              {selectedUser ? 'Member details' : 'Team member analytics'}
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Click on any row to drill down into individual metrics
-            </p>
+            {!selectedUser && (
+              <p className="text-xs text-slate-500 mt-0.5">Click a member to see their individual metrics</p>
+            )}
           </div>
 
           {!selectedUser && (
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search user or email..."
-                className="w-full h-8 pl-8 pr-3 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="Search name, email or department…"
+                className="w-full h-10 pl-9 pr-3 text-xs border border-slate-200 rounded-xl bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
             </div>
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/90 text-slate-700 font-semibold border-b border-slate-200">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="py-3 px-3.5 whitespace-nowrap">Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Email</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Total</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Open</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">In Prog.</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Waiting</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Resolved</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Closed</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Escalated</th>
+                <th className="py-3 px-5 font-semibold whitespace-nowrap">Member</th>
+                <th className="py-3 px-3 font-semibold whitespace-nowrap text-center">Total</th>
+                {statusCardConfig.map((cfg) => (
+                  <th key={cfg.key} className="py-3 px-3 font-semibold whitespace-nowrap text-center">
+                    {cfg.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {userList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={2 + statusCardConfig.length} className="py-10 text-center text-slate-400">
                     No team members found
                   </td>
                 </tr>
@@ -499,60 +438,38 @@ export function HelpCenterAnalyticsView({
                   <tr
                     key={u.userEmail}
                     onClick={() => {
-                      if (!selectedUser) {
-                        setSelectedUser(u)
-                      }
+                      if (!selectedUser) setSelectedUser(u)
                     }}
-                    className={`transition-colors ${
-                      !selectedUser
-                        ? 'hover:bg-blue-50/50 cursor-pointer'
-                        : 'hover:bg-transparent'
-                    }`}
+                    className={`transition-colors ${!selectedUser ? 'hover:bg-blue-50/40 cursor-pointer' : ''}`}
                   >
-                    <td className="py-3 px-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                    <td className="py-3 px-5 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
                           {u.userName.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-slate-900">{u.userName}</span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900">{u.userName}</p>
+                          <p className="text-[11px] text-slate-500">{u.userEmail}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">{u.userEmail}</td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-900 whitespace-nowrap">
+                    <td className="py-3 px-3 text-center text-sm font-bold text-slate-900 whitespace-nowrap">
                       {u.totalTickets}
                     </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
-                        {u.open}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
-                        {u.inProgress}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700">
-                        {u.waitingOnCustomer}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
-                        {u.resolved}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-600 whitespace-nowrap">
-                      {u.closed}
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      {u.escalated > 0 ? (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-700">
-                          {u.escalated}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">0</span>
-                      )}
-                    </td>
+                    {statusCardConfig.map((cfg) => {
+                      const val = u[cfg.key as keyof HelpCenterDashboardUserAnalytics] as number
+                      return (
+                        <td key={cfg.key} className="py-3 px-3 text-center whitespace-nowrap">
+                          {val > 0 ? (
+                            <span className={`inline-flex min-w-[24px] justify-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.pillClass}`}>
+                              {val}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))
               )}
@@ -563,4 +480,3 @@ export function HelpCenterAnalyticsView({
     </div>
   )
 }
-

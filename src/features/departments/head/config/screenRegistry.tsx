@@ -34,6 +34,11 @@ const DeliveredCustomersPage = lazyScreen(() => import('../pages/DeliveredCustom
 const RecurringDashboardPage = lazyScreen(() => import('../pages/RecurringDashboardPage'), 'RecurringDashboardPage')
 const LeadsManagementPage = lazyScreen(() => import('../../../sales/pages/LeadsManagementPage'), 'LeadsManagementPage')
 const PlanManagementPage = lazyScreen(() => import('../../../plans/pages/PlanManagementPage'), 'PlanManagementPage')
+const ConfirmationPreviewPage = lazy(() =>
+  import('../../../../components/customers/confirmation').then((module) => ({
+    default: (module.ConfirmationPreviewPage || module.default) as ComponentType<{ feature: FeaturePermission }>,
+  })),
+)
 
 interface ScreenEntry {
   component: ComponentType<{ feature: FeaturePermission }>
@@ -76,5 +81,8 @@ export const SCREEN_REGISTRY: Record<HeadScreenKey, ScreenEntry> = {
   leads: { component: LeadsManagementPage as any, title: 'Leads Management' },
   plans: { component: PlanManagementPage as any, title: 'Plan Management' },
   'manage-plans': { component: PlanManagementPage as any, title: 'Plan Management' },
+  confirmation: { component: ConfirmationPreviewPage as any, title: 'Confirmation Link' },
+  confirm: { component: ConfirmationPreviewPage as any, title: 'Confirmation Link' },
+  'confirmation-link': { component: ConfirmationPreviewPage as any, title: 'Confirmation Link' },
   custom: { component: CustomFeaturePage },
 } as Record<string, ScreenEntry>

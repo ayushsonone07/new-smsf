@@ -11,10 +11,12 @@ import {
   CreditCard,
   FileText,
   Clock,
+  ArrowRightLeft,
 } from 'lucide-react'
 import type { LeadInfo } from '../../../api/leads.api'
 
 interface LeadDetailsModalProps {
+  onTransferClick?: (lead: LeadInfo) => void
   isOpen: boolean
   onClose: () => void
   lead: LeadInfo | null
@@ -24,6 +26,7 @@ export const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
   isOpen,
   onClose,
   lead,
+  onTransferClick,
 }) => {
   if (!isOpen || !lead) return null
 

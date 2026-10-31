@@ -23,6 +23,7 @@ import {
   Wallet,
   Bell,
   CalendarCheck,
+  LifeBuoy,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -38,6 +39,7 @@ type NavPath =
   | '/admin/timelines'
   | '/admin/service-flow'
   | '/admin/notification-history'
+  | '/admin/help-support'
   | '/manage-leads'
   | '/manage-customers-payment'
   | '/head'
@@ -134,13 +136,20 @@ const NAV_ITEMS: NavItem[] = [
       pathname.startsWith('/admin/payments'),
   },
   {
+    to: '/admin/help-support',
+    label: 'Help & Support',
+    icon: LifeBuoy,
+    roles: ['ADMIN'],
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/help-support'),
+  },
+  {
     to: '/admin/notification-history',
     label: 'Notification History',
     icon: Bell,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/notification-history'),
-    badge: 4,
   },
 ]
 
