@@ -8,6 +8,11 @@ import {
   Loader2,
   Ticket as TicketIcon,
   History,
+  Clock,
+  Activity,
+  CheckCircle2,
+  Phone,
+  Repeat,
 } from 'lucide-react'
 import type {
   EmployeeTicketWithCreator,
@@ -421,52 +426,103 @@ export function AssignedTicketsView({
     }
   }
 
+  const resolvedCount = (statusCounts.RESOLVED ?? 0) + (statusCounts.CLOSED ?? 0)
+  const summaryCards = [
+    { key: 'ALL', label: 'Total tickets', value: statusCounts.ALL ?? 0, icon: TicketIcon, tone: 'bg-blue-50 text-blue-600' },
+    { key: 'OPEN', label: 'Open', value: statusCounts.OPEN ?? 0, icon: Clock, tone: 'bg-amber-50 text-amber-600' },
+    { key: 'IN_PROGRESS', label: 'In progress', value: statusCounts.IN_PROGRESS ?? 0, icon: Activity, tone: 'bg-sky-50 text-sky-600' },
+    { key: 'RESOLVED', label: 'Resolved', value: resolvedCount, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-600' },
+  ]
+
   return (
     <div className="space-y-4">
-      {/* ── Top Header Bar (matches media_1792575222481_a7ce2dbc.png) ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Assigned tickets</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Showing tickets for{' '}
-            <span className="font-medium text-slate-700">{email || 'your department'}</span>
-          </p>
+      {/* ── Summary cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((card) => {
+          const CardIcon = card.icon
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => setActiveTab(card.key)}
+              className={`flex items-center gap-3.5 p-4 rounded-2xl bg-white border text-left transition-all ${
+                activeTab === card.key ? 'border-blue-300 shadow-sm' : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${card.tone}`}>
+                <CardIcon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-2xl font-bold leading-none text-slate-900">
+                  {isLoading && tickets.length === 0 ? '–' : card.value}
+                </span>
+                <span className="mt-1 block text-xs text-slate-500">{card.label}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Filters, search and actions ── */}
+      <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+        <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl overflow-x-auto scrollbar-thin">
+          {STATUS_TABS.map((tab) => {
+            const isActive = activeTab === tab.key
+            const count = statusCounts[tab.key] ?? 0
+
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                  isActive ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[11px] font-bold ${
+                    isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search Input */}
-          <div className="relative">
+        <div className="flex flex-1 items-center gap-2 min-w-0">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search ticket, name, email or phone"
-              className="w-64 sm:w-80 h-9 pl-3.5 pr-8 text-xs border border-slate-200 rounded-lg bg-white shadow-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              placeholder="Search ticket, name, email or phone…"
+              className="w-full h-10 pl-9 pr-8 text-xs border border-slate-200 rounded-xl bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
-            {searchQuery ? (
+            {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
-            ) : (
-              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             )}
           </div>
 
-          {/* Refresh Button */}
           <button
             type="button"
             onClick={onRefresh}
             disabled={isLoading || isRefreshing}
-            className="h-9 px-3.5 inline-flex items-center gap-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors disabled:opacity-60"
+            title="Refresh tickets"
+            className="h-10 px-3 inline-flex items-center gap-1.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors disabled:opacity-60 flex-shrink-0"
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`}
-            />
-            <span>Refresh</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
           {canReassignTickets && (
@@ -477,45 +533,17 @@ export function AssignedTicketsView({
                 setIsAssignAllModalOpen(true)
               }}
               disabled={isLoading || tickets.length === 0}
-              className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-60"
+              title="Distribute open tickets across department members"
+              className="h-10 px-4 inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-colors disabled:opacity-60 flex-shrink-0"
             >
-              <span>Assign all</span>
+              <Repeat className="h-3.5 w-3.5" />
+              <span>Assign all · Round robin</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Filter Tabs with Count Pills (matches media_1792575222481_a7ce2dbc.png) ── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-        {STATUS_TABS.map((tab) => {
-          const isActive = activeTab === tab.key
-          const count = statusCounts[tab.key] ?? 0
-
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[11px] font-bold ${
-                  isActive ? 'bg-blue-800 text-white' : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Two-Column Split View (Left: Ticket Cards, Right: Ticket Details) ── */}
+      {/* ── Ticket list + details ── */}
       {isLoading && tickets.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200">
           <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-3" />
@@ -530,7 +558,9 @@ export function AssignedTicketsView({
           <p className="text-xs text-slate-500 mt-1 max-w-sm">
             {searchQuery
               ? `No tickets matching "${searchQuery}".`
-              : 'There are no tickets matching this filter status.'}
+              : tickets.length === 0
+                ? 'No tickets are assigned to you yet.'
+                : 'There are no tickets matching this filter status.'}
           </p>
           {searchQuery && (
             <button
@@ -543,10 +573,14 @@ export function AssignedTicketsView({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* ── Left Column: Scrollable Ticket List with 8-at-a-time pagination ── */}
+        <div
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-4 items-start transition-opacity ${
+            isRefreshing ? 'opacity-60' : ''
+          }`}
+        >
+          {/* ── Left: ticket list ── */}
           <div
-            className="lg:col-span-5 space-y-3 max-h-[calc(100vh-230px)] overflow-y-auto pr-1"
+            className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 overflow-hidden max-h-[calc(100vh-300px)] min-h-[320px] overflow-y-auto"
             onScroll={(e) => {
               const target = e.currentTarget
               if (target.scrollHeight - target.scrollTop - target.clientHeight < 50) {
@@ -562,61 +596,63 @@ export function AssignedTicketsView({
               return (
                 <div
                   key={t.ticketNumber}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedTicketNumber(t.ticketNumber)}
-                  className={`p-4 rounded-xl bg-white border cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-2 border-blue-600 shadow-sm'
-                      : 'border-slate-200 hover:border-slate-300'
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedTicketNumber(t.ticketNumber)
+                    }
+                  }}
+                  className={`relative px-5 py-4 border-b border-slate-100 last:border-b-0 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50'
                   }`}
                 >
-                  {/* Card Header: Priority & Status Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span
-                      className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(
-                        t.priority
-                      )}`}
-                    >
-                      {formatPriority(t.priority)}
-                    </span>
-                    <span
-                      className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(
-                        t.ticketStatus
-                      )}`}
-                    >
-                      {formatStatus(t.ticketStatus)}
+                  {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600" />}
+
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                      <span className="text-xs font-bold font-mono text-blue-600">{t.ticketNumber}</span>
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${getPriorityBadgeClass(t.priority)}`}
+                      >
+                        {formatPriority(t.priority)}
+                      </span>
+                      <span
+                        className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${getStatusBadgeClass(t.ticketStatus)}`}
+                      >
+                        {formatStatus(t.ticketStatus)}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 flex-shrink-0">
+                      {formatShortDate(t.ticketCreatedAt)}
                     </span>
                   </div>
 
-                  {/* Card Title */}
-                  <h3 className="font-semibold text-slate-900 text-sm mb-1 leading-snug line-clamp-1">
+                  <h3 className="mt-1.5 font-semibold text-slate-900 text-sm leading-snug line-clamp-1">
                     {t.subject || 'No Subject'}
                   </h3>
 
-                  {/* Creator Name */}
-                  <p className="text-xs text-slate-500 mb-3">
-                    {t.creatorName || t.creatorEmail || 'Customer'}
-                  </p>
-
-                  {/* Card Footer: Ticket ID & Date */}
-                  <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="font-mono">{t.ticketNumber}</span>
-                    <div className="flex items-center gap-2">
-                      {canViewHistory && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
-                          }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
-                          title="View ticket history"
-                        >
-                          <History className="h-3 w-3" />
-                          <span>History</span>
-                        </button>
-                      )}
-                      <span className="font-sans">{formatShortDate(t.ticketCreatedAt)}</span>
-                    </div>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                    <span className="truncate">
+                      {t.creatorName || t.creatorEmail || 'Customer'}
+                      {t.departmentName ? ` · ${t.departmentName}` : ''}
+                    </span>
+                    {canViewHistory && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
+                        }}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex-shrink-0"
+                        title="View ticket history"
+                      >
+                        <History className="h-3 w-3" />
+                        <span>History</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -629,162 +665,150 @@ export function AssignedTicketsView({
             )}
           </div>
 
-          {/* ── Right Column: Selected Ticket Details Card (1:1 with media_1792575222481_a7ce2dbc.png) ── */}
-          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          {/* ── Right: selected ticket ── */}
+          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden">
             {selectedTicket ? (
               <div>
-                {/* Header Row: Ticket ID, Subject & Action Buttons */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="p-5 sm:p-6 space-y-4">
+                  {/* Ticket id, priority, raised date */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold font-mono text-blue-600">
+                        {selectedTicket.ticketNumber}
+                      </span>
+                      <span
+                        className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(
+                          selectedTicket.priority
+                        )}`}
+                      >
+                        {formatPriority(selectedTicket.priority)} priority
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      Raised {formatFullDate(selectedTicket.ticketCreatedAt)}
+                    </span>
+                  </div>
+
+                  <h2 className="text-xl font-bold text-slate-900 leading-tight">
+                    {selectedTicket.subject || 'No Subject'}
+                  </h2>
+
+                  {/* Customer card */}
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 text-sm font-bold">
+                      {(selectedTicket.creatorName || selectedTicket.creatorEmail || 'C').charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {selectedTicket.creatorName || 'Customer'}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {[selectedTicket.creatorPhone, selectedTicket.creatorEmail].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </div>
+                    {selectedTicket.creatorPhone && (
+                      <a
+                        href={`tel:${selectedTicket.creatorPhone}`}
+                        title={`Call ${selectedTicket.creatorPhone}`}
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-emerald-600 hover:bg-emerald-50 transition-colors"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Status + actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
+                      <span
+                        className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(
+                          selectedTicket.ticketStatus
+                        )}`}
+                      >
+                        {formatStatus(selectedTicket.ticketStatus)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {canViewHistory && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenHistoryModal(selectedTicket.ticketNumber, selectedTicket.ticketStatus)
+                          }
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                          title="View status change history"
+                        >
+                          <History className="h-3.5 w-3.5 text-slate-500" />
+                          <span>History</span>
+                        </button>
+                      )}
+
+                      {canReassignTickets && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReassignError(null)
+                            setIsReassignModalOpen(true)
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                        >
+                          <UserCheck className="h-3.5 w-3.5 text-slate-500" />
+                          <span>Re-assign</span>
+                        </button>
+                      )}
+
+                      {canUpdateStatus && (
+                        <button
+                          type="button"
+                          onClick={handleOpenStatusModal}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                        >
+                          <span>Update status</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Meta details */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-5 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/40">
                   <div className="min-w-0">
-                    <span className="text-xs font-bold font-mono text-blue-600 block">
-                      {selectedTicket.ticketNumber}
-                    </span>
-                    <h2 className="text-lg font-bold text-slate-900 mt-1 leading-tight">
-                      {selectedTicket.subject}
-                    </h2>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {canViewHistory && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleOpenHistoryModal(
-                            selectedTicket.ticketNumber,
-                            selectedTicket.ticketStatus
-                          )
-                        }
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-xs font-semibold text-blue-700 shadow-2xs transition-colors"
-                        title="View status change history"
-                      >
-                        <History className="h-3.5 w-3.5 text-blue-600" />
-                        <span>History</span>
-                      </button>
-                    )}
-
-                    {canReassignTickets && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReassignError(null)
-                          setIsReassignModalOpen(true)
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-xs transition-colors"
-                      >
-                        <UserCheck className="h-3.5 w-3.5 text-slate-500" />
-                        <span>Re-assign</span>
-                      </button>
-                    )}
-
-                    {canUpdateStatus && (
-                      <button
-                        type="button"
-                        onClick={handleOpenStatusModal}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors"
-                      >
-                        <span>Update status</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3-Column Metadata Grid (Exact layout from media_1792575222481_a7ce2dbc.png) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-5 gap-x-6 py-5 border-b border-slate-100">
-                  {/* Row 1: Priority | Status | Department */}
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Priority</p>
-                    <span
-                      className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${getPriorityBadgeClass(
-                        selectedTicket.priority
-                      )}`}
-                    >
-                      {formatPriority(selectedTicket.priority)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Status</p>
-                    <span
-                      className={`inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(
-                        selectedTicket.ticketStatus
-                      )}`}
-                    >
-                      {formatStatus(selectedTicket.ticketStatus)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Department</p>
-                    <p className="text-xs font-semibold text-slate-800 uppercase tracking-tight">
-                      {selectedTicket.departmentName || departmentType || 'GOOGLE_DEPARTMENT'}
+                    <p className="text-[11px] text-slate-400 mb-0.5">Department</p>
+                    <p className="text-xs font-semibold text-slate-800 truncate">
+                      {selectedTicket.departmentName || departmentType || '—'}
                     </p>
                   </div>
-
-                  {/* Row 2: Creator status | Creator | Email */}
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Creator status</p>
-                    <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white">
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-slate-400 mb-0.5">Creator status</p>
+                    <p className="text-xs font-semibold text-emerald-700">
                       {selectedTicket.creatorStatus || 'Active'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Creator</p>
-                    <p className="text-xs font-medium text-slate-900">
-                      {selectedTicket.creatorName || '—'}
                     </p>
                   </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Email</p>
-                    <p className="text-xs text-slate-700 truncate">
-                      {selectedTicket.creatorEmail || '—'}
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-slate-400 mb-0.5">Updated</p>
+                    <p className="text-xs text-slate-700">
+                      {selectedTicket.ticketUpdatedAt ? formatFullDate(selectedTicket.ticketUpdatedAt) : '—'}
                     </p>
                   </div>
-
-                  {/* Row 3: Phone | Created | Updated */}
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Phone</p>
-                    <p className="text-xs font-medium text-slate-900">
-                      {selectedTicket.creatorPhone || '—'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Created</p>
-                    <p className="text-xs text-slate-600">
-                      {formatFullDate(selectedTicket.ticketCreatedAt)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Updated</p>
-                    <p className="text-xs text-slate-600">
-                      {selectedTicket.ticketUpdatedAt
-                        ? formatFullDate(selectedTicket.ticketUpdatedAt)
-                        : '—'}
-                    </p>
-                  </div>
-
-                  {/* Row 4: Resolved */}
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1 font-normal">Resolved</p>
-                    <p className="text-xs text-slate-600">
-                      {selectedTicket.ticketResolvedAt
-                        ? formatFullDate(selectedTicket.ticketResolvedAt)
-                        : '—'}
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-slate-400 mb-0.5">Resolved</p>
+                    <p className="text-xs text-slate-700">
+                      {selectedTicket.ticketResolvedAt ? formatFullDate(selectedTicket.ticketResolvedAt) : '—'}
                     </p>
                   </div>
                 </div>
 
-                {/* Description Box */}
-                <div className="pt-5">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                    Description
-                  </h4>
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap min-h-[90px]">
+                {/* Customer message */}
+                <div className="px-5 sm:px-6 py-5 border-t border-slate-100">
+                  <div className="max-w-[90%] rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {selectedTicket.description || 'No description provided.'}
                   </div>
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    {selectedTicket.creatorName || selectedTicket.creatorEmail || 'Customer'} ·{' '}
+                    {formatFullDate(selectedTicket.ticketCreatedAt)}
+                  </p>
                 </div>
               </div>
             ) : (

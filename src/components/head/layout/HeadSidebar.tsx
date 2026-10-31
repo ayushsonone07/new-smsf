@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from 'react'
+import { Fragment, useState, useRef, useEffect } from 'react'
 
 import {
   LayoutDashboard,
@@ -15,6 +15,9 @@ import {
   Menu,
   X,
   LogOut,
+  Ticket,
+  BarChart3,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -28,7 +31,22 @@ import type {
   HeadRole,
 } from '../../../features/departments/head/types/head.types'
 
+import {
+  HELP_CENTER_TABS,
+  canSeeHelpCenterMembers,
+  isHelpSupportNavItem,
+  setHelpCenterTab,
+  useHelpCenterTab,
+  type HelpCenterTab,
+} from '../../../features/departments/head/utils/helpCenterTab'
+
 import './HeadSidebar.css'
+
+const HELP_TAB_ICONS: Record<HelpCenterTab, LucideIcon> = {
+  'assigned-tickets': Ticket,
+  analytics: BarChart3,
+  'department-members': Users,
+}
 
 interface HeadSidebarProps {
   open: boolean
@@ -88,6 +106,8 @@ export function HeadSidebar({
   onLogout,
 }: HeadSidebarProps) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const helpTab = useHelpCenterTab()
+  const helpTabs = HELP_CENTER_TABS.filter((t) => !t.headOnly || canSeeHelpCenterMembers())
   const accountRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -126,7 +146,7 @@ export function HeadSidebar({
     const active = item.key === activeKey
     const NavIcon = getMenuIcon(item)
 
-    return (
+    const button = (
       <button
         key={item.key}
         type="button"
@@ -146,6 +166,38 @@ export function HeadSidebar({
           {item.label}
         </span>
       </button>
+    )
+
+    if (!isHelpSupportNavItem(item)) return button
+
+    return (
+      <Fragment key={item.key}>
+        {button}
+        <div className="hnav__sub" role="group" aria-label={`${item.label} sections`}>
+          {helpTabs.map((tab) => {
+            const SubIcon = HELP_TAB_ICONS[tab.key]
+            const subActive = active && helpTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                className={`hnav__subitem${subActive ? ' is-on' : ''}`}
+                aria-current={subActive ? 'page' : undefined}
+                title={tab.label}
+                onClick={() => {
+                  setHelpCenterTab(tab.key)
+                  handleSelect(item)
+                }}
+              >
+                <SubIcon className="hnav__subicon" size={16} strokeWidth={1.9} aria-hidden="true" />
+                <span className="hnav__label" aria-hidden={!open}>
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Fragment>
     )
   }
 
