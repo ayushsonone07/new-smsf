@@ -580,7 +580,7 @@ export function AssignedTicketsView({
         >
           {/* ── Left: ticket list ── */}
           <div
-            className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 overflow-hidden max-h-[calc(100vh-300px)] min-h-[320px] overflow-y-auto"
+            className="lg:col-span-5 space-y-2.5 max-h-[calc(100vh-300px)] min-h-[320px] overflow-y-auto p-0.5 pr-1.5"
             onScroll={(e) => {
               const target = e.currentTarget
               if (target.scrollHeight - target.scrollTop - target.clientHeight < 50) {
@@ -605,8 +605,10 @@ export function AssignedTicketsView({
                       setSelectedTicketNumber(t.ticketNumber)
                     }
                   }}
-                  className={`relative px-5 py-4 border-b border-slate-100 last:border-b-0 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50'
+                  className={`relative overflow-hidden px-5 py-4 rounded-xl border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'bg-blue-50/60 border-blue-300 shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
                   }`}
                 >
                   {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600" />}
