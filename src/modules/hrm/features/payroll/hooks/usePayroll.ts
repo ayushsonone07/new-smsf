@@ -10,6 +10,9 @@ import type {
   PayrollPaymentInput,
   SalaryStructure,
   SalaryStructureInput,
+  BulkActionResult,
+  BulkApproveInput,
+  BulkPaymentInput,
 } from "../types";
 
 export const payrollKeys = {
@@ -93,6 +96,22 @@ export function useSaveSalaryStructure() {
       void qc.invalidateQueries({ queryKey: payrollKeys.structures });
       void qc.invalidateQueries({ queryKey: payrollKeys.structure(vars.employeeId) });
     },
+  });
+}
+
+export function useBulkApprovePayroll() {
+  const qc = useQueryClient();
+  return useMutation<BulkActionResult, Error, BulkApproveInput>({
+    mutationFn: (input) => payrollService.bulkApprove(input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: payrollKeys.all }),
+  });
+}
+
+export function useBulkPayPayroll() {
+  const qc = useQueryClient();
+  return useMutation<BulkActionResult, Error, BulkPaymentInput>({
+    mutationFn: (input) => payrollService.bulkPay(input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: payrollKeys.all }),
   });
 }
 

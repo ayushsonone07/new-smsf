@@ -14,6 +14,9 @@ import type {
   PayrollSummary,
   SalaryStructure,
   SalaryStructureInput,
+  BulkActionResult,
+  BulkApproveInput,
+  BulkPaymentInput,
 } from "../types";
 
 function queryString(params: PayrollListParams): string {
@@ -51,6 +54,14 @@ export const payrollService = {
   },
 
   /* ------------------------------ payrolls ----------------------------- */
+  async bulkApprove(input: BulkApproveInput): Promise<BulkActionResult> {
+    return hrApiPut<BulkActionResult, BulkApproveInput>(PAYROLL_ENDPOINTS.bulkApprove, input);
+  },
+
+  async bulkPay(input: BulkPaymentInput): Promise<BulkActionResult> {
+    return hrApiPut<BulkActionResult, BulkPaymentInput>(PAYROLL_ENDPOINTS.bulkPay, input);
+  },
+
   async generate(input: GeneratePayrollInput): Promise<GeneratePayrollBatchResult> {
     return hrApiPost<GeneratePayrollBatchResult, GeneratePayrollInput>(PAYROLL_ENDPOINTS.generate, input);
   },

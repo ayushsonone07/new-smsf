@@ -230,3 +230,21 @@ export const DEDUCTION_LABELS: Record<DeductionType, string> = {
   UNPAID_LEAVE: "Unpaid Leave",
   HALF_DAY: "Half-Day Attendance",
 };
+
+export interface BulkApproveInput {
+  payrollIds: number[];
+}
+
+export interface BulkPaymentInput {
+  payrollIds: number[];
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  transactionReference?: string;
+}
+
+export interface BulkActionResult {
+  totalRequested: number;
+  successfulCount: number;
+  skippedCount: number;
+  message: string;
+}

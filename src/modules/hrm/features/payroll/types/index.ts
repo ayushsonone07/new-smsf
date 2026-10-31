@@ -1,4 +1,7 @@
 export type {
+  BulkActionResult,
+  BulkApproveInput,
+  BulkPaymentInput,
   DeductionType,
   EarningType,
   GeneratePayrollBatchResult,
