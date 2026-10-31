@@ -45,6 +45,9 @@ const NotificationHistoryPage = lazy(() =>
 const AdminApprovalsPage = lazy(() =>
   import('../features/departments/pages/AdminApprovalsPage').then((module) => ({ default: module.AdminApprovalsPage })),
 )
+const AdminHelpSupportPage = lazy(() =>
+  import('../features/departments/pages/AdminHelpSupportPage').then((module) => ({ default: module.AdminHelpSupportPage })),
+)
 const AdminAirtelServicePage = lazy(() =>
   import('../features/departments/pages/AdminAirtelServicePage').then((module) => ({ default: module.AdminAirtelServicePage })),
 )
@@ -379,6 +382,13 @@ const adminApprovalsRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/approvals',
   component: AdminApprovalsPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminHelpSupportRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/help-support',
+  component: AdminHelpSupportPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -880,6 +890,7 @@ const routeTree = rootRoute.addChildren([
     adminTimelinesRoute,
     adminServiceFlowRoute,
     adminApprovalsRoute,
+    adminHelpSupportRoute,
     adminAirtelServiceRoute,
     airtelServiceAliasRoute,
     adminSalaryManagementRoute,

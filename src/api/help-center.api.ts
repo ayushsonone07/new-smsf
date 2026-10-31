@@ -97,6 +97,10 @@ export async function fetchHelpCenterAnalytics(
   role?: string
 ): Promise<HelpCenterDashboardAnalytics | null> {
   try {
+    // The Help Center reads the caller's role from X-User-Role. SMSB sets it
+    // when proxying, but in local dev Vite sends /api/help-center straight to the
+    // Help Center — without it a SUPERADMIN is looked up as a user and gets 404.
+    const isSuperAdmin = role === 'SUPERADMIN'
     const res = await apiClient.get<CustomApiResponse<HelpCenterDashboardAnalytics>>(
       '/api/help-center/dashboard/analytics',
       {
@@ -104,6 +108,9 @@ export async function fetchHelpCenterAnalytics(
           email: email || undefined,
           role: role || undefined,
         },
+        headers: isSuperAdmin
+          ? { 'X-User-Role': 'SUPER_ADMIN', ...(email ? { 'X-User-Email': email } : {}) }
+          : undefined,
       }
     )
     return res.data?.data ?? null
@@ -257,6 +264,99 @@ export async function fetchTicketHistory(
       hasPrevious: false,
     }
   }
+}
+
+export interface AllTicketsRow {
+  ticketNumber: string
+  subject: string
+  department: string
+}
+
+export interface AllTicketsPage {
+  rows: AllTicketsRow[]
+  currentPage: number
+  pageSize: number
+  totalRecords: number
+  totalPages: number
+}
+
+/**
+ * Every ticket across all departments (SUPERADMIN only).
+ * Endpoint: GET /api/help-center/tickets/fetch_all
+ */
+export async function fetchAllTickets(params: {
+  page?: number
+  size?: number
+  status?: string
+  priority?: string
+  departmentId?: number
+  search?: string
+}): Promise<AllTicketsPage> {
+  const size = params.size ?? 20
+  const res = await apiClient.get<
+    CustomApiResponse<{
+      tickets?: Record<string, string>
+      departments?: Record<string, string>
+      currentPage?: number
+      pageSize?: number
+      totalRecords?: number
+      totalPages?: number
+    }>
+  >('/api/help-center/tickets/fetch_all', {
+    params: {
+      page: params.page ?? 0,
+      size,
+      status: params.status || undefined,
+      priority: params.priority || undefined,
+      departmentId: params.departmentId ?? undefined,
+      search: params.search?.trim() || undefined,
+    },
+  })
+
+  const data = res.data?.data
+  const tickets = data?.tickets ?? {}
+  const departments = data?.departments ?? {}
+
+  return {
+    rows: Object.entries(tickets).map(([ticketNumber, subject]) => ({
+      ticketNumber,
+      subject,
+      department: departments[ticketNumber] ?? '',
+    })),
+    currentPage: data?.currentPage ?? 0,
+    pageSize: data?.pageSize ?? size,
+    totalRecords: data?.totalRecords ?? 0,
+    totalPages: data?.totalPages ?? 0,
+  }
+}
+
+export interface HelpCenterTicketDetails {
+  ticketNumber: string
+  subject: string
+  description?: string
+  status: string
+  priority: string
+  departmentName?: string
+  department?: { id?: string | number; name?: string }
+  userDto?: { name?: string; email?: string }
+  assignedToName?: string
+  assignedTo?: string
+  createdAt?: string
+  updatedAt?: string
+  resolvedAt?: string
+  latestRemark?: string
+}
+
+/**
+ * Full details of one ticket.
+ * Endpoint: GET /api/help-center/tickets/fetchTicket?ticketNumber=...
+ */
+export async function fetchTicketDetails(ticketNumber: string): Promise<HelpCenterTicketDetails | null> {
+  const res = await apiClient.get<CustomApiResponse<HelpCenterTicketDetails>>(
+    '/api/help-center/tickets/fetchTicket',
+    { params: { ticketNumber } }
+  )
+  return res.data?.data ?? null
 }
 
 /**
