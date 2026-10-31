@@ -168,7 +168,8 @@ export function HeadSidebar({
       </button>
     )
 
-    if (!isHelpSupportNavItem(item)) return button
+    // Sub-tabs appear only while Help & Support is the open screen.
+    if (!active || !isHelpSupportNavItem(item)) return button
 
     return (
       <Fragment key={item.key}>
