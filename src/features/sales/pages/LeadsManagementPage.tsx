@@ -297,7 +297,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const end = Math.min((currentPage + 1) * pageSize, totalElements)
 
   return (
-    <div className="space-y-4 font-sans">
+    <div className="space-y-4 px-3 py-4 font-sans sm:px-5 lg:px-6 xl:px-8">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-6 right-6 z-50 flex items-start gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl max-w-sm animate-in fade-in slide-in-from-top-4">
@@ -838,6 +838,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         funnels={funnels}
         leadStatusOptions={LEAD_STATUS_OPTIONS}
         platformOptions={LEAD_TYPE_OPTIONS}
+        assignableUsers={assignableUsers}
       />
 
       <UploadLeadModal

@@ -1,6 +1,10 @@
 import React, { useState } from 'react'
 import { UserPlus, X, AlertCircle, Loader2 } from 'lucide-react'
-import { createLead, type FunnelItem } from '../../../api/leads.api'
+import {
+  createLead,
+  type AssignableUser,
+  type FunnelItem,
+} from '../../../api/leads.api'
 
 interface AddLeadModalProps {
   isOpen: boolean
@@ -9,6 +13,7 @@ interface AddLeadModalProps {
   funnels: FunnelItem[]
   leadStatusOptions: string[]
   platformOptions: string[]
+  assignableUsers: AssignableUser[]
 }
 
 interface LeadForm {
@@ -22,6 +27,7 @@ interface LeadForm {
   city: string
   contact: string
   funnelType: string
+  assignedUser: string
 }
 
 function nowLocalInput(): string {
@@ -48,6 +54,7 @@ function emptyForm(): LeadForm {
     city: '',
     contact: '',
     funnelType: '',
+    assignedUser: '',
   }
 }
 
@@ -91,6 +98,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   funnels,
   leadStatusOptions,
   platformOptions,
+  assignableUsers,
 }) => {
   const [form, setForm] = useState<LeadForm>(emptyForm)
   const [errors, setErrors] = useState<Partial<Record<keyof LeadForm, string>>>({})
@@ -151,6 +159,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
         city: form.city.trim() || undefined,
         contact: form.contact.replace(/\D/g, ''),
         funnelType: form.funnelType.trim(),
+        assignedUser: form.assignedUser || undefined,
       })
       if (!res.success) {
         setSubmitError(res.message || 'Could not add the lead.')
@@ -273,6 +282,20 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
                       {name}
                     </option>
                   ))}
+                </select>
+              </Field>
+
+              <Field label="Assigned To">
+                <select value={form.assignedUser} onChange={set('assignedUser')} className={inputClass}>
+                  <option value="">Not Assigned</option>
+                  {assignableUsers.map((user) => {
+                    const value = user.email || user.username
+                    return (
+                      <option key={user.id ?? value} value={value}>
+                        {user.username}{user.email && user.email !== user.username ? ` · ${user.email}` : ''}
+                      </option>
+                    )
+                  })}
                 </select>
               </Field>
             </div>
