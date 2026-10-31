@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { payrollService } from "../services";
 
 import type {
+  GeneratePayrollBatchResult,
   GeneratePayrollInput,
   Payroll,
   PayrollListParams,
@@ -72,7 +73,7 @@ export function useEmployeePayslips(employeeId: number) {
 
 export function useGeneratePayroll() {
   const qc = useQueryClient();
-  return useMutation<Payroll[], Error, GeneratePayrollInput>({
+  return useMutation<GeneratePayrollBatchResult, Error, GeneratePayrollInput>({
     mutationFn: (input) => payrollService.generate(input),
     onSuccess: () => void qc.invalidateQueries({ queryKey: payrollKeys.all }),
   });

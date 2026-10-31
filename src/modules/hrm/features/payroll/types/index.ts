@@ -1,7 +1,9 @@
 export type {
   DeductionType,
   EarningType,
+  GeneratePayrollBatchResult,
   GeneratePayrollInput,
+  SkippedEmployee,
   PaymentMethod,
   PaymentRecord,
   PaymentStatus,

@@ -50,6 +50,22 @@ export interface SalaryStructureInput {
   effectiveFrom: string;
 }
 
+export interface SkippedEmployee {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  departmentName?: string;
+  reason: string;
+}
+
+export interface GeneratePayrollBatchResult {
+  payrolls: Payroll[];
+  skippedEmployees: SkippedEmployee[];
+  totalAttempted: number;
+  generatedCount: number;
+  skippedCount: number;
+}
+
 export interface GeneratePayrollInput {
   month: number;
   year: number;

@@ -4,6 +4,7 @@ import type { PaginationMeta } from "@shared/types";
 import { PAYROLL_ENDPOINT_BUILDERS, PAYROLL_ENDPOINTS } from "./endpoints";
 
 import type {
+  GeneratePayrollBatchResult,
   GeneratePayrollInput,
   PayslipDetails,
   Payroll,
@@ -50,8 +51,8 @@ export const payrollService = {
   },
 
   /* ------------------------------ payrolls ----------------------------- */
-  async generate(input: GeneratePayrollInput): Promise<Payroll[]> {
-    return hrApiPost<Payroll[], GeneratePayrollInput>(PAYROLL_ENDPOINTS.generate, input);
+  async generate(input: GeneratePayrollInput): Promise<GeneratePayrollBatchResult> {
+    return hrApiPost<GeneratePayrollBatchResult, GeneratePayrollInput>(PAYROLL_ENDPOINTS.generate, input);
   },
 
   async list(params: PayrollListParams): Promise<{ data: Payroll[]; meta: PaginationMeta }> {
