@@ -147,6 +147,9 @@ const SalesSummaryPage = lazy(() =>
 const ProfileUpdatePage = lazy(() =>
   import('../features/profile/pages/ProfileUpdatePage').then((module) => ({ default: module.ProfileUpdatePage })),
 )
+const ConfirmationPreviewPage = lazy(() =>
+  import('../components/customers/confirmation').then((module) => ({ default: module.default || module.ConfirmationPreviewPage })),
+)
 const OnboardingConfirmationPage = lazy(() =>
   import('../features/customers/pages/OnboardingConfirmationPage').then((module) => ({ default: module.OnboardingConfirmationPage })),
 )
@@ -256,6 +259,12 @@ const departmentConfirmationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/confirmation/department',
   component: OnboardingConfirmationPage,
+})
+
+const confirmationPreviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/confirmation',
+  component: ConfirmationPreviewPage,
 })
 
 const websiteConfirmationRoute = createRoute({
@@ -916,6 +925,7 @@ const routeTree = rootRoute.addChildren([
   onboardingConfirmationRoute,
   departmentConfirmationRoute,
   websiteConfirmationRoute,
+  confirmationPreviewRoute,
   profileUpdateRoute,
   departmentDashboardRoute,
   departmentCustomersRoute,

@@ -143,6 +143,35 @@ export async function getLeads(params: FetchLeadsParams = {}): Promise<{
   }
 }
 
+export interface CreateLeadPayload {
+  timeStamp?: string
+  ownerName: string
+  businessName: string
+  email?: string
+  platform: string
+  leadStatus?: string
+  category?: string
+  city?: string
+  contact: string
+  assignedUser?: string
+  telecallerUser?: string
+  funnelType: string
+}
+
+/**
+ * Add a single lead from the Add Lead form: POST /api/leads/create
+ */
+export async function createLead(payload: CreateLeadPayload): Promise<{ success: boolean; message: string }> {
+  const res = await authedApiRequest<any>('/api/leads/create', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return {
+    success: Boolean(res?.success ?? true),
+    message: res?.message || 'Lead added successfully',
+  }
+}
+
 /**
  * Upload leads Excel file: POST /api/leads/upload (multipart/form-data)
  */

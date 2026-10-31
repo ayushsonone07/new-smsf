@@ -1,154 +1,242 @@
-import React from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import React, { useState } from 'react'
+import { Check, Clock3, AlertTriangle, RefreshCw } from 'lucide-react'
 
-// --- Utility for Tailwind classes ---
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+export type ConfirmationPreviewState = 'loading' | 'verifying' | 'success' | 'failure' | 'error'
 
-// --- Types ---
-interface TopNavProps {
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
-}
+const PRESET_SERVICES = [
+  'Onboarding Service',
+  'Website Creation',
+  'Google Service',
+  'Automation Dashboard',
+  'SEO & Content',
+]
 
-interface LoadingCardProps {
-  title?: string;
-  subtitle?: string;
-}
+export function ConfirmationPreviewCard({
+  state = 'success',
+  serviceName = 'Onboarding Service',
+  businessName = 'Lala Company',
+  confirmedAt = '26 Sep 2026, 06:12 PM',
+  onRetry,
+}: {
+  state?: ConfirmationPreviewState
+  serviceName?: string
+  businessName?: string
+  confirmedAt?: string
+  onRetry?: () => void
+}) {
+  const currentService = serviceName.trim() || 'Onboarding Service'
+  const svcLower = currentService.toLowerCase()
 
-// ==========================================
-// 1. TOP NAVIGATION BAR COMPONENT
-// ==========================================
-const TopNav: React.FC<TopNavProps> = ({ 
-  activeTab = "Loading", 
-  onTabChange 
-}) => {
-  const tabs = ["Loading", "Verifying", "Success", "Failure", "Error"];
+  const config = {
+    loading: {
+      title: 'Loading…',
+      body: 'Opening your confirmation link.',
+      tileBg: '#e8efff',
+      tileFg: '#2459e0',
+    },
+    verifying: {
+      title: 'Verifying your link',
+      body: `Checking the secure token for ${currentService} — this takes a moment.`,
+      tileBg: '#e8efff',
+      tileFg: '#2459e0',
+    },
+    success: {
+      title: `${currentService} confirmed!`,
+      body: `Thank you! Your ${svcLower} with MBG Card is confirmed. Our team will reach out with next steps.`,
+      tileBg: '#dcfce7',
+      tileFg: '#16a34a',
+    },
+    failure: {
+      title: 'Link expired or already used',
+      body: `This confirmation link for ${currentService} is no longer valid. Ask your onboarding executive for a new one.`,
+      tileBg: '#fff5d6',
+      tileFg: '#b7791f',
+    },
+    error: {
+      title: 'Something went wrong',
+      body: 'We could not reach the server. Check your connection and try again.',
+      tileBg: '#ffe4e6',
+      tileFg: '#e11d48',
+    },
+  }[state]
 
   return (
-    <div className="flex flex-wrap items-center gap-4 mb-4 select-none">
-      <span className="text-[15px] font-medium text-gray-500">Preview state</span>
-      
-      {/* Tab Container */}
-      <div className="flex items-center bg-white rounded-xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-gray-100 p-1">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => onTabChange && onTabChange(tab)}
-              className={cn(
-                "px-5 py-1.5 text-[15px] font-medium rounded-lg transition-all duration-200",
-                isActive
-                  ? "bg-[#2563eb] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              )}
-            >
-              {tab}
-            </button>
-          );
-        })}
+    <div className="w-full max-w-[430px] rounded-[22px] bg-white p-7 shadow-[0_20px_50px_rgba(36,89,224,0.12)] border border-[#e6e9f0] flex flex-col items-center text-center gap-3 animate-in fade-in zoom-in-95 duration-200">
+      {/* Brand logo */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-8 h-8 rounded-[9px] bg-[#2459e0] grid place-items-center shadow-[inset_0_-3px_0_#ffc629]">
+          <span className="font-bold text-[11px] text-white">
+            M<span className="text-[#ffc629]">B</span>G
+          </span>
+        </span>
+        <strong className="font-semibold text-slate-800 text-[15px]">MBG Card</strong>
       </div>
 
-      {/* Standalone Badge */}
-      <span className="px-3 py-1.5 text-[14px] font-medium text-[#a16207] bg-[#fef9c3] rounded-lg">
-        Standalone · no login
-      </span>
-    </div>
-  );
-};
-
-// ==========================================
-// 2. CUSTOM LOADING SPINNER
-// ==========================================
-const CustomSpinner = () => {
-  return (
-    <div className="relative flex items-center justify-center w-[68px] h-[68px]">
-      {/* Background Track Circle */}
-      <div className="absolute inset-0 rounded-full border-[4px] border-[#e5e7eb]/60" />
-      
-      {/* Animated Blue Arc */}
-      <svg 
-        className="absolute inset-0 w-full h-full animate-spin text-[#2563eb]" 
-        viewBox="0 0 50 50"
-        style={{ animationDuration: '0.8s' }}
+      {/* State Tile Icon */}
+      <div
+        className="w-[76px] h-[76px] rounded-[22px] grid place-items-center my-1"
+        style={{ backgroundColor: config.tileBg, color: config.tileFg }}
       >
-        <circle
-          cx="25"
-          cy="25"
-          r="21"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray="35 100" // Creates the small arc shape
-        />
-      </svg>
-    </div>
-  );
-};
+        {state === 'loading' || state === 'verifying' ? (
+          <div
+            className="w-[34px] h-[34px] rounded-full border-[3px] border-[#c7d6ff] border-t-[#2459e0] animate-spin"
+            style={{ animationDuration: '0.8s' }}
+          />
+        ) : state === 'success' ? (
+          <Check size={34} strokeWidth={2.4} />
+        ) : state === 'failure' ? (
+          <Clock3 size={34} strokeWidth={2.4} />
+        ) : (
+          <AlertTriangle size={34} strokeWidth={2.4} />
+        )}
+      </div>
 
-// ==========================================
-// 3. MAIN LOADING CARD COMPONENT
-// ==========================================
-const LoadingCard: React.FC<LoadingCardProps> = ({
-  title = "Loading...",
-  subtitle = "Opening your confirmation link.",
-}) => {
+      {/* Title & Body */}
+      <h2 className="m-0 text-[22px] font-semibold text-slate-900 tracking-tight">
+        {config.title}
+      </h2>
+      <p className="m-0 text-[13.5px] text-slate-600 max-w-[340px] leading-relaxed">
+        {config.body}
+      </p>
+
+      {/* Summary table for Success */}
+      {state === 'success' && (
+        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 text-left text-[13px] w-full p-3 rounded-[13px] bg-[#f0fdf4] border border-[#bbf7d0]">
+          <dt className="text-slate-500 font-normal">Business</dt>
+          <dd className="m-0 font-medium text-slate-900">{businessName}</dd>
+          <dt className="text-slate-500 font-normal">Service</dt>
+          <dd className="m-0 font-medium text-slate-900">{currentService}</dd>
+          <dt className="text-slate-500 font-normal">Confirmed</dt>
+          <dd className="m-0 font-medium text-slate-900">{confirmedAt}</dd>
+        </dl>
+      )}
+
+      {/* Try Again Button for Error */}
+      {state === 'error' && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-2 h-9 px-5 rounded-[11px] bg-[#2459e0] hover:bg-[#1a45b8] text-white font-medium text-[13.5px] shadow-xs transition-colors"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function ConfirmationPreviewPage() {
+  const [activeState, setActiveState] = useState<ConfirmationPreviewState>('success')
+  const [serviceName, setServiceName] = useState('Onboarding Service')
+  const [businessName, setBusinessName] = useState('Lala Company')
+
+  const states: { key: ConfirmationPreviewState; label: string }[] = [
+    { key: 'loading', label: 'Loading' },
+    { key: 'verifying', label: 'Verifying (Pending Confirmation)' },
+    { key: 'success', label: 'Success' },
+    { key: 'failure', label: 'Failure' },
+    { key: 'error', label: 'Error' },
+  ]
+
+  const handleRetry = () => {
+    setActiveState('verifying')
+    setTimeout(() => setActiveState('success'), 1100)
+  }
+
   return (
-    <div className="bg-white rounded-[32px] p-10 w-full max-w-[460px] flex flex-col items-center justify-center shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white/50 backdrop-blur-sm">
-      
-      {/* MBG Logo Section */}
-      <div className="flex items-center gap-3 mb-10">
-        <img className="h-10 w-14 object-contain" src="/mbg-card-logo.svg" alt="MBG Card" />
-        {/* Logo Text */}
-        <span className="text-[22px] font-semibold text-gray-900 tracking-tight">
-          MBG Card
+    <div className="space-y-5 p-4 sm:p-6 max-w-6xl mx-auto">
+      {/* Top Header / Switcher Bar matching prototype */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">Preview state:</span>
+          <div
+            role="radiogroup"
+            className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200/60"
+          >
+            {states.map((s) => {
+              const active = activeState === s.key
+              return (
+                <button
+                  key={s.key}
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setActiveState(s.key)}
+                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70">
+          Standalone · no login
         </span>
       </div>
 
-      {/* Loading Spinner Container */}
-      <div className="flex items-center justify-center w-[120px] h-[120px] bg-[#f0f4ff] rounded-[32px] mb-8">
-        <CustomSpinner />
-      </div>
-
-      {/* Text Content */}
-      <h2 className="text-[28px] font-bold text-gray-900 mb-2">{title}</h2>
-      <p className="text-[16px] text-gray-500">{subtitle}</p>
-    </div>
-  );
-};
-
-// ==========================================
-// 4. MAIN PAGE LAYOUT (To match the exact background)
-// ==========================================
-export default function PreviewStatePage() {
-  const [activeTab, setActiveTab] = React.useState("Loading");
-
-  return (
-    <div className="min-h-screen p-6 lg:p-8 font-sans bg-gray-50">
-      
-      {/* Top Navigation */}
-      <TopNav activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Main Content Area with Gradient Background */}
-      <div className="relative w-full h-[calc(100vh-100px)] rounded-[32px] overflow-hidden flex items-center justify-center shadow-sm border border-gray-200/60">
-        
-        {/* Complex Background Gradient matching the image */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#eef2ff] via-[#f8fafc] to-[#fef3c7] z-0" />
-        
-        {/* Background Soft Blurs (Optional for extra polish) */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-blue-100/40 via-transparent to-transparent z-0" />
-        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-yellow-100/40 via-transparent to-transparent z-0" />
-
-        {/* Floating Center Card */}
-        <div className="relative z-10 animate-in fade-in zoom-in-95 duration-500">
-          <LoadingCard />
+      {/* Service Selector & Customizer Bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs text-xs">
+        <span className="font-semibold text-slate-700">Particular Service:</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PRESET_SERVICES.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setServiceName(preset)}
+              className={`px-2.5 py-1 rounded-lg border transition-all text-xs ${
+                serviceName === preset
+                  ? 'bg-blue-50 border-blue-400 text-blue-700 font-semibold'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
         </div>
-        
+
+        <div className="flex items-center gap-2 ml-auto">
+          <input
+            type="text"
+            value={serviceName}
+            onChange={(e) => setServiceName(e.target.value)}
+            placeholder="Custom Service Name..."
+            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 w-48"
+          />
+          <input
+            type="text"
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+            placeholder="Business Name..."
+            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 w-36"
+          />
+        </div>
+      </div>
+
+      {/* Main Preview Container with Prototype Radial Gradient Background */}
+      <div
+        className="min-h-[490px] rounded-3xl grid place-items-center p-7 border border-[#e6e9f0]"
+        style={{
+          background:
+            'radial-gradient(circle at 20% 0%, #e3ebff 0%, transparent 45%), radial-gradient(circle at 90% 100%, #fff0bf 0%, transparent 40%), #f7f9fd',
+        }}
+      >
+        <ConfirmationPreviewCard
+          state={activeState}
+          serviceName={serviceName}
+          businessName={businessName}
+          confirmedAt="26 Sep 2026, 06:12 PM"
+          onRetry={handleRetry}
+        />
       </div>
     </div>
-  );
+  )
 }
+
+export { ConfirmationPreviewPage as PreviewStatePage }
+
+export default ConfirmationPreviewPage
