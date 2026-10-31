@@ -16,6 +16,7 @@ import {
   TrendingUp,
   LayoutGrid,
   CreditCard,
+  UserPlus,
 } from 'lucide-react'
 import {
   getLeads,
@@ -28,6 +29,7 @@ import {
   type FunnelItem,
 } from '../../../api/leads.api'
 import { UploadLeadModal } from '../components/UploadLeadModal'
+import { AddLeadModal } from '../components/AddLeadModal'
 import { LeadDetailsModal } from '../components/LeadDetailsModal'
 import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
@@ -137,6 +139,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [addLeadModalOpen, setAddLeadModalOpen] = useState(false)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<LeadInfo | null>(null)
 
@@ -425,6 +428,15 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
                 <span>Filters</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAddLeadModalOpen(true)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Add Lead</span>
               </button>
 
               <button
@@ -814,6 +826,18 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
           fetchLeadsData()
           setSelectedLeads([])
         }}
+      />
+
+      <AddLeadModal
+        isOpen={addLeadModalOpen}
+        onClose={() => setAddLeadModalOpen(false)}
+        onSuccess={() => {
+          showToast('Lead added successfully!', 'success')
+          void fetchLeadsData()
+        }}
+        funnels={funnels}
+        leadStatusOptions={LEAD_STATUS_OPTIONS}
+        platformOptions={LEAD_TYPE_OPTIONS}
       />
 
       <UploadLeadModal

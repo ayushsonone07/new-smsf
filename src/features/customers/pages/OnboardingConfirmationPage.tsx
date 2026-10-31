@@ -15,6 +15,8 @@ interface ConfirmationPayload {
   departmentType?: string
   username?: string
   phaseName?: string
+  subService?: string
+  serviceName?: string
   isDuplicate?: boolean | string
   domainConnect?: boolean | string
   themeSelection?: boolean | string
@@ -23,7 +25,7 @@ interface ConfirmationPayload {
 interface ConfirmationResponse {
   success?: boolean
   message?: string
-  data?: { businessName?: string; confirmedAt?: string }
+  data?: { businessName?: string; serviceName?: string; confirmedAt?: string }
 }
 
 const booleanValue = (value: boolean | string | undefined) =>
@@ -50,6 +52,7 @@ export function OnboardingConfirmationPage() {
   const [state, setState] = useState<ConfirmationState>('loading')
   const [message, setMessage] = useState('')
   const [businessName, setBusinessName] = useState('Your business')
+  const [serviceName, setServiceName] = useState<string>(isDepartment ? 'Service' : 'Onboarding Service')
   const [confirmedAt, setConfirmedAt] = useState('')
   const [payload, setPayload] = useState<ConfirmationPayload | null>(null)
 
@@ -58,6 +61,20 @@ export function OnboardingConfirmationPage() {
     const token = details.token || customerSession?.accessToken
     const email = details.email || customerSession?.email
     const contact = details.contact
+
+    const currentService =
+      details.phaseName ||
+      details.subService ||
+      details.serviceName ||
+      (isWebsite
+        ? 'Website Creation'
+        : isDepartment
+        ? details.departmentType
+          ? details.departmentType.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')
+          : 'Service'
+        : 'Onboarding Service')
+
+    setServiceName(currentService)
 
     if (!email || !contact || !token) {
       setState('failure')
@@ -79,7 +96,7 @@ export function OnboardingConfirmationPage() {
           return
         }
         search.set('departmentType', details.departmentType)
-        search.set('subService', details.phaseName || 'Default')
+        search.set('subService', details.phaseName || details.subService || 'Default')
       } else {
         search.set('domainConnect', String(booleanValue(details.domainConnect)))
         search.set('themeSelection', String(booleanValue(details.themeSelection)))
@@ -94,12 +111,15 @@ export function OnboardingConfirmationPage() {
           },
         },
       )
-      if (response.success === false) throw new Error(response.message || 'Onboarding could not be confirmed.')
+      if (response.success === false) throw new Error(response.message || 'Confirmation could not be completed.')
       setBusinessName(response.data?.businessName || details.businessName || customerSession?.company || 'Your business')
       setConfirmedAt(response.data?.confirmedAt || new Date().toISOString())
-      setMessage(response.message || (isDepartment
-        ? 'Your service delivery has been successfully confirmed.'
-        : 'Your onboarding with MBG Card is confirmed. Our team will reach out with next steps.'))
+      if (response.data?.serviceName) setServiceName(response.data.serviceName)
+
+      setMessage(
+        response.message ||
+          `Thank you! Your ${currentService.toLowerCase()} with MBG Card is confirmed. Our team will reach out with next steps.`,
+      )
       rememberCompletedConfirmation()
       setState('success')
     } catch (error) {
@@ -107,7 +127,7 @@ export function OnboardingConfirmationPage() {
       if (/already (used|updated|confirmed|completed)|status already updated/i.test(text)) {
         setBusinessName(details.businessName || customerSession?.company || 'Your business')
         setConfirmedAt(new Date().toISOString())
-        setMessage('This acknowledgement has already been completed.')
+        setMessage(`Your ${currentService.toLowerCase()} acknowledgement has already been completed.`)
         rememberCompletedConfirmation()
         setState('success')
         return
@@ -115,7 +135,7 @@ export function OnboardingConfirmationPage() {
       setMessage(text)
       setState(/expired|already used|invalid/i.test(text) ? 'failure' : 'error')
     }
-  }, [isDepartment])
+  }, [isDepartment, isWebsite])
 
   useEffect(() => {
     if (startedRef.current) return
@@ -132,20 +152,37 @@ export function OnboardingConfirmationPage() {
             businessName: params.get('businessName') || undefined,
             departmentType: params.get('departmentType') || undefined,
             username: params.get('username') || undefined,
-            phaseName: params.get('phaseName') || params.get('subService') || undefined,
+            phaseName: params.get('phaseName') || params.get('subService') || params.get('serviceName') || undefined,
+            subService: params.get('subService') || params.get('phaseName') || undefined,
+            serviceName: params.get('serviceName') || params.get('subService') || params.get('phaseName') || undefined,
             isDuplicate: params.get('isDuplicate') || undefined,
             domainConnect: params.get('domainConnect') || undefined,
             themeSelection: params.get('themeSelection') || undefined,
           }
+
+      const initialService =
+        details.phaseName ||
+        details.subService ||
+        details.serviceName ||
+        (isWebsite
+          ? 'Website Creation'
+          : isDepartment
+          ? details.departmentType
+            ? details.departmentType.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')
+            : 'Service'
+          : 'Onboarding Service')
+
+      setServiceName(initialService)
+      if (details.businessName) setBusinessName(details.businessName)
       setPayload(details)
       window.setTimeout(() => void confirm(details), 350)
     } catch {
       setMessage('This confirmation link is invalid, corrupted, or has expired.')
       setState('failure')
     }
-  }, [confirm, isDepartment])
+  }, [confirm, isDepartment, isWebsite, routeType])
 
-  const content = confirmationContent(state, message)
+  const content = confirmationContent(state, message, serviceName)
   const StateIcon = state === 'success' ? Check : state === 'failure' ? Clock3 : state === 'error' ? AlertTriangle : LoaderCircle
 
   return (
@@ -158,31 +195,66 @@ export function OnboardingConfirmationPage() {
             initial={{ opacity: 0, y: 18, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.32, ease: 'easeOut' }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
           >
+            {/* MBG Logo */}
             <div className="onboarding-confirmation__brand">
-              <span>MBG</span><strong>MBG Card</strong>
+              <span>M<strong style={{ color: '#ffc629', fontWeight: 700 }}>B</strong>G</span>
+              <strong>MBG Card</strong>
             </div>
+
+            {/* Icon Tile */}
             <motion.div
               className="onboarding-confirmation__icon"
               animate={state === 'loading' || state === 'verifying' ? { rotate: 360 } : { scale: [0.75, 1.08, 1] }}
-              transition={state === 'loading' || state === 'verifying' ? { repeat: Infinity, duration: 0.9, ease: 'linear' } : { duration: 0.45 }}
+              transition={state === 'loading' || state === 'verifying' ? { repeat: Infinity, duration: 0.85, ease: 'linear' } : { duration: 0.4 }}
             >
-              <StateIcon size={44} />
+              <StateIcon size={34} strokeWidth={2.4} />
             </motion.div>
-            <h1>{state === 'success' && isDepartment ? 'Service confirmed!' : content.title}</h1>
+
+            {/* Title & Body */}
+            <h1>{content.title}</h1>
             <p>{content.body}</p>
 
+            {/* Success Summary DL */}
             {state === 'success' ? (
-              <motion.div className="onboarding-confirmation__summary" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <span>Business</span><strong>{businessName}</strong>
-                <span>Confirmed</span><strong>{new Date(confirmedAt).toLocaleString()}</strong>
+              <motion.div
+                className="onboarding-confirmation__summary"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <span>Business</span>
+                <strong>{businessName}</strong>
+                <span>Service</span>
+                <strong>{serviceName}</strong>
+                <span>Confirmed</span>
+                <strong>
+                  {confirmedAt
+                    ? new Date(confirmedAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
+                    : 'Just now'}
+                </strong>
               </motion.div>
             ) : null}
 
+            {/* Error Retry */}
             {state === 'error' && payload ? (
-              <button type="button" onClick={() => void confirm(payload)}>Try again</button>
+              <button
+                type="button"
+                className="onboarding-confirmation__retry"
+                onClick={() => void confirm(payload)}
+              >
+                Try again
+              </button>
             ) : null}
+
             <button
               type="button"
               className="onboarding-confirmation__back"
@@ -197,12 +269,44 @@ export function OnboardingConfirmationPage() {
   )
 }
 
-function confirmationContent(state: ConfirmationState, message: string) {
-  if (state === 'loading') return { title: 'Loading…', body: 'Opening your confirmation link.' }
-  if (state === 'verifying') return { title: 'Verifying your link', body: 'Checking the secure token — this takes a moment.' }
-  if (state === 'success') return { title: 'Onboarding confirmed!', body: message }
-  if (state === 'failure') return { title: 'Link expired or already used', body: message }
-  return { title: 'Something went wrong', body: message || 'We could not reach the server. Check your connection and try again.' }
+function confirmationContent(state: ConfirmationState, message: string, serviceName: string) {
+  const svc = serviceName || 'Onboarding Service'
+  const svcLower = svc.toLowerCase()
+
+  if (state === 'loading') {
+    return {
+      title: 'Loading…',
+      body: 'Opening your confirmation link.',
+    }
+  }
+  if (state === 'verifying') {
+    return {
+      title: 'Verifying your link',
+      body: `Checking the secure token for ${svc} — this takes a moment.`,
+    }
+  }
+  if (state === 'success') {
+    return {
+      title: `${svc} confirmed!`,
+      body:
+        message ||
+        `Thank you! Your ${svcLower} with MBG Card is confirmed. Our team will reach out with next steps.`,
+    }
+  }
+  if (state === 'failure') {
+    return {
+      title: 'Link expired or already used',
+      body:
+        message ||
+        `This confirmation link is no longer valid. Ask your onboarding executive for a new one.`,
+    }
+  }
+  return {
+    title: 'Something went wrong',
+    body:
+      message ||
+      'We could not reach the server. Check your connection and try again.',
+  }
 }
 
 function rememberCompletedConfirmation() {
