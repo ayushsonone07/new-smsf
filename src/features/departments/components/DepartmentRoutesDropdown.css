@@ -1,0 +1,423 @@
+/* Modern Department Routes & Columns Split-Panel Styles */
+
+.dept-routes-dropdown-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  font-family: inherit;
+  color: #0f172a;
+}
+
+/* Toolbar Header */
+.dept-routes-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dept-routes-toolbar-title strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.dept-routes-toolbar-title span {
+  display: block;
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.dept-routes-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dept-routes-count-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.dept-route-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dept-route-add-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Two-Column Split Layout */
+.dept-routes-split-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .dept-routes-split-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+/* Left Panel: Routes List */
+.dept-routes-left-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 0.65rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  max-height: 235px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.dept-routes-left-card::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dept-routes-left-card::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 9999px;
+}
+
+.dept-routes-left-card::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dept-routes-left-card::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media (min-width: 900px) {
+  .dept-routes-left-card {
+    width: 48%;
+    min-width: 380px;
+    flex-shrink: 0;
+  }
+}
+
+/* Route Item Row */
+.dept-route-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.dept-route-row-item:hover {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.dept-route-row-item.is-selected {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  border-left: 4px solid #2563eb;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+}
+
+/* Route Item Left Info (Branch Icon + Route Name + Arrow) */
+.dept-route-row-left {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-w: 0;
+  flex: 1;
+}
+
+.dept-route-branch-icon {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.dept-route-name-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+@media (min-width: 1100px) {
+  .dept-route-name-text {
+    max-width: 160px;
+  }
+}
+
+.dept-route-chevron {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+/* Route Item Right Controls (Role Toggles & Action Buttons) */
+.dept-route-row-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.dept-role-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.dept-role-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dept-role-toggle-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Custom Mini Toggle Switch */
+.dept-mini-toggle {
+  position: relative;
+  display: inline-flex;
+  width: 2.15rem;
+  height: 1.25rem;
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  transition: background-color 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.dept-mini-toggle.is-on {
+  background-color: #4f46e5;
+}
+
+.dept-mini-toggle-thumb {
+  width: 0.95rem;
+  height: 0.95rem;
+  background-color: #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+.dept-mini-toggle.is-on .dept-mini-toggle-thumb {
+  transform: translateX(0.9rem);
+}
+
+.dept-mini-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Route Action Buttons (Edit & Delete) */
+.dept-route-btn-action {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dept-route-btn-action:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.dept-route-btn-action.is-delete:hover {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
+/* Right Panel: Columns for Selected Route */
+.dept-columns-right-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  min-height: 235px;
+  max-height: 235px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dept-columns-right-card::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dept-columns-right-card::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 9999px;
+}
+
+.dept-columns-right-card::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dept-columns-right-card::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dept-columns-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dept-columns-header-label {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.dept-columns-header-route {
+  font-size: 0.88rem;
+  font-weight: 750;
+  color: #0f172a;
+  word-break: break-all;
+  margin-top: 0.2rem;
+}
+
+.dept-columns-empty-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 500;
+  text-align: center;
+  padding: 3rem 1rem;
+  margin: auto;
+}
+
+/* Columns List (when columns exist) */
+.dept-columns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.dept-column-row-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.6rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+}
+
+.dept-column-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dept-column-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dept-column-id-badge {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.dept-column-order-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dept-column-order-btn {
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 0.35rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.dept-column-order-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.dept-column-order-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dept-column-perm-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+

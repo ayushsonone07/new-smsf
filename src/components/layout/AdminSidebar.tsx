@@ -1,12 +1,32 @@
+
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
+
 import {
   clearSession,
   getSession,
 } from '../../app/auth/session'
+
 import type { UserRole } from '../../features/auth/types/auth.types'
 import { ProfileMenu } from '../common/ProfileMenu'
 import { Icon } from '../head/shared/Icon'
+
+import {
+  LayoutDashboard,
+  Building2,
+  CirclePlus,
+  ListChecks,
+  CreditCard,
+  Workflow,
+  UsersRound,
+  Target,
+  Wallet,
+  Bell,
+  CalendarCheck,
+  type LucideIcon,
+} from 'lucide-react'
+
+import './AdminSidebar.css'
 
 type NavPath =
   | '/admin'
@@ -26,32 +46,35 @@ type NavPath =
 interface NavItem {
   to: NavPath
   label: string
-  icon: string
+  icon: LucideIcon
   roles: UserRole[]
   isActive: (pathname: string) => boolean
+  badge?: number
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
     to: '/admin/overview',
     label: 'Overview',
-    icon: '📊',
+    icon: LayoutDashboard,
     roles: ['ADMIN'],
-    isActive: (pathname) => pathname.startsWith('/admin/overview'),
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/overview'),
   },
   {
     to: '/admin',
     label: 'Departments',
-    icon: '▦',
+    icon: Building2,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname === '/admin' ||
-      (pathname.startsWith('/admin/departments') && !pathname.includes('/create')),
+      (pathname.startsWith('/admin/departments') &&
+        !pathname.includes('/create')),
   },
   {
     to: '/admin/create-department',
     label: 'Create Department',
-    icon: '➕',
+    icon: CirclePlus,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname === '/admin/create-department' ||
@@ -60,7 +83,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     to: '/admin/services',
     label: 'Service List',
-    icon: '🛠',
+    icon: ListChecks,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/services') ||
@@ -69,7 +92,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     to: '/admin/plans',
     label: 'Plans',
-    icon: '💳',
+    icon: CreditCard,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/plans') ||
@@ -77,8 +100,8 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     to: '/admin/timelines',
-    label: 'Service Flow',
-    icon: '🔄',
+    label: 'Services & SOP',
+    icon: Workflow,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/timelines') ||
@@ -87,46 +110,37 @@ const NAV_ITEMS: NavItem[] = [
   {
     to: '/admin/customers',
     label: 'Customers',
-    icon: '♙',
+    icon: UsersRound,
     roles: ['ADMIN'],
-    isActive: (pathname) => pathname.startsWith('/admin/customers'),
+    isActive: (pathname) =>
+      pathname.startsWith('/admin/customers'),
   },
   {
     to: '/manage-leads',
     label: 'Leads',
-    icon: '🏠',
+    icon: Target,
     roles: ['ADMIN'],
-    isActive: (pathname) => pathname.startsWith('/manage-leads') || pathname.startsWith('/leads'),
+    isActive: (pathname) =>
+      pathname.startsWith('/manage-leads') ||
+      pathname.startsWith('/leads'),
   },
   {
     to: '/manage-customers-payment',
     label: 'Payments',
-    icon: '💳',
+    icon: Wallet,
     roles: ['ADMIN'],
-    isActive: (pathname) => pathname.startsWith('/manage-customers-payment') || pathname.startsWith('/admin/payments'),
+    isActive: (pathname) =>
+      pathname.startsWith('/manage-customers-payment') ||
+      pathname.startsWith('/admin/payments'),
   },
   {
     to: '/admin/notification-history',
     label: 'Notification History',
-    icon: '🔔',
+    icon: Bell,
     roles: ['ADMIN'],
-    isActive: (pathname) => pathname.startsWith('/admin/notification-history'),
-  },
-  {
-    to: '/head',
-    label: 'Head Panel',
-    icon: '♙',
-    roles: ['ADMIN', 'HEAD'],
     isActive: (pathname) =>
-      pathname.startsWith('/head') || pathname.startsWith('/onboarding'),
-  },
-  {
-    to: '/users',
-    label: 'Users',
-    icon: '☰',
-    roles: ['ADMIN', 'HEAD', 'USER'],
-    isActive: (pathname) =>
-      pathname.startsWith('/users') || pathname.startsWith('/onboarding'),
+      pathname.startsWith('/admin/notification-history'),
+    badge: 4,
   },
 ]
 
@@ -141,23 +155,31 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
+
   const [panelOpen, setPanelOpen] = useState(false)
   const footerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!panelOpen) return
+
     function handleClickOutside(event: MouseEvent) {
-      if (footerRef.current && !footerRef.current.contains(event.target as Node)) {
+      if (
+        footerRef.current &&
+        !footerRef.current.contains(event.target as Node)
+      ) {
         setPanelOpen(false)
       }
     }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setPanelOpen(false)
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
@@ -168,11 +190,7 @@ export function AdminSidebar({
   const role = session?.user.role
 
   const visibleItems = NAV_ITEMS.filter(
-    (item) =>
-      (role ? item.roles.includes(role) : false) &&
-      // Head Panel and Users are hidden from the sidebar (UI only)
-      item.to !== '/head' &&
-      item.to !== '/users',
+    (item) => role ? item.roles.includes(role) : false
   )
 
   function handleLogout() {
@@ -181,11 +199,22 @@ export function AdminSidebar({
     navigate({ to: '/login' })
   }
 
+  function handleNavigation(to: NavPath) {
+    setPanelOpen(false)
+    onNavigate?.()
+    navigate({ to })
+  }
+
   return (
-    <>
-      <aside className="sidebar">
+    <aside className="sidebar admin-sidebar-v2">
+
+      {/* Brand Header */}
       <div className="brand">
-        <img className="brand-mark" src="/mbg-card-logo.svg" alt="MBG Card" />
+        <img
+          className="brand-mark"
+          src="/mbg-card-logo.svg"
+          alt="MBG Card"
+        />
 
         <div>
           <strong>MBG Card</strong>
@@ -203,60 +232,94 @@ export function AdminSidebar({
         </button>
       </div>
 
-      <nav className="navigation">
+      {/* Navigation Menu */}
+      <nav
+        className="navigation"
+        aria-label="Admin navigation"
+      >
         <p className="nav-label">MAIN MENU</p>
 
         {visibleItems.map((item) => {
-          const targetTo =
-            (item.to === '/head' || item.to === '/users') &&
-            session?.user.departmentType?.toUpperCase().includes('ONBOARDING')
-              ? item.to === '/users' ? '/onboarding-user' : '/onboarding-head'
-              : item.to
+          const NavIcon = item.icon
+          const active = item.isActive(location.pathname)
 
           return (
             <a
               key={item.to}
-              href={targetTo}
-              className={`nav-item ${
-                item.isActive(location.pathname)
-                  ? 'active'
-                  : ''
-              }`}
+              href={item.to}
+              aria-current={active ? 'page' : undefined}
+              className={`nav-item ${active ? 'active' : ''}`}
               onClick={(event) => {
                 event.preventDefault()
-                onNavigate?.()
-                navigate({ to: targetTo as never })
+                handleNavigation(item.to)
               }}
             >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
+              <NavIcon
+                className="nav-item-icon"
+                size={19}
+                strokeWidth={1.9}
+                aria-hidden="true"
+              />
+
+              <span className="nav-item-label">
+                {item.label}
+              </span>
+
+              {item.badge !== undefined &&
+                item.badge > 0 && (
+                  <span className="nav-item-badge">
+                    {item.badge}
+                  </span>
+                )}
             </a>
           )
         })}
 
-        {/* HRM System — cross-router navigation (react-router-dom boundary) */}
+        {/* HRM System uses cross-router navigation */}
         {role === 'ADMIN' && (
           <a
             href="/hrm/dashboard"
-            className={`nav-item ${location.pathname.startsWith('/hrm') ? 'active' : ''}`}
+            className={`nav-item ${
+              location.pathname.startsWith('/hrm')
+                ? 'active'
+                : ''
+            }`}
+            aria-current={
+              location.pathname.startsWith('/hrm')
+                ? 'page'
+                : undefined
+            }
             onClick={(event) => {
               event.preventDefault()
+              setPanelOpen(false)
               onNavigate?.()
               window.location.href = '/hrm/dashboard'
             }}
           >
-            <span>👥</span>
-            <span>HRM System</span>
+            <CalendarCheck
+              className="nav-item-icon"
+              size={19}
+              strokeWidth={1.9}
+              aria-hidden="true"
+            />
+
+            <span className="nav-item-label">
+              HRM System
+            </span>
           </a>
         )}
       </nav>
 
+      {/* Profile Footer */}
       <div
         ref={footerRef}
         className="sidebar-footer-container"
-        style={{ position: 'relative', marginTop: 'auto' }}
+        style={{
+          position: 'relative',
+          marginTop: 'auto',
+        }}
       >
-        {panelOpen ? (
+        {panelOpen && (
           <div
             className="sidebar-profile-menu-popover"
             style={{
@@ -277,7 +340,7 @@ export function AdminSidebar({
               }}
             />
           </div>
-        ) : null}
+        )}
 
         <div
           className="sidebar-footer sidebar-footer--clickable"
@@ -288,7 +351,10 @@ export function AdminSidebar({
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((value) => !value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
+            if (
+              event.key === 'Enter' ||
+              event.key === ' '
+            ) {
               event.preventDefault()
               setPanelOpen((value) => !value)
             }
@@ -310,13 +376,16 @@ export function AdminSidebar({
           </div>
 
           <span
-            className={`sidebar-footer__chevron${panelOpen ? ' is-open' : ''}`}
+            className={`sidebar-footer__chevron${
+              panelOpen ? ' is-open' : ''
+            }`}
             aria-hidden="true"
           >
             ›
           </span>
 
           <button
+            type="button"
             className="logout-button"
             aria-label="Logout"
             title="Logout"
@@ -329,7 +398,6 @@ export function AdminSidebar({
           </button>
         </div>
       </div>
-      </aside>
-    </>
+    </aside>
   )
 }

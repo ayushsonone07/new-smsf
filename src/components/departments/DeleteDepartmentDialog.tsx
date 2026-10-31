@@ -19,12 +19,17 @@ export function DeleteDepartmentDialog({
 }: DeleteDepartmentDialogProps) {
   const open = department !== null
 
+  const deptLabel =
+    department?.name ||
+    department?.username ||
+    (department?.type
+      ? department.type.replace(/_DEPARTMENT$/i, '').replace(/_/g, ' ')
+      : 'this department')
+
   const message: ReactNode = (
     <>
-      This will remove the department login
-      account for{' '}
-      <strong>{department?.name}</strong>. This
-      action cannot be undone.
+      This will remove the department account and login credentials for{' '}
+      <strong>{deptLabel}</strong>. This action cannot be undone.
     </>
   )
 

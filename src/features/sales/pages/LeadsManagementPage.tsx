@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   SlidersHorizontal,
@@ -9,16 +9,13 @@ import {
   AlertCircle,
   Eye,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  Building,
-  CreditCard,
+  Trash2,
   Copy,
   ExternalLink,
   Loader2,
-  Trash2,
-  ArrowRightLeft,
+  TrendingUp,
+  LayoutGrid,
+  CreditCard,
 } from 'lucide-react'
 import {
   getLeads,
@@ -38,7 +35,7 @@ import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
-import { TrendingUp, LayoutGrid } from 'lucide-react'
+import '../../customers/pages/AdminCustomersPage.css'
 
 const LEAD_STATUS_OPTIONS = [
   'PENDING',
@@ -57,6 +54,41 @@ const TELECALLER_STATUS_OPTIONS = [
 ]
 
 const LEAD_TYPE_OPTIONS = ['Webinar 999', 'Direct', 'Inbound', 'Referral', 'Campaign']
+
+function isNa(val?: string | null): boolean {
+  if (!val) return true
+  const v = val.trim().toLowerCase()
+  return v === '' || v === 'na' || v === 'n/a' || v === 'null' || v === 'undefined'
+}
+
+function getCustomerDisplay(lead: LeadInfo): { name: string; initial: string } {
+  if (!isNa(lead.ownerName)) {
+    const trimmed = lead.ownerName!.trim()
+    return { name: trimmed, initial: trimmed.charAt(0).toUpperCase() }
+  }
+
+  if (!isNa(lead.businessName)) {
+    const trimmed = lead.businessName!.trim()
+    return { name: trimmed, initial: trimmed.charAt(0).toUpperCase() }
+  }
+
+  if (lead.businessEmail && lead.businessEmail.includes('@')) {
+    const emailPrefix = lead.businessEmail.split('@')[0].replace(/[._0-9]/g, ' ').trim()
+    if (emailPrefix) {
+      const formatted = emailPrefix
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+      return { name: formatted, initial: formatted.charAt(0).toUpperCase() }
+    }
+  }
+
+  if (lead.contact) {
+    return { name: `Lead ${lead.contact}`, initial: 'L' }
+  }
+
+  return { name: `Lead #${lead.leadId?.slice(-4) || '—'}`, initial: 'L' }
+}
 
 export interface LeadsManagementPageProps {
   initialTab?: 'leads' | 'summary' | 'payments'
@@ -77,6 +109,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     }
     return 'leads'
   })
+
   const [leads, setLeads] = useState<LeadInfo[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -184,20 +217,10 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   ])
 
   useEffect(() => {
-    void fetchLeadsData()
-  }, [fetchLeadsData])
-
-  // Stat counters (computed from total elements and lead items)
-  const stats = useMemo(() => {
-    const total = totalElements
-    const pending = leads.filter((l) => (l.leadStatus || '').toUpperCase() === 'PENDING').length
-    const inProgress = leads.filter((l) =>
-      ['FOLLOW_UP', 'MEETING_SCHEDULED_AT', 'NOT_CONNECTED'].includes((l.leadStatus || '').toUpperCase()),
-    ).length
-    const converted = leads.filter((l) => (l.leadStatus || '').toUpperCase() === 'DONE').length
-
-    return { total, pending, inProgress, converted }
-  }, [totalElements, leads])
+    if (activeMainTab === 'leads') {
+      void fetchLeadsData()
+    }
+  }, [fetchLeadsData, activeMainTab])
 
   // Table selection
   const allCurrentPageSelected =
@@ -215,7 +238,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
   const toggleSelectOne = (id: string) => {
     setSelectedLeads((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
 
@@ -267,8 +290,11 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     setCurrentPage(0)
   }
 
+  const start = totalElements === 0 ? 0 : currentPage * pageSize + 1
+  const end = Math.min((currentPage + 1) * pageSize, totalElements)
+
   return (
-    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-5 font-sans">
+    <div className="space-y-4 font-sans">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-6 right-6 z-50 flex items-start gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl max-w-sm animate-in fade-in slide-in-from-top-4">
@@ -292,590 +318,485 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="text-slate-400 hover:text-slate-600 p-1"
+            className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Top Banner & Header info */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <nav className="text-xs text-slate-400 mb-1 flex items-center gap-1.5">
-            <span>MBG Card</span>
-            <span>&rsaquo;</span>
-            <span className="text-slate-600 font-medium">Leads Management</span>
-          </nav>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Leads Management
-            </h1>
-            <span className="text-xs text-slate-400 hidden sm:inline">— Manage and track your sales leads</span>
-          </div>
-        </div>
+      {/* Main Tabs Navigation (Leads, Summary, Payments) */}
+      <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('leads')}
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+            activeMainTab === 'leads'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4" />
+          <span>Leads Management</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('summary')}
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+            activeMainTab === 'summary'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>Sales Summary</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('payments')}
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+            activeMainTab === 'payments'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>Customer Payments</span>
+        </button>
       </div>
 
-      {/* 4 Stat Cards */}
-      <div
-        className={`grid grid-cols-2 lg:grid-cols-4 gap-3.5 transition-opacity ${refreshing ? 'opacity-60' : ''}`}
-        aria-busy={refreshing}
-      >
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Total Leads
-          </p>
-          <p className="text-2xl font-bold text-slate-900 mt-1.5 tracking-tight">
-            {stats.total.toLocaleString('en-IN')}
-          </p>
-        </div>
+      {activeMainTab === 'summary' && <SalesSummaryView />}
+      {activeMainTab === 'payments' && <CustomerPaymentView />}
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Pending
-          </p>
-          <p className="text-2xl font-bold text-amber-500 mt-1.5 tracking-tight">
-            {stats.pending.toLocaleString('en-IN')}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            In Progress
-          </p>
-          <p className="text-2xl font-bold text-slate-500 mt-1.5 tracking-tight">
-            {stats.inProgress.toLocaleString('en-IN')}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Converted
-          </p>
-          <p className="text-2xl font-bold text-emerald-500 mt-1.5 tracking-tight">
-            {stats.converted.toLocaleString('en-IN')}
-          </p>
-        </div>
-      </div>
-
-      {/* Search, Filter bar & Action Buttons */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Search box */}
-          <div className="flex-1 relative max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or business..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Right Action buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {selectedLeads.length > 0 && (
-              <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
-                {selectedLeads.length} selected
-              </span>
-            )}
-
-            <button
-              type="button"
-              disabled={selectedLeads.length === 0 || isDeleting}
-              onClick={handleDeleteSelected}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-xs ${
-                selectedLeads.length === 0 || isDeleting
-                  ? 'bg-rose-100 text-rose-300 cursor-not-allowed'
-                  : 'bg-rose-500 hover:bg-rose-600 text-white cursor-pointer'
-              }`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                showFilters
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-              <span>Filters</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setUploadModalOpen(true)}
-              className="px-4 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import Leads</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={refreshing}
-              onClick={() => fetchLeadsData(true)}
-              aria-label="Refresh"
-              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer shadow-xs"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Filter Dropdowns */}
-        {showFilters && (
-          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
+      {activeMainTab === 'leads' && (
+        <section className="content-card admin-customers-card border border-slate-200/80 rounded-2xl bg-white shadow-xs overflow-hidden">
+          {/* Card Heading with Title, Subtitle & Action Toolbar */}
+          <div className="admin-customers-card__heading flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 pb-3">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                Sales Status
-              </label>
-              <select
-                value={selectedLeadStatus}
-                onChange={(e) => {
-                  setSelectedLeadStatus(e.target.value)
-                  setCurrentPage(0)
-                }}
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All Statuses</option>
-                {LEAD_STATUS_OPTIONS.map((st) => (
-                  <option key={st} value={st}>
-                    {st.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Customers</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{totalElements.toLocaleString('en-IN')} customer accounts</p>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                Telecaller Status
-              </label>
-              <select
-                value={selectedTelecallerStatus}
-                onChange={(e) => {
-                  setSelectedTelecallerStatus(e.target.value)
-                  setCurrentPage(0)
-                }}
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All Telecaller Statuses</option>
-                {TELECALLER_STATUS_OPTIONS.map((st) => (
-                  <option key={st} value={st}>
-                    {st.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Action Bar Controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Search Box */}
+              <div className="relative w-64 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search name, email, phone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                Lead Type
-              </label>
-              <select
-                value={selectedLeadType}
-                onChange={(e) => {
-                  setSelectedLeadType(e.target.value)
-                  setCurrentPage(0)
-                }}
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All Lead Types</option>
-                {LEAD_TYPE_OPTIONS.map((lt) => (
-                  <option key={lt} value={lt}>
-                    {lt}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                Funnel Type
-              </label>
-              <select
-                value={selectedFunnel}
-                onChange={(e) => {
-                  setSelectedFunnel(e.target.value)
-                  setCurrentPage(0)
-                }}
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All Funnels</option>
-                {funnels.map((f, i) => (
-                  <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                    {f.funnelName || f.funnelType}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {hasActiveFilters && (
-              <div className="col-span-full flex justify-end">
+              {selectedLeads.length > 0 && (
                 <button
                   type="button"
-                  onClick={clearAllFilters}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                  disabled={isDeleting}
+                  onClick={handleDeleteSelected}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500 hover:bg-rose-600 text-white cursor-pointer flex items-center gap-1.5 shadow-xs"
                 >
-                  Clear all filters
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete ({selectedLeads.length})</span>
                 </button>
-              </div>
-            )}
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                  showFilters
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                <span>Filters</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUploadModalOpen(true)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import Leads</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={refreshing}
+                onClick={() => fetchLeadsData(true)}
+                aria-label="Refresh"
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer shadow-xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
+              </button>
+            </div>
           </div>
-        )}
 
-        {/* Leads Table */}
-        <div
-          className={`overflow-x-auto rounded-xl border border-slate-200/80 transition-opacity ${refreshing ? 'pointer-events-none opacity-60' : ''}`}
-          aria-busy={refreshing}
-        >
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/90 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
-                <th className="py-2.5 px-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allCurrentPageSelected}
-                    onChange={toggleSelectAll}
-                    className="rounded w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
-                  />
-                </th>
-                <th className="py-2.5 px-3 min-w-[170px]">Customer</th>
-                <th className="py-2.5 px-3 min-w-[170px]">Email</th>
-                <th className="py-2.5 px-3 min-w-[140px]">Business</th>
-                <th className="py-2.5 px-3 min-w-[100px]">Lead Type</th>
-                <th className="py-2.5 px-3 min-w-[80px]">Category</th>
-                <th className="py-2.5 px-3 min-w-[130px]">Sales Status</th>
-                <th className="py-2.5 px-3 min-w-[140px]">Assigned Rep</th>
-                <th className="py-2.5 px-3 min-w-[130px]">Telecaller</th>
-                <th className="py-2.5 px-3 min-w-[130px]">Telecaller Status</th>
-                <th className="py-2.5 px-3 min-w-[125px] text-center">Payment</th>
-                <th className="py-2.5 px-3 w-12 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {loading && !refreshing ? (
-                <tr>
-                  <td colSpan={12} className="py-16 text-center text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                    <span>Loading leads data...</span>
-                  </td>
+          {/* Collapsible Filter Bar */}
+          {showFilters && (
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                  Sales Status
+                </label>
+                <select
+                  value={selectedLeadStatus}
+                  onChange={(e) => {
+                    setSelectedLeadStatus(e.target.value)
+                    setCurrentPage(0)
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="all">All Statuses</option>
+                  {LEAD_STATUS_OPTIONS.map((st) => (
+                    <option key={st} value={st}>
+                      {st.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                  Telecaller Status
+                </label>
+                <select
+                  value={selectedTelecallerStatus}
+                  onChange={(e) => {
+                    setSelectedTelecallerStatus(e.target.value)
+                    setCurrentPage(0)
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="all">All Telecaller Statuses</option>
+                  {TELECALLER_STATUS_OPTIONS.map((st) => (
+                    <option key={st} value={st}>
+                      {st.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                  Lead Type
+                </label>
+                <select
+                  value={selectedLeadType}
+                  onChange={(e) => {
+                    setSelectedLeadType(e.target.value)
+                    setCurrentPage(0)
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="all">All Lead Types</option>
+                  {LEAD_TYPE_OPTIONS.map((lt) => (
+                    <option key={lt} value={lt}>
+                      {lt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                  Funnel Type
+                </label>
+                <select
+                  value={selectedFunnel}
+                  onChange={(e) => {
+                    setSelectedFunnel(e.target.value)
+                    setCurrentPage(0)
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="all">All Funnels</option>
+                  {funnels.map((f, i) => (
+                    <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
+                      {f.funnelName || f.funnelType}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {hasActiveFilters && (
+                <div className="col-span-full flex justify-end">
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Table matching AdminCustomersPage / DataTable layout */}
+          <div className="table-wrapper border-0 rounded-none overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
+              <thead>
+                <tr className="border-b border-slate-200/80">
+                  <th className="py-3 px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allCurrentPageSelected}
+                      onChange={toggleSelectAll}
+                      className="rounded w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="py-3 px-4 min-w-[200px]">CUSTOMER</th>
+                  <th className="py-3 px-4 min-w-[190px]">EMAIL</th>
+                  <th className="py-3 px-4 min-w-[130px]">PHONE</th>
+                  <th className="py-3 px-4 min-w-[160px]">BUSINESS</th>
+                  <th className="py-3 px-4 min-w-[120px]">STATUS</th>
+                  <th className="py-3 px-4 min-w-[140px]">ASSIGNED REP</th>
+                  <th className="py-3 px-4 min-w-[110px] text-center">PAYMENT</th>
+                  <th className="py-3 px-4 w-14 text-center">ACTIONS</th>
                 </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={12} className="py-12 text-center">
-                    <div className="max-w-md mx-auto p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
-                      <p className="font-semibold text-xs mb-1">Failed to fetch leads</p>
-                      <p className="text-xs text-rose-600">{error}</p>
-                      <button
-                        type="button"
-                        onClick={() => fetchLeadsData(true)}
-                        className="mt-3 px-3 py-1 bg-white border border-rose-300 rounded-lg text-xs font-semibold hover:bg-rose-100"
+              </thead>
+              <tbody>
+                {loading && !refreshing ? (
+                  <tr>
+                    <td colSpan={9} className="py-16 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
+                      <span>Loading leads data...</span>
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center">
+                      <div className="max-w-md mx-auto p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
+                        <p className="font-semibold text-xs mb-1">Failed to fetch leads</p>
+                        <p className="text-xs text-rose-600 mb-2">{error}</p>
+                        <button
+                          type="button"
+                          onClick={() => fetchLeadsData(true)}
+                          className="px-3 py-1 bg-white border border-rose-300 rounded-lg text-xs font-semibold hover:bg-rose-100 cursor-pointer"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : leads.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-16 text-center">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <FileSpreadsheet className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-1">No Leads Found</h3>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                        {hasActiveFilters
+                          ? 'Try adjusting your search query or filter options.'
+                          : 'No leads available yet. Use "Import Leads" to upload your Excel sheet.'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  leads.map((lead) => {
+                    const isSelected = selectedLeads.includes(lead.leadId)
+                    const customerInfo = getCustomerDisplay(lead)
+                    const isPending = (lead.leadStatus || 'PENDING') === 'PENDING'
+                    const isDone = (lead.leadStatus || '').toUpperCase() === 'DONE'
+
+                    return (
+                      <tr
+                        key={lead.leadId}
+                        className={`hover:bg-slate-50/70 transition-colors ${
+                          isSelected ? 'bg-blue-50/40' : ''
+                        }`}
                       >
-                        Try Again
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : leads.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="py-16 text-center">
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                      <FileSpreadsheet className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-800 mb-1">No Leads Found</h3>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                      {hasActiveFilters
-                        ? 'Try adjusting your search query or filter options.'
-                        : 'No leads available yet. Use "Import Leads" to upload your leads Excel sheet.'}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                leads.map((lead) => {
-                  const isSelected = selectedLeads.includes(lead.leadId)
-                  return (
-                    <tr
-                      key={lead.leadId}
-                      className={`hover:bg-slate-50/70 transition-colors ${
-                        isSelected ? 'bg-blue-50/40' : ''
-                      }`}
-                    >
-                      {/* Checkbox */}
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelectOne(lead.leadId)}
-                          className="rounded w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
-                        />
-                      </td>
+                        {/* Checkbox */}
+                        <td className="py-3 px-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectOne(lead.leadId)}
+                            className="rounded w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
 
-                      {/* Customer */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                            {(lead.ownerName || 'N').charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-semibold text-slate-900 block truncate text-xs">
-                              {lead.ownerName || 'na'}
+                        {/* Customer Identity matching AdminCustomersPage */}
+                        <td className="py-3 px-4">
+                          <div className="admin-customer-identity">
+                            <span className="admin-customer-avatar">
+                              {customerInfo.initial}
                             </span>
-                            <span className="text-[11px] text-slate-400 block truncate font-mono">
-                              {lead.contact || '—'}
-                            </span>
+                            <div>
+                              <strong>{customerInfo.name}</strong>
+                              <span>Customer account</span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Email */}
-                      <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
-                        <span className="truncate block max-w-[160px]" title={lead.businessEmail || ''}>
-                          {lead.businessEmail || '—'}
-                        </span>
-                      </td>
+                        {/* Email */}
+                        <td className="py-3 px-4 font-semibold text-slate-800">
+                          <span className="truncate block max-w-[180px]" title={lead.businessEmail || ''}>
+                            {lead.businessEmail || '—'}
+                          </span>
+                        </td>
 
-                      {/* Business */}
-                      <td className="py-2.5 px-3 text-slate-700">
-                        <div className="truncate max-w-[140px]">
-                          <span className="font-medium text-xs block truncate">{lead.businessName || 'na'}</span>
-                          {lead.city && (
-                            <span className="text-[11px] text-slate-400 block truncate">{lead.city}</span>
-                          )}
-                        </div>
-                      </td>
+                        {/* Phone */}
+                        <td className="py-3 px-4 font-bold text-slate-800 font-mono tracking-tight">
+                          {lead.contact || '—'}
+                        </td>
 
-                      {/* Lead Type */}
-                      <td className="py-2.5 px-3">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                          {lead.leadType || 'Direct'}
-                        </span>
-                      </td>
+                        {/* Business */}
+                        <td className="py-3 px-4 font-semibold text-slate-800">
+                          <span className="truncate block max-w-[160px]" title={lead.businessName || ''}>
+                            {!isNa(lead.businessName) ? lead.businessName : '—'}
+                          </span>
+                        </td>
 
-                      {/* Category */}
-                      <td className="py-2.5 px-3">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {lead.category || 'mix'}
-                        </span>
-                      </td>
+                        {/* Status matching admin-customer-status */}
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusModalData({
+                                leadId: lead.leadId,
+                                leadName: customerInfo.name,
+                                currentStatus: lead.leadStatus || 'PENDING',
+                                newStatus: isDone ? 'PENDING' : 'DONE',
+                              })
+                              setStatusModalOpen(true)
+                            }}
+                            className={`admin-customer-status cursor-pointer border-0 ${
+                              isDone
+                                ? ''
+                                : isPending
+                                ? 'bg-amber-100/80 text-amber-800'
+                                : 'admin-customer-status--inactive'
+                            }`}
+                            title="Click to update status"
+                          >
+                            {lead.leadStatus || 'PENDING'}
+                          </button>
+                        </td>
 
-                      {/* Sales Status dropdown */}
-                      <td className="py-2.5 px-3">
-                        <select
-                          value={lead.leadStatus || 'PENDING'}
-                          onChange={(e) => {
-                            const newSt = e.target.value
-                            setStatusModalData({
-                              leadId: lead.leadId,
-                              leadName: lead.ownerName,
-                              currentStatus: lead.leadStatus || 'PENDING',
-                              newStatus: newSt,
-                            })
-                            setStatusModalOpen(true)
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border-0 focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                            lead.leadStatus === 'DONE'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : lead.leadStatus === 'FOLLOW_UP'
-                              ? 'bg-blue-100 text-blue-800'
-                              : lead.leadStatus === 'NOT_INTERESTED'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {LEAD_STATUS_OPTIONS.map((st) => (
-                            <option key={st} value={st}>
-                              {st.replace(/_/g, ' ')}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                        {/* Assigned Rep */}
+                        <td className="py-3 px-4">
+                          <select
+                            value={lead.assginedUser || ''}
+                            onChange={(e) => handleAssignUser(lead.leadId, e.target.value)}
+                            className="w-full max-w-[140px] px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer truncate"
+                          >
+                            <option value="">Not Assigned</option>
+                            {assignableUsers.map((u) => (
+                              <option key={u.email || u.username} value={u.email || u.username}>
+                                {u.username}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
 
-                      {/* Assigned Sales User */}
-                      <td className="py-2.5 px-3">
-                        <select
-                          value={lead.assginedUser || ''}
-                          onChange={(e) => handleAssignUser(lead.leadId, e.target.value)}
-                          className="w-full max-w-[140px] px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer truncate"
-                        >
-                          <option value="">Not Assigned</option>
-                          {assignableUsers.map((u) => (
-                            <option key={u.email || u.username} value={u.email || u.username}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Telecaller */}
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-md font-medium inline-block truncate max-w-[120px] ${
-                            lead.telecallerAssigned
-                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                              : 'text-slate-400 italic'
-                          }`}
-                        >
-                          {lead.telecallerAssigned || 'Not Assigned'}
-                        </span>
-                      </td>
-
-                      {/* Telecaller Status */}
-                      <td className="py-2.5 px-3">
-                        <select
-                          value={lead.telecallerStatus || 'PENDING'}
-                          onChange={(e) => {
-                            const newSt = e.target.value
-                            if (newSt === 'FOLLOW_UP') {
-                              setSelectedLeadForTelecaller(lead)
-                              setTelecallerMode('follow_up')
-                              setTelecallerModalOpen(true)
-                            } else if (newSt === 'ASSIGNED') {
-                              setSelectedLeadForTelecaller(lead)
-                              setTelecallerMode('assign')
-                              setTelecallerModalOpen(true)
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border-0 focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                            lead.telecallerStatus === 'ASSIGNED'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : lead.telecallerStatus === 'FOLLOW_UP'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {TELECALLER_STATUS_OPTIONS.map((st) => (
-                            <option key={st} value={st}>
-                              {st.replace(/_/g, ' ')}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Payment */}
-                      <td className="py-2.5 px-3 text-center">
-                        {lead.paymentLink ? (
-                          <div className="inline-flex items-center gap-1.5 justify-center">
+                        {/* Payment */}
+                        <td className="py-3 px-4 text-center">
+                          {lead.paymentLink ? (
                             <a
                               href={lead.paymentLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1"
+                              className="admin-customer-status inline-flex items-center gap-1 cursor-pointer"
                             >
-                              <span>Link Active</span>
+                              <span>Active</span>
                               <ExternalLink className="w-3 h-3" />
                             </a>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText(lead.paymentLink!)
-                                showToast('Payment link copied to clipboard.', 'success')
+                                setSelectedLeadForPayment(lead)
+                                setPaymentModalOpen(true)
                               }}
-                              title="Copy Payment Link"
-                              className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                              className="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
                             >
-                              <Copy className="w-3.5 h-3.5" />
+                              Generate Link
                             </button>
-                          </div>
-                        ) : (
+                          )}
+                        </td>
+
+                        {/* Actions matching admin-customer-view-button */}
+                        <td className="py-3 px-4 text-center">
                           <button
                             type="button"
+                            className="admin-customer-view-button mx-auto"
                             onClick={() => {
-                              setSelectedLeadForPayment(lead)
-                              setPaymentModalOpen(true)
+                              setSelectedLeadForDetails(lead)
+                              setDetailsModalOpen(true)
                             }}
-                            className="px-3 py-1 rounded-full text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-xs cursor-pointer inline-flex items-center gap-1"
+                            title={`View details for ${customerInfo.name}`}
+                            aria-label={`View details for ${customerInfo.name}`}
                           >
-                            <span>Generate Link</span>
+                            <Eye size={17} />
                           </button>
-                        )}
-                      </td>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                      {/* Actions */}
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedLeadForDetails(lead)
-                            setDetailsModalOpen(true)
-                          }}
-                          title="View Details"
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer */}
-        {totalElements > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
-              <span>Rows per page:</span>
+          {/* Pagination Footer matching AdminCustomersPage */}
+          <div className="admin-customers-pagination">
+            <label>
+              Rows per page
               <select
                 value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value))
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value))
                   setCurrentPage(0)
                 }}
-                className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
-              <span>
-                Showing {currentPage * pageSize + 1}–
-                {Math.min((currentPage + 1) * pageSize, totalElements)} of {totalElements} leads
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
+            </label>
+            <div className="admin-customers-pagination__buttons">
               <button
                 type="button"
                 disabled={currentPage === 0}
                 onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
+                ← Previous
               </button>
-              <span className="px-2 font-semibold text-slate-800">
-                Page {currentPage + 1} of {Math.max(1, totalPages)}
-              </span>
+              <span>Page {currentPage + 1} of {Math.max(1, totalPages)}</span>
               <button
                 type="button"
                 disabled={currentPage >= totalPages - 1}
                 onClick={() => setCurrentPage((p) => p + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <ChevronRight className="w-4 h-4" />
+                Next →
               </button>
             </div>
+            <span>Showing {start}–{end} of {totalElements.toLocaleString('en-IN')}</span>
           </div>
-        )}
-      </div>
+        </section>
+      )}
 
       {/* Modals */}
       <TransferLeadModal
@@ -966,4 +887,3 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     </div>
   )
 }
-

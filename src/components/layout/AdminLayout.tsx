@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { useLocation } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { ProfileChip } from '../common/ProfileChip'
@@ -17,26 +16,22 @@ interface AdminLayoutProps {
 export function AdminLayout({
   children,
 }: AdminLayoutProps) {
-  const location = useLocation()
-
   const [sidebarOpen, setSidebarOpen] = useState(
     () =>
       typeof window !== 'undefined' &&
       window.innerWidth > 900,
   )
-  const [lastPath, setLastPath] = useState(
-    location.pathname,
-  )
-
   const { items, markAllRead } = useSuperAdminNotifications()
 
-  if (location.pathname !== lastPath) {
-    setLastPath(location.pathname)
-
-    if (window.innerWidth <= 900) {
-      setSidebarOpen(false)
+  // Only close on Escape key or explicit user action (button click / backdrop)
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setSidebarOpen(false)
     }
-  }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <NotificationCenter
@@ -50,16 +45,14 @@ export function AdminLayout({
         }`}
       >
         <AdminSidebar
-          onNavigate={() => setSidebarOpen(false)}
           onClose={() => setSidebarOpen(false)}
         />
 
-        {sidebarOpen && (
-          <div
-            className="sidebar-backdrop"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+        <div
+          className="sidebar-backdrop"
+          aria-hidden="true"
+          onClick={() => setSidebarOpen(false)}
+        />
 
         <div className="main-content">
           <header className="shell-topbar">
@@ -67,6 +60,7 @@ export function AdminLayout({
               type="button"
               className="menu-button"
               aria-label="Open sidebar"
+              aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               ☰

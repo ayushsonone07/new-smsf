@@ -2143,6 +2143,27 @@
     border-radius: 14px;
     background: #fff;
     box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+    cursor: pointer;
+  }
+
+  /* Compact mobile summary. Tap the card to reveal all permitted fields. */
+  .users-table tbody > tr:not(.users-table__expanded-row):not(.is-expanded) > td:not(.users-table__expand-column):not(.users-table__name-column):not(.users-table__role-column) {
+    display: none;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row):not(.is-expanded) > .users-table__expand-column {
+    min-height: 34px;
+    padding-block: 5px;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row):not(.is-expanded) > .users-table__name-column,
+  .users-table tbody > tr:not(.users-table__expanded-row):not(.is-expanded) > .users-table__role-column {
+    padding-block: 8px;
+  }
+
+  .users-table tbody > tr:not(.users-table__expanded-row):focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
   }
 
   .users-table tbody > tr:not(.users-table__expanded-row) > td {

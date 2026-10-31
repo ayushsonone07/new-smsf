@@ -1,0 +1,297 @@
+/* Modern Department Table Styles */
+.dept-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+}
+
+.dept-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 0.82rem;
+  color: #1e293b;
+}
+
+/* Table Header */
+.dept-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.dept-th-expand { width: 36px; padding-left: 0.85rem; }
+.dept-th-dept { min-width: 180px; }
+.dept-th-head { min-width: 180px; }
+.dept-th-login { width: 44px; }
+.dept-th-users { width: 70px; text-align: center; }
+.dept-th-customers { width: 85px; text-align: center; }
+.dept-th-completion { min-width: 130px; }
+.dept-th-delayed { width: 75px; text-align: center; }
+.dept-th-active { width: 70px; text-align: center; }
+.dept-th-actions { width: 80px; text-align: right; padding-right: 1rem; }
+
+/* Table Body Rows */
+.dept-row {
+  background: #ffffff;
+  transition: background-color 0.15s ease;
+}
+
+.dept-row:hover {
+  background-color: #f8fafc;
+}
+
+.dept-row.is-expanded {
+  background-color: #f1f5f9;
+}
+
+.dept-row td {
+  padding: 0.85rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* Chevron expand button */
+.dept-expand-chevron-btn {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.35rem;
+  transition: background-color 0.15s ease;
+}
+
+.dept-expand-chevron-btn:hover {
+  background-color: #e2e8f0;
+}
+
+/* Department Avatar Badge */
+.dept-avatar-badge {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.dept-title-text {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.dept-code-text {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 0.15rem;
+  line-height: 1.2;
+}
+
+.dept-head-name-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.dept-head-email-text {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+  line-height: 1.2;
+  max-width: 170px;
+}
+
+/* Login Button */
+.dept-row-login-btn {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+}
+
+.dept-row-login-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  transform: translateY(-0.5px);
+}
+
+.dept-row-login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Numbers (Users & Customers) */
+.dept-td-users,
+.dept-td-customers {
+  text-align: center;
+}
+
+.dept-stat-num {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Completion Progress */
+.dept-completion-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dept-progress-track {
+  width: 4.5rem;
+  height: 0.45rem;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.dept-completion-pct {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334155;
+  width: 2.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Delayed Pill Badge */
+.dept-td-delayed {
+  text-align: center;
+}
+
+.dept-delayed-badge-red {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e11d48;
+  background: #fff1f2;
+  border: 1px solid #ffe4e6;
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dept-delayed-badge-gray {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* iOS-style Active Toggle Switch */
+.dept-td-active {
+  text-align: center;
+}
+
+.dept-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  width: 2.35rem;
+  height: 1.35rem;
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+.dept-toggle-switch.is-active {
+  background-color: #10b981;
+}
+
+.dept-toggle-thumb {
+  width: 1.1rem;
+  height: 1.1rem;
+  background-color: #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+  transform: translateX(0);
+}
+
+.dept-toggle-switch.is-active .dept-toggle-thumb {
+  transform: translateX(1rem);
+}
+
+/* Actions: Eye & Pencil */
+.dept-td-actions {
+  text-align: right;
+  padding-right: 1rem;
+}
+
+.dept-action-icon-btn {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dept-action-icon-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.dept-action-icon-btn.is-delete {
+  color: #f43f5e;
+}
+
+.dept-action-icon-btn.is-delete:hover {
+  background-color: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
+/* Expanded Container */
+.dept-routes-expanded-container {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 1rem 1.25rem;
+}
+
+.dept-table-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+
