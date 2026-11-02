@@ -1790,11 +1790,8 @@ export function RegisterBusinessPage() {
         discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
         originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
         includeGst,
-        isGstIncluded: includeGst ? 'true' : 'false',
         gstRate: includeGst ? '18%' : '0%',
-        gstPercent: includeGst ? '18' : '0',
         gstAmount: includeGst ? String(calculatedGstAmount) : '0',
-        gst: includeGst ? String(calculatedGstAmount) : '0',
         baseAmountWithoutGst: String(baseWithoutGst),
         remark:
           discountPctNum > 0
