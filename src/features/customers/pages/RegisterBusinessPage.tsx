@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   ArrowLeft,
@@ -368,6 +368,7 @@ function GstinDetailsCard({
 
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   // Queries for plans and pricing
   const plansQuery = useQuery({
@@ -1165,6 +1166,40 @@ export function RegisterBusinessPage() {
     ],
   )
 
+  /*
+   * Packages picked earlier must still fit when the balance changes (another payment
+   * picked, a top-up removed): if they no longer do, clear them so they are re-picked.
+   */
+  useEffect(() => {
+    if (verifiedPaymentAmount == null) return
+    const selectedIds = formData.selectedPackages || []
+    if (selectedIds.length === 0) return
+    const selectedCost = getDiscountedCost(
+      selectedIds.reduce((sum, id) => {
+        const p = plans.find((pl) => pl.id === id)
+        return (
+          sum +
+          (p ? (includeGst ? priceOf(p.name).withGst : priceOf(p.name).amount) : 0)
+        )
+      }, 0),
+    )
+    if (selectedCost <= verifiedPaymentAmount) return
+    setFormData((prev) => ({ ...prev, selectedPackages: [] }))
+    showToast({
+      title: 'Packages Cleared',
+      description: `The selected packages (₹${selectedCost.toLocaleString('en-IN')}) cost more than the ₹${verifiedPaymentAmount.toLocaleString('en-IN')} available. Please choose packages within the available balance or add a top-up payment.`,
+      variant: 'destructive',
+    })
+  }, [
+    verifiedPaymentAmount,
+    formData.selectedPackages,
+    plans,
+    priceOf,
+    includeGst,
+    getDiscountedCost,
+    showToast,
+  ])
+
   /* Total Amount follows selected plans & discount */
   const lastAutoTotal = useRef(0)
   const lastDiscount = useRef('0')
@@ -1515,8 +1550,9 @@ export function RegisterBusinessPage() {
     }
 
     if (paymentVerified && verifiedPaymentAmount != null) {
-      const rawOrNet = parseInt(formData.totalAmount) || autoTotal
-      const currentTotal = getDiscountedCost(rawOrNet)
+      // Total Amount already has the discount applied; only the package sum still needs it.
+      const currentTotal =
+        parseInt(formData.totalAmount) || getDiscountedCost(autoTotal)
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
@@ -1748,12 +1784,18 @@ export function RegisterBusinessPage() {
       }
 
       await registerCustomer(customerData)
+      // What is left on this number's payments has changed.
+      void queryClient.invalidateQueries({
+        queryKey: ['earlier-payments', formData.phoneNumber.trim()],
+      })
 
       const submittedTotal = Number(formData.totalAmount) || autoTotal
       const submittedPaid =
         formData.paymentType === 'part-time'
           ? Number(formData.amountPaid) || 0
-          : (verifiedPaymentAmount ?? Number(formData.amountPaid)) || 0
+          : verifiedPaymentAmount != null
+            ? Math.min(submittedTotal, verifiedPaymentAmount)
+            : Number(formData.amountPaid) || 0
       setRegistrationSuccess({
         businessName: formData.businessName,
         registrationId: `MBG-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,

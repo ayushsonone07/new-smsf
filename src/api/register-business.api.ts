@@ -118,6 +118,25 @@ export async function fetchGstinDetails(gstin: string): Promise<GstinDetails> {
   return response.data
 }
 
+/** A business an earlier registration charged to a payment. */
+export interface PaymentUsage {
+  businessName?: string | null
+  isDuplicate?: boolean
+  /** Rupees. */
+  amount?: number | null
+  usedAt?: string | null
+}
+
+/** A verified payment with what is left of it (rupees). */
+export interface VerifiedPayment {
+  paymentId?: string | null
+  amount?: number | null
+  used?: number | null
+  available?: number | null
+  usedBy?: PaymentUsage[]
+  paidAt?: string | null
+}
+
 export interface VerifyPaymentResult {
   success: boolean
   message?: string
