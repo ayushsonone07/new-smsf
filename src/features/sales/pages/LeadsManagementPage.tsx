@@ -561,25 +561,6 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   </select>
                 </div>
 
-<<<<<<< HEAD
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                  Funnel Type
-                </label>
-                <ScrollableSelect
-                  value={selectedFunnel}
-                  pinnedOption={{ value: 'all', label: 'All Funnels' }}
-                  onChange={(value) => {
-                    setSelectedFunnel(value)
-                    setCurrentPage(0)
-                  }}
-                  options={funnelOptions}
-                  placeholder="All Funnels"
-                  pageSize={10}
-                  width="100%"
-                  maxHeight={220}
-                />
-=======
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
                     Funnel Type
@@ -623,7 +604,6 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                     />
                   </div>
                 </div>
->>>>>>> 2168d5baee1073689c29177f65a81ad9c99aa923
               </div>
 
               {hasActiveFilters && (
