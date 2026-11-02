@@ -59,28 +59,53 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   return response.data ?? []
 }
 
+/** A business that already used part of a payment. */
+export interface PaymentUsage {
+  businessName?: string | null
+  isDuplicate?: boolean
+  /** Rupees. */
+  amount?: number | null
+  usedAt?: string | null
+}
+
+export interface VerifiedPayment {
+  /** Full payment amount in rupees, already converted by SMSB from paise. */
+  amount?: number | null
+  /** Rupees already spent on earlier registrations of this customer. */
+  used?: number | null
+  /** Rupees still left to spend — a payment can fund several businesses. */
+  available?: number | null
+  usedBy?: PaymentUsage[]
+  paidAt?: string | null
+}
+
 export interface VerifyPaymentResult {
   success: boolean
   message?: string
-  data?: {
-    /** Rupees, already converted by SMSB from Razorpay/payment_info paise. */
-    amount?: number | null
-    paidAt?: string | null
-  }
+  data?: VerifiedPayment
 }
 
 /**
- * Verifies a payment ID against a phone number. `POST /api/payment/verify`.
+ * Verifies a payment ID against a phone number and returns what is left of it.
+ * `POST /api/payment/verify`. A fully used payment fails, with its usage in `data`.
  */
 export async function verifyPayment(
   phoneNumber: string,
   paymentId: string,
+  options?: {
+    /** Encrypted reference from {@link fetchEarlierPayments}, sent instead of the ID. */
+    paymentRef?: string
+  },
 ): Promise<VerifyPaymentResult> {
-  const response = await apiRequest<CustomApiResponse<{ amount?: number | null; paidAt?: string | null }>>(
+  const response = await apiRequest<CustomApiResponse<VerifiedPayment>>(
     '/api/payment/verify',
     {
       method: 'POST',
-      body: JSON.stringify({ phoneNumber, paymentId }),
+      body: JSON.stringify(
+        options?.paymentRef
+          ? { phoneNumber, paymentRef: options.paymentRef }
+          : { phoneNumber, paymentId },
+      ),
     },
   )
 
@@ -89,6 +114,37 @@ export async function verifyPayment(
     message: response.message,
     data: response.data ?? undefined,
   }
+}
+
+/** An earlier payment from a phone number; its real ID is never sent to the browser. */
+export interface EarlierPayment {
+  /** Encrypted, phone-bound reference accepted by verify and register. */
+  paymentRef: string
+  /** e.g. "pay_****XyZ1". */
+  maskedPaymentId: string
+  /** Rupees. */
+  amount?: number | null
+  used?: number | null
+  available?: number | null
+  paidAt?: string | null
+}
+
+/**
+ * Earlier payments made from a phone number, with what is left on each — so a new
+ * business can be registered without knowing the old payment ID.
+ * `POST /api/payment/customer-payments` (public; IDs are masked).
+ */
+export async function fetchEarlierPayments(
+  phoneNumber: string,
+): Promise<EarlierPayment[]> {
+  const response = await apiRequest<CustomApiResponse<EarlierPayment[]>>(
+    '/api/payment/customer-payments',
+    {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber }),
+    },
+  )
+  return response.data ?? []
 }
 
 /**
