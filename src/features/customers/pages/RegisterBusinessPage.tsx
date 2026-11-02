@@ -13,6 +13,7 @@ import {
   Lock,
   MapPin,
   Package,
+  Pencil,
   Wallet,
   X,
 } from 'lucide-react'
@@ -300,6 +301,7 @@ export function RegisterBusinessPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPasskeyModal, setShowPasskeyModal] = useState(false)
+  const [showFullFormModal, setShowFullFormModal] = useState(false)
   const [passkey, setPasskey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -944,6 +946,13 @@ export function RegisterBusinessPage() {
     goToStep,
   ])
 
+  /* Fallback to Step 1 if business details become incomplete while editing */
+  useEffect(() => {
+    if (activeStep === 'packages' && !businessComplete) {
+      setActiveStep('business')
+    }
+  }, [activeStep, businessComplete])
+
   /* ─── Combined validation — same rules/order/messages as before ─── */
   const handleFinalSubmit = useCallback(() => {
     // 1. Business details
@@ -1154,7 +1163,7 @@ export function RegisterBusinessPage() {
       return
     }
 
-    setShowPasskeyModal(true)
+    setShowFullFormModal(true)
   }, [
     formData,
     cityInput,
@@ -1564,7 +1573,7 @@ export function RegisterBusinessPage() {
 
             {/* Card body */}
             <div className="flex-1 p-4 sm:p-[18px]">
-              {!unlocked[activeStep] ? (
+              {!isFirstPage && !unlocked[activeStep] ? (
                 <LockedNotice message={lockedMessages[activeStep]} />
               ) : (
                 <>
@@ -2583,6 +2592,523 @@ export function RegisterBusinessPage() {
           </div>
         </main>
       </div>
+
+      {/* ─── Full Form Preview & Direct Edit Modal ─── */}
+      {showFullFormModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                  <Eye className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Preview Registration Form
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Review all details before submitting. Click on any field to edit directly.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+                        {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/40">
+              {/* Important Warning Notice */}
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/95 p-4 text-xs text-amber-900 shadow-sm">
+                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-xs sm:text-sm text-amber-950">
+                    Important Notice: This form cannot be edited once submitted!
+                  </p>
+                  <p className="text-amber-800 text-xs leading-relaxed">
+                    Please review and verify all details carefully before proceeding. Once submitted, you will not be able to make any changes to this registration.
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Business & Contact */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    1. Business & Contact Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Client / Owner Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ownerName}
+                      onChange={(e) => handleInputChange('ownerName', e.target.value)}
+                      placeholder="Enter client name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.businessName}
+                      onChange={(e) => handleInputChange('businessName', e.target.value)}
+                      placeholder="Enter business name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      placeholder="10-digit mobile number"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="name@company.com"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city || cityInput}
+                      onChange={(e) => {
+                        handleCityChange(e.target.value)
+                        handleInputChange('city', e.target.value)
+                      }}
+                      placeholder="Enter city"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Onboarding City <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.onboardingCity}
+                      onChange={(e) => handleInputChange('onboardingCity', e.target.value)}
+                      className={inputClass()}
+                    >
+                      {ONBOARDING_CITIES.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Website Included <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'yes')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'yes'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'no')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'no'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Packages & Payment */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    2. Packages & Verified Payment
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900">
+                        Payment Status: Verified
+                      </span>
+                      <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                        Verified ✓
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                      <div>
+                        <span className="text-emerald-700">Payment ID:</span>
+                        <p className="font-mono font-bold text-emerald-950 break-all">
+                          {formData.paymentId || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Verified Amount:</span>
+                        <p className="font-bold text-emerald-950">
+                          ₹{formData.amountPaid || '0'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Customer Phone:</span>
+                        <p className="font-bold text-emerald-950">
+                          +91 {formData.phoneNumber || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Selected Package(s)
+                    </label>
+                    {selectedPlans.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedPlans.map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-900"
+                          >
+                            <span>{pkg.name}</span>
+                            <span className="rounded-md bg-blue-200/80 px-1.5 py-0.5 text-[10px] text-blue-800">
+                              ₹{priceOf(pkg.name).amount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-600">No package selected yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Financial Information */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Wallet className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    3. Financial & Invoicing Information
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Service Months <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={formData.expirationInMonths}
+                      disabled={monthsLocked}
+                      onChange={(e) => handleInputChange('expirationInMonths', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Total Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.totalAmount}
+                      disabled={totalLocked}
+                      onChange={(e) => handleInputChange('totalAmount', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Payment Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.paymentType}
+                      onChange={(e) => handleInputChange('paymentType', e.target.value)}
+                      className={inputClass()}
+                    >
+                      <option value="">Select payment type</option>
+                      <option value="full-time">Full Payment</option>
+                      <option value="part-time">Part-Time (Partial) Payment</option>
+                    </select>
+                  </div>
+
+                  {formData.paymentType === 'part-time' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Remaining Amount Due Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.remainingAmountDueDate}
+                        onChange={(e) => handleInputChange('remainingAmountDueDate', e.target.value)}
+                        className={inputClass()}
+                      />
+                    </div>
+                  )}
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Invoice Option <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'gstin')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'gstin'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        GSTIN Number
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'address')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'address'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Billing Address
+                      </button>
+                    </div>
+
+                    {formData.invoiceOption === 'gstin' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          GSTIN Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.gstinForInvoice}
+                          onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={inputClass()}
+                        />
+                      </div>
+                    )}
+
+                    {formData.invoiceOption === 'address' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Complete Billing Address <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={formData.completeAddress}
+                          onChange={(e) => handleInputChange('completeAddress', e.target.value)}
+                          placeholder="Enter full address for invoice"
+                          rows={2}
+                          className={textareaClass}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Sales & Handoff */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <ClipboardList className="h-4 w-4 text-purple-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    4. Sales & Handoff Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Sales Person Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.salesPersonName}
+                      onChange={(e) => handleInputChange('salesPersonName', e.target.value)}
+                      placeholder="Enter sales person's name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Lead Type <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.leadType}
+                      onChange={(e) => handleInputChange('leadType', e.target.value)}
+                      placeholder="e.g. 99, 699, 999"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Is Webinar Client?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'YES')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'YES'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'NO')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'NO'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      WhatsApp Group Link (optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.groupLink}
+                      onChange={(e) => handleInputChange('groupLink', e.target.value)}
+                      placeholder="https://chat.whatsapp.com/…"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Remarks (optional)
+                    </label>
+                    <textarea
+                      value={formData.remark}
+                      onChange={(e) => handleInputChange('remark', e.target.value)}
+                      placeholder="Any additional notes"
+                      rows={2}
+                      className={textareaClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              >
+                ← Back to Form
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!formData.ownerName?.trim() || !formData.businessName?.trim() || !formData.phoneNumber?.trim() || !formData.email?.trim()) {
+                    showToast({
+                      title: 'Required Details Missing',
+                      description: 'Please ensure Client Name, Business Name, Phone Number, and Email are filled.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validateEmail(formData.email)) {
+                    showToast({
+                      title: 'Invalid Email',
+                      description: 'Please enter a valid email address.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validatePhoneNumber(formData.phoneNumber)) {
+                    showToast({
+                      title: 'Invalid Phone Number',
+                      description: 'Please enter a valid 10-digit mobile number.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!formData.salesPersonName || !formData.leadType) {
+                    showToast({
+                      title: 'Sales Details Missing',
+                      description: "Please enter the Sales Person's Name and Lead Type.",
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  setShowFullFormModal(false)
+                  setShowPasskeyModal(true)
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700"
+              >
+                Submit & Enter Passkey →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Passkey modal ─── */}
       {showPasskeyModal && (
