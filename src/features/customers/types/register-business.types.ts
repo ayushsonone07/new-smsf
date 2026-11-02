@@ -37,6 +37,9 @@ export interface CustomerRegistrationRequest {
   isWebinarClient: string
   onboardingCity: string
   paymentId?: string
+  discountPercent?: string
+  discountAmount?: string
+  originalAmount?: string
 }
 
 /** Minimal identity kept after registration so the payment screenshot can be uploaded against it. */

@@ -422,6 +422,9 @@ export function RegisterBusinessPage() {
   const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
   /* Toggle 18% GST addition on packages */
   const [includeGst, setIncludeGst] = useState(true)
+  /* Discount percentage (0 to 100) */
+  const [discountPercent, setDiscountPercent] = useState<string>('0')
+  const [manualBaseAmount, setManualBaseAmount] = useState<string>('')
 
   /* Plan whose features are shown in the docked side panel */
   const [viewingPlanId, setViewingPlanId] = useState<string | null>(null)
@@ -755,6 +758,73 @@ export function RegisterBusinessPage() {
   const totalLocked = autoTotal > 0 && !hasUnpricedSelection
   const monthsLocked = autoMonths > 0
 
+  /* Base amount before discount */
+  const rawBaseAmount =
+    autoTotal > 0
+      ? autoTotal
+      : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+  const discountPctNum = Math.min(
+    100,
+    Math.max(0, parseFloat(discountPercent) || 0),
+  )
+  const discountAmount = Math.round((rawBaseAmount * discountPctNum) / 100)
+  const finalCalculatedTotal = Math.max(0, rawBaseAmount - discountAmount)
+
+  /* Effective discounted cost calculator */
+  const getDiscountedCost = useCallback(
+    (rawAmount: number) => {
+      if (discountPctNum <= 0) return rawAmount
+      const disc = Math.round((rawAmount * discountPctNum) / 100)
+      return Math.max(0, rawAmount - disc)
+    },
+    [discountPctNum],
+  )
+
+  const handleDiscountChange = useCallback(
+    (pct: string) => {
+      if (pct === '') {
+        setDiscountPercent('')
+        return
+      }
+      const num = parseFloat(pct)
+      if (isNaN(num)) return
+      const clamped = Math.min(100, Math.max(0, num))
+      const pctStr = String(clamped)
+      setDiscountPercent(pctStr)
+
+      const base =
+        autoTotal > 0
+          ? autoTotal
+          : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+      const disc = Math.round((base * clamped) / 100)
+      const net = Math.max(0, base - disc)
+      const netStr = base > 0 || net > 0 ? String(net) : ''
+
+      handleInputChange('totalAmount', netStr)
+
+      const currentPaid =
+        verifiedPaymentAmount != null
+          ? verifiedPaymentAmount
+          : parseInt(formData.amountPaid) || 0
+      const rem = net - currentPaid
+
+      handleInputChange('amountRemaining', rem > 0 ? String(rem) : '')
+      if (rem <= 0 && currentPaid > 0) {
+        handleInputChange('paymentType', 'full-time')
+      } else if (rem > 0) {
+        handleInputChange('paymentType', 'part-time')
+      }
+    },
+    [
+      autoTotal,
+      manualBaseAmount,
+      formData.totalAmount,
+      formData.amountPaid,
+      verifiedPaymentAmount,
+      handleInputChange,
+    ],
+  )
+
   /* Handle package selection with verified payment amount restriction */
   const handlePackageToggle = useCallback(
     (packageId: string, checked?: boolean) => {
@@ -768,11 +838,17 @@ export function RegisterBusinessPage() {
         const pkgPrice = includeGst
           ? priceOf(pkg.name).withGst
           : priceOf(pkg.name).amount
-        if (pkgPrice > verifiedPaymentAmount) {
-          const extra = pkgPrice - verifiedPaymentAmount
+        const effectivePkgPrice = getDiscountedCost(pkgPrice)
+
+        if (effectivePkgPrice > verifiedPaymentAmount) {
+          const extra = effectivePkgPrice - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectivePkgPrice.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
             title: 'Package Exceeds Verified Payment',
-            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -793,11 +869,16 @@ export function RegisterBusinessPage() {
           }, 0)
 
         const totalSelected = otherSelectedCost + pkgPrice
-        if (totalSelected > verifiedPaymentAmount) {
-          const extra = totalSelected - verifiedPaymentAmount
+        const effectiveTotalSelected = getDiscountedCost(totalSelected)
+        if (effectiveTotalSelected > verifiedPaymentAmount) {
+          const extra = effectiveTotalSelected - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectiveTotalSelected.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
             title: 'Total Exceeds Verified Payment',
-            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -826,30 +907,52 @@ export function RegisterBusinessPage() {
       includeGst,
       verifiedPaymentAmount,
       showToast,
+      getDiscountedCost,
+      discountPctNum,
     ],
   )
 
-  /* Total Amount follows the selected plans */
+  /* Total Amount follows selected plans & discount */
   const lastAutoTotal = useRef(0)
+  const lastDiscount = useRef('0')
   useEffect(() => {
-    if (autoTotal === lastAutoTotal.current) return
-    const hadAutoTotal = lastAutoTotal.current > 0
+    if (
+      autoTotal === lastAutoTotal.current &&
+      discountPercent === lastDiscount.current
+    )
+      return
     lastAutoTotal.current = autoTotal
-    if (autoTotal <= 0 && !hadAutoTotal) return
-    const value = autoTotal > 0 ? String(autoTotal) : ''
+    lastDiscount.current = discountPercent
+
+    const base =
+      autoTotal > 0
+        ? autoTotal
+        : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+    if (base <= 0 && !hasUnpricedSelection) return
+
+    const pct = Math.min(100, Math.max(0, parseFloat(discountPercent) || 0))
+    const disc = Math.round((base * pct) / 100)
+    const net = Math.max(0, base - disc)
+    const value = base > 0 || net > 0 ? String(net) : ''
+
     setFormData((prev) => {
       if (verifiedPaymentAmount != null) {
         const currentPaid =
           prev.paymentType === 'part-time' && prev.amountPaid
             ? parseInt(prev.amountPaid) || 0
             : verifiedPaymentAmount
-        const remaining = autoTotal - currentPaid
+        const remaining = net - currentPaid
         return {
           ...prev,
           totalAmount: value,
           amountPaid: String(currentPaid),
           amountRemaining: remaining > 0 ? String(remaining) : '',
-          paymentType: remaining > 0 ? 'part-time' : prev.paymentType,
+          paymentType:
+            remaining <= 0 && currentPaid > 0
+              ? 'full-time'
+              : remaining > 0
+                ? 'part-time'
+                : prev.paymentType,
         }
       }
       if (prev.paymentType === 'full-time') {
@@ -860,14 +963,20 @@ export function RegisterBusinessPage() {
           amountRemaining: '',
         }
       }
-      const remaining = autoTotal - (parseInt(prev.amountPaid) || 0)
+      const remaining = net - (parseInt(prev.amountPaid) || 0)
       return {
         ...prev,
         totalAmount: value,
         amountRemaining: remaining > 0 ? String(remaining) : '',
       }
     })
-  }, [autoTotal, verifiedPaymentAmount])
+  }, [
+    autoTotal,
+    discountPercent,
+    manualBaseAmount,
+    hasUnpricedSelection,
+    verifiedPaymentAmount,
+  ])
 
   /* Service Months follows the longest selected plan */
   useEffect(() => {
@@ -1150,7 +1259,8 @@ export function RegisterBusinessPage() {
     }
 
     if (paymentVerified && verifiedPaymentAmount != null) {
-      const currentTotal = parseInt(formData.totalAmount) || autoTotal
+      const rawOrNet = parseInt(formData.totalAmount) || autoTotal
+      const currentTotal = getDiscountedCost(rawOrNet)
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
@@ -1281,6 +1391,7 @@ export function RegisterBusinessPage() {
     paymentVerified,
     verifiedPaymentAmount,
     autoTotal,
+    getDiscountedCost,
   ])
 
   /* ─── Passkey submit & registration ─── */
@@ -1354,7 +1465,6 @@ export function RegisterBusinessPage() {
               : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
-        remark: formData.remark,
         isWebsiteIncluded,
         gstinOrAddress: gstinOrAddress || '',
         remainingAmountDueDate: formData.remainingAmountDueDate || '',
@@ -1363,6 +1473,13 @@ export function RegisterBusinessPage() {
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
         paymentId: formData.paymentId.trim(),
+        discountPercent: discountPctNum > 0 ? String(discountPctNum) : undefined,
+        discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
+        originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
+        remark:
+          discountPctNum > 0
+            ? `[Discount: ${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})] ${formData.remark}`.trim()
+            : formData.remark,
       }
 
       await registerCustomer(customerData)
@@ -2141,9 +2258,10 @@ export function RegisterBusinessPage() {
                                   const pkgCost = includeGst
                                     ? price.withGst
                                     : price.amount
+                                  const effectivePkgCost = getDiscountedCost(pkgCost)
                                   const isExceedingPayment =
                                     verifiedPaymentAmount != null &&
-                                    pkgCost > verifiedPaymentAmount
+                                    effectivePkgCost > verifiedPaymentAmount
                                   const isViewingFeatures = viewingPlanId === pkg.id
                                   return (
                                     <div
@@ -2156,7 +2274,7 @@ export function RegisterBusinessPage() {
                                         if (isExceedingPayment) {
                                           showToast({
                                             title: 'Reviewing Package Features',
-                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
+                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}${discountPctNum > 0 ? ` / ₹${effectivePkgCost.toLocaleString('en-IN')} with discount` : ''}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
                                             variant: 'default',
                                           })
                                           return
@@ -2228,6 +2346,11 @@ export function RegisterBusinessPage() {
                                                 <span className="text-xs font-semibold text-slate-400">
                                                   ₹{price.amount.toLocaleString('en-IN')} + 18% GST
                                                 </span>
+                                                {discountPctNum > 0 && (
+                                                  <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
+                                                    ₹{effectivePkgCost.toLocaleString('en-IN')} ({discountPctNum}% off)
+                                                  </span>
+                                                )}
                                               </span>
                                             )}
                                             {price.months > 0 && (
@@ -2296,9 +2419,11 @@ export function RegisterBusinessPage() {
                           hasPrice={priceOf(viewingPlan.name).hasPrice}
                           months={priceOf(viewingPlan.name).months}
                           cost={
-                            includeGst
-                              ? priceOf(viewingPlan.name).withGst
-                              : priceOf(viewingPlan.name).amount
+                            getDiscountedCost(
+                              includeGst
+                                ? priceOf(viewingPlan.name).withGst
+                                : priceOf(viewingPlan.name).amount
+                            )
                           }
                           verifiedAmount={verifiedPaymentAmount}
                           selected={!!formData.selectedPackages?.includes(viewingPlan.id)}
@@ -2343,7 +2468,54 @@ export function RegisterBusinessPage() {
                         </p>
                       </div>
 
+                      {/* Discount (%) Field */}
                       <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="discountPercent"
+                            className="block text-xs font-semibold text-slate-600"
+                          >
+                            Discount (%)
+                          </label>
+                          <div className="flex items-center gap-1">
+                            {['0', '10', '20', '30', '50'].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => handleDiscountChange(pct)}
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                                  discountPercent === pct
+                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <input
+                            id="discountPercent"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={discountPercent}
+                            onChange={(e) => handleDiscountChange(e.target.value)}
+                            placeholder="0 to 100"
+                            className={inputClass()}
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                            %
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Applies discount on total package price
+                        </p>
+                      </div>
+
+                      {/* Total Amount (₹) */}
+                      <div className="space-y-1 sm:col-span-2">
                         <div className="flex items-center justify-between gap-2">
                           <label
                             htmlFor="totalAmount"
@@ -2386,17 +2558,26 @@ export function RegisterBusinessPage() {
                           disabled={totalLocked}
                           onChange={(e) => {
                             const value = e.target.value
+                            setManualBaseAmount(value)
                             if (
                               value === '' ||
-                              (/^\d+$/.test(value) && value.length <= 12)
+                              (/^d+$/.test(value) && value.length <= 12)
                             ) {
-                              handleInputChange('totalAmount', value)
-                              const total = parseInt(value) || 0
+                              const base = parseInt(value) || 0
+                              const pct = Math.min(
+                                100,
+                                Math.max(0, parseFloat(discountPercent) || 0),
+                              )
+                              const disc = Math.round((base * pct) / 100)
+                              const net = Math.max(0, base - disc)
+                              const netStr = base > 0 ? String(net) : ''
+                              handleInputChange('totalAmount', netStr)
+
                               const paid =
                                 verifiedPaymentAmount != null
                                   ? verifiedPaymentAmount
                                   : parseInt(formData.amountPaid) || 0
-                              const remaining = total - paid
+                              const remaining = net - paid
                               handleInputChange(
                                 'amountRemaining',
                                 remaining > 0 ? remaining.toString() : '',
@@ -2405,7 +2586,7 @@ export function RegisterBusinessPage() {
                                 formData.paymentType === 'full-time' &&
                                 verifiedPaymentAmount == null
                               )
-                                handleInputChange('amountPaid', value)
+                                handleInputChange('amountPaid', netStr)
                             } else if (value.length > 12) {
                               showToast({
                                 title: 'Amount Limit Exceeded',
@@ -2424,12 +2605,30 @@ export function RegisterBusinessPage() {
                         <p className="text-[11px] text-slate-400">
                           {totalLocked
                             ? includeGst
-                              ? 'Auto-calculated from the selected plans (incl. 18% GST)'
-                              : 'Auto-calculated from the selected plans (excl. GST)'
+                              ? 'Auto-calculated from selected plans (incl. 18% GST) minus discount'
+                              : 'Auto-calculated from selected plans (excl. GST) minus discount'
                             : hasUnpricedSelection && selectedPlans.length > 0
                               ? 'A selected plan has no price set — enter the total'
                               : undefined}
                         </p>
+
+                        {/* Live calculation summary */}
+                        {rawBaseAmount > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                            <span className="text-slate-600">
+                              Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                              {includeGst ? ' (incl. 18% GST)' : ''}
+                            </span>
+                            {discountPctNum > 0 && (
+                              <span className="font-semibold text-emerald-700">
+                                Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                            <span className="text-slate-700">
+                              Net Payable: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -3008,6 +3207,46 @@ export function RegisterBusinessPage() {
                     />
                   </div>
 
+                  {/* Discount (%) in Modal */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        Discount (%)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {['0', '10', '20', '30', '50'].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => handleDiscountChange(pct)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                              discountPercent === pct
+                                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={discountPercent}
+                        onChange={(e) => handleDiscountChange(e.target.value)}
+                        placeholder="0 to 100"
+                        className={inputClass()}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        %
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Total Amount (₹) */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">
                       Total Amount (₹) <span className="text-red-500">*</span>
@@ -3020,6 +3259,23 @@ export function RegisterBusinessPage() {
                       className={inputClass()}
                     />
                   </div>
+
+                  {rawBaseAmount > 0 && (
+                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                      <span className="text-slate-600">
+                        Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                        {includeGst ? ' (incl. 18% GST)' : ''}
+                      </span>
+                      {discountPctNum > 0 && (
+                        <span className="font-semibold text-emerald-700">
+                          Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                      <span className="text-slate-700">
+                        Final Total: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">
