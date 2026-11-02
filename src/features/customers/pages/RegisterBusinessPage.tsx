@@ -13,6 +13,7 @@ import {
   Lock,
   MapPin,
   Package,
+  Pencil,
   Wallet,
   X,
 } from 'lucide-react'
@@ -21,6 +22,8 @@ import {
   fetchPlansWithDepartments,
   registerCustomer,
   verifyPayment,
+  fetchEarlierPayments,
+  type EarlierPayment,
   type PaymentUsage,
 } from '../../../api/register-business.api'
 import type {
@@ -93,9 +96,19 @@ type PaymentCheck = {
 /** A further verified payment that tops up the first one's remaining balance. */
 type ExtraPayment = {
   phone: string
+  /** Typed ID, or the masked ID when picked from the earlier-payments list. */
   paymentId: string
+  /** Set when picked from the list: the real ID is only known to the server. */
+  ref?: string
   amount: number
   available: number
+}
+
+/** An earlier payment chosen from the list; only its masked ID is ever shown. */
+type PickedPayment = {
+  phone: string
+  ref: string
+  masked: string
 }
 
 const INITIAL_VALIDATION_ERRORS = {
@@ -115,6 +128,15 @@ interface ToastMessage {
   title: string
   description?: string
   variant: ToastVariant
+}
+
+interface RegistrationSuccess {
+  businessName: string
+  registrationId: string
+  plan: string
+  total: number
+  paid: number
+  balance: number
 }
 
 const SECTIONS: {
@@ -262,6 +284,10 @@ const WIZARD_STYLES = `
 .rb-step-in{animation:rbStepIn .35s cubic-bezier(.2,.7,.2,1) both}
 .rb-panel-in{animation:rbPanelIn .3s cubic-bezier(.2,.7,.2,1) both}
 .rb-pop{animation:rbPop .4s}
+.rb-registration{font-family:var(--app-font-family);background:#f4f6fb}
+.rb-registration input,.rb-registration textarea,.rb-registration select{font-weight:var(--app-font-weight-body)}
+.rb-registration input::placeholder,.rb-registration textarea::placeholder{color:#94a3b8}
+.rb-registration ::selection{background:#ffe08a}
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
@@ -301,6 +327,7 @@ export function RegisterBusinessPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPasskeyModal, setShowPasskeyModal] = useState(false)
+  const [showFullFormModal, setShowFullFormModal] = useState(false)
   const [passkey, setPasskey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -309,6 +336,9 @@ export function RegisterBusinessPage() {
   const [extraPaymentInput, setExtraPaymentInput] = useState('')
   const [extraPaymentError, setExtraPaymentError] = useState('')
   const [isVerifyingExtra, setIsVerifyingExtra] = useState(false)
+  const [pickedPayment, setPickedPayment] = useState<PickedPayment | null>(null)
+  /* Phone whose earlier payments were already auto-picked, so it happens once per number. */
+  const autoPickedPhone = useRef<string | null>(null)
 
   /* Wizard: which step card is currently shown */
   const [activeStep, setActiveStep] = useState<SectionId>('business')
@@ -317,6 +347,9 @@ export function RegisterBusinessPage() {
   const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
   /* Toggle 18% GST addition on packages */
   const [includeGst, setIncludeGst] = useState(true)
+  /* Discount percentage (0 to 100) */
+  const [discountPercent, setDiscountPercent] = useState<string>('0')
+  const [manualBaseAmount, setManualBaseAmount] = useState<string>('')
 
   /* Plan whose features are shown in the docked side panel */
   const [viewingPlanId, setViewingPlanId] = useState<string | null>(null)
@@ -348,6 +381,8 @@ export function RegisterBusinessPage() {
 
   // Internal toast notification
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [registrationSuccess, setRegistrationSuccess] =
+    useState<RegistrationSuccess | null>(null)
   const toastTimer = useRef<number | null>(null)
 
   const showToast = useCallback(
@@ -514,6 +549,7 @@ export function RegisterBusinessPage() {
   )
 
   const resetForm = useCallback(() => {
+    setRegistrationSuccess(null)
     setFormData({ ...INITIAL_FORM_DATA })
     setValidationErrors({ ...INITIAL_VALIDATION_ERRORS })
     setTouchedFields(new Set())
@@ -526,6 +562,8 @@ export function RegisterBusinessPage() {
     setExtraPayments([])
     setExtraPaymentInput('')
     setExtraPaymentError('')
+    setPickedPayment(null)
+    autoPickedPhone.current = null
     autoAdvanceArmed.current = {
       business: true,
       packages: true,
@@ -579,9 +617,9 @@ export function RegisterBusinessPage() {
         ? Math.min(enteredTotal, verifiedPaymentAmount)
         : verifiedPaymentAmount
 
-  const handleVerifyPayment = useCallback(async () => {
-    const phone = formData.phoneNumber.trim()
-    const paymentId = formData.paymentId.trim()
+  /* Verifies the first payment — typed, or picked from the list (then only its ref is sent). */
+  const verifyPrimaryPayment = useCallback(
+    async (phone: string, paymentId: string, paymentRef?: string) => {
     if (!validatePhoneNumber(phone) || !paymentId) return
 
     const isSameCheck = (prev: PaymentCheck | null) =>
@@ -591,7 +629,7 @@ export function RegisterBusinessPage() {
     setExtraPaymentError('')
 
     try {
-      const res = await verifyPayment(phone, paymentId)
+      const res = await verifyPayment(phone, paymentId, { paymentRef })
       setPaymentCheck((prev) => {
         if (!isSameCheck(prev)) return prev
         return res.success
@@ -639,7 +677,133 @@ export function RegisterBusinessPage() {
           : prev,
       )
     }
-  }, [formData.phoneNumber, formData.paymentId])
+    },
+    [],
+  )
+
+  /* A picked payment counts only while its masked ID is still what the field shows. */
+  const activePickedRef =
+    pickedPayment &&
+    pickedPayment.phone === paymentPhone &&
+    pickedPayment.masked === paymentIdInput
+      ? pickedPayment.ref
+      : undefined
+
+  /* ─── Earlier payments of this number, detected as soon as it is valid. ─── */
+  const earlierPaymentsQuery = useQuery({
+    queryKey: ['earlier-payments', paymentPhone],
+    queryFn: () => fetchEarlierPayments(paymentPhone),
+    enabled: canEnterPaymentId,
+    staleTime: 60_000,
+    retry: false,
+  })
+  const earlierPayments = useMemo(
+    () => (canEnterPaymentId ? earlierPaymentsQuery.data ?? [] : []),
+    [canEnterPaymentId, earlierPaymentsQuery.data],
+  )
+
+  /*
+   * A typed payment ID must be a new one: if it is one of the earlier payments
+   * listed above (same masked form), it has to be picked from the list instead.
+   */
+  const listedPaymentMessage = useCallback(
+    (typedId: string): string | null => {
+      if (!typedId || typedId.includes('****')) return null
+      const masked = maskPaymentId(typedId)
+      const match = earlierPayments.find((p) => p.maskedPaymentId === masked)
+      return match
+        ? `This payment (${match.maskedPaymentId}) is already listed above under earlier payments — use it from the list instead of entering it again.`
+        : null
+    },
+    [earlierPayments],
+  )
+
+  const handleVerifyPayment = useCallback(() => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = formData.paymentId.trim()
+    const listed = activePickedRef ? null : listedPaymentMessage(paymentId)
+    if (listed) {
+      setPaymentCheck({ status: 'failed', phone, paymentId, message: listed })
+      return
+    }
+    void verifyPrimaryPayment(phone, paymentId, activePickedRef)
+  }, [
+    verifyPrimaryPayment,
+    formData.phoneNumber,
+    formData.paymentId,
+    activePickedRef,
+    listedPaymentMessage,
+  ])
+
+  const pickEarlierPayment = useCallback(
+    (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setPickedPayment({
+        phone,
+        ref: payment.paymentRef,
+        masked: payment.maskedPaymentId,
+      })
+      setFormData((prev) => ({ ...prev, paymentId: payment.maskedPaymentId }))
+      void verifyPrimaryPayment(phone, payment.maskedPaymentId, payment.paymentRef)
+    },
+    [formData.phoneNumber, verifyPrimaryPayment],
+  )
+
+  /* Pick the first payment with money left automatically — once per number, and
+     never over a payment ID the staff member already typed. */
+  useEffect(() => {
+    if (!canEnterPaymentId || !earlierPaymentsQuery.isSuccess) return
+    if (autoPickedPhone.current === paymentPhone) return
+    autoPickedPhone.current = paymentPhone
+    if (formData.paymentId.trim()) return
+    const usable = earlierPayments.find((p) => Number(p.available ?? 0) > 0)
+    if (usable) pickEarlierPayment(usable)
+  }, [
+    canEnterPaymentId,
+    earlierPaymentsQuery.isSuccess,
+    paymentPhone,
+    formData.paymentId,
+    earlierPayments,
+    pickEarlierPayment,
+  ])
+
+  /* Use another listed payment to top up the first one's balance. */
+  const addEarlierAsTopUp = useCallback(
+    async (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setIsVerifyingExtra(true)
+      setExtraPaymentError('')
+      try {
+        const res = await verifyPayment(phone, payment.maskedPaymentId, {
+          paymentRef: payment.paymentRef,
+        })
+        const available = Number(res.data?.available ?? 0)
+        if (!res.success || available <= 0) {
+          setExtraPaymentError(res.message || 'Payment could not be verified')
+          return
+        }
+        setExtraPayments((prev) => [
+          ...prev,
+          {
+            phone,
+            paymentId: payment.maskedPaymentId,
+            ref: payment.paymentRef,
+            amount: Number(res.data?.amount ?? available),
+            available,
+          },
+        ])
+      } catch (error) {
+        setExtraPaymentError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Payment could not be verified',
+        )
+      } finally {
+        setIsVerifyingExtra(false)
+      }
+    },
+    [formData.phoneNumber],
+  )
 
   /* ─── Top-up: another verified payment adds to the available balance. ─── */
   const handleAddExtraPayment = useCallback(async () => {
@@ -651,6 +815,16 @@ export function RegisterBusinessPage() {
       extraPayments.some((p) => p.phone === phone && p.paymentId === paymentId)
     if (alreadyAdded) {
       setExtraPaymentError('This payment ID is already added')
+      return
+    }
+    const listed = listedPaymentMessage(paymentId)
+    if (listed) {
+      setExtraPaymentError(listed)
+      return
+    }
+    // The first payment may be a picked one whose real ID the page never sees; compare masks.
+    if (activePickedRef && pickedPayment?.masked === maskPaymentId(paymentId)) {
+      setExtraPaymentError('This is the same payment already used above')
       return
     }
 
@@ -677,7 +851,15 @@ export function RegisterBusinessPage() {
     } finally {
       setIsVerifyingExtra(false)
     }
-  }, [formData.phoneNumber, formData.paymentId, extraPaymentInput, extraPayments])
+  }, [
+    formData.phoneNumber,
+    formData.paymentId,
+    extraPaymentInput,
+    extraPayments,
+    listedPaymentMessage,
+    activePickedRef,
+    pickedPayment,
+  ])
 
   /* ─── Plan pricing from planAmounts ─── */
   const priceOf = useCallback(
@@ -721,6 +903,73 @@ export function RegisterBusinessPage() {
   const totalLocked = autoTotal > 0 && !hasUnpricedSelection
   const monthsLocked = autoMonths > 0
 
+  /* Base amount before discount */
+  const rawBaseAmount =
+    autoTotal > 0
+      ? autoTotal
+      : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+  const discountPctNum = Math.min(
+    100,
+    Math.max(0, parseFloat(discountPercent) || 0),
+  )
+  const discountAmount = Math.round((rawBaseAmount * discountPctNum) / 100)
+  const finalCalculatedTotal = Math.max(0, rawBaseAmount - discountAmount)
+
+  /* Effective discounted cost calculator */
+  const getDiscountedCost = useCallback(
+    (rawAmount: number) => {
+      if (discountPctNum <= 0) return rawAmount
+      const disc = Math.round((rawAmount * discountPctNum) / 100)
+      return Math.max(0, rawAmount - disc)
+    },
+    [discountPctNum],
+  )
+
+  const handleDiscountChange = useCallback(
+    (pct: string) => {
+      if (pct === '') {
+        setDiscountPercent('')
+        return
+      }
+      const num = parseFloat(pct)
+      if (isNaN(num)) return
+      const clamped = Math.min(100, Math.max(0, num))
+      const pctStr = String(clamped)
+      setDiscountPercent(pctStr)
+
+      const base =
+        autoTotal > 0
+          ? autoTotal
+          : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+      const disc = Math.round((base * clamped) / 100)
+      const net = Math.max(0, base - disc)
+      const netStr = base > 0 || net > 0 ? String(net) : ''
+
+      handleInputChange('totalAmount', netStr)
+
+      const currentPaid =
+        verifiedPaymentAmount != null
+          ? verifiedPaymentAmount
+          : parseInt(formData.amountPaid) || 0
+      const rem = net - currentPaid
+
+      handleInputChange('amountRemaining', rem > 0 ? String(rem) : '')
+      if (rem <= 0 && currentPaid > 0) {
+        handleInputChange('paymentType', 'full-time')
+      } else if (rem > 0) {
+        handleInputChange('paymentType', 'part-time')
+      }
+    },
+    [
+      autoTotal,
+      manualBaseAmount,
+      formData.totalAmount,
+      formData.amountPaid,
+      verifiedPaymentAmount,
+      handleInputChange,
+    ],
+  )
+
   /* Handle package selection with verified payment amount restriction */
   const handlePackageToggle = useCallback(
     (packageId: string, checked?: boolean) => {
@@ -734,11 +983,17 @@ export function RegisterBusinessPage() {
         const pkgPrice = includeGst
           ? priceOf(pkg.name).withGst
           : priceOf(pkg.name).amount
-        if (pkgPrice > verifiedPaymentAmount) {
-          const extra = pkgPrice - verifiedPaymentAmount
+        const effectivePkgPrice = getDiscountedCost(pkgPrice)
+
+        if (effectivePkgPrice > verifiedPaymentAmount) {
+          const extra = effectivePkgPrice - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectivePkgPrice.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
-            title: 'Package Exceeds Available Balance',
-            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            title: 'Package Exceeds Verified Payment',
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -759,11 +1014,16 @@ export function RegisterBusinessPage() {
           }, 0)
 
         const totalSelected = otherSelectedCost + pkgPrice
-        if (totalSelected > verifiedPaymentAmount) {
-          const extra = totalSelected - verifiedPaymentAmount
+        const effectiveTotalSelected = getDiscountedCost(totalSelected)
+        if (effectiveTotalSelected > verifiedPaymentAmount) {
+          const extra = effectiveTotalSelected - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectiveTotalSelected.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
-            title: 'Total Exceeds Available Balance',
-            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            title: 'Total Exceeds Verified Payment',
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -792,24 +1052,34 @@ export function RegisterBusinessPage() {
       includeGst,
       verifiedPaymentAmount,
       showToast,
+      getDiscountedCost,
+      discountPctNum,
     ],
   )
 
-  /* Total Amount follows the selected plans */
+  /* Total Amount follows selected plans & discount */
   const lastAutoTotal = useRef(0)
-  const lastAvailable = useRef<number | null>(null)
+  const lastDiscount = useRef('0')
   useEffect(() => {
-    // Re-run when the plans' total changes, or when a top-up changes what is available.
     if (
       autoTotal === lastAutoTotal.current &&
-      verifiedPaymentAmount === lastAvailable.current
+      discountPercent === lastDiscount.current
     )
       return
-    const hadAutoTotal = lastAutoTotal.current > 0
     lastAutoTotal.current = autoTotal
-    lastAvailable.current = verifiedPaymentAmount
-    if (autoTotal <= 0 && !hadAutoTotal) return
-    const value = autoTotal > 0 ? String(autoTotal) : ''
+    lastDiscount.current = discountPercent
+
+    const base =
+      autoTotal > 0
+        ? autoTotal
+        : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+    if (base <= 0 && !hasUnpricedSelection) return
+
+    const pct = Math.min(100, Math.max(0, parseFloat(discountPercent) || 0))
+    const disc = Math.round((base * pct) / 100)
+    const net = Math.max(0, base - disc)
+    const value = base > 0 || net > 0 ? String(net) : ''
+
     setFormData((prev) => {
       if (verifiedPaymentAmount != null) {
         // Only the package's share of the balance is spent; the rest stays as credit.
@@ -825,7 +1095,12 @@ export function RegisterBusinessPage() {
           totalAmount: value,
           amountPaid: String(currentPaid),
           amountRemaining: remaining > 0 ? String(remaining) : '',
-          paymentType: remaining > 0 ? 'part-time' : prev.paymentType,
+          paymentType:
+            remaining <= 0 && currentPaid > 0
+              ? 'full-time'
+              : remaining > 0
+                ? 'part-time'
+                : prev.paymentType,
         }
       }
       if (prev.paymentType === 'full-time') {
@@ -836,14 +1111,20 @@ export function RegisterBusinessPage() {
           amountRemaining: '',
         }
       }
-      const remaining = autoTotal - (parseInt(prev.amountPaid) || 0)
+      const remaining = net - (parseInt(prev.amountPaid) || 0)
       return {
         ...prev,
         totalAmount: value,
         amountRemaining: remaining > 0 ? String(remaining) : '',
       }
     })
-  }, [autoTotal, verifiedPaymentAmount])
+  }, [
+    autoTotal,
+    discountPercent,
+    manualBaseAmount,
+    hasUnpricedSelection,
+    verifiedPaymentAmount,
+  ])
 
   /* Service Months follows the longest selected plan */
   useEffect(() => {
@@ -952,9 +1233,28 @@ export function RegisterBusinessPage() {
   const selectedCount = formData.selectedPackages?.length || 0
 
   const activeIndex = SECTIONS.findIndex((s) => s.id === activeStep)
-  const activeSection = SECTIONS[activeIndex]
   const isLastStep = activeIndex === SECTIONS.length - 1
   const activeComplete = sectionStatus[activeStep]
+  const isFirstPage = activeIndex < 2
+  const pageNumber = isFirstPage ? 1 : 2
+  const pageComplete = isFirstPage
+    ? businessComplete && packagesComplete
+    : financialComplete && finalComplete
+  const pageTitle = isFirstPage ? 'Business & package' : 'Payment & final details'
+  const pageSubtitle = isFirstPage
+    ? 'Customer details, payment verification and plan'
+    : 'Amounts, invoice, sales info and review'
+  const requiredFieldsLeft = isFirstPage
+    ? [
+        !formData.ownerName.trim(),
+        !formData.businessName.trim(),
+        !validateEmail(formData.email),
+        !validatePhoneNumber(formData.phoneNumber),
+        !(formData.city || cityInput).trim(),
+        !paymentVerified,
+        selectedCount === 0,
+      ].filter(Boolean).length
+    : [!financialComplete, !formData.salesPersonName, !formData.leadType].filter(Boolean).length
 
   const handleStepClick = useCallback(
     (id: SectionId) => {
@@ -1010,6 +1310,13 @@ export function RegisterBusinessPage() {
     cityInput,
     goToStep,
   ])
+
+  /* Fallback to Step 1 if business details become incomplete while editing */
+  useEffect(() => {
+    if (activeStep === 'packages' && !businessComplete) {
+      setActiveStep('business')
+    }
+  }, [activeStep, businessComplete])
 
   /* ─── Combined validation — same rules/order/messages as before ─── */
   const handleFinalSubmit = useCallback(() => {
@@ -1100,7 +1407,8 @@ export function RegisterBusinessPage() {
     }
 
     if (paymentVerified && verifiedPaymentAmount != null) {
-      const currentTotal = parseInt(formData.totalAmount) || autoTotal
+      const rawOrNet = parseInt(formData.totalAmount) || autoTotal
+      const currentTotal = getDiscountedCost(rawOrNet)
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
@@ -1221,7 +1529,7 @@ export function RegisterBusinessPage() {
       return
     }
 
-    setShowPasskeyModal(true)
+    setShowFullFormModal(true)
   }, [
     formData,
     cityInput,
@@ -1231,6 +1539,7 @@ export function RegisterBusinessPage() {
     paymentVerified,
     verifiedPaymentAmount,
     autoTotal,
+    getDiscountedCost,
   ])
 
   /* ─── Passkey submit & registration ─── */
@@ -1304,7 +1613,6 @@ export function RegisterBusinessPage() {
               : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
-        remark: formData.remark,
         isWebsiteIncluded,
         gstinOrAddress: gstinOrAddress || '',
         remainingAmountDueDate: formData.remainingAmountDueDate || '',
@@ -1312,18 +1620,46 @@ export function RegisterBusinessPage() {
         source: 'root',
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
-        paymentId: formData.paymentId.trim(),
-        additionalPaymentIds: activeExtraPayments.map((p) => p.paymentId),
+        // A payment picked from the list is sent as its reference; the field only holds the masked ID.
+        ...(activePickedRef
+          ? { paymentRef: activePickedRef }
+          : { paymentId: formData.paymentId.trim() }),
+        additionalPaymentIds: activeExtraPayments
+          .filter((p) => !p.ref)
+          .map((p) => p.paymentId),
+        additionalPaymentRefs: activeExtraPayments
+          .filter((p): p is ExtraPayment & { ref: string } => !!p.ref)
+          .map((p) => p.ref),
+        discountPercent: discountPctNum > 0 ? String(discountPctNum) : undefined,
+        discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
+        originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
+        remark:
+          discountPctNum > 0
+            ? `[Discount: ${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})] ${formData.remark}`.trim()
+            : formData.remark,
       }
 
       await registerCustomer(customerData)
+
+      const submittedTotal = Number(formData.totalAmount) || autoTotal
+      const submittedPaid =
+        formData.paymentType === 'part-time'
+          ? Number(formData.amountPaid) || 0
+          : (verifiedPaymentAmount ?? Number(formData.amountPaid)) || 0
+      setRegistrationSuccess({
+        businessName: formData.businessName,
+        registrationId: `MBG-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+        plan: packageNames || 'Selected plan',
+        total: submittedTotal,
+        paid: submittedPaid,
+        balance: Math.max(0, submittedTotal - submittedPaid),
+      })
 
       showToast({
         title: 'Registration Successful',
         description: 'Customer has been registered successfully!',
         variant: 'success',
       })
-      resetForm()
       setIsSubmitting(false)
       setShowPasskeyModal(false)
     } catch (error: any) {
@@ -1346,21 +1682,24 @@ export function RegisterBusinessPage() {
     paymentVerified,
     appliedFromBalance,
     activeExtraPayments,
+    activePickedRef,
     scrollToSection,
   ])
 
   const inputClass = (hasError?: boolean) =>
-    `h-9 w-full rounded-md border bg-white px-3 py-1 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+    `h-10 w-full rounded-[10px] border bg-white px-3 py-1 text-[13px] font-semibold text-slate-900 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-[3px] disabled:cursor-not-allowed disabled:bg-slate-100 ${
       hasError
-        ? 'border-red-500 ring-1 ring-red-200 focus:ring-red-200'
-        : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-200'
+        ? 'border-red-400 bg-red-50/30 ring-1 ring-red-100 focus:ring-red-100'
+        : 'border-[#e2e6ee] hover:border-slate-300 focus:border-[#2459e0] focus:ring-[#dde7ff]'
     }`
 
   const textareaClass =
-    'w-full resize-none rounded-md border border-slate-200 bg-white p-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200'
+    'w-full resize-none rounded-[10px] border border-[#e2e6ee] bg-white p-3 text-[13px] font-semibold text-slate-900 transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-[#2459e0] focus:outline-none focus:ring-[3px] focus:ring-[#dde7ff]'
 
   /* Footer hint text */
-  const footerHint = isLastStep
+  const footerHint = requiredFieldsLeft > 0
+    ? `${requiredFieldsLeft} required field${requiredFieldsLeft === 1 ? '' : 's'} left`
+    : isLastStep
     ? 'By registering, you agree to our Terms of Service and Privacy Policy.'
     : activeStep === 'packages' && selectedCount > 0
       ? `${selectedCount} selected · ₹${autoTotal.toLocaleString('en-IN')}${includeGst ? ' incl. GST' : ''}`
@@ -1374,13 +1713,68 @@ export function RegisterBusinessPage() {
     : null
   const panelOpen = activeStep === 'packages' && !!viewingPlan
 
+  if (registrationSuccess) {
+    const facts = [
+      ['Plan', registrationSuccess.plan],
+      ['Total', `₹${registrationSuccess.total.toLocaleString('en-IN')}`],
+      ['Paid', `₹${registrationSuccess.paid.toLocaleString('en-IN')}`],
+      [
+        'Balance',
+        registrationSuccess.balance
+          ? `₹${registrationSuccess.balance.toLocaleString('en-IN')}`
+          : 'Nil',
+      ],
+    ]
+
+    return (
+      <div className="rb-registration grid min-h-screen place-items-center bg-[#f4f6fb] p-4 text-slate-900">
+        <style>{WIZARD_STYLES}</style>
+        <section className="rb-step-in w-full max-w-[840px] rounded-[22px] border border-[#dfe4ed] bg-white px-6 py-10 sm:px-8 sm:py-11">
+          <div className="mx-auto grid h-[108px] w-[108px] place-items-center rounded-full bg-[#dcfce7] text-[#16a34a]">
+            <Check className="h-12 w-12 stroke-[2.4]" />
+          </div>
+          <div className="mt-5 text-center leading-tight">
+            <h1 className="break-words text-[26px] font-bold text-slate-950">
+              {registrationSuccess.businessName} is registered
+            </h1>
+            <p className="mt-1 text-base font-semibold text-slate-500">
+              Registration ID{' '}
+              <strong className="font-bold text-slate-950">
+                {registrationSuccess.registrationId}
+              </strong>
+            </p>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {facts.map(([label, value]) => (
+              <div key={label} className="min-h-[78px] rounded-2xl bg-[#f7f9fd] px-5 py-3.5 leading-tight">
+                <p className="text-sm font-semibold text-slate-500">{label}</p>
+                <p className="mt-1 break-words text-lg font-bold text-slate-950">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 rounded-2xl border border-[#ffe19a] bg-[#fffbea] px-5 py-4 text-base font-semibold leading-relaxed text-[#8a5a00]">
+            Assigned to an onboarding executive by round robin. The customer gets the confirmation link on WhatsApp and email.
+          </div>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <button type="button" onClick={resetForm} className="h-[62px] rounded-2xl border border-[#dfe4ed] bg-white px-6 text-base font-bold text-slate-900 transition-colors hover:bg-[#f7f9fd]">
+              Register another business
+            </button>
+            <button type="button" onClick={() => navigate({ to: '/onboarding-head/customers' as never })} className="h-[62px] rounded-2xl bg-[#2459e0] px-6 text-base font-bold text-white transition-colors hover:bg-[#1a45b8]">
+              Go to Customer List
+            </button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-sm text-slate-900">
+    <div className="rb-registration flex min-h-screen flex-col text-sm text-slate-900">
       <style>{WIZARD_STYLES}</style>
 
       {/* ─── Sticky header: back, title, progress ─── */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="flex h-14 items-center gap-3 px-3 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-[#e6e9f0] bg-white/95 backdrop-blur">
+        <div className="flex min-h-[58px] items-center gap-2.5 px-3 py-2 sm:px-4">
           <button
             type="button"
             onClick={() => {
@@ -1390,80 +1784,79 @@ export function RegisterBusinessPage() {
                 navigate({ to: '/login' as never })
               }
             }}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] border border-[#e6e9f0] text-slate-500 transition-colors hover:bg-[#f4f6fb] hover:text-slate-900"
             aria-label="Back"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back</span>
           </button>
-          <div className="flex min-w-0 items-center gap-2">
-            <img
-              src="https://www.mbgcard.in/mbg_logo.png"
-              alt="MBG logo"
-              className="h-7 w-7 flex-shrink-0 rounded-lg"
-            />
-            <h1 className="truncate text-base font-bold text-slate-900">
-              Register Your Business
-            </h1>
+          <div
+            aria-label="MBG"
+            className="grid h-[34px] w-[34px] flex-none place-items-center rounded-[10px] bg-[#2459e0] text-[12px] font-bold text-white shadow-[inset_0_-3px_0_#ffc629]"
+          >
+            <span aria-hidden="true">M<span className="text-[#ffc629]">B</span>G</span>
           </div>
-
-          <span className="flex-1" />
-
-          <span className="hidden whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-500 sm:inline-block">
-            {completedCount}/{SECTIONS.length} done
-          </span>
+          <div className="mr-auto min-w-0 leading-tight">
+            <h1 className="truncate text-base font-bold text-slate-900">Register your business</h1>
+            <p className="truncate text-xs font-semibold text-slate-500">MBG Card · New customer</p>
+          </div>
+          <div className="hidden items-center gap-2 rounded-full bg-[#f4f6fb] px-2.5 py-1.5 sm:flex">
+            <span className="h-1.5 w-[60px] overflow-hidden rounded-full bg-[#e2e6ee]">
+              <span className="block h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+            </span>
+            <span className="whitespace-nowrap text-xs font-bold tabular-nums text-[#1a45b8]">{completedCount}/{SECTIONS.length} done</span>
+          </div>
           <button
             type="button"
             onClick={() => {
               window.location.href = '/hrm/login'
             }}
-            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+            className="hidden h-[34px] cursor-pointer items-center rounded-[10px] border border-[#e2e6ee] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] md:inline-flex"
           >
             HRM Login
           </button>
           <button
             type="button"
             onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex cursor-pointer items-center rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-[13px]"
+            className="inline-flex h-[34px] cursor-pointer items-center rounded-[10px] bg-[#2459e0] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] sm:px-4"
           >
             Login
           </button>
         </div>
-        <div className="h-0.5 bg-slate-100">
+        <div className="h-0.5 bg-[#eef1f6] sm:hidden">
           <div
-            className="h-full bg-blue-600 transition-all duration-500"
+            className="h-full bg-[#2459e0] transition-all duration-500"
             style={{ width: `${progressPct}%` }}
           />
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 p-2.5 sm:p-4 lg:py-5">
         {/* ─── Left stepper rail ─── */}
-        <aside className="sticky top-[58px] flex h-[calc(100vh-58px)] w-14 flex-none flex-col items-center border-r border-slate-200 bg-white py-6 sm:w-[76px]">
+        <aside className="hidden">
           {SECTIONS.map((s, k) => {
             const done = sectionStatus[s.id]
             const isActive = activeStep === s.id
             const isLocked = !unlocked[s.id]
             const Icon = s.icon
             return (
-              <div key={s.id} className="flex flex-col items-center">
+              <div key={s.id} className="flex min-w-[118px] flex-1 items-center lg:min-w-0 lg:flex-none lg:flex-col">
                 <button
                   type="button"
                   title={s.title}
                   onClick={() => handleStepClick(s.id)}
                   aria-current={isActive ? 'step' : undefined}
-                  className={`group flex flex-col items-center gap-1.5 p-0.5 ${
+                  className={`group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
                     isLocked ? 'cursor-not-allowed' : 'cursor-pointer'
-                  }`}
+                  } ${isActive ? 'bg-[#eaf0ff]' : 'hover:bg-[#f7f9fd]'}`}
                 >
                   <span
-                    className={`grid h-9 w-9 place-items-center rounded-full border-2 transition-all duration-200 ${
+                    className={`grid h-[30px] w-[30px] flex-none place-items-center rounded-full border-[1.5px] transition-all duration-200 ${
                       done
                         ? `rb-pop border-emerald-500 bg-emerald-500 text-white ${
                             isActive ? 'shadow-[0_0_0_4px_#d1fae5]' : ''
                           }`
                         : isActive
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_#dbeafe]'
+                          ? 'border-[#2459e0] bg-[#2459e0] text-white shadow-[0_0_0_4px_#dde7ff]'
                           : isLocked
                             ? 'border-slate-200 bg-slate-50 text-slate-300'
                             : 'border-slate-300 bg-white text-slate-500 group-hover:border-blue-400 group-hover:text-blue-600'
@@ -1478,7 +1871,7 @@ export function RegisterBusinessPage() {
                     )}
                   </span>
                   <span
-                    className={`hidden w-16 text-center text-[10px] font-semibold leading-tight sm:block ${
+                    className={`min-w-0 truncate text-[13px] font-semibold leading-tight ${
                       isActive
                         ? 'text-slate-900'
                         : isLocked
@@ -1486,12 +1879,12 @@ export function RegisterBusinessPage() {
                           : 'text-slate-500'
                     }`}
                   >
-                    {s.label}
+                    {s.title}
                   </span>
                 </button>
                 {k < SECTIONS.length - 1 && (
                   <span
-                    className={`my-2.5 h-10 w-0.5 rounded-sm transition-colors duration-500 ${
+                    className={`mx-1 h-0.5 flex-1 rounded-sm transition-colors duration-500 lg:my-0.5 lg:ml-[24px] lg:h-3 lg:w-0.5 lg:flex-none ${
                       done ? 'bg-emerald-400' : 'bg-slate-200'
                     }`}
                   />
@@ -1502,7 +1895,7 @@ export function RegisterBusinessPage() {
         </aside>
 
         {/* ─── Step card ─── */}
-        <main className="min-w-0 flex-1 p-3 sm:p-6">
+        <main className="min-w-0 flex-1">
           <div
             key={activeStep}
             onInputCapture={() => {
@@ -1511,30 +1904,30 @@ export function RegisterBusinessPage() {
             onChangeCapture={() => {
               skipAutoAdvanceRef.current = false
             }}
-            className="rb-step-in flex min-h-[calc(100vh-106px)] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm"
+            className="rb-step-in flex min-h-[calc(100vh-100px)] flex-col overflow-hidden rounded-2xl border border-[#e6e9f0] bg-white"
           >
             {/* Card header */}
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+            <div className="relative flex items-center gap-3 border-b border-[#eef1f6] px-4 pb-5 pt-3.5 sm:px-[18px]">
               <span
-                className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
-                  activeComplete ? 'bg-emerald-500' : 'bg-blue-600'
+                className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-base font-bold text-white ${
+                  pageComplete ? 'bg-emerald-500' : 'bg-[#2459e0]'
                 }`}
               >
-                {activeComplete ? (
+                {pageComplete ? (
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 ) : (
-                  activeIndex + 1
+                  pageNumber
                 )}
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-base font-bold text-slate-900">
-                  {activeSection.title}
+                <h2 className="truncate text-[19px] font-bold text-slate-900">
+                  {pageTitle}
                 </h2>
-                <p className="text-xs text-slate-400">
-                  Step {activeIndex + 1} of {SECTIONS.length}
+                <p className="text-xs font-semibold text-slate-500">
+                  Page {pageNumber} of 2 · {pageSubtitle}
                 </p>
               </div>
-              {activeStep === 'packages' && unlocked.packages && (
+              {isFirstPage && unlocked.packages && (
                 <span className="ml-auto flex items-center gap-2">
                   {selectedCount > 0 && (
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
@@ -1555,17 +1948,23 @@ export function RegisterBusinessPage() {
                   />
                 </span>
               )}
+              <div className="absolute bottom-2 left-[18px] right-[18px] grid grid-cols-2 gap-1.5">
+                <span className="h-1 rounded-full bg-[#2459e0]" />
+                <span className={`h-1 rounded-full ${pageNumber === 2 ? 'bg-[#2459e0]' : 'bg-[#e6e9f0]'}`} />
+              </div>
             </div>
 
             {/* Card body */}
-            <div className="flex-1 p-4 sm:p-6">
-              {!unlocked[activeStep] ? (
+            <div className="flex-1 p-4 sm:p-[18px]">
+              {!isFirstPage && !unlocked[activeStep] ? (
                 <LockedNotice message={lockedMessages[activeStep]} />
               ) : (
                 <>
                   {/* ═══ 1 — Business Details ═══ */}
-                  {activeStep === 'business' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                  {isFirstPage && (
+                    <section className="space-y-4 pt-2">
+                      <SectionHeading number={1} title="Business details" subtitle="Who the customer is" />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <Field label="Client Name" htmlFor="ownerName" required>
                         <input
                           id="ownerName"
@@ -1594,7 +1993,11 @@ export function RegisterBusinessPage() {
                           htmlFor="email"
                           required
                           error={
-                            shouldShowError('email') ? validationErrors.email : ''
+                            shouldShowError('email')
+                              ? validationErrors.email
+                              : formData.email && !validateEmail(formData.email)
+                                ? 'This email looks incomplete'
+                                : ''
                           }
                         >
                           <input
@@ -1606,7 +2009,10 @@ export function RegisterBusinessPage() {
                             }
                             onBlur={(e) => handleFieldBlur('email', e.target.value)}
                             placeholder="name@company.com"
-                            className={inputClass(shouldShowError('email'))}
+                            className={inputClass(
+                              shouldShowError('email') ||
+                                (!!formData.email && !validateEmail(formData.email)),
+                            )}
                           />
                         </Field>
                       </div>
@@ -1765,12 +2171,14 @@ export function RegisterBusinessPage() {
                           />
                         </Field>
                       </div>
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 2 — Select Packages & Verify Payment ═══ */}
-                  {activeStep === 'packages' && (
-                    <div className="flex items-start gap-6">
+                  {isFirstPage && (
+                    <section className="mt-5 border-t border-[#eef1f6] pt-5">
+                      <SectionHeading number={2} title="Payment & package" subtitle="Verify the customer's payment ID first — only plans within the verified amount can be selected." />
+                    <div className="mt-4 flex items-start gap-6">
                       <div className="min-w-0 flex-1">
                         <div className="mb-5 grid grid-cols-1 gap-4 min-[1100px]:grid-cols-2">
                           {/* Note: First verify payment, then select package */}
@@ -1790,6 +2198,93 @@ export function RegisterBusinessPage() {
 
                           {/* Payment Verification Box */}
                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                            {canEnterPaymentId && earlierPaymentsQuery.isFetching && earlierPayments.length === 0 && (
+                              <p className="mb-3 text-xs text-slate-500">
+                                Looking for earlier payments from {paymentPhone}…
+                              </p>
+                            )}
+                            {earlierPayments.length > 0 && (
+                              <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
+                                <p className="text-xs font-semibold text-slate-700">
+                                  Earlier payments from this number
+                                </p>
+                                <p className="mb-2 text-[11px] text-slate-500">
+                                  Use one to pay for this business from what is left on it. IDs are partly hidden.
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {earlierPayments.map((p) => {
+                                    const available = Number(p.available ?? 0)
+                                    const isPrimary =
+                                      activePickedRef === p.paymentRef ||
+                                      (pickedPayment?.ref === p.paymentRef &&
+                                        paymentIdInput === p.maskedPaymentId)
+                                    const isTopUp = activeExtraPayments.some(
+                                      (x) => x.ref === p.paymentRef,
+                                    )
+                                    const paidDate = p.paidAt ? new Date(p.paidAt) : null
+                                    return (
+                                      <li
+                                        key={p.paymentRef}
+                                        className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                                          isPrimary || isTopUp
+                                            ? 'border-emerald-300 bg-emerald-50'
+                                            : 'border-slate-200 bg-slate-50'
+                                        }`}
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="font-mono font-semibold text-slate-800">
+                                            {p.maskedPaymentId}
+                                          </span>
+                                          <span className="ml-2 text-slate-500">
+                                            ₹{formatVerifiedRupees(Number(p.amount ?? 0))} paid
+                                            {paidDate && !isNaN(paidDate.getTime())
+                                              ? ` on ${paidDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                              : ''}
+                                          </span>
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <span
+                                            className={
+                                              available > 0
+                                                ? 'font-semibold text-emerald-700'
+                                                : 'text-slate-400'
+                                            }
+                                          >
+                                            {available > 0
+                                              ? `₹${formatVerifiedRupees(available)} available`
+                                              : 'Fully used'}
+                                          </span>
+                                          {available > 0 &&
+                                            (isPrimary ? (
+                                              <span className="font-semibold text-emerald-700">In use</span>
+                                            ) : isTopUp ? (
+                                              <span className="font-semibold text-emerald-700">Top-up</span>
+                                            ) : paymentVerified ? (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingExtra}
+                                                onClick={() => void addEarlierAsTopUp(p)}
+                                                className="rounded border border-blue-600 px-2 py-0.5 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                              >
+                                                Add as top-up
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingPayment}
+                                                onClick={() => pickEarlierPayment(p)}
+                                                className="rounded bg-blue-600 px-2 py-0.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                              >
+                                                Use
+                                              </button>
+                                            ))}
+                                        </span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </div>
+                            )}
                             <Field
                               label="Payment ID"
                               htmlFor="paymentId"
@@ -2049,9 +2544,7 @@ export function RegisterBusinessPage() {
                               </div>
                             )}
                             <div
-                              className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
-                                panelOpen ? '' : 'min-[1100px]:grid-cols-4'
-                              }`}
+                              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
                             >
                               {visiblePlans.length === 0 ? (
                                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center text-sm text-slate-500 sm:col-span-2 min-[1100px]:col-span-full">
@@ -2071,9 +2564,10 @@ export function RegisterBusinessPage() {
                                   const pkgCost = includeGst
                                     ? price.withGst
                                     : price.amount
+                                  const effectivePkgCost = getDiscountedCost(pkgCost)
                                   const isExceedingPayment =
                                     verifiedPaymentAmount != null &&
-                                    pkgCost > verifiedPaymentAmount
+                                    effectivePkgCost > verifiedPaymentAmount
                                   const isViewingFeatures = viewingPlanId === pkg.id
                                   return (
                                     <div
@@ -2086,7 +2580,7 @@ export function RegisterBusinessPage() {
                                         if (isExceedingPayment) {
                                           showToast({
                                             title: 'Reviewing Package Features',
-                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds the available ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Add another payment ID above to top up. Viewing features in the side panel.`,
+                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}${discountPctNum > 0 ? ` / ₹${effectivePkgCost.toLocaleString('en-IN')} with discount` : ''}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
                                             variant: 'default',
                                           })
                                           return
@@ -2134,21 +2628,35 @@ export function RegisterBusinessPage() {
                                           <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
                                             {pkg.name}
                                           </h3>
-                                          {isExceedingPayment && (
+                                          {isSelected ? (
+                                            <span className="flex-shrink-0 rounded-full bg-[#2459e0] px-3 py-1 text-xs font-bold text-white">
+                                              Selected
+                                            </span>
+                                          ) : isExceedingPayment ? (
                                             <span className="flex-shrink-0 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                                               Exceeds payment
+                                            </span>
+                                          ) : (
+                                            <span className="flex-shrink-0 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-bold text-[#15803d]">
+                                              Fits payment
                                             </span>
                                           )}
                                         </div>
                                         {(price.hasPrice || price.months > 0) && (
                                           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-slate-400">
                                             {price.hasPrice && (
-                                              <span>
-                                                <span className="text-sm font-bold text-emerald-600">
-                                                  ₹{price.amount.toLocaleString('en-IN')}
-                                                </span>{' '}
-                                                +18% = ₹
-                                                {price.withGst.toLocaleString('en-IN')}
+                                              <span className="flex flex-wrap items-baseline gap-2">
+                                                <span className="text-2xl font-bold text-slate-950">
+                                                  ₹{price.withGst.toLocaleString('en-IN')}
+                                                </span>
+                                                <span className="text-xs font-semibold text-slate-400">
+                                                  ₹{price.amount.toLocaleString('en-IN')} + 18% GST
+                                                </span>
+                                                {discountPctNum > 0 && (
+                                                  <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
+                                                    ₹{effectivePkgCost.toLocaleString('en-IN')} ({discountPctNum}% off)
+                                                  </span>
+                                                )}
                                               </span>
                                             )}
                                             {price.months > 0 && (
@@ -2165,7 +2673,7 @@ export function RegisterBusinessPage() {
                                               return (
                                                 <span
                                                   key={dept}
-                                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                                                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-xs font-semibold text-slate-700"
                                                 >
                                                   <span
                                                     className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
@@ -2217,9 +2725,11 @@ export function RegisterBusinessPage() {
                           hasPrice={priceOf(viewingPlan.name).hasPrice}
                           months={priceOf(viewingPlan.name).months}
                           cost={
-                            includeGst
-                              ? priceOf(viewingPlan.name).withGst
-                              : priceOf(viewingPlan.name).amount
+                            getDiscountedCost(
+                              includeGst
+                                ? priceOf(viewingPlan.name).withGst
+                                : priceOf(viewingPlan.name).amount
+                            )
                           }
                           verifiedAmount={verifiedPaymentAmount}
                           selected={!!formData.selectedPackages?.includes(viewingPlan.id)}
@@ -2227,12 +2737,14 @@ export function RegisterBusinessPage() {
                           onClose={() => setViewingPlanId(null)}
                         />
                       )}
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 3 — Financial Information ═══ */}
-                  {activeStep === 'financial' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-4">
+                  {!isFirstPage && (
+                    <section className="space-y-4 pt-2">
+                      <SectionHeading number={3} title="Payment details" subtitle="Amounts, payment type and invoice information" />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1">
                         <label
                           htmlFor="expirationInMonths"
@@ -2262,7 +2774,54 @@ export function RegisterBusinessPage() {
                         </p>
                       </div>
 
+                      {/* Discount (%) Field */}
                       <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="discountPercent"
+                            className="block text-xs font-semibold text-slate-600"
+                          >
+                            Discount (%)
+                          </label>
+                          <div className="flex items-center gap-1">
+                            {['0', '10', '20', '30', '50'].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => handleDiscountChange(pct)}
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                                  discountPercent === pct
+                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <input
+                            id="discountPercent"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={discountPercent}
+                            onChange={(e) => handleDiscountChange(e.target.value)}
+                            placeholder="0 to 100"
+                            className={inputClass()}
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                            %
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Applies discount on total package price
+                        </p>
+                      </div>
+
+                      {/* Total Amount (₹) */}
+                      <div className="space-y-1 sm:col-span-2">
                         <div className="flex items-center justify-between gap-2">
                           <label
                             htmlFor="totalAmount"
@@ -2270,7 +2829,7 @@ export function RegisterBusinessPage() {
                           >
                             Total Amount (₹) <span className="text-red-500">*</span>
                           </label>
-                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-[11px] font-medium text-slate-600">
+                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-xs font-semibold text-slate-600">
                             <span className="select-none">18% GST</span>
                             <button
                               type="button"
@@ -2305,17 +2864,26 @@ export function RegisterBusinessPage() {
                           disabled={totalLocked}
                           onChange={(e) => {
                             const value = e.target.value
+                            setManualBaseAmount(value)
                             if (
                               value === '' ||
-                              (/^\d+$/.test(value) && value.length <= 12)
+                              (/^d+$/.test(value) && value.length <= 12)
                             ) {
-                              handleInputChange('totalAmount', value)
-                              const total = parseInt(value) || 0
+                              const base = parseInt(value) || 0
+                              const pct = Math.min(
+                                100,
+                                Math.max(0, parseFloat(discountPercent) || 0),
+                              )
+                              const disc = Math.round((base * pct) / 100)
+                              const net = Math.max(0, base - disc)
+                              const netStr = base > 0 ? String(net) : ''
+                              handleInputChange('totalAmount', netStr)
+
                               const paid =
                                 verifiedPaymentAmount != null
-                                  ? Math.min(total, verifiedPaymentAmount)
+                                  ? Math.min(net, verifiedPaymentAmount)
                                   : parseInt(formData.amountPaid) || 0
-                              const remaining = total - paid
+                              const remaining = net - paid
                               handleInputChange(
                                 'amountRemaining',
                                 remaining > 0 ? remaining.toString() : '',
@@ -2324,7 +2892,7 @@ export function RegisterBusinessPage() {
                                 formData.paymentType === 'full-time' &&
                                 verifiedPaymentAmount == null
                               )
-                                handleInputChange('amountPaid', value)
+                                handleInputChange('amountPaid', netStr)
                             } else if (value.length > 12) {
                               showToast({
                                 title: 'Amount Limit Exceeded',
@@ -2343,12 +2911,30 @@ export function RegisterBusinessPage() {
                         <p className="text-[11px] text-slate-400">
                           {totalLocked
                             ? includeGst
-                              ? 'Auto-calculated from the selected plans (incl. 18% GST)'
-                              : 'Auto-calculated from the selected plans (excl. GST)'
+                              ? 'Auto-calculated from selected plans (incl. 18% GST) minus discount'
+                              : 'Auto-calculated from selected plans (excl. GST) minus discount'
                             : hasUnpricedSelection && selectedPlans.length > 0
                               ? 'A selected plan has no price set — enter the total'
                               : undefined}
                         </p>
+
+                        {/* Live calculation summary */}
+                        {rawBaseAmount > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                            <span className="text-slate-600">
+                              Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                              {includeGst ? ' (incl. 18% GST)' : ''}
+                            </span>
+                            {discountPctNum > 0 && (
+                              <span className="font-semibold text-emerald-700">
+                                Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                            <span className="text-slate-700">
+                              Net Payable: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -2572,12 +3158,14 @@ export function RegisterBusinessPage() {
                           </Field>
                         </div>
                       )}
-                    </div>
+                    </div></section>
                   )}
 
                   {/* ═══ 4 — Final Details ═══ */}
-                  {activeStep === 'final' && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-3">
+                  {!isFirstPage && (
+                    <section className="mt-5 border-t border-[#eef1f6] pt-5">
+                      <SectionHeading number={4} title="Sales & handoff" subtitle="Final details before registration" />
+                    <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 min-[1100px]:grid-cols-3">
                       <Field
                         label="Sales Person Name"
                         htmlFor="salesPersonName"
@@ -2619,19 +3207,19 @@ export function RegisterBusinessPage() {
                           className={inputClass()}
                         />
                       </Field>
-                    </div>
+                    </div></section>
                   )}
                 </>
               )}
             </div>
 
             {/* Card footer: Previous / hint / Continue (or Complete Registration) */}
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-4 sm:px-6">
+            <div className="flex items-center justify-between gap-3 border-t border-[#eef1f6] px-4 py-3 sm:px-[18px]">
               <button
                 type="button"
-                onClick={() => goToStep(SECTIONS[activeIndex - 1].id)}
-                className={`cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${
-                  activeIndex === 0 ? 'invisible' : ''
+                onClick={() => goToStep('packages')}
+                className={`h-10 cursor-pointer rounded-xl border border-[#e2e6ee] bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] ${
+                  isFirstPage ? 'invisible' : ''
                 }`}
               >
                 ← Previous
@@ -2643,20 +3231,594 @@ export function RegisterBusinessPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    isLastStep
+                    !isFirstPage
                       ? handleFinalSubmit()
-                      : goToStep(SECTIONS[activeIndex + 1].id)
+                      : goToStep('financial')
                   }
-                  disabled={!isLastStep && !activeComplete}
-                  className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  disabled={!pageComplete}
+                  className="h-10 cursor-pointer rounded-xl bg-[#2459e0] px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
                 >
-                  {isLastStep ? 'Complete Registration' : 'Continue →'}
+                  {!isFirstPage ? 'Complete Registration' : 'Continue →'}
                 </button>
               </div>
             </div>
           </div>
         </main>
       </div>
+
+      {/* ─── Full Form Preview & Direct Edit Modal ─── */}
+      {showFullFormModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                  <Eye className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Preview Registration Form
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Review all details before submitting. Click on any field to edit directly.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+                        {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/40">
+              {/* Important Warning Notice */}
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/95 p-4 text-xs text-amber-900 shadow-sm">
+                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-xs sm:text-sm text-amber-950">
+                    Important Notice: This form cannot be edited once submitted!
+                  </p>
+                  <p className="text-amber-800 text-xs leading-relaxed">
+                    Please review and verify all details carefully before proceeding. Once submitted, you will not be able to make any changes to this registration.
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Business & Contact */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    1. Business & Contact Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Client / Owner Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ownerName}
+                      onChange={(e) => handleInputChange('ownerName', e.target.value)}
+                      placeholder="Enter client name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.businessName}
+                      onChange={(e) => handleInputChange('businessName', e.target.value)}
+                      placeholder="Enter business name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      placeholder="10-digit mobile number"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="name@company.com"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city || cityInput}
+                      onChange={(e) => {
+                        handleCityChange(e.target.value)
+                        handleInputChange('city', e.target.value)
+                      }}
+                      placeholder="Enter city"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Onboarding City <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.onboardingCity}
+                      onChange={(e) => handleInputChange('onboardingCity', e.target.value)}
+                      className={inputClass()}
+                    >
+                      {ONBOARDING_CITIES.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Website Included <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'yes')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'yes'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'no')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'no'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Packages & Payment */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    2. Packages & Verified Payment
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900">
+                        Payment Status: Verified
+                      </span>
+                      <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                        Verified ✓
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                      <div>
+                        <span className="text-emerald-700">Payment ID:</span>
+                        <p className="font-mono font-bold text-emerald-950 break-all">
+                          {formData.paymentId || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Verified Amount:</span>
+                        <p className="font-bold text-emerald-950">
+                          ₹{formData.amountPaid || '0'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Customer Phone:</span>
+                        <p className="font-bold text-emerald-950">
+                          +91 {formData.phoneNumber || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Selected Package(s)
+                    </label>
+                    {selectedPlans.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedPlans.map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-900"
+                          >
+                            <span>{pkg.name}</span>
+                            <span className="rounded-md bg-blue-200/80 px-1.5 py-0.5 text-[10px] text-blue-800">
+                              ₹{priceOf(pkg.name).amount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-600">No package selected yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Financial Information */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Wallet className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    3. Financial & Invoicing Information
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Service Months <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={formData.expirationInMonths}
+                      disabled={monthsLocked}
+                      onChange={(e) => handleInputChange('expirationInMonths', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  {/* Discount (%) in Modal */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        Discount (%)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {['0', '10', '20', '30', '50'].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => handleDiscountChange(pct)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                              discountPercent === pct
+                                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={discountPercent}
+                        onChange={(e) => handleDiscountChange(e.target.value)}
+                        placeholder="0 to 100"
+                        className={inputClass()}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        %
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Total Amount (₹) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Total Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.totalAmount}
+                      disabled={totalLocked}
+                      onChange={(e) => handleInputChange('totalAmount', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  {rawBaseAmount > 0 && (
+                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                      <span className="text-slate-600">
+                        Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                        {includeGst ? ' (incl. 18% GST)' : ''}
+                      </span>
+                      {discountPctNum > 0 && (
+                        <span className="font-semibold text-emerald-700">
+                          Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                      <span className="text-slate-700">
+                        Final Total: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Payment Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.paymentType}
+                      onChange={(e) => handleInputChange('paymentType', e.target.value)}
+                      className={inputClass()}
+                    >
+                      <option value="">Select payment type</option>
+                      <option value="full-time">Full Payment</option>
+                      <option value="part-time">Part-Time (Partial) Payment</option>
+                    </select>
+                  </div>
+
+                  {formData.paymentType === 'part-time' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Remaining Amount Due Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.remainingAmountDueDate}
+                        onChange={(e) => handleInputChange('remainingAmountDueDate', e.target.value)}
+                        className={inputClass()}
+                      />
+                    </div>
+                  )}
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Invoice Option <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'gstin')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'gstin'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        GSTIN Number
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'address')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'address'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Billing Address
+                      </button>
+                    </div>
+
+                    {formData.invoiceOption === 'gstin' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          GSTIN Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.gstinForInvoice}
+                          onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={inputClass()}
+                        />
+                      </div>
+                    )}
+
+                    {formData.invoiceOption === 'address' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Complete Billing Address <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={formData.completeAddress}
+                          onChange={(e) => handleInputChange('completeAddress', e.target.value)}
+                          placeholder="Enter full address for invoice"
+                          rows={2}
+                          className={textareaClass}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Sales & Handoff */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <ClipboardList className="h-4 w-4 text-purple-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    4. Sales & Handoff Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Sales Person Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.salesPersonName}
+                      onChange={(e) => handleInputChange('salesPersonName', e.target.value)}
+                      placeholder="Enter sales person's name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Lead Type <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.leadType}
+                      onChange={(e) => handleInputChange('leadType', e.target.value)}
+                      placeholder="e.g. 99, 699, 999"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Is Webinar Client?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'YES')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'YES'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'NO')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'NO'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      WhatsApp Group Link (optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.groupLink}
+                      onChange={(e) => handleInputChange('groupLink', e.target.value)}
+                      placeholder="https://chat.whatsapp.com/…"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Remarks (optional)
+                    </label>
+                    <textarea
+                      value={formData.remark}
+                      onChange={(e) => handleInputChange('remark', e.target.value)}
+                      placeholder="Any additional notes"
+                      rows={2}
+                      className={textareaClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              >
+                ← Back to Form
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!formData.ownerName?.trim() || !formData.businessName?.trim() || !formData.phoneNumber?.trim() || !formData.email?.trim()) {
+                    showToast({
+                      title: 'Required Details Missing',
+                      description: 'Please ensure Client Name, Business Name, Phone Number, and Email are filled.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validateEmail(formData.email)) {
+                    showToast({
+                      title: 'Invalid Email',
+                      description: 'Please enter a valid email address.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validatePhoneNumber(formData.phoneNumber)) {
+                    showToast({
+                      title: 'Invalid Phone Number',
+                      description: 'Please enter a valid 10-digit mobile number.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!formData.salesPersonName || !formData.leadType) {
+                    showToast({
+                      title: 'Sales Details Missing',
+                      description: "Please enter the Sales Person's Name and Lead Type.",
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  setShowFullFormModal(false)
+                  setShowPasskeyModal(true)
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700"
+              >
+                Submit & Enter Passkey →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Passkey modal ─── */}
       {showPasskeyModal && (
@@ -2758,6 +3920,28 @@ export function RegisterBusinessPage() {
 /* ─────────────────────────────────────────────────────────────────
    Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
+
+function SectionHeading({
+  number,
+  title,
+  subtitle,
+}: {
+  number: number
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-[#e8efff] text-[13px] font-bold text-[#1a45b8]">
+        {number}
+      </span>
+      <div className="min-w-0 leading-tight">
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        <p className="text-xs font-semibold text-slate-500">{subtitle}</p>
+      </div>
+    </div>
+  )
+}
 
 function FilterChip({
   active,
@@ -2897,7 +4081,7 @@ function FeaturesPanel({
                 return (
                   <span
                     key={dept}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-px text-xs font-semibold text-slate-700"
                   >
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${departmentDot(label)}`}
@@ -2917,7 +4101,7 @@ function FeaturesPanel({
           features.map((feature, idx) => (
             <div
               key={idx}
-              className="mb-1.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 text-xs font-medium text-slate-700"
+              className="mb-1.5 flex items-start gap-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 text-xs font-semibold text-slate-700"
             >
               <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="h-2 w-2 stroke-[3.5]" />
@@ -3008,10 +4192,10 @@ function ChoiceCard({
     <label
       htmlFor={id}
       onClick={() => onSelect(value)}
-      className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-[13px] font-medium transition-colors ${
+      className={`flex h-10 cursor-pointer items-center gap-2 rounded-[10px] border px-3 text-[13px] font-semibold transition-all ${
         selected
-          ? 'border-blue-500 bg-blue-50 text-blue-900'
-          : 'border-slate-200 text-slate-700 hover:border-blue-300'
+          ? 'border-[#2459e0] bg-[#f4f7ff] text-[#1a45b8] shadow-[0_0_0_3px_#e8efff]'
+          : 'border-[#e2e6ee] bg-white text-slate-700 hover:border-blue-300'
       }`}
     >
       <input
@@ -3030,6 +4214,15 @@ function ChoiceCard({
 
 // Payment verification returns rupees. Razorpay and payment_info store the same
 // value in paise, so never render that database value directly in this form.
+/** Same masking as SMSB's PaymentRefCodec.mask: "pay_ABCDEF123456XyZ1" -> "pay_****XyZ1". */
+const maskPaymentId = (paymentId: string): string => {
+  if (paymentId.length <= 8) return '****'
+  const underscore = paymentId.indexOf('_')
+  const prefix =
+    underscore > 0 && underscore < 6 ? paymentId.slice(0, underscore + 1) : ''
+  return `${prefix}****${paymentId.slice(-4)}`
+}
+
 const formatVerifiedRupees = (amount: number): string =>
   amount.toLocaleString('en-IN', {
     minimumFractionDigits: 2,

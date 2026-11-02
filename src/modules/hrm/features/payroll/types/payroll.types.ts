@@ -50,6 +50,22 @@ export interface SalaryStructureInput {
   effectiveFrom: string;
 }
 
+export interface SkippedEmployee {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  departmentName?: string;
+  reason: string;
+}
+
+export interface GeneratePayrollBatchResult {
+  payrolls: Payroll[];
+  skippedEmployees: SkippedEmployee[];
+  totalAttempted: number;
+  generatedCount: number;
+  skippedCount: number;
+}
+
 export interface GeneratePayrollInput {
   month: number;
   year: number;
@@ -214,3 +230,21 @@ export const DEDUCTION_LABELS: Record<DeductionType, string> = {
   UNPAID_LEAVE: "Unpaid Leave",
   HALF_DAY: "Half-Day Attendance",
 };
+
+export interface BulkApproveInput {
+  payrollIds: number[];
+}
+
+export interface BulkPaymentInput {
+  payrollIds: number[];
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  transactionReference?: string;
+}
+
+export interface BulkActionResult {
+  totalRequested: number;
+  successfulCount: number;
+  skippedCount: number;
+  message: string;
+}
