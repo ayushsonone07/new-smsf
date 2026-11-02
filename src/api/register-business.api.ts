@@ -14,6 +14,17 @@ interface CustomApiResponse<T> {
   data?: T | null
 }
 
+export interface PaymentInfoRecord {
+  paymentReference?: string | null
+  createdAt?: string | null
+  customerPhone?: string | null
+  customerEmail?: string | null
+  amount?: number | null
+  paymentId?: string | null
+  paymentsInfoId?: string | null
+  paymentInfo?: Record<string, unknown> | null
+}
+
 interface PlansWithDepartmentsEnvelope {
   success?: boolean
   message?: string
@@ -54,6 +65,26 @@ export async function fetchPlansWithDepartments(): Promise<
 export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   const response = await apiRequest<CustomApiResponse<PlanAmount[]>>(
     '/api/plan/amounts',
+  )
+
+  return response.data ?? []
+}
+
+/** Fetches payment records used to attribute a registration to its seller. */
+export async function fetchPaymentInfo(
+  customerEmail: string,
+): Promise<PaymentInfoRecord[]> {
+  const session = getSession()
+  const headers: Record<string, string> = {}
+
+  if (session?.token) headers.Authorization = `Bearer ${session.token}`
+  if (session?.user.email || session?.user.username) {
+    headers.username = session.user.email || session.user.username || ''
+  }
+
+  const response = await apiRequest<CustomApiResponse<PaymentInfoRecord[]>>(
+    `/api/payment/info?customerEmail=${encodeURIComponent(customerEmail.trim())}`,
+    { headers },
   )
 
   return response.data ?? []

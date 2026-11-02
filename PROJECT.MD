@@ -436,6 +436,13 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Registration payment attribution (02 Nov 2026)** — valid customer email enter karne
+      par `GET /api/payment/info` lookup hota hai; case-insensitive exact email match milne par
+      Email field ke neeche `Sold by <paymentReference>` render hota hai, payment reference bold
+      hai. Saath ka compact circular info control matched record ke reference, timestamp, phone,
+      email, amount, payment ID, payments-info ID aur payment-info JSON ko responsive popover me
+      dikhata hai. Lookup failure/no-match form validation aur registration flow ko affect nahi karta.
+      Production build successful (3836 modules).
 - [x] **Vite 8 / Rolldown production-build compatibility (25 Oct 2026)** — converted
       `build.rollupOptions.output.manualChunks` from the unsupported object form to a
       module-ID callback while preserving the React, TanStack, and Lucide vendor chunks.
