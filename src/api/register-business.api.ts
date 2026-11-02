@@ -118,6 +118,26 @@ export async function fetchGstinDetails(gstin: string): Promise<GstinDetails> {
   return response.data
 }
 
+/** A business that already used part of a payment. */
+export interface PaymentUsage {
+  businessName?: string | null
+  isDuplicate?: boolean
+  /** Rupees. */
+  amount?: number | null
+  usedAt?: string | null
+}
+
+export interface VerifiedPayment {
+  /** Full payment amount in rupees, already converted by SMSB from paise. */
+  amount?: number | null
+  /** Rupees already spent on earlier registrations of this customer. */
+  used?: number | null
+  /** Rupees still left to spend — a payment can fund several businesses. */
+  available?: number | null
+  usedBy?: PaymentUsage[]
+  paidAt?: string | null
+}
+
 export interface VerifyPaymentResult {
   success: boolean
   message?: string
