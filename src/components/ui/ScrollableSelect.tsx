@@ -10,9 +10,11 @@ export interface ScrollableSelectProps {
   value: string
   onChange: (value: string) => void
   options: (ScrollableSelectOption | string)[]
+  pinnedOption?: ScrollableSelectOption
   placeholder?: string
   searchable?: boolean
   maxHeight?: number
+  pageSize?: number
   width?: string
   disabled?: boolean
   className?: string
@@ -23,9 +25,11 @@ export function ScrollableSelect({
   value,
   onChange,
   options,
+  pinnedOption,
   placeholder = 'Select an option',
   searchable = true,
   maxHeight = 220,
+  pageSize,
   width = '240px',
   disabled = false,
   className = '',
@@ -33,6 +37,7 @@ export function ScrollableSelect({
 }: ScrollableSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [visibleOptionCount, setVisibleOptionCount] = useState(pageSize ?? 0)
   const containerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,7 +52,9 @@ export function ScrollableSelect({
   }, [options])
 
   // Current selected label
-  const selectedOption = normalizedOptions.find((opt) => opt.value === value)
+  const selectedOption =
+    normalizedOptions.find((opt) => opt.value === value) ??
+    (pinnedOption?.value === value ? pinnedOption : undefined)
   const displayLabel = selectedOption ? selectedOption.label : placeholder
 
   // Filter options based on search query
@@ -58,6 +65,17 @@ export function ScrollableSelect({
       opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query)
     )
   }, [normalizedOptions, searchTerm])
+  const filteredPinnedOption =
+    pinnedOption &&
+    (!searchTerm.trim() ||
+      pinnedOption.label.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+      pinnedOption.value.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+      ? pinnedOption
+      : undefined
+  const visibleOptions = [
+    ...(filteredPinnedOption ? [filteredPinnedOption] : []),
+    ...(pageSize ? filteredOptions.slice(0, visibleOptionCount) : filteredOptions),
+  ]
 
   // Handle clicking outside to close
   useEffect(() => {
@@ -101,6 +119,15 @@ export function ScrollableSelect({
     onChange(val)
     setIsOpen(false)
     setSearchTerm('')
+  }
+
+  const handleListScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    if (!pageSize || visibleOptionCount >= filteredOptions.length) return
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget
+    if (scrollHeight - scrollTop - clientHeight <= 24) {
+      setVisibleOptionCount((count) => Math.min(count + pageSize, filteredOptions.length))
+    }
   }
 
   return (
@@ -179,7 +206,7 @@ export function ScrollableSelect({
           }}
         >
           {/* Search box if enabled and many items */}
-          {searchable && normalizedOptions.length > 5 && (
+          {searchable && normalizedOptions.length + (pinnedOption ? 1 : 0) > 5 && (
             <div
               style={{
                 padding: '8px',
@@ -195,7 +222,10 @@ export function ScrollableSelect({
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setVisibleOptionCount(pageSize ?? 0)
+                }}
                 placeholder="Search..."
                 style={{
                   width: '100%',
@@ -219,8 +249,9 @@ export function ScrollableSelect({
               scrollbarColor: '#cbd5e1 #f8fafc',
             }}
             className="scrollable-select-menu"
+            onScroll={handleListScroll}
           >
-            {filteredOptions.length === 0 ? (
+            {visibleOptions.length === 0 ? (
               <div
                 style={{
                   padding: '12px',
@@ -229,10 +260,10 @@ export function ScrollableSelect({
                   color: '#94a3b8',
                 }}
               >
-                No departments found
+                No options found
               </div>
             ) : (
-              filteredOptions.map((opt) => {
+              visibleOptions.map((opt) => {
                 const isSelected = opt.value === value
                 return (
                   <div
@@ -283,4 +314,3 @@ export function ScrollableSelect({
     </div>
   )
 }
-

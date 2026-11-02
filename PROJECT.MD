@@ -436,6 +436,20 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Registration payment attribution (02 Nov 2026)** — valid customer email enter karne
+      par `GET /api/payment/info` lookup hota hai; case-insensitive exact email match milne par
+      Email field ke neeche `Sold by <paymentReference>` render hota hai, payment reference bold
+      hai. Saath ka compact circular info control matched record ke reference, timestamp, phone,
+      email, amount, payment ID, payments-info ID aur payment-info JSON ko responsive popover me
+      dikhata hai. Lookup failure/no-match form validation aur registration flow ko affect nahi karta.
+      Production build successful (3836 modules).
+- [x] **GSTIN customer lookup (02 Nov 2026)** — Invoice Details me valid 15-character
+      GSTIN enter hote hi public SMSB proxy `/api/gstin/{gstin}` provider verification call
+      karta hai. Field ke neeche legal/trade name, registration status, taxpayer type,
+      business constitution, registration date, address aur nature of business ka responsive
+      card render hota hai; loading/error states isolated hain. Provider key browser bundle se
+      bahar `GSTIN_API_KEY` backend environment variable me rakhi gayi. Backend compile aur
+      frontend production build successful (3836 modules).
 - [x] **Vite 8 / Rolldown production-build compatibility (25 Oct 2026)** — converted
       `build.rollupOptions.output.manualChunks` from the unsupported object form to a
       module-ID callback while preserving the React, TanStack, and Lucide vendor chunks.

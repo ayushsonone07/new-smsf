@@ -28,6 +28,7 @@ import {
   type AssignableUser,
   type FunnelItem,
 } from '../../../api/leads.api'
+import { DateRangePicker } from '../../../components/head/customers-list/CustomersListFilters'
 import { UploadLeadModal } from '../components/UploadLeadModal'
 import { AddLeadModal } from '../components/AddLeadModal'
 import { LeadDetailsModal } from '../components/LeadDetailsModal'
@@ -37,6 +38,7 @@ import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
+import { ScrollableSelect } from '../../../components/ui/ScrollableSelect'
 import '../../customers/pages/AdminCustomersPage.css'
 
 const LEAD_STATUS_OPTIONS = [
@@ -130,7 +132,18 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const [selectedTelecallerStatus, setSelectedTelecallerStatus] = useState('all')
   const [selectedLeadType, setSelectedLeadType] = useState('all')
   const [selectedFunnel, setSelectedFunnel] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [funnels, setFunnels] = useState<FunnelItem[]>([])
+  const funnelOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return funnels.flatMap((funnel) => {
+      const name = funnel.funnelName || funnel.funnelType || ''
+      if (!name || seen.has(name)) return []
+      seen.add(name)
+      return [{ value: name, label: name }]
+    })
+  }, [funnels])
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
 
   // Selection
@@ -198,6 +211,8 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         telecallerStatus: selectedTelecallerStatus,
         leadType: selectedLeadType,
         funnelType: selectedFunnel,
+        startDate: startDate ? `${startDate}T00:00:00` : undefined,
+        endDate: endDate ? `${endDate}T23:59:59` : undefined,
       })
       setLeads(res.leads)
       setTotalElements(res.totalElements)
@@ -217,6 +232,8 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedTelecallerStatus,
     selectedLeadType,
     selectedFunnel,
+    startDate,
+    endDate,
   ])
 
   useEffect(() => {
@@ -281,7 +298,17 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedLeadStatus !== 'all' ||
     selectedTelecallerStatus !== 'all' ||
     selectedLeadType !== 'all' ||
-    selectedFunnel !== 'all'
+    selectedFunnel !== 'all' ||
+    Boolean(startDate) ||
+    Boolean(endDate)
+
+  const activeFiltersCount = [
+    selectedLeadStatus !== 'all',
+    selectedTelecallerStatus !== 'all',
+    selectedLeadType !== 'all',
+    selectedFunnel !== 'all',
+    Boolean(startDate || endDate),
+  ].filter(Boolean).length
 
   const clearAllFilters = () => {
     setSearchTerm('')
@@ -290,6 +317,8 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     setSelectedTelecallerStatus('all')
     setSelectedLeadType('all')
     setSelectedFunnel('all')
+    setStartDate('')
+    setEndDate('')
     setCurrentPage(0)
   }
 
@@ -374,7 +403,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
       {activeMainTab === 'payments' && <CustomerPaymentView />}
 
       {activeMainTab === 'leads' && (
-        <section className="content-card admin-customers-card border border-slate-200/80 rounded-2xl bg-white shadow-xs overflow-hidden">
+        <section className="content-card admin-customers-card border border-slate-200/80 rounded-2xl bg-white shadow-xs overflow-visible">
           {/* Card Heading with Title, Subtitle & Action Toolbar */}
           <div className="admin-customers-card__heading flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 pb-3">
             <div>
@@ -421,13 +450,18 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                 type="button"
                 onClick={() => setShowFilters(!showFilters)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                  showFilters
+                  showFilters || activeFiltersCount > 0
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
                 <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    {activeFiltersCount}
+                  </span>
+                )}
               </button>
 
               <button
@@ -462,93 +496,138 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
           {/* Collapsible Filter Bar */}
           {showFilters && (
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                  Sales Status
-                </label>
-                <select
-                  value={selectedLeadStatus}
-                  onChange={(e) => {
-                    setSelectedLeadStatus(e.target.value)
-                    setCurrentPage(0)
-                  }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="all">All Statuses</option>
-                  {LEAD_STATUS_OPTIONS.map((st) => (
-                    <option key={st} value={st}>
-                      {st.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Sales Status
+                  </label>
+                  <select
+                    value={selectedLeadStatus}
+                    onChange={(e) => {
+                      setSelectedLeadStatus(e.target.value)
+                      setCurrentPage(0)
+                    }}
+                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Statuses</option>
+                    {LEAD_STATUS_OPTIONS.map((st) => (
+                      <option key={st} value={st}>
+                        {st.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                  Telecaller Status
-                </label>
-                <select
-                  value={selectedTelecallerStatus}
-                  onChange={(e) => {
-                    setSelectedTelecallerStatus(e.target.value)
-                    setCurrentPage(0)
-                  }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="all">All Telecaller Statuses</option>
-                  {TELECALLER_STATUS_OPTIONS.map((st) => (
-                    <option key={st} value={st}>
-                      {st.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Telecaller Status
+                  </label>
+                  <select
+                    value={selectedTelecallerStatus}
+                    onChange={(e) => {
+                      setSelectedTelecallerStatus(e.target.value)
+                      setCurrentPage(0)
+                    }}
+                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Telecaller Statuses</option>
+                    {TELECALLER_STATUS_OPTIONS.map((st) => (
+                      <option key={st} value={st}>
+                        {st.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                  Lead Type
-                </label>
-                <select
-                  value={selectedLeadType}
-                  onChange={(e) => {
-                    setSelectedLeadType(e.target.value)
-                    setCurrentPage(0)
-                  }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="all">All Lead Types</option>
-                  {LEAD_TYPE_OPTIONS.map((lt) => (
-                    <option key={lt} value={lt}>
-                      {lt}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Lead Type
+                  </label>
+                  <select
+                    value={selectedLeadType}
+                    onChange={(e) => {
+                      setSelectedLeadType(e.target.value)
+                      setCurrentPage(0)
+                    }}
+                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Lead Types</option>
+                    {LEAD_TYPE_OPTIONS.map((lt) => (
+                      <option key={lt} value={lt}>
+                        {lt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
+<<<<<<< HEAD
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
                   Funnel Type
                 </label>
-                <select
+                <ScrollableSelect
                   value={selectedFunnel}
-                  onChange={(e) => {
-                    setSelectedFunnel(e.target.value)
+                  pinnedOption={{ value: 'all', label: 'All Funnels' }}
+                  onChange={(value) => {
+                    setSelectedFunnel(value)
                     setCurrentPage(0)
                   }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="all">All Funnels</option>
-                  {funnels.map((f, i) => (
-                    <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                      {f.funnelName || f.funnelType}
-                    </option>
-                  ))}
-                </select>
+                  options={funnelOptions}
+                  placeholder="All Funnels"
+                  pageSize={10}
+                  width="100%"
+                  maxHeight={220}
+                />
+=======
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Funnel Type
+                  </label>
+                  <select
+                    value={selectedFunnel}
+                    onChange={(e) => {
+                      setSelectedFunnel(e.target.value)
+                      setCurrentPage(0)
+                    }}
+                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Funnels</option>
+                    {funnels.map((f, i) => (
+                      <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
+                        {f.funnelName || f.funnelType}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Date Range
+                  </label>
+                  <div className="leads-filter-date-picker relative z-30">
+                    <DateRangePicker
+                      label="Date Range"
+                      from={startDate}
+                      to={endDate}
+                      onChange={(start, end) => {
+                        setStartDate(start)
+                        setEndDate(end)
+                        setCurrentPage(0)
+                      }}
+                      onReset={() => {
+                        setStartDate('')
+                        setEndDate('')
+                        setCurrentPage(0)
+                      }}
+                    />
+                  </div>
+                </div>
+>>>>>>> 2168d5baee1073689c29177f65a81ad9c99aa923
               </div>
 
               {hasActiveFilters && (
-                <div className="col-span-full flex justify-end">
+                <div className="mt-3 flex justify-end pt-2 border-t border-slate-200/60">
                   <button
                     type="button"
                     onClick={clearAllFilters}
@@ -578,6 +657,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   <th className="py-3 px-4 min-w-[190px]">EMAIL</th>
                   <th className="py-3 px-4 min-w-[130px]">PHONE</th>
                   <th className="py-3 px-4 min-w-[160px]">BUSINESS</th>
+                  <th className="py-3 px-4 min-w-[120px]">FUNNEL TYPE</th>
                   <th className="py-3 px-4 min-w-[120px]">STATUS</th>
                   <th className="py-3 px-4 min-w-[140px]">ASSIGNED REP</th>
                   <th className="py-3 px-4 min-w-[110px] text-center">PAYMENT</th>
@@ -587,14 +667,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               <tbody>
                 {loading && !refreshing ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center text-slate-400">
+                    <td colSpan={10} className="py-16 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                       <span>Loading leads data...</span>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center">
+                    <td colSpan={10} className="py-12 text-center">
                       <div className="max-w-md mx-auto p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
                         <p className="font-semibold text-xs mb-1">Failed to fetch leads</p>
                         <p className="text-xs text-rose-600 mb-2">{error}</p>
@@ -610,7 +690,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center">
+                    <td colSpan={10} className="py-16 text-center">
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <FileSpreadsheet className="w-6 h-6" />
                       </div>
@@ -675,6 +755,13 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                         <td className="py-3 px-4 font-semibold text-slate-800">
                           <span className="truncate block max-w-[160px]" title={lead.businessName || ''}>
                             {!isNa(lead.businessName) ? lead.businessName : '—'}
+                          </span>
+                        </td>
+
+                        {/* Funnel Type */}
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                            {lead.funnelType || 'General'}
                           </span>
                         </td>
 
@@ -846,6 +933,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         onClose={() => setUploadModalOpen(false)}
         onSuccess={() => {
           showToast('Leads Excel imported successfully!', 'success')
+          fetchFunnels().then((data) => setFunnels(data)).catch(() => {})
           void fetchLeadsData()
         }}
       />

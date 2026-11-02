@@ -89,7 +89,7 @@ export const UploadLeadModal: React.FC<UploadLeadModalProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900">Import Leads</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Upload an Excel (.xlsx, .xls) or CSV file to import leads.
+              Upload an Excel (.xlsx, .xls) file. Funnel types in the sheet will be automatically registered into filters.
             </p>
           </div>
           <button

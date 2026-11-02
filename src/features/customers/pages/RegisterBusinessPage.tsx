@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   ArrowLeft,
@@ -10,21 +10,30 @@ import {
   Eye,
   EyeOff,
   Hash,
+  Info,
   Lock,
   MapPin,
   Package,
+  Pencil,
   Wallet,
   X,
 } from 'lucide-react'
 import {
+  type GstinDetails,
   fetchPlanAmounts,
+  fetchGstinDetails,
+  fetchPaymentInfo,
   fetchPlansWithDepartments,
   registerCustomer,
   verifyPayment,
+  fetchEarlierPayments,
+  type EarlierPayment,
+  type PaymentUsage,
 } from '../../../api/register-business.api'
 import type {
   PlanAmount,
   PlanWithDepartments,
+  CustomerRegistrationRequest,
 } from '../types/register-business.types'
 import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
@@ -80,8 +89,31 @@ type PaymentCheck = {
   phone: string
   paymentId: string
   message?: string
+  /** Full payment amount (₹). */
   amount?: number | null
+  /** Still unspent (₹): a payment can fund several businesses of the same customer. */
+  available?: number | null
+  /** Earlier businesses that already used part of this payment. */
+  usedBy?: PaymentUsage[]
   paidAt?: string | null
+}
+
+/** A further verified payment that tops up the first one's remaining balance. */
+type ExtraPayment = {
+  phone: string
+  /** Typed ID, or the masked ID when picked from the earlier-payments list. */
+  paymentId: string
+  /** Set when picked from the list: the real ID is only known to the server. */
+  ref?: string
+  amount: number
+  available: number
+}
+
+/** An earlier payment chosen from the list; only its masked ID is ever shown. */
+type PickedPayment = {
+  phone: string
+  ref: string
+  masked: string
 }
 
 const INITIAL_VALIDATION_ERRORS = {
@@ -110,6 +142,8 @@ interface RegistrationSuccess {
   total: number
   paid: number
   balance: number
+  gstInfo?: string
+  discountInfo?: string
 }
 
 const SECTIONS: {
@@ -126,9 +160,9 @@ const SECTIONS: {
 
 /* UI only: steps that move on by themselves a moment after they become complete. */
 const AUTO_ADVANCE: Record<SectionId, boolean> = {
-  business: true,
+  business: false,
   packages: false,
-  financial: true,
+  financial: false,
   final: false,
 }
 const AUTO_ADVANCE_DELAY_MS = 1400
@@ -264,8 +298,80 @@ const WIZARD_STYLES = `
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
+function GstinDetailsCard({
+  details,
+  isLoading,
+  error,
+}: {
+  details?: GstinDetails
+  isLoading: boolean
+  error: Error | null
+}) {
+  if (isLoading) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-blue-600" role="status">
+        Verifying GSTIN…
+      </p>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
+        {error.message || 'Unable to verify this GSTIN'}
+      </p>
+    )
+  }
+
+  if (!details) return null
+
+  return (
+    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3" aria-live="polite">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-900">
+          {details.trade_name || details.legal_name || 'GST registered customer'}
+        </p>
+        {details.status && (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${details.status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            {details.status}
+          </span>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-slate-500">Legal name</dt>
+          <dd className="font-semibold text-slate-900">{details.legal_name || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Taxpayer type</dt>
+          <dd className="font-semibold text-slate-900">{details.taxpayer_type || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Business constitution</dt>
+          <dd className="font-semibold text-slate-900">{details.business_constitution || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Registration date</dt>
+          <dd className="font-semibold text-slate-900">{details.registration_date || '—'}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="font-semibold text-slate-500">Registered address</dt>
+          <dd className="font-semibold text-slate-900">{details.address || '—'}</dd>
+        </div>
+        {!!details.nature_of_business?.length && (
+          <div className="sm:col-span-2">
+            <dt className="font-semibold text-slate-500">Nature of business</dt>
+            <dd className="font-semibold text-slate-900">{details.nature_of_business.join(', ')}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  )
+}
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   // Queries for plans and pricing
   const plansQuery = useQuery({
@@ -289,6 +395,39 @@ export function RegisterBusinessPage() {
     (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
+
+  const normalizedGstin = formData.gstinForInvoice.trim().toUpperCase()
+  const gstinQuery = useQuery({
+    queryKey: ['register-business', 'gstin', normalizedGstin],
+    queryFn: () => fetchGstinDetails(normalizedGstin),
+    enabled:
+      formData.invoiceOption === 'gstin' &&
+      validateGSTNumber(normalizedGstin),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+
+  const paymentInfoQuery = useQuery({
+    queryKey: ['register-business', 'payment-info', formData.email.trim().toLowerCase()],
+    queryFn: () => fetchPaymentInfo(formData.email),
+    enabled: validateEmail(formData.email.trim()),
+    staleTime: 30_000,
+    retry: false,
+  })
+
+  const matchedPaymentInfo = useMemo(() => {
+    const normalizedEmail = formData.email.trim().toLowerCase()
+    if (!validateEmail(normalizedEmail)) return null
+
+    return paymentInfoQuery.data?.find(
+      (payment) =>
+        payment.customerEmail?.trim().toLowerCase() === normalizedEmail &&
+        payment.paymentReference?.trim(),
+    )
+  }, [formData.email, paymentInfoQuery.data])
+
+  const paymentReference = matchedPaymentInfo?.paymentReference?.trim() || null
+
   const [validationErrors, setValidationErrors] = useState({
     ...INITIAL_VALIDATION_ERRORS,
   })
@@ -300,10 +439,18 @@ export function RegisterBusinessPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPasskeyModal, setShowPasskeyModal] = useState(false)
+  const [showFullFormModal, setShowFullFormModal] = useState(false)
   const [passkey, setPasskey] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
   const [paymentCheck, setPaymentCheck] = useState<PaymentCheck | null>(null)
+  const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>([])
+  const [extraPaymentInput, setExtraPaymentInput] = useState('')
+  const [extraPaymentError, setExtraPaymentError] = useState('')
+  const [isVerifyingExtra, setIsVerifyingExtra] = useState(false)
+  const [pickedPayment, setPickedPayment] = useState<PickedPayment | null>(null)
+  /* Phone whose earlier payments were already auto-picked, so it happens once per number. */
+  const autoPickedPhone = useRef<string | null>(null)
 
   /* Wizard: which step card is currently shown */
   const [activeStep, setActiveStep] = useState<SectionId>('business')
@@ -312,6 +459,9 @@ export function RegisterBusinessPage() {
   const [durationFilter, setDurationFilter] = useState<number | 'all' | null>(null)
   /* Toggle 18% GST addition on packages */
   const [includeGst, setIncludeGst] = useState(true)
+  /* Discount percentage (0 to 100) */
+  const [discountPercent, setDiscountPercent] = useState<string>('0')
+  const [manualBaseAmount, setManualBaseAmount] = useState<string>('')
 
   /* Plan whose features are shown in the docked side panel */
   const [viewingPlanId, setViewingPlanId] = useState<string | null>(null)
@@ -521,6 +671,11 @@ export function RegisterBusinessPage() {
     setIncludeGst(true)
     setViewingPlanId(null)
     setPaymentCheck(null)
+    setExtraPayments([])
+    setExtraPaymentInput('')
+    setExtraPaymentError('')
+    setPickedPayment(null)
+    autoPickedPhone.current = null
     autoAdvanceArmed.current = {
       business: true,
       packages: true,
@@ -543,22 +698,50 @@ export function RegisterBusinessPage() {
   const isVerifyingPayment = currentPaymentCheck?.status === 'verifying'
   const paymentVerified =
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
-  const verifiedPaymentAmount =
-    paymentVerified && currentPaymentCheck?.amount != null
-      ? Number(currentPaymentCheck.amount)
-      : null
+  /* Extra payments only count for the phone they were verified against. */
+  const activeExtraPayments = useMemo(
+    () =>
+      paymentVerified
+        ? extraPayments.filter((p) => p.phone === paymentPhone)
+        : [],
+    [paymentVerified, extraPayments, paymentPhone],
+  )
+  const primaryAvailable =
+    paymentVerified && currentPaymentCheck
+      ? Number(currentPaymentCheck.available ?? currentPaymentCheck.amount ?? 0)
+      : 0
+  /*
+   * What can still be spent on this business (₹): what is left of the first
+   * payment after the customer's earlier businesses, plus any top-up payments.
+   * Packages are limited to this amount.
+   */
+  const verifiedPaymentAmount = paymentVerified
+    ? primaryAvailable +
+      activeExtraPayments.reduce((sum, p) => sum + p.available, 0)
+    : null
+  const priorUsage = paymentVerified ? currentPaymentCheck?.usedBy ?? [] : []
+  /* The share of the balance this business takes; anything beyond the total stays as credit. */
+  const enteredTotal = parseInt(formData.totalAmount) || 0
+  const appliedFromBalance =
+    verifiedPaymentAmount == null
+      ? null
+      : enteredTotal > 0
+        ? Math.min(enteredTotal, verifiedPaymentAmount)
+        : verifiedPaymentAmount
 
-  const handleVerifyPayment = useCallback(async () => {
-    const phone = formData.phoneNumber.trim()
-    const paymentId = formData.paymentId.trim()
+  /* Verifies the first payment — typed, or picked from the list (then only its ref is sent). */
+  const verifyPrimaryPayment = useCallback(
+    async (phone: string, paymentId: string, paymentRef?: string) => {
     if (!validatePhoneNumber(phone) || !paymentId) return
 
     const isSameCheck = (prev: PaymentCheck | null) =>
       !!prev && prev.phone === phone && prev.paymentId === paymentId
     setPaymentCheck({ status: 'verifying', phone, paymentId })
+    setExtraPayments([])
+    setExtraPaymentError('')
 
     try {
-      const res = await verifyPayment(phone, paymentId)
+      const res = await verifyPayment(phone, paymentId, { paymentRef })
       setPaymentCheck((prev) => {
         if (!isSameCheck(prev)) return prev
         return res.success
@@ -567,6 +750,8 @@ export function RegisterBusinessPage() {
               phone,
               paymentId,
               amount: res.data?.amount ?? null,
+              available: res.data?.available ?? res.data?.amount ?? null,
+              usedBy: res.data?.usedBy ?? [],
               paidAt: res.data?.paidAt ?? null,
             }
           : {
@@ -577,14 +762,17 @@ export function RegisterBusinessPage() {
             }
       })
 
-      if (res.success && res.data?.amount != null) {
-        const verifiedAmt = Number(res.data.amount)
+      const available = res.data?.available ?? res.data?.amount
+      if (res.success && available != null) {
+        const availableAmt = Number(available)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
-          const remaining = total - verifiedAmt
+          // Only the package's share is spent; anything left stays as credit.
+          const paid = total > 0 ? Math.min(total, availableAmt) : availableAmt
+          const remaining = total - paid
           return {
             ...prev,
-            amountPaid: String(verifiedAmt),
+            amountPaid: String(paid),
             amountRemaining: remaining > 0 ? String(remaining) : '',
           }
         })
@@ -601,7 +789,189 @@ export function RegisterBusinessPage() {
           : prev,
       )
     }
-  }, [formData.phoneNumber, formData.paymentId])
+    },
+    [],
+  )
+
+  /* A picked payment counts only while its masked ID is still what the field shows. */
+  const activePickedRef =
+    pickedPayment &&
+    pickedPayment.phone === paymentPhone &&
+    pickedPayment.masked === paymentIdInput
+      ? pickedPayment.ref
+      : undefined
+
+  /* ─── Earlier payments of this number, detected as soon as it is valid. ─── */
+  const earlierPaymentsQuery = useQuery({
+    queryKey: ['earlier-payments', paymentPhone],
+    queryFn: () => fetchEarlierPayments(paymentPhone),
+    enabled: canEnterPaymentId,
+    staleTime: 60_000,
+    retry: false,
+  })
+  const earlierPayments = useMemo(
+    () => (canEnterPaymentId ? earlierPaymentsQuery.data ?? [] : []),
+    [canEnterPaymentId, earlierPaymentsQuery.data],
+  )
+
+  /*
+   * A typed payment ID must be a new one: if it is one of the earlier payments
+   * listed above (same masked form), it has to be picked from the list instead.
+   */
+  const listedPaymentMessage = useCallback(
+    (typedId: string): string | null => {
+      if (!typedId || typedId.includes('****')) return null
+      const masked = maskPaymentId(typedId)
+      const match = earlierPayments.find((p) => p.maskedPaymentId === masked)
+      return match
+        ? `This payment (${match.maskedPaymentId}) is already listed above under earlier payments — use it from the list instead of entering it again.`
+        : null
+    },
+    [earlierPayments],
+  )
+
+  const handleVerifyPayment = useCallback(() => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = formData.paymentId.trim()
+    const listed = activePickedRef ? null : listedPaymentMessage(paymentId)
+    if (listed) {
+      setPaymentCheck({ status: 'failed', phone, paymentId, message: listed })
+      return
+    }
+    void verifyPrimaryPayment(phone, paymentId, activePickedRef)
+  }, [
+    verifyPrimaryPayment,
+    formData.phoneNumber,
+    formData.paymentId,
+    activePickedRef,
+    listedPaymentMessage,
+  ])
+
+  const pickEarlierPayment = useCallback(
+    (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setPickedPayment({
+        phone,
+        ref: payment.paymentRef,
+        masked: payment.maskedPaymentId,
+      })
+      setFormData((prev) => ({ ...prev, paymentId: payment.maskedPaymentId }))
+      void verifyPrimaryPayment(phone, payment.maskedPaymentId, payment.paymentRef)
+    },
+    [formData.phoneNumber, verifyPrimaryPayment],
+  )
+
+  /* Pick the first payment with money left automatically — once per number, and
+     never over a payment ID the staff member already typed. */
+  useEffect(() => {
+    if (!canEnterPaymentId || !earlierPaymentsQuery.isSuccess) return
+    if (autoPickedPhone.current === paymentPhone) return
+    autoPickedPhone.current = paymentPhone
+    if (formData.paymentId.trim()) return
+    const usable = earlierPayments.find((p) => Number(p.available ?? 0) > 0)
+    if (usable) pickEarlierPayment(usable)
+  }, [
+    canEnterPaymentId,
+    earlierPaymentsQuery.isSuccess,
+    paymentPhone,
+    formData.paymentId,
+    earlierPayments,
+    pickEarlierPayment,
+  ])
+
+  /* Use another listed payment to top up the first one's balance. */
+  const addEarlierAsTopUp = useCallback(
+    async (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setIsVerifyingExtra(true)
+      setExtraPaymentError('')
+      try {
+        const res = await verifyPayment(phone, payment.maskedPaymentId, {
+          paymentRef: payment.paymentRef,
+        })
+        const available = Number(res.data?.available ?? 0)
+        if (!res.success || available <= 0) {
+          setExtraPaymentError(res.message || 'Payment could not be verified')
+          return
+        }
+        setExtraPayments((prev) => [
+          ...prev,
+          {
+            phone,
+            paymentId: payment.maskedPaymentId,
+            ref: payment.paymentRef,
+            amount: Number(res.data?.amount ?? available),
+            available,
+          },
+        ])
+      } catch (error) {
+        setExtraPaymentError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Payment could not be verified',
+        )
+      } finally {
+        setIsVerifyingExtra(false)
+      }
+    },
+    [formData.phoneNumber],
+  )
+
+  /* ─── Top-up: another verified payment adds to the available balance. ─── */
+  const handleAddExtraPayment = useCallback(async () => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = extraPaymentInput.trim()
+    if (!validatePhoneNumber(phone) || !paymentId) return
+    const alreadyAdded =
+      paymentId === formData.paymentId.trim() ||
+      extraPayments.some((p) => p.phone === phone && p.paymentId === paymentId)
+    if (alreadyAdded) {
+      setExtraPaymentError('This payment ID is already added')
+      return
+    }
+    const listed = listedPaymentMessage(paymentId)
+    if (listed) {
+      setExtraPaymentError(listed)
+      return
+    }
+    // The first payment may be a picked one whose real ID the page never sees; compare masks.
+    if (activePickedRef && pickedPayment?.masked === maskPaymentId(paymentId)) {
+      setExtraPaymentError('This is the same payment already used above')
+      return
+    }
+
+    setIsVerifyingExtra(true)
+    setExtraPaymentError('')
+    try {
+      const res = await verifyPayment(phone, paymentId)
+      const available = Number(res.data?.available ?? res.data?.amount ?? 0)
+      if (!res.success || available <= 0) {
+        setExtraPaymentError(res.message || 'Payment could not be verified')
+        return
+      }
+      setExtraPayments((prev) => [
+        ...prev,
+        { phone, paymentId, amount: Number(res.data?.amount ?? available), available },
+      ])
+      setExtraPaymentInput('')
+    } catch (error) {
+      setExtraPaymentError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Payment could not be verified',
+      )
+    } finally {
+      setIsVerifyingExtra(false)
+    }
+  }, [
+    formData.phoneNumber,
+    formData.paymentId,
+    extraPaymentInput,
+    extraPayments,
+    listedPaymentMessage,
+    activePickedRef,
+    pickedPayment,
+  ])
 
   /* ─── Plan pricing from planAmounts ─── */
   const priceOf = useCallback(
@@ -645,6 +1015,73 @@ export function RegisterBusinessPage() {
   const totalLocked = autoTotal > 0 && !hasUnpricedSelection
   const monthsLocked = autoMonths > 0
 
+  /* Base amount before discount */
+  const rawBaseAmount =
+    autoTotal > 0
+      ? autoTotal
+      : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+  const discountPctNum = Math.min(
+    100,
+    Math.max(0, parseFloat(discountPercent) || 0),
+  )
+  const discountAmount = Math.round((rawBaseAmount * discountPctNum) / 100)
+  const finalCalculatedTotal = Math.max(0, rawBaseAmount - discountAmount)
+
+  /* Effective discounted cost calculator */
+  const getDiscountedCost = useCallback(
+    (rawAmount: number) => {
+      if (discountPctNum <= 0) return rawAmount
+      const disc = Math.round((rawAmount * discountPctNum) / 100)
+      return Math.max(0, rawAmount - disc)
+    },
+    [discountPctNum],
+  )
+
+  const handleDiscountChange = useCallback(
+    (pct: string) => {
+      if (pct === '') {
+        setDiscountPercent('')
+        return
+      }
+      const num = parseFloat(pct)
+      if (isNaN(num)) return
+      const clamped = Math.min(100, Math.max(0, num))
+      const pctStr = String(clamped)
+      setDiscountPercent(pctStr)
+
+      const base =
+        autoTotal > 0
+          ? autoTotal
+          : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+      const disc = Math.round((base * clamped) / 100)
+      const net = Math.max(0, base - disc)
+      const netStr = base > 0 || net > 0 ? String(net) : ''
+
+      handleInputChange('totalAmount', netStr)
+
+      const currentPaid =
+        verifiedPaymentAmount != null
+          ? verifiedPaymentAmount
+          : parseInt(formData.amountPaid) || 0
+      const rem = net - currentPaid
+
+      handleInputChange('amountRemaining', rem > 0 ? String(rem) : '')
+      if (rem <= 0 && currentPaid > 0) {
+        handleInputChange('paymentType', 'full-time')
+      } else if (rem > 0) {
+        handleInputChange('paymentType', 'part-time')
+      }
+    },
+    [
+      autoTotal,
+      manualBaseAmount,
+      formData.totalAmount,
+      formData.amountPaid,
+      verifiedPaymentAmount,
+      handleInputChange,
+    ],
+  )
+
   /* Handle package selection with verified payment amount restriction */
   const handlePackageToggle = useCallback(
     (packageId: string, checked?: boolean) => {
@@ -658,11 +1095,17 @@ export function RegisterBusinessPage() {
         const pkgPrice = includeGst
           ? priceOf(pkg.name).withGst
           : priceOf(pkg.name).amount
-        if (pkgPrice > verifiedPaymentAmount) {
-          const extra = pkgPrice - verifiedPaymentAmount
+        const effectivePkgPrice = getDiscountedCost(pkgPrice)
+
+        if (effectivePkgPrice > verifiedPaymentAmount) {
+          const extra = effectivePkgPrice - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectivePkgPrice.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
             title: 'Package Exceeds Verified Payment',
-            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -683,11 +1126,16 @@ export function RegisterBusinessPage() {
           }, 0)
 
         const totalSelected = otherSelectedCost + pkgPrice
-        if (totalSelected > verifiedPaymentAmount) {
-          const extra = totalSelected - verifiedPaymentAmount
+        const effectiveTotalSelected = getDiscountedCost(totalSelected)
+        if (effectiveTotalSelected > verifiedPaymentAmount) {
+          const extra = effectiveTotalSelected - verifiedPaymentAmount
+          const discText =
+            discountPctNum > 0
+              ? ` (₹${effectiveTotalSelected.toLocaleString('en-IN')} after ${discountPctNum}% discount)`
+              : ''
           showToast({
             title: 'Total Exceeds Verified Payment',
-            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}${discText}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -716,30 +1164,89 @@ export function RegisterBusinessPage() {
       includeGst,
       verifiedPaymentAmount,
       showToast,
+      getDiscountedCost,
+      discountPctNum,
     ],
   )
 
-  /* Total Amount follows the selected plans */
-  const lastAutoTotal = useRef(0)
+  /*
+   * Packages picked earlier must still fit when the balance changes (another payment
+   * picked, a top-up removed): if they no longer do, clear them so they are re-picked.
+   */
   useEffect(() => {
-    if (autoTotal === lastAutoTotal.current) return
-    const hadAutoTotal = lastAutoTotal.current > 0
+    if (verifiedPaymentAmount == null) return
+    const selectedIds = formData.selectedPackages || []
+    if (selectedIds.length === 0) return
+    const selectedCost = getDiscountedCost(
+      selectedIds.reduce((sum, id) => {
+        const p = plans.find((pl) => pl.id === id)
+        return (
+          sum +
+          (p ? (includeGst ? priceOf(p.name).withGst : priceOf(p.name).amount) : 0)
+        )
+      }, 0),
+    )
+    if (selectedCost <= verifiedPaymentAmount) return
+    setFormData((prev) => ({ ...prev, selectedPackages: [] }))
+    showToast({
+      title: 'Packages Cleared',
+      description: `The selected packages (₹${selectedCost.toLocaleString('en-IN')}) cost more than the ₹${verifiedPaymentAmount.toLocaleString('en-IN')} available. Please choose packages within the available balance or add a top-up payment.`,
+      variant: 'destructive',
+    })
+  }, [
+    verifiedPaymentAmount,
+    formData.selectedPackages,
+    plans,
+    priceOf,
+    includeGst,
+    getDiscountedCost,
+    showToast,
+  ])
+
+  /* Total Amount follows selected plans & discount */
+  const lastAutoTotal = useRef(0)
+  const lastDiscount = useRef('0')
+  useEffect(() => {
+    if (
+      autoTotal === lastAutoTotal.current &&
+      discountPercent === lastDiscount.current
+    )
+      return
     lastAutoTotal.current = autoTotal
-    if (autoTotal <= 0 && !hadAutoTotal) return
-    const value = autoTotal > 0 ? String(autoTotal) : ''
+    lastDiscount.current = discountPercent
+
+    const base =
+      autoTotal > 0
+        ? autoTotal
+        : parseInt(manualBaseAmount) || parseInt(formData.totalAmount) || 0
+    if (base <= 0 && !hasUnpricedSelection) return
+
+    const pct = Math.min(100, Math.max(0, parseFloat(discountPercent) || 0))
+    const disc = Math.round((base * pct) / 100)
+    const net = Math.max(0, base - disc)
+    const value = base > 0 || net > 0 ? String(net) : ''
+
     setFormData((prev) => {
       if (verifiedPaymentAmount != null) {
+        // Only the package's share of the balance is spent; the rest stays as credit.
         const currentPaid =
           prev.paymentType === 'part-time' && prev.amountPaid
-            ? parseInt(prev.amountPaid) || 0
-            : verifiedPaymentAmount
+            ? Math.min(parseInt(prev.amountPaid) || 0, verifiedPaymentAmount)
+            : autoTotal > 0
+              ? Math.min(autoTotal, verifiedPaymentAmount)
+              : verifiedPaymentAmount
         const remaining = autoTotal - currentPaid
         return {
           ...prev,
           totalAmount: value,
           amountPaid: String(currentPaid),
           amountRemaining: remaining > 0 ? String(remaining) : '',
-          paymentType: remaining > 0 ? 'part-time' : prev.paymentType,
+          paymentType:
+            remaining <= 0 && currentPaid > 0
+              ? 'full-time'
+              : remaining > 0
+                ? 'part-time'
+                : prev.paymentType,
         }
       }
       if (prev.paymentType === 'full-time') {
@@ -750,14 +1257,20 @@ export function RegisterBusinessPage() {
           amountRemaining: '',
         }
       }
-      const remaining = autoTotal - (parseInt(prev.amountPaid) || 0)
+      const remaining = net - (parseInt(prev.amountPaid) || 0)
       return {
         ...prev,
         totalAmount: value,
         amountRemaining: remaining > 0 ? String(remaining) : '',
       }
     })
-  }, [autoTotal, verifiedPaymentAmount])
+  }, [
+    autoTotal,
+    discountPercent,
+    manualBaseAmount,
+    hasUnpricedSelection,
+    verifiedPaymentAmount,
+  ])
 
   /* Service Months follows the longest selected plan */
   useEffect(() => {
@@ -944,6 +1457,16 @@ export function RegisterBusinessPage() {
     goToStep,
   ])
 
+  /* Fallback to Step 1 if business details become incomplete while editing */
+  useEffect(() => {
+    if (activeStep === 'packages' && !businessComplete) {
+      setActiveStep('business')
+    }
+    if (activeStep === 'final' && !financialComplete) {
+      setActiveStep('financial')
+    }
+  }, [activeStep, businessComplete, financialComplete])
+
   /* ─── Combined validation — same rules/order/messages as before ─── */
   const handleFinalSubmit = useCallback(() => {
     // 1. Business details
@@ -1033,12 +1556,14 @@ export function RegisterBusinessPage() {
     }
 
     if (paymentVerified && verifiedPaymentAmount != null) {
-      const currentTotal = parseInt(formData.totalAmount) || autoTotal
+      // Total Amount already has the discount applied; only the package sum still needs it.
+      const currentTotal =
+        parseInt(formData.totalAmount) || getDiscountedCost(autoTotal)
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
-          title: 'Total Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please adjust your packages to match the paid amount.`,
+          title: 'Total Exceeds Available Balance',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or adjust the packages.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
@@ -1154,7 +1679,7 @@ export function RegisterBusinessPage() {
       return
     }
 
-    setShowPasskeyModal(true)
+    setShowFullFormModal(true)
   }, [
     formData,
     cityInput,
@@ -1164,6 +1689,7 @@ export function RegisterBusinessPage() {
     paymentVerified,
     verifiedPaymentAmount,
     autoTotal,
+    getDiscountedCost,
   ])
 
   /* ─── Passkey submit & registration ─── */
@@ -1220,7 +1746,16 @@ export function RegisterBusinessPage() {
           ? formData.gstinForInvoice
           : formData.completeAddress
 
-      const customerData = {
+      const baseWithoutGst = includeGst
+        ? (selectedPlans.length > 0
+            ? selectedPlans.reduce((sum, p) => sum + priceOf(p.name).amount, 0)
+            : Math.round(rawBaseAmount / 1.18))
+        : rawBaseAmount
+      const calculatedGstAmount = includeGst
+        ? Math.max(0, rawBaseAmount - baseWithoutGst)
+        : 0
+
+      const customerData: CustomerRegistrationRequest = {
         clientName: formData.ownerName,
         businessName: formData.businessName,
         clientEmail: formData.email,
@@ -1232,12 +1767,11 @@ export function RegisterBusinessPage() {
         amountPaid:
           formData.paymentType === 'part-time'
             ? formData.amountPaid || '0'
-            : verifiedPaymentAmount != null
-              ? String(verifiedPaymentAmount)
+            : appliedFromBalance != null
+              ? String(appliedFromBalance)
               : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
-        remark: formData.remark,
         isWebsiteIncluded,
         gstinOrAddress: gstinOrAddress || '',
         remainingAmountDueDate: formData.remainingAmountDueDate || '',
@@ -1245,16 +1779,42 @@ export function RegisterBusinessPage() {
         source: 'root',
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
-        paymentId: formData.paymentId.trim(),
+        // A payment picked from the list is sent as its reference; the field only holds the masked ID.
+        ...(activePickedRef
+          ? { paymentRef: activePickedRef }
+          : { paymentId: formData.paymentId.trim() }),
+        additionalPaymentIds: activeExtraPayments
+          .filter((p) => !p.ref)
+          .map((p) => p.paymentId),
+        additionalPaymentRefs: activeExtraPayments
+          .filter((p): p is ExtraPayment & { ref: string } => !!p.ref)
+          .map((p) => p.ref),
+        discountPercent: discountPctNum > 0 ? String(discountPctNum) : undefined,
+        discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
+        originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
+        includeGst,
+        gstRate: includeGst ? '18%' : '0%',
+        gstAmount: includeGst ? String(calculatedGstAmount) : '0',
+        baseAmountWithoutGst: String(baseWithoutGst),
+        remark:
+          discountPctNum > 0
+            ? `[Discount: ${discountPctNum}%${discountAmount > 0 ? ` (-₹${discountAmount.toLocaleString('en-IN')})` : ''}] ${formData.remark}`.trim()
+            : formData.remark,
       }
 
       await registerCustomer(customerData)
+      // What is left on this number's payments has changed.
+      void queryClient.invalidateQueries({
+        queryKey: ['earlier-payments', formData.phoneNumber.trim()],
+      })
 
       const submittedTotal = Number(formData.totalAmount) || autoTotal
       const submittedPaid =
         formData.paymentType === 'part-time'
           ? Number(formData.amountPaid) || 0
-          : (verifiedPaymentAmount ?? Number(formData.amountPaid)) || 0
+          : verifiedPaymentAmount != null
+            ? Math.min(submittedTotal, verifiedPaymentAmount)
+            : Number(formData.amountPaid) || 0
       setRegistrationSuccess({
         businessName: formData.businessName,
         registrationId: `MBG-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
@@ -1262,6 +1822,13 @@ export function RegisterBusinessPage() {
         total: submittedTotal,
         paid: submittedPaid,
         balance: Math.max(0, submittedTotal - submittedPaid),
+        gstInfo: includeGst
+          ? `18% Incl. (₹${calculatedGstAmount.toLocaleString('en-IN')})`
+          : 'Excluded (0%)',
+        discountInfo:
+          discountPctNum > 0
+            ? `${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})`
+            : undefined,
       })
 
       showToast({
@@ -1289,9 +1856,18 @@ export function RegisterBusinessPage() {
     showToast,
     resetForm,
     paymentVerified,
-    verifiedPaymentAmount,
-    autoTotal,
+    appliedFromBalance,
+    activeExtraPayments,
+    activePickedRef,
     scrollToSection,
+    includeGst,
+    selectedPlans,
+    priceOf,
+    rawBaseAmount,
+    discountPctNum,
+    discountAmount,
+    autoTotal,
+    verifiedPaymentAmount,
   ])
 
   const inputClass = (hasError?: boolean) =>
@@ -1332,6 +1908,12 @@ export function RegisterBusinessPage() {
           ? `₹${registrationSuccess.balance.toLocaleString('en-IN')}`
           : 'Nil',
       ],
+      ...(registrationSuccess.gstInfo
+        ? [['GST', registrationSuccess.gstInfo]]
+        : []),
+      ...(registrationSuccess.discountInfo
+        ? [['Discount', registrationSuccess.discountInfo]]
+        : []),
     ]
 
     return (
@@ -1418,16 +2000,18 @@ export function RegisterBusinessPage() {
             onClick={() => {
               window.location.href = '/hrm/login'
             }}
-            className="hidden h-[34px] cursor-pointer items-center rounded-[10px] border border-[#e2e6ee] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] md:inline-flex"
+            className="relative hidden h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] md:inline-flex"
           >
-            HRM Login
+            <HrmOrangeBg />
+            <span className="relative z-10">HRM Login</span>
           </button>
           <button
             type="button"
             onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex h-[34px] cursor-pointer items-center rounded-[10px] bg-[#2459e0] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] sm:px-4"
+            className="relative inline-flex h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] sm:px-4"
           >
-            Login
+            <LoginBlueBg />
+            <span className="relative z-10">Login</span>
           </button>
         </div>
         <div className="h-0.5 bg-[#eef1f6] sm:hidden">
@@ -1505,7 +2089,7 @@ export function RegisterBusinessPage() {
         {/* ─── Step card ─── */}
         <main className="min-w-0 flex-1">
           <div
-            key={activeStep}
+            key={pageNumber}
             onInputCapture={() => {
               skipAutoAdvanceRef.current = false
             }}
@@ -1564,8 +2148,8 @@ export function RegisterBusinessPage() {
 
             {/* Card body */}
             <div className="flex-1 p-4 sm:p-[18px]">
-              {!unlocked[activeStep] ? (
-                <LockedNotice message={lockedMessages[activeStep]} />
+              {!isFirstPage && (!businessComplete || !packagesComplete) ? (
+                <LockedNotice message="Please complete Business Details and Package Selection on Page 1 first." />
               ) : (
                 <>
                   {/* ═══ 1 — Business Details ═══ */}
@@ -1623,6 +2207,38 @@ export function RegisterBusinessPage() {
                             )}
                           />
                         </Field>
+                        {paymentReference && (
+                          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-slate-600" aria-live="polite">
+                            <span>
+                              Sold by <strong className="font-bold text-slate-900">{paymentReference}</strong>
+                            </span>
+                            <details className="group relative">
+                              <summary
+                                className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&::-webkit-details-marker]:hidden"
+                                aria-label="View payment information"
+                                title="View payment information"
+                              >
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-blue-500 bg-blue-50 text-blue-600 transition-colors group-open:bg-blue-600 group-open:text-white">
+                                  <Info size={13} strokeWidth={2.5} aria-hidden="true" />
+                                </span>
+                              </summary>
+                              <div className="absolute right-0 z-30 mt-1 w-[min(21rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-600 shadow-xl">
+                                <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 break-words">
+                                  <dt className="text-slate-500">Payment reference</dt>
+                                  <dd className="min-w-0 break-all font-bold text-slate-900">{matchedPaymentInfo?.paymentReference || '—'}</dd>
+                                  <dt className="text-slate-500">Created at</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.createdAt || '—'}</dd>
+                                  <dt className="text-slate-500">Customer phone</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.customerPhone || '—'}</dd>
+                                  <dt className="text-slate-500">Customer email</dt>
+                                  <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.customerEmail || '—'}</dd>
+                                  <dt className="text-slate-500">Amount</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.amount == null ? '—' : `₹${Number(matchedPaymentInfo.amount).toFixed(2)}`}</dd>
+                                </dl>
+                              </div>
+                            </details>
+                          </div>
+                        )}
                       </div>
                       <Field
                         label="Phone Number"
@@ -1799,13 +2415,100 @@ export function RegisterBusinessPage() {
                               <p className="leading-relaxed text-blue-700">
                                 Please enter and verify the customer's payment ID
                                 first. Once verified, you will be able to select
-                                packages within your verified payment amount.
+                                packages within the amount still available on it.
                               </p>
                             </div>
                           </div>
 
                           {/* Payment Verification Box */}
                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                            {canEnterPaymentId && earlierPaymentsQuery.isFetching && earlierPayments.length === 0 && (
+                              <p className="mb-3 text-xs text-slate-500">
+                                Looking for earlier payments from {paymentPhone}…
+                              </p>
+                            )}
+                            {earlierPayments.length > 0 && (
+                              <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
+                                <p className="text-xs font-semibold text-slate-700">
+                                  Earlier payments from this number
+                                </p>
+                                <p className="mb-2 text-[11px] text-slate-500">
+                                  Use one to pay for this business from what is left on it. IDs are partly hidden.
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {earlierPayments.map((p) => {
+                                    const available = Number(p.available ?? 0)
+                                    const isPrimary =
+                                      activePickedRef === p.paymentRef ||
+                                      (pickedPayment?.ref === p.paymentRef &&
+                                        paymentIdInput === p.maskedPaymentId)
+                                    const isTopUp = activeExtraPayments.some(
+                                      (x) => x.ref === p.paymentRef,
+                                    )
+                                    const paidDate = p.paidAt ? new Date(p.paidAt) : null
+                                    return (
+                                      <li
+                                        key={p.paymentRef}
+                                        className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                                          isPrimary || isTopUp
+                                            ? 'border-emerald-300 bg-emerald-50'
+                                            : 'border-slate-200 bg-slate-50'
+                                        }`}
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="font-mono font-semibold text-slate-800">
+                                            {p.maskedPaymentId}
+                                          </span>
+                                          <span className="ml-2 text-slate-500">
+                                            ₹{formatVerifiedRupees(Number(p.amount ?? 0))} paid
+                                            {paidDate && !isNaN(paidDate.getTime())
+                                              ? ` on ${paidDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                              : ''}
+                                          </span>
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <span
+                                            className={
+                                              available > 0
+                                                ? 'font-semibold text-emerald-700'
+                                                : 'text-slate-400'
+                                            }
+                                          >
+                                            {available > 0
+                                              ? `₹${formatVerifiedRupees(available)} available`
+                                              : 'Fully used'}
+                                          </span>
+                                          {available > 0 &&
+                                            (isPrimary ? (
+                                              <span className="font-semibold text-emerald-700">In use</span>
+                                            ) : isTopUp ? (
+                                              <span className="font-semibold text-emerald-700">Top-up</span>
+                                            ) : paymentVerified ? (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingExtra}
+                                                onClick={() => void addEarlierAsTopUp(p)}
+                                                className="rounded border border-blue-600 px-2 py-0.5 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                              >
+                                                Add as top-up
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingPayment}
+                                                onClick={() => pickEarlierPayment(p)}
+                                                className="rounded bg-blue-600 px-2 py-0.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                              >
+                                                Use
+                                              </button>
+                                            ))}
+                                        </span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </div>
+                            )}
                             <Field
                               label="Payment ID"
                               htmlFor="paymentId"
@@ -1883,8 +2586,8 @@ export function RegisterBusinessPage() {
                                     Payment Verified:{' '}
                                     <strong>
                                       ₹
-                                      {verifiedPaymentAmount != null &&
-                                        formatVerifiedRupees(verifiedPaymentAmount)}
+                                      {currentPaymentCheck?.amount != null &&
+                                        formatVerifiedRupees(Number(currentPaymentCheck.amount))}
                                     </strong>{' '}
                                     paid
                                     {paidOn &&
@@ -1894,10 +2597,111 @@ export function RegisterBusinessPage() {
                                         month: 'short',
                                         year: 'numeric',
                                       })}`}
+                                    {priorUsage.length > 0 && (
+                                      <>
+                                        {' · '}
+                                        <strong>₹{formatVerifiedRupees(primaryAvailable)}</strong>{' '}
+                                        available
+                                      </>
+                                    )}
                                   </span>
                                 </div>
                               )}
+                              {paymentVerified && priorUsage.length > 0 && (
+                                <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                  <p className="font-semibold">
+                                    Existing customer — this will be registered as a new business.
+                                  </p>
+                                  <p className="mt-0.5 text-blue-800">Already used from this payment:</p>
+                                  <ul className="mt-1 space-y-0.5">
+                                    {priorUsage.map((u, i) => (
+                                      <li key={`${u.businessName ?? 'business'}-${i}`} className="flex justify-between gap-3">
+                                        <span>{u.businessName || 'Earlier business'}</span>
+                                        <span className="font-semibold">
+                                          ₹{formatVerifiedRupees(Number(u.amount ?? 0))}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </Field>
+
+                            {paymentVerified && (
+                              <div className="mt-3 border-t border-slate-200 pt-3">
+                                <p className="text-xs font-semibold text-slate-600">
+                                  Top up with another payment
+                                  <span className="ml-1 font-normal text-slate-400">
+                                    (when the package costs more than what&apos;s available)
+                                  </span>
+                                </p>
+                                {activeExtraPayments.length > 0 && (
+                                  <ul className="mt-2 space-y-1">
+                                    {activeExtraPayments.map((p) => (
+                                      <li
+                                        key={p.paymentId}
+                                        className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-900"
+                                      >
+                                        <span className="truncate">
+                                          <Check className="mr-1 inline h-3.5 w-3.5 text-emerald-600" />
+                                          {p.paymentId}
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <strong>+₹{formatVerifiedRupees(p.available)}</strong>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExtraPayments((prev) =>
+                                                prev.filter((x) => x.paymentId !== p.paymentId),
+                                              )
+                                            }
+                                            aria-label={`Remove payment ${p.paymentId}`}
+                                            className="rounded p-0.5 text-emerald-700 hover:bg-emerald-100"
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                          </button>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <input
+                                    aria-label="Additional payment ID"
+                                    value={extraPaymentInput}
+                                    disabled={isVerifyingExtra}
+                                    onChange={(e) => {
+                                      setExtraPaymentInput(e.target.value.replace(/\s/g, ''))
+                                      setExtraPaymentError('')
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        void handleAddExtraPayment()
+                                      }
+                                    }}
+                                    placeholder="Another payment ID (e.g. pay_...)"
+                                    className={`${inputClass(!!extraPaymentError)} min-w-0 flex-1`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleAddExtraPayment()}
+                                    disabled={!extraPaymentInput.trim() || isVerifyingExtra}
+                                    className="h-9 shrink-0 whitespace-nowrap rounded-md border border-blue-600 px-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                  >
+                                    {isVerifyingExtra ? 'Verifying…' : 'Verify & Add'}
+                                  </button>
+                                </div>
+                                {extraPaymentError && (
+                                  <p className="mt-1 text-xs text-red-600">{extraPaymentError}</p>
+                                )}
+                                {activeExtraPayments.length > 0 && verifiedPaymentAmount != null && (
+                                  <p className="mt-1.5 text-xs font-semibold text-slate-700">
+                                    Total available: ₹{formatVerifiedRupees(verifiedPaymentAmount)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1935,11 +2739,11 @@ export function RegisterBusinessPage() {
                               <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
                                 <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                                 <span>
-                                  Verified Payment:{' '}
+                                  Available to spend:{' '}
                                   <strong>
                                     ₹{formatVerifiedRupees(verifiedPaymentAmount)}
                                   </strong>
-                                  . Only packages within this amount can be selected.
+                                  . Packages above this need a top-up payment (above).
                                 </span>
                               </div>
                             )}
@@ -1984,9 +2788,10 @@ export function RegisterBusinessPage() {
                                   const pkgCost = includeGst
                                     ? price.withGst
                                     : price.amount
+                                  const effectivePkgCost = getDiscountedCost(pkgCost)
                                   const isExceedingPayment =
                                     verifiedPaymentAmount != null &&
-                                    pkgCost > verifiedPaymentAmount
+                                    effectivePkgCost > verifiedPaymentAmount
                                   const isViewingFeatures = viewingPlanId === pkg.id
                                   return (
                                     <div
@@ -1999,7 +2804,7 @@ export function RegisterBusinessPage() {
                                         if (isExceedingPayment) {
                                           showToast({
                                             title: 'Reviewing Package Features',
-                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
+                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}${discountPctNum > 0 ? ` / ₹${effectivePkgCost.toLocaleString('en-IN')} with discount` : ''}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
                                             variant: 'default',
                                           })
                                           return
@@ -2071,6 +2876,11 @@ export function RegisterBusinessPage() {
                                                 <span className="text-xs font-semibold text-slate-400">
                                                   ₹{price.amount.toLocaleString('en-IN')} + 18% GST
                                                 </span>
+                                                {discountPctNum > 0 && (
+                                                  <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
+                                                    ₹{effectivePkgCost.toLocaleString('en-IN')} ({discountPctNum}% off)
+                                                  </span>
+                                                )}
                                               </span>
                                             )}
                                             {price.months > 0 && (
@@ -2139,9 +2949,11 @@ export function RegisterBusinessPage() {
                           hasPrice={priceOf(viewingPlan.name).hasPrice}
                           months={priceOf(viewingPlan.name).months}
                           cost={
-                            includeGst
-                              ? priceOf(viewingPlan.name).withGst
-                              : priceOf(viewingPlan.name).amount
+                            getDiscountedCost(
+                              includeGst
+                                ? priceOf(viewingPlan.name).withGst
+                                : priceOf(viewingPlan.name).amount
+                            )
                           }
                           verifiedAmount={verifiedPaymentAmount}
                           selected={!!formData.selectedPackages?.includes(viewingPlan.id)}
@@ -2186,7 +2998,54 @@ export function RegisterBusinessPage() {
                         </p>
                       </div>
 
+                      {/* Discount (%) Field */}
                       <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label
+                            htmlFor="discountPercent"
+                            className="block text-xs font-semibold text-slate-600"
+                          >
+                            Discount (%)
+                          </label>
+                          <div className="flex items-center gap-1">
+                            {['0', '10', '20', '30', '50'].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => handleDiscountChange(pct)}
+                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                                  discountPercent === pct
+                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <input
+                            id="discountPercent"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={discountPercent}
+                            onChange={(e) => handleDiscountChange(e.target.value)}
+                            placeholder="0 to 100"
+                            className={inputClass()}
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                            %
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Applies discount on total package price
+                        </p>
+                      </div>
+
+                      {/* Total Amount (₹) */}
+                      <div className="space-y-1 sm:col-span-2">
                         <div className="flex items-center justify-between gap-2">
                           <label
                             htmlFor="totalAmount"
@@ -2229,17 +3088,26 @@ export function RegisterBusinessPage() {
                           disabled={totalLocked}
                           onChange={(e) => {
                             const value = e.target.value
+                            setManualBaseAmount(value)
                             if (
                               value === '' ||
-                              (/^\d+$/.test(value) && value.length <= 12)
+                              (/^d+$/.test(value) && value.length <= 12)
                             ) {
-                              handleInputChange('totalAmount', value)
-                              const total = parseInt(value) || 0
+                              const base = parseInt(value) || 0
+                              const pct = Math.min(
+                                100,
+                                Math.max(0, parseFloat(discountPercent) || 0),
+                              )
+                              const disc = Math.round((base * pct) / 100)
+                              const net = Math.max(0, base - disc)
+                              const netStr = base > 0 ? String(net) : ''
+                              handleInputChange('totalAmount', netStr)
+
                               const paid =
                                 verifiedPaymentAmount != null
-                                  ? verifiedPaymentAmount
+                                  ? Math.min(net, verifiedPaymentAmount)
                                   : parseInt(formData.amountPaid) || 0
-                              const remaining = total - paid
+                              const remaining = net - paid
                               handleInputChange(
                                 'amountRemaining',
                                 remaining > 0 ? remaining.toString() : '',
@@ -2248,7 +3116,7 @@ export function RegisterBusinessPage() {
                                 formData.paymentType === 'full-time' &&
                                 verifiedPaymentAmount == null
                               )
-                                handleInputChange('amountPaid', value)
+                                handleInputChange('amountPaid', netStr)
                             } else if (value.length > 12) {
                               showToast({
                                 title: 'Amount Limit Exceeded',
@@ -2267,12 +3135,30 @@ export function RegisterBusinessPage() {
                         <p className="text-[11px] text-slate-400">
                           {totalLocked
                             ? includeGst
-                              ? 'Auto-calculated from the selected plans (incl. 18% GST)'
-                              : 'Auto-calculated from the selected plans (excl. GST)'
+                              ? 'Auto-calculated from selected plans (incl. 18% GST) minus discount'
+                              : 'Auto-calculated from selected plans (excl. GST) minus discount'
                             : hasUnpricedSelection && selectedPlans.length > 0
                               ? 'A selected plan has no price set — enter the total'
                               : undefined}
                         </p>
+
+                        {/* Live calculation summary */}
+                        {rawBaseAmount > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                            <span className="text-slate-600">
+                              Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                              {includeGst ? ' (incl. 18% GST)' : ''}
+                            </span>
+                            {discountPctNum > 0 && (
+                              <span className="font-semibold text-emerald-700">
+                                Discount ({discountPctNum}%): {discountAmount > 0 ? `-₹${discountAmount.toLocaleString('en-IN')}` : '₹0'}
+                              </span>
+                            )}
+                            <span className="text-slate-700">
+                              Net Payable: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -2288,8 +3174,8 @@ export function RegisterBusinessPage() {
                             onSelect={(value) => {
                               handleInputChange('paymentType', value)
                               const fullPaid =
-                                verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : formData.totalAmount || ''
                               handleInputChange('amountPaid', fullPaid)
                               handleInputChange('amountRemaining', '')
@@ -2305,8 +3191,8 @@ export function RegisterBusinessPage() {
                               handleInputChange('paymentType', value)
                               const initialPaid =
                                 formData.amountPaid ||
-                                (verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                (appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : '')
                               handleInputChange('amountPaid', initialPaid)
                               const total = parseInt(formData.totalAmount) || 0
@@ -2324,8 +3210,8 @@ export function RegisterBusinessPage() {
                         const isPartTime = formData.paymentType === 'part-time'
                         const paidNum = isPartTime
                           ? parseInt(formData.amountPaid) || 0
-                          : verifiedPaymentAmount != null
-                            ? verifiedPaymentAmount
+                          : appliedFromBalance != null
+                            ? appliedFromBalance
                             : parseInt(formData.amountPaid) || 0
                         const remainingNum =
                           (parseInt(formData.totalAmount) || 0) - paidNum
@@ -2336,8 +3222,8 @@ export function RegisterBusinessPage() {
                           paidNum > remainingNum
                         const displayPaidValue = isPartTime
                           ? formData.amountPaid
-                          : verifiedPaymentAmount != null
-                            ? String(verifiedPaymentAmount)
+                          : appliedFromBalance != null
+                            ? String(appliedFromBalance)
                             : formData.totalAmount || ''
                         const isPaidDisabled = !isPartTime
                         return (
@@ -2353,7 +3239,7 @@ export function RegisterBusinessPage() {
                             hint={
                               isPartTime
                                 ? verifiedPaymentAmount != null
-                                  ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
+                                  ? `Editable for part-time (Available: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
                                   : undefined
                                 : verifiedPaymentAmount != null
                                   ? 'Auto-filled from verified Payment ID'
@@ -2465,7 +3351,7 @@ export function RegisterBusinessPage() {
                               id="gstinForInvoice"
                               value={formData.gstinForInvoice}
                               onChange={(e) =>
-                                handleInputChange('gstinForInvoice', e.target.value)
+                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
                               }
                               onBlur={(e) =>
                                 handleFieldBlur('gstinForInvoice', e.target.value)
@@ -2474,6 +3360,11 @@ export function RegisterBusinessPage() {
                               className={inputClass(shouldShowError('gstin'))}
                             />
                           </Field>
+                          <GstinDetailsCard
+                            details={gstinQuery.data}
+                            isLoading={gstinQuery.isFetching}
+                            error={gstinQuery.error}
+                          />
                         </div>
                       )}
                       {formData.invoiceOption === 'address' && (
@@ -2584,6 +3475,585 @@ export function RegisterBusinessPage() {
         </main>
       </div>
 
+      {/* ─── Full Form Preview & Direct Edit Modal ─── */}
+      {showFullFormModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                  <Eye className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Preview Registration Form
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Review all details before submitting. Click on any field to edit directly.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+                        {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/40">
+              {/* Important Warning Notice */}
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/95 p-4 text-xs text-amber-900 shadow-sm">
+                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-xs sm:text-sm text-amber-950">
+                    Important Notice: This form cannot be edited once submitted!
+                  </p>
+                  <p className="text-amber-800 text-xs leading-relaxed">
+                    Please review and verify all details carefully before proceeding. Once submitted, you will not be able to make any changes to this registration.
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Business & Contact */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    1. Business & Contact Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Client / Owner Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ownerName}
+                      onChange={(e) => handleInputChange('ownerName', e.target.value)}
+                      placeholder="Enter client name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.businessName}
+                      onChange={(e) => handleInputChange('businessName', e.target.value)}
+                      placeholder="Enter business name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      placeholder="10-digit mobile number"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="name@company.com"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city || cityInput}
+                      onChange={(e) => {
+                        handleCityChange(e.target.value)
+                        handleInputChange('city', e.target.value)
+                      }}
+                      placeholder="Enter city"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Onboarding City <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.onboardingCity}
+                      onChange={(e) => handleInputChange('onboardingCity', e.target.value)}
+                      className={inputClass()}
+                    >
+                      {ONBOARDING_CITIES.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Website Included <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'yes')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'yes'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('websiteRequired', 'no')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.websiteRequired === 'no'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Packages & Payment */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    2. Packages & Verified Payment
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900">
+                        Payment Status: Verified
+                      </span>
+                      <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                        Verified ✓
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                      <div>
+                        <span className="text-emerald-700">Payment ID:</span>
+                        <p className="font-mono font-bold text-emerald-950 break-all">
+                          {formData.paymentId || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Verified Amount:</span>
+                        <p className="font-bold text-emerald-950">
+                          ₹{formData.amountPaid || '0'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700">Customer Phone:</span>
+                        <p className="font-bold text-emerald-950">
+                          +91 {formData.phoneNumber || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Selected Package(s)
+                    </label>
+                    {selectedPlans.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedPlans.map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-900"
+                          >
+                            <span>{pkg.name}</span>
+                            <span className="rounded-md bg-blue-200/80 px-1.5 py-0.5 text-[10px] text-blue-800">
+                              ₹{priceOf(pkg.name).amount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-600">No package selected yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Financial Information */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <Wallet className="h-4 w-4 text-emerald-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    3. Financial & Invoicing Information
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Service Months <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={formData.expirationInMonths}
+                      disabled={monthsLocked}
+                      onChange={(e) => handleInputChange('expirationInMonths', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  {/* Discount (%) in Modal */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-600">
+                        Discount (%)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {['0', '10', '20', '30', '50'].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => handleDiscountChange(pct)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
+                              discountPercent === pct
+                                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={discountPercent}
+                        onChange={(e) => handleDiscountChange(e.target.value)}
+                        placeholder="0 to 100"
+                        className={inputClass()}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        %
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Total Amount (₹) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Total Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.totalAmount}
+                      disabled={totalLocked}
+                      onChange={(e) => handleInputChange('totalAmount', e.target.value)}
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  {rawBaseAmount > 0 && (
+                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3.5 py-2 text-xs">
+                      <span className="text-slate-600">
+                        Package Base: <strong className="text-slate-800">₹{rawBaseAmount.toLocaleString('en-IN')}</strong>
+                        {includeGst ? ' (incl. 18% GST)' : ''}
+                      </span>
+                      {discountPctNum > 0 && (
+                        <span className="font-semibold text-emerald-700">
+                          Discount ({discountPctNum}%): {discountAmount > 0 ? `-₹${discountAmount.toLocaleString('en-IN')}` : '₹0'}
+                        </span>
+                      )}
+                      <span className="text-slate-700">
+                        Final Total: <strong className="text-blue-700 font-bold">₹{finalCalculatedTotal.toLocaleString('en-IN')}</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Payment Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.paymentType}
+                      onChange={(e) => handleInputChange('paymentType', e.target.value)}
+                      className={inputClass()}
+                    >
+                      <option value="">Select payment type</option>
+                      <option value="full-time">Full Payment</option>
+                      <option value="part-time">Part-Time (Partial) Payment</option>
+                    </select>
+                  </div>
+
+                  {formData.paymentType === 'part-time' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Remaining Amount Due Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.remainingAmountDueDate}
+                        onChange={(e) => handleInputChange('remainingAmountDueDate', e.target.value)}
+                        className={inputClass()}
+                      />
+                    </div>
+                  )}
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Invoice Option <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'gstin')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'gstin'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        GSTIN Number
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'address')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'address'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Billing Address
+                      </button>
+                    </div>
+
+                    {formData.invoiceOption === 'gstin' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          GSTIN Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.gstinForInvoice}
+                          onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={inputClass()}
+                        />
+                        <GstinDetailsCard
+                          details={gstinQuery.data}
+                          isLoading={gstinQuery.isFetching}
+                          error={gstinQuery.error}
+                        />
+                      </div>
+                    )}
+
+                    {formData.invoiceOption === 'address' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Complete Billing Address <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={formData.completeAddress}
+                          onChange={(e) => handleInputChange('completeAddress', e.target.value)}
+                          placeholder="Enter full address for invoice"
+                          rows={2}
+                          className={textareaClass}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Sales & Handoff */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                  <ClipboardList className="h-4 w-4 text-purple-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    4. Sales & Handoff Details
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Sales Person Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.salesPersonName}
+                      onChange={(e) => handleInputChange('salesPersonName', e.target.value)}
+                      placeholder="Enter sales person's name"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Lead Type <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.leadType}
+                      onChange={(e) => handleInputChange('leadType', e.target.value)}
+                      placeholder="e.g. 99, 699, 999"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Is Webinar Client?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'YES')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'YES'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('isWebinarClient', 'NO')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.isWebinarClient.toUpperCase() === 'NO'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      WhatsApp Group Link (optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.groupLink}
+                      onChange={(e) => handleInputChange('groupLink', e.target.value)}
+                      placeholder="https://chat.whatsapp.com/…"
+                      className={inputClass()}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Remarks (optional)
+                    </label>
+                    <textarea
+                      value={formData.remark}
+                      onChange={(e) => handleInputChange('remark', e.target.value)}
+                      placeholder="Any additional notes"
+                      rows={2}
+                      className={textareaClass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowFullFormModal(false)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              >
+                ← Back to Form
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!formData.ownerName?.trim() || !formData.businessName?.trim() || !formData.phoneNumber?.trim() || !formData.email?.trim()) {
+                    showToast({
+                      title: 'Required Details Missing',
+                      description: 'Please ensure Client Name, Business Name, Phone Number, and Email are filled.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validateEmail(formData.email)) {
+                    showToast({
+                      title: 'Invalid Email',
+                      description: 'Please enter a valid email address.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!validatePhoneNumber(formData.phoneNumber)) {
+                    showToast({
+                      title: 'Invalid Phone Number',
+                      description: 'Please enter a valid 10-digit mobile number.',
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  if (!formData.salesPersonName || !formData.leadType) {
+                    showToast({
+                      title: 'Sales Details Missing',
+                      description: "Please enter the Sales Person's Name and Lead Type.",
+                      variant: 'destructive',
+                    })
+                    return
+                  }
+                  setShowFullFormModal(false)
+                  setShowPasskeyModal(true)
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700"
+              >
+                Submit & Enter Passkey →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Passkey modal ─── */}
       {showPasskeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -2684,6 +4154,74 @@ export function RegisterBusinessPage() {
 /* ─────────────────────────────────────────────────────────────────
    Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
+
+/* Abstract blue background for the header "Login" button. */
+function LoginBlueBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="loginBlueGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3b82f6" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#loginBlueGrad)" />
+      <circle cx="104" cy="6" r="22" fill="#60a5fa" opacity="0.35" />
+      <circle cx="10" cy="42" r="18" fill="#1e40af" opacity="0.45" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#93c5fd"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#bfdbfe"
+        strokeOpacity="0.4"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
+/* Abstract orange background for the header "HRM Login" button. */
+function HrmOrangeBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="hrmOrangeGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fb923c" />
+          <stop offset="1" stopColor="#ea580c" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#hrmOrangeGrad)" />
+      <circle cx="102" cy="4" r="22" fill="#fdba74" opacity="0.4" />
+      <circle cx="12" cy="42" r="18" fill="#c2410c" opacity="0.4" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#fed7aa"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#ffedd5"
+        strokeOpacity="0.45"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
 
 function SectionHeading({
   number,
@@ -2824,10 +4362,10 @@ function FeaturesPanel({
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-amber-950">
-                Package exceeds verified payment
+                Package exceeds available balance
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
-                Price: ₹{cost.toLocaleString('en-IN')} (verified: ₹
+                Price: ₹{cost.toLocaleString('en-IN')} (available: ₹
                 {formatVerifiedRupees(verifiedAmount)}). Review only.
               </p>
             </div>
@@ -2895,7 +4433,7 @@ function FeaturesPanel({
           {selected
             ? 'Remove from selection'
             : exceeding
-              ? 'Exceeds verified payment'
+              ? 'Exceeds available balance'
               : 'Select this plan'}
         </button>
       </div>
@@ -2978,6 +4516,15 @@ function ChoiceCard({
 
 // Payment verification returns rupees. Razorpay and payment_info store the same
 // value in paise, so never render that database value directly in this form.
+/** Same masking as SMSB's PaymentRefCodec.mask: "pay_ABCDEF123456XyZ1" -> "pay_****XyZ1". */
+const maskPaymentId = (paymentId: string): string => {
+  if (paymentId.length <= 8) return '****'
+  const underscore = paymentId.indexOf('_')
+  const prefix =
+    underscore > 0 && underscore < 6 ? paymentId.slice(0, underscore + 1) : ''
+  return `${prefix}****${paymentId.slice(-4)}`
+}
+
 const formatVerifiedRupees = (amount: number): string =>
   amount.toLocaleString('en-IN', {
     minimumFractionDigits: 2,

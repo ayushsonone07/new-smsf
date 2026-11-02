@@ -37,6 +37,21 @@ export interface CustomerRegistrationRequest {
   isWebinarClient: string
   onboardingCity: string
   paymentId?: string
+  /** Encrypted stand-in for paymentId when the payment was picked from the masked list. */
+  paymentRef?: string
+  /** Further payments that top up the first one's remaining balance, used in order. */
+  additionalPaymentIds?: string[]
+  additionalPaymentRefs?: string[]
+  discountPercent?: string
+  discountAmount?: string
+  originalAmount?: string
+  includeGst?: boolean
+  isGstIncluded?: string
+  gstRate?: string
+  gstPercent?: string
+  gstAmount?: string
+  gst?: string
+  baseAmountWithoutGst?: string
 }
 
 /** Minimal identity kept after registration so the payment screenshot can be uploaded against it. */

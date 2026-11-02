@@ -23,6 +23,7 @@ import {
   type SalesHeadSummaryResponse,
   type TelecallerItem,
 } from '../../../api/sales-summary.api'
+import { fetchFunnels, type FunnelItem } from '../../../api/leads.api'
 
 function formatRupees(amount?: number | string | null): string {
   const num = typeof amount === 'number' ? amount : Number(amount) || 0
@@ -43,6 +44,12 @@ export function SalesSummaryView() {
   const [departmentUser, setDepartmentUser] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+  const [selectedFunnel, setSelectedFunnel] = useState<string>('all')
+  const [funnels, setFunnels] = useState<FunnelItem[]>([])
+
+  useEffect(() => {
+    fetchFunnels().then((list) => setFunnels(list)).catch(() => {})
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -53,6 +60,7 @@ export function SalesSummaryView() {
         departmentUser: departmentUser || undefined,
         startDate: startDate ? new Date(startDate).toISOString() : undefined,
         endDate: endDate ? new Date(endDate).toISOString() : undefined,
+        funnelType: selectedFunnel !== 'all' ? selectedFunnel : undefined,
       })
       setData(res)
     } catch (err) {
@@ -60,7 +68,7 @@ export function SalesSummaryView() {
     } finally {
       setLoading(false)
     }
-  }, [totalSummary, departmentUser, startDate, endDate])
+  }, [totalSummary, departmentUser, startDate, endDate, selectedFunnel])
 
   useEffect(() => {
     loadData()
@@ -254,6 +262,26 @@ export function SalesSummaryView() {
               </div>
             )}
 
+            {/* Funnel Type Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Funnel:</span>
+              <select
+                value={selectedFunnel}
+                onChange={(e) => {
+                  setSelectedFunnel(e.target.value)
+                  setTotalSummary(false)
+                }}
+                className="py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all cursor-pointer"
+              >
+                <option value="all">All Funnels</option>
+                {funnels.map((f, i) => (
+                  <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
+                    {f.funnelName || f.funnelType}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Date Range Pickers */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
@@ -291,9 +319,10 @@ export function SalesSummaryView() {
                 setStartDate('')
                 setEndDate('')
                 setDepartmentUser('')
+                setSelectedFunnel('all')
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                totalSummary && !startDate && !endDate && !departmentUser
+                totalSummary && !startDate && !endDate && !departmentUser && selectedFunnel === 'all'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
