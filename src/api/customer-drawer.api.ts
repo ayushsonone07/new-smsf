@@ -76,6 +76,16 @@ export interface CustomerProfileDetails {
   source?: string
   paymentId?: string
   lastUpdatedAt?: string
+  includeGst?: boolean | string
+  isGstIncluded?: string
+  gstRate?: string
+  gstPercent?: string
+  gstAmount?: string
+  gst?: string
+  discountPercent?: string
+  discountAmount?: string
+  originalAmount?: string
+  baseAmountWithoutGst?: string
 }
 
 export interface CustomerServiceRow {
@@ -105,6 +115,16 @@ export interface CustomerServiceRow {
     amountPending?: string
     remark?: string
     dueDate?: string
+    includeGst?: boolean | string
+    isGstIncluded?: string
+    gstRate?: string
+    gstPercent?: string
+    gstAmount?: string
+    gst?: string
+    discountPercent?: string
+    discountAmount?: string
+    originalAmount?: string
+    baseAmountWithoutGst?: string
     status?: string
   }
   departmentStatuses?: Record<

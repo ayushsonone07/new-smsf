@@ -417,6 +417,29 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                 </button>
               )}
 
+              {/* Quick Funnel Filter */}
+              <div className="relative">
+                <select
+                  value={selectedFunnel}
+                  onChange={(e) => {
+                    setSelectedFunnel(e.target.value)
+                    setCurrentPage(0)
+                  }}
+                  className={`h-8 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-blue-500 ${
+                    selectedFunnel !== 'all'
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <option value="all">All Funnels</option>
+                  {funnels.map((f, i) => (
+                    <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
+                      {f.funnelName || f.funnelType}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowFilters(!showFilters)}
@@ -578,6 +601,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   <th className="py-3 px-4 min-w-[190px]">EMAIL</th>
                   <th className="py-3 px-4 min-w-[130px]">PHONE</th>
                   <th className="py-3 px-4 min-w-[160px]">BUSINESS</th>
+                  <th className="py-3 px-4 min-w-[120px]">FUNNEL TYPE</th>
                   <th className="py-3 px-4 min-w-[120px]">STATUS</th>
                   <th className="py-3 px-4 min-w-[140px]">ASSIGNED REP</th>
                   <th className="py-3 px-4 min-w-[110px] text-center">PAYMENT</th>
@@ -587,14 +611,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               <tbody>
                 {loading && !refreshing ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center text-slate-400">
+                    <td colSpan={10} className="py-16 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                       <span>Loading leads data...</span>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center">
+                    <td colSpan={10} className="py-12 text-center">
                       <div className="max-w-md mx-auto p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
                         <p className="font-semibold text-xs mb-1">Failed to fetch leads</p>
                         <p className="text-xs text-rose-600 mb-2">{error}</p>
@@ -610,7 +634,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center">
+                    <td colSpan={10} className="py-16 text-center">
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <FileSpreadsheet className="w-6 h-6" />
                       </div>
@@ -675,6 +699,13 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                         <td className="py-3 px-4 font-semibold text-slate-800">
                           <span className="truncate block max-w-[160px]" title={lead.businessName || ''}>
                             {!isNa(lead.businessName) ? lead.businessName : '—'}
+                          </span>
+                        </td>
+
+                        {/* Funnel Type */}
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
+                            {lead.funnelType || 'General'}
                           </span>
                         </td>
 
@@ -846,6 +877,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         onClose={() => setUploadModalOpen(false)}
         onSuccess={() => {
           showToast('Leads Excel imported successfully!', 'success')
+          fetchFunnels().then((data) => setFunnels(data)).catch(() => {})
           void fetchLeadsData()
         }}
       />

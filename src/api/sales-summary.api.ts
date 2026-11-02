@@ -38,6 +38,7 @@ export interface FetchSalesHeadSummaryParams {
   departmentUser?: string
   startDate?: string
   endDate?: string
+  funnelType?: string
 }
 
 /**
@@ -58,6 +59,9 @@ export async function fetchSalesHeadSummary(
   }
   if (params.endDate) {
     query.set('endDate', params.endDate)
+  }
+  if (params.funnelType && params.funnelType !== 'all') {
+    query.set('funnelType', params.funnelType)
   }
 
   const qs = query.toString()
