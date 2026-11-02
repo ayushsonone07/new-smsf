@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Hash,
+  Info,
   Lock,
   MapPin,
   Package,
@@ -18,10 +19,16 @@ import {
   X,
 } from 'lucide-react'
 import {
+  type GstinDetails,
   fetchPlanAmounts,
+  fetchGstinDetails,
+  fetchPaymentInfo,
   fetchPlansWithDepartments,
   registerCustomer,
   verifyPayment,
+  fetchEarlierPayments,
+  type EarlierPayment,
+  type PaymentUsage,
 } from '../../../api/register-business.api'
 import type {
   PlanAmount,
@@ -81,8 +88,31 @@ type PaymentCheck = {
   phone: string
   paymentId: string
   message?: string
+  /** Full payment amount (₹). */
   amount?: number | null
+  /** Still unspent (₹): a payment can fund several businesses of the same customer. */
+  available?: number | null
+  /** Earlier businesses that already used part of this payment. */
+  usedBy?: PaymentUsage[]
   paidAt?: string | null
+}
+
+/** A further verified payment that tops up the first one's remaining balance. */
+type ExtraPayment = {
+  phone: string
+  /** Typed ID, or the masked ID when picked from the earlier-payments list. */
+  paymentId: string
+  /** Set when picked from the list: the real ID is only known to the server. */
+  ref?: string
+  amount: number
+  available: number
+}
+
+/** An earlier payment chosen from the list; only its masked ID is ever shown. */
+type PickedPayment = {
+  phone: string
+  ref: string
+  masked: string
 }
 
 const INITIAL_VALIDATION_ERRORS = {
@@ -265,6 +295,77 @@ const WIZARD_STYLES = `
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
+function GstinDetailsCard({
+  details,
+  isLoading,
+  error,
+}: {
+  details?: GstinDetails
+  isLoading: boolean
+  error: Error | null
+}) {
+  if (isLoading) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-blue-600" role="status">
+        Verifying GSTIN…
+      </p>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
+        {error.message || 'Unable to verify this GSTIN'}
+      </p>
+    )
+  }
+
+  if (!details) return null
+
+  return (
+    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3" aria-live="polite">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-900">
+          {details.trade_name || details.legal_name || 'GST registered customer'}
+        </p>
+        {details.status && (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${details.status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            {details.status}
+          </span>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-slate-500">Legal name</dt>
+          <dd className="font-semibold text-slate-900">{details.legal_name || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Taxpayer type</dt>
+          <dd className="font-semibold text-slate-900">{details.taxpayer_type || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Business constitution</dt>
+          <dd className="font-semibold text-slate-900">{details.business_constitution || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Registration date</dt>
+          <dd className="font-semibold text-slate-900">{details.registration_date || '—'}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="font-semibold text-slate-500">Registered address</dt>
+          <dd className="font-semibold text-slate-900">{details.address || '—'}</dd>
+        </div>
+        {!!details.nature_of_business?.length && (
+          <div className="sm:col-span-2">
+            <dt className="font-semibold text-slate-500">Nature of business</dt>
+            <dd className="font-semibold text-slate-900">{details.nature_of_business.join(', ')}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  )
+}
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
 
@@ -290,6 +391,39 @@ export function RegisterBusinessPage() {
     (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
+
+  const normalizedGstin = formData.gstinForInvoice.trim().toUpperCase()
+  const gstinQuery = useQuery({
+    queryKey: ['register-business', 'gstin', normalizedGstin],
+    queryFn: () => fetchGstinDetails(normalizedGstin),
+    enabled:
+      formData.invoiceOption === 'gstin' &&
+      validateGSTNumber(normalizedGstin),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+
+  const paymentInfoQuery = useQuery({
+    queryKey: ['register-business', 'payment-info', formData.email.trim().toLowerCase()],
+    queryFn: () => fetchPaymentInfo(formData.email),
+    enabled: validateEmail(formData.email.trim()),
+    staleTime: 30_000,
+    retry: false,
+  })
+
+  const matchedPaymentInfo = useMemo(() => {
+    const normalizedEmail = formData.email.trim().toLowerCase()
+    if (!validateEmail(normalizedEmail)) return null
+
+    return paymentInfoQuery.data?.find(
+      (payment) =>
+        payment.customerEmail?.trim().toLowerCase() === normalizedEmail &&
+        payment.paymentReference?.trim(),
+    )
+  }, [formData.email, paymentInfoQuery.data])
+
+  const paymentReference = matchedPaymentInfo?.paymentReference?.trim() || null
+
   const [validationErrors, setValidationErrors] = useState({
     ...INITIAL_VALIDATION_ERRORS,
   })
@@ -306,6 +440,13 @@ export function RegisterBusinessPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const [paymentCheck, setPaymentCheck] = useState<PaymentCheck | null>(null)
+  const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>([])
+  const [extraPaymentInput, setExtraPaymentInput] = useState('')
+  const [extraPaymentError, setExtraPaymentError] = useState('')
+  const [isVerifyingExtra, setIsVerifyingExtra] = useState(false)
+  const [pickedPayment, setPickedPayment] = useState<PickedPayment | null>(null)
+  /* Phone whose earlier payments were already auto-picked, so it happens once per number. */
+  const autoPickedPhone = useRef<string | null>(null)
 
   /* Wizard: which step card is currently shown */
   const [activeStep, setActiveStep] = useState<SectionId>('business')
@@ -526,6 +667,11 @@ export function RegisterBusinessPage() {
     setIncludeGst(true)
     setViewingPlanId(null)
     setPaymentCheck(null)
+    setExtraPayments([])
+    setExtraPaymentInput('')
+    setExtraPaymentError('')
+    setPickedPayment(null)
+    autoPickedPhone.current = null
     autoAdvanceArmed.current = {
       business: true,
       packages: true,
@@ -548,22 +694,50 @@ export function RegisterBusinessPage() {
   const isVerifyingPayment = currentPaymentCheck?.status === 'verifying'
   const paymentVerified =
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
-  const verifiedPaymentAmount =
-    paymentVerified && currentPaymentCheck?.amount != null
-      ? Number(currentPaymentCheck.amount)
-      : null
+  /* Extra payments only count for the phone they were verified against. */
+  const activeExtraPayments = useMemo(
+    () =>
+      paymentVerified
+        ? extraPayments.filter((p) => p.phone === paymentPhone)
+        : [],
+    [paymentVerified, extraPayments, paymentPhone],
+  )
+  const primaryAvailable =
+    paymentVerified && currentPaymentCheck
+      ? Number(currentPaymentCheck.available ?? currentPaymentCheck.amount ?? 0)
+      : 0
+  /*
+   * What can still be spent on this business (₹): what is left of the first
+   * payment after the customer's earlier businesses, plus any top-up payments.
+   * Packages are limited to this amount.
+   */
+  const verifiedPaymentAmount = paymentVerified
+    ? primaryAvailable +
+      activeExtraPayments.reduce((sum, p) => sum + p.available, 0)
+    : null
+  const priorUsage = paymentVerified ? currentPaymentCheck?.usedBy ?? [] : []
+  /* The share of the balance this business takes; anything beyond the total stays as credit. */
+  const enteredTotal = parseInt(formData.totalAmount) || 0
+  const appliedFromBalance =
+    verifiedPaymentAmount == null
+      ? null
+      : enteredTotal > 0
+        ? Math.min(enteredTotal, verifiedPaymentAmount)
+        : verifiedPaymentAmount
 
-  const handleVerifyPayment = useCallback(async () => {
-    const phone = formData.phoneNumber.trim()
-    const paymentId = formData.paymentId.trim()
+  /* Verifies the first payment — typed, or picked from the list (then only its ref is sent). */
+  const verifyPrimaryPayment = useCallback(
+    async (phone: string, paymentId: string, paymentRef?: string) => {
     if (!validatePhoneNumber(phone) || !paymentId) return
 
     const isSameCheck = (prev: PaymentCheck | null) =>
       !!prev && prev.phone === phone && prev.paymentId === paymentId
     setPaymentCheck({ status: 'verifying', phone, paymentId })
+    setExtraPayments([])
+    setExtraPaymentError('')
 
     try {
-      const res = await verifyPayment(phone, paymentId)
+      const res = await verifyPayment(phone, paymentId, { paymentRef })
       setPaymentCheck((prev) => {
         if (!isSameCheck(prev)) return prev
         return res.success
@@ -572,6 +746,8 @@ export function RegisterBusinessPage() {
               phone,
               paymentId,
               amount: res.data?.amount ?? null,
+              available: res.data?.available ?? res.data?.amount ?? null,
+              usedBy: res.data?.usedBy ?? [],
               paidAt: res.data?.paidAt ?? null,
             }
           : {
@@ -582,14 +758,17 @@ export function RegisterBusinessPage() {
             }
       })
 
-      if (res.success && res.data?.amount != null) {
-        const verifiedAmt = Number(res.data.amount)
+      const available = res.data?.available ?? res.data?.amount
+      if (res.success && available != null) {
+        const availableAmt = Number(available)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
-          const remaining = total - verifiedAmt
+          // Only the package's share is spent; anything left stays as credit.
+          const paid = total > 0 ? Math.min(total, availableAmt) : availableAmt
+          const remaining = total - paid
           return {
             ...prev,
-            amountPaid: String(verifiedAmt),
+            amountPaid: String(paid),
             amountRemaining: remaining > 0 ? String(remaining) : '',
           }
         })
@@ -606,7 +785,189 @@ export function RegisterBusinessPage() {
           : prev,
       )
     }
-  }, [formData.phoneNumber, formData.paymentId])
+    },
+    [],
+  )
+
+  /* A picked payment counts only while its masked ID is still what the field shows. */
+  const activePickedRef =
+    pickedPayment &&
+    pickedPayment.phone === paymentPhone &&
+    pickedPayment.masked === paymentIdInput
+      ? pickedPayment.ref
+      : undefined
+
+  /* ─── Earlier payments of this number, detected as soon as it is valid. ─── */
+  const earlierPaymentsQuery = useQuery({
+    queryKey: ['earlier-payments', paymentPhone],
+    queryFn: () => fetchEarlierPayments(paymentPhone),
+    enabled: canEnterPaymentId,
+    staleTime: 60_000,
+    retry: false,
+  })
+  const earlierPayments = useMemo(
+    () => (canEnterPaymentId ? earlierPaymentsQuery.data ?? [] : []),
+    [canEnterPaymentId, earlierPaymentsQuery.data],
+  )
+
+  /*
+   * A typed payment ID must be a new one: if it is one of the earlier payments
+   * listed above (same masked form), it has to be picked from the list instead.
+   */
+  const listedPaymentMessage = useCallback(
+    (typedId: string): string | null => {
+      if (!typedId || typedId.includes('****')) return null
+      const masked = maskPaymentId(typedId)
+      const match = earlierPayments.find((p) => p.maskedPaymentId === masked)
+      return match
+        ? `This payment (${match.maskedPaymentId}) is already listed above under earlier payments — use it from the list instead of entering it again.`
+        : null
+    },
+    [earlierPayments],
+  )
+
+  const handleVerifyPayment = useCallback(() => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = formData.paymentId.trim()
+    const listed = activePickedRef ? null : listedPaymentMessage(paymentId)
+    if (listed) {
+      setPaymentCheck({ status: 'failed', phone, paymentId, message: listed })
+      return
+    }
+    void verifyPrimaryPayment(phone, paymentId, activePickedRef)
+  }, [
+    verifyPrimaryPayment,
+    formData.phoneNumber,
+    formData.paymentId,
+    activePickedRef,
+    listedPaymentMessage,
+  ])
+
+  const pickEarlierPayment = useCallback(
+    (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setPickedPayment({
+        phone,
+        ref: payment.paymentRef,
+        masked: payment.maskedPaymentId,
+      })
+      setFormData((prev) => ({ ...prev, paymentId: payment.maskedPaymentId }))
+      void verifyPrimaryPayment(phone, payment.maskedPaymentId, payment.paymentRef)
+    },
+    [formData.phoneNumber, verifyPrimaryPayment],
+  )
+
+  /* Pick the first payment with money left automatically — once per number, and
+     never over a payment ID the staff member already typed. */
+  useEffect(() => {
+    if (!canEnterPaymentId || !earlierPaymentsQuery.isSuccess) return
+    if (autoPickedPhone.current === paymentPhone) return
+    autoPickedPhone.current = paymentPhone
+    if (formData.paymentId.trim()) return
+    const usable = earlierPayments.find((p) => Number(p.available ?? 0) > 0)
+    if (usable) pickEarlierPayment(usable)
+  }, [
+    canEnterPaymentId,
+    earlierPaymentsQuery.isSuccess,
+    paymentPhone,
+    formData.paymentId,
+    earlierPayments,
+    pickEarlierPayment,
+  ])
+
+  /* Use another listed payment to top up the first one's balance. */
+  const addEarlierAsTopUp = useCallback(
+    async (payment: EarlierPayment) => {
+      const phone = formData.phoneNumber.trim()
+      setIsVerifyingExtra(true)
+      setExtraPaymentError('')
+      try {
+        const res = await verifyPayment(phone, payment.maskedPaymentId, {
+          paymentRef: payment.paymentRef,
+        })
+        const available = Number(res.data?.available ?? 0)
+        if (!res.success || available <= 0) {
+          setExtraPaymentError(res.message || 'Payment could not be verified')
+          return
+        }
+        setExtraPayments((prev) => [
+          ...prev,
+          {
+            phone,
+            paymentId: payment.maskedPaymentId,
+            ref: payment.paymentRef,
+            amount: Number(res.data?.amount ?? available),
+            available,
+          },
+        ])
+      } catch (error) {
+        setExtraPaymentError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Payment could not be verified',
+        )
+      } finally {
+        setIsVerifyingExtra(false)
+      }
+    },
+    [formData.phoneNumber],
+  )
+
+  /* ─── Top-up: another verified payment adds to the available balance. ─── */
+  const handleAddExtraPayment = useCallback(async () => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = extraPaymentInput.trim()
+    if (!validatePhoneNumber(phone) || !paymentId) return
+    const alreadyAdded =
+      paymentId === formData.paymentId.trim() ||
+      extraPayments.some((p) => p.phone === phone && p.paymentId === paymentId)
+    if (alreadyAdded) {
+      setExtraPaymentError('This payment ID is already added')
+      return
+    }
+    const listed = listedPaymentMessage(paymentId)
+    if (listed) {
+      setExtraPaymentError(listed)
+      return
+    }
+    // The first payment may be a picked one whose real ID the page never sees; compare masks.
+    if (activePickedRef && pickedPayment?.masked === maskPaymentId(paymentId)) {
+      setExtraPaymentError('This is the same payment already used above')
+      return
+    }
+
+    setIsVerifyingExtra(true)
+    setExtraPaymentError('')
+    try {
+      const res = await verifyPayment(phone, paymentId)
+      const available = Number(res.data?.available ?? res.data?.amount ?? 0)
+      if (!res.success || available <= 0) {
+        setExtraPaymentError(res.message || 'Payment could not be verified')
+        return
+      }
+      setExtraPayments((prev) => [
+        ...prev,
+        { phone, paymentId, amount: Number(res.data?.amount ?? available), available },
+      ])
+      setExtraPaymentInput('')
+    } catch (error) {
+      setExtraPaymentError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Payment could not be verified',
+      )
+    } finally {
+      setIsVerifyingExtra(false)
+    }
+  }, [
+    formData.phoneNumber,
+    formData.paymentId,
+    extraPaymentInput,
+    extraPayments,
+    listedPaymentMessage,
+    activePickedRef,
+    pickedPayment,
+  ])
 
   /* ─── Plan pricing from planAmounts ─── */
   const priceOf = useCallback(
@@ -829,11 +1190,14 @@ export function RegisterBusinessPage() {
 
     setFormData((prev) => {
       if (verifiedPaymentAmount != null) {
+        // Only the package's share of the balance is spent; the rest stays as credit.
         const currentPaid =
           prev.paymentType === 'part-time' && prev.amountPaid
-            ? parseInt(prev.amountPaid) || 0
-            : verifiedPaymentAmount
-        const remaining = net - currentPaid
+            ? Math.min(parseInt(prev.amountPaid) || 0, verifiedPaymentAmount)
+            : autoTotal > 0
+              ? Math.min(autoTotal, verifiedPaymentAmount)
+              : verifiedPaymentAmount
+        const remaining = autoTotal - currentPaid
         return {
           ...prev,
           totalAmount: value,
@@ -1156,8 +1520,8 @@ export function RegisterBusinessPage() {
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
-          title: 'Total Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please adjust your packages to match the paid amount.`,
+          title: 'Total Exceeds Available Balance',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or adjust the packages.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
@@ -1352,8 +1716,8 @@ export function RegisterBusinessPage() {
         amountPaid:
           formData.paymentType === 'part-time'
             ? formData.amountPaid || '0'
-            : verifiedPaymentAmount != null
-              ? String(verifiedPaymentAmount)
+            : appliedFromBalance != null
+              ? String(appliedFromBalance)
               : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
@@ -1364,7 +1728,16 @@ export function RegisterBusinessPage() {
         source: 'root',
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
-        paymentId: formData.paymentId.trim(),
+        // A payment picked from the list is sent as its reference; the field only holds the masked ID.
+        ...(activePickedRef
+          ? { paymentRef: activePickedRef }
+          : { paymentId: formData.paymentId.trim() }),
+        additionalPaymentIds: activeExtraPayments
+          .filter((p) => !p.ref)
+          .map((p) => p.paymentId),
+        additionalPaymentRefs: activeExtraPayments
+          .filter((p): p is ExtraPayment & { ref: string } => !!p.ref)
+          .map((p) => p.ref),
         discountPercent: discountPctNum > 0 ? String(discountPctNum) : undefined,
         discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
         originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
@@ -1415,8 +1788,9 @@ export function RegisterBusinessPage() {
     showToast,
     resetForm,
     paymentVerified,
-    verifiedPaymentAmount,
-    autoTotal,
+    appliedFromBalance,
+    activeExtraPayments,
+    activePickedRef,
     scrollToSection,
   ])
 
@@ -1544,16 +1918,18 @@ export function RegisterBusinessPage() {
             onClick={() => {
               window.location.href = '/hrm/login'
             }}
-            className="hidden h-[34px] cursor-pointer items-center rounded-[10px] border border-[#e2e6ee] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] md:inline-flex"
+            className="relative hidden h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] md:inline-flex"
           >
-            HRM Login
+            <HrmOrangeBg />
+            <span className="relative z-10">HRM Login</span>
           </button>
           <button
             type="button"
             onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex h-[34px] cursor-pointer items-center rounded-[10px] bg-[#2459e0] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] sm:px-4"
+            className="relative inline-flex h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] sm:px-4"
           >
-            Login
+            <LoginBlueBg />
+            <span className="relative z-10">Login</span>
           </button>
         </div>
         <div className="h-0.5 bg-[#eef1f6] sm:hidden">
@@ -1749,6 +2125,38 @@ export function RegisterBusinessPage() {
                             )}
                           />
                         </Field>
+                        {paymentReference && (
+                          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-slate-600" aria-live="polite">
+                            <span>
+                              Sold by <strong className="font-bold text-slate-900">{paymentReference}</strong>
+                            </span>
+                            <details className="group relative">
+                              <summary
+                                className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&::-webkit-details-marker]:hidden"
+                                aria-label="View payment information"
+                                title="View payment information"
+                              >
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-blue-500 bg-blue-50 text-blue-600 transition-colors group-open:bg-blue-600 group-open:text-white">
+                                  <Info size={13} strokeWidth={2.5} aria-hidden="true" />
+                                </span>
+                              </summary>
+                              <div className="absolute right-0 z-30 mt-1 w-[min(21rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-600 shadow-xl">
+                                <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 break-words">
+                                  <dt className="text-slate-500">Payment reference</dt>
+                                  <dd className="min-w-0 break-all font-bold text-slate-900">{matchedPaymentInfo?.paymentReference || '—'}</dd>
+                                  <dt className="text-slate-500">Created at</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.createdAt || '—'}</dd>
+                                  <dt className="text-slate-500">Customer phone</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.customerPhone || '—'}</dd>
+                                  <dt className="text-slate-500">Customer email</dt>
+                                  <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.customerEmail || '—'}</dd>
+                                  <dt className="text-slate-500">Amount</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.amount == null ? '—' : `₹${Number(matchedPaymentInfo.amount).toFixed(2)}`}</dd>
+                                </dl>
+                              </div>
+                            </details>
+                          </div>
+                        )}
                       </div>
                       <Field
                         label="Phone Number"
@@ -1925,13 +2333,100 @@ export function RegisterBusinessPage() {
                               <p className="leading-relaxed text-blue-700">
                                 Please enter and verify the customer's payment ID
                                 first. Once verified, you will be able to select
-                                packages within your verified payment amount.
+                                packages within the amount still available on it.
                               </p>
                             </div>
                           </div>
 
                           {/* Payment Verification Box */}
                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                            {canEnterPaymentId && earlierPaymentsQuery.isFetching && earlierPayments.length === 0 && (
+                              <p className="mb-3 text-xs text-slate-500">
+                                Looking for earlier payments from {paymentPhone}…
+                              </p>
+                            )}
+                            {earlierPayments.length > 0 && (
+                              <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
+                                <p className="text-xs font-semibold text-slate-700">
+                                  Earlier payments from this number
+                                </p>
+                                <p className="mb-2 text-[11px] text-slate-500">
+                                  Use one to pay for this business from what is left on it. IDs are partly hidden.
+                                </p>
+                                <ul className="space-y-1.5">
+                                  {earlierPayments.map((p) => {
+                                    const available = Number(p.available ?? 0)
+                                    const isPrimary =
+                                      activePickedRef === p.paymentRef ||
+                                      (pickedPayment?.ref === p.paymentRef &&
+                                        paymentIdInput === p.maskedPaymentId)
+                                    const isTopUp = activeExtraPayments.some(
+                                      (x) => x.ref === p.paymentRef,
+                                    )
+                                    const paidDate = p.paidAt ? new Date(p.paidAt) : null
+                                    return (
+                                      <li
+                                        key={p.paymentRef}
+                                        className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                                          isPrimary || isTopUp
+                                            ? 'border-emerald-300 bg-emerald-50'
+                                            : 'border-slate-200 bg-slate-50'
+                                        }`}
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="font-mono font-semibold text-slate-800">
+                                            {p.maskedPaymentId}
+                                          </span>
+                                          <span className="ml-2 text-slate-500">
+                                            ₹{formatVerifiedRupees(Number(p.amount ?? 0))} paid
+                                            {paidDate && !isNaN(paidDate.getTime())
+                                              ? ` on ${paidDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                              : ''}
+                                          </span>
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <span
+                                            className={
+                                              available > 0
+                                                ? 'font-semibold text-emerald-700'
+                                                : 'text-slate-400'
+                                            }
+                                          >
+                                            {available > 0
+                                              ? `₹${formatVerifiedRupees(available)} available`
+                                              : 'Fully used'}
+                                          </span>
+                                          {available > 0 &&
+                                            (isPrimary ? (
+                                              <span className="font-semibold text-emerald-700">In use</span>
+                                            ) : isTopUp ? (
+                                              <span className="font-semibold text-emerald-700">Top-up</span>
+                                            ) : paymentVerified ? (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingExtra}
+                                                onClick={() => void addEarlierAsTopUp(p)}
+                                                className="rounded border border-blue-600 px-2 py-0.5 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                              >
+                                                Add as top-up
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                disabled={isVerifyingPayment}
+                                                onClick={() => pickEarlierPayment(p)}
+                                                className="rounded bg-blue-600 px-2 py-0.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                              >
+                                                Use
+                                              </button>
+                                            ))}
+                                        </span>
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </div>
+                            )}
                             <Field
                               label="Payment ID"
                               htmlFor="paymentId"
@@ -2009,8 +2504,8 @@ export function RegisterBusinessPage() {
                                     Payment Verified:{' '}
                                     <strong>
                                       ₹
-                                      {verifiedPaymentAmount != null &&
-                                        formatVerifiedRupees(verifiedPaymentAmount)}
+                                      {currentPaymentCheck?.amount != null &&
+                                        formatVerifiedRupees(Number(currentPaymentCheck.amount))}
                                     </strong>{' '}
                                     paid
                                     {paidOn &&
@@ -2020,10 +2515,111 @@ export function RegisterBusinessPage() {
                                         month: 'short',
                                         year: 'numeric',
                                       })}`}
+                                    {priorUsage.length > 0 && (
+                                      <>
+                                        {' · '}
+                                        <strong>₹{formatVerifiedRupees(primaryAvailable)}</strong>{' '}
+                                        available
+                                      </>
+                                    )}
                                   </span>
                                 </div>
                               )}
+                              {paymentVerified && priorUsage.length > 0 && (
+                                <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                  <p className="font-semibold">
+                                    Existing customer — this will be registered as a new business.
+                                  </p>
+                                  <p className="mt-0.5 text-blue-800">Already used from this payment:</p>
+                                  <ul className="mt-1 space-y-0.5">
+                                    {priorUsage.map((u, i) => (
+                                      <li key={`${u.businessName ?? 'business'}-${i}`} className="flex justify-between gap-3">
+                                        <span>{u.businessName || 'Earlier business'}</span>
+                                        <span className="font-semibold">
+                                          ₹{formatVerifiedRupees(Number(u.amount ?? 0))}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </Field>
+
+                            {paymentVerified && (
+                              <div className="mt-3 border-t border-slate-200 pt-3">
+                                <p className="text-xs font-semibold text-slate-600">
+                                  Top up with another payment
+                                  <span className="ml-1 font-normal text-slate-400">
+                                    (when the package costs more than what&apos;s available)
+                                  </span>
+                                </p>
+                                {activeExtraPayments.length > 0 && (
+                                  <ul className="mt-2 space-y-1">
+                                    {activeExtraPayments.map((p) => (
+                                      <li
+                                        key={p.paymentId}
+                                        className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-900"
+                                      >
+                                        <span className="truncate">
+                                          <Check className="mr-1 inline h-3.5 w-3.5 text-emerald-600" />
+                                          {p.paymentId}
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <strong>+₹{formatVerifiedRupees(p.available)}</strong>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExtraPayments((prev) =>
+                                                prev.filter((x) => x.paymentId !== p.paymentId),
+                                              )
+                                            }
+                                            aria-label={`Remove payment ${p.paymentId}`}
+                                            className="rounded p-0.5 text-emerald-700 hover:bg-emerald-100"
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                          </button>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <input
+                                    aria-label="Additional payment ID"
+                                    value={extraPaymentInput}
+                                    disabled={isVerifyingExtra}
+                                    onChange={(e) => {
+                                      setExtraPaymentInput(e.target.value.replace(/\s/g, ''))
+                                      setExtraPaymentError('')
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        void handleAddExtraPayment()
+                                      }
+                                    }}
+                                    placeholder="Another payment ID (e.g. pay_...)"
+                                    className={`${inputClass(!!extraPaymentError)} min-w-0 flex-1`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleAddExtraPayment()}
+                                    disabled={!extraPaymentInput.trim() || isVerifyingExtra}
+                                    className="h-9 shrink-0 whitespace-nowrap rounded-md border border-blue-600 px-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                  >
+                                    {isVerifyingExtra ? 'Verifying…' : 'Verify & Add'}
+                                  </button>
+                                </div>
+                                {extraPaymentError && (
+                                  <p className="mt-1 text-xs text-red-600">{extraPaymentError}</p>
+                                )}
+                                {activeExtraPayments.length > 0 && verifiedPaymentAmount != null && (
+                                  <p className="mt-1.5 text-xs font-semibold text-slate-700">
+                                    Total available: ₹{formatVerifiedRupees(verifiedPaymentAmount)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -2061,11 +2657,11 @@ export function RegisterBusinessPage() {
                               <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
                                 <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                                 <span>
-                                  Verified Payment:{' '}
+                                  Available to spend:{' '}
                                   <strong>
                                     ₹{formatVerifiedRupees(verifiedPaymentAmount)}
                                   </strong>
-                                  . Only packages within this amount can be selected.
+                                  . Packages above this need a top-up payment (above).
                                 </span>
                               </div>
                             )}
@@ -2427,7 +3023,7 @@ export function RegisterBusinessPage() {
 
                               const paid =
                                 verifiedPaymentAmount != null
-                                  ? verifiedPaymentAmount
+                                  ? Math.min(net, verifiedPaymentAmount)
                                   : parseInt(formData.amountPaid) || 0
                               const remaining = net - paid
                               handleInputChange(
@@ -2496,8 +3092,8 @@ export function RegisterBusinessPage() {
                             onSelect={(value) => {
                               handleInputChange('paymentType', value)
                               const fullPaid =
-                                verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : formData.totalAmount || ''
                               handleInputChange('amountPaid', fullPaid)
                               handleInputChange('amountRemaining', '')
@@ -2513,8 +3109,8 @@ export function RegisterBusinessPage() {
                               handleInputChange('paymentType', value)
                               const initialPaid =
                                 formData.amountPaid ||
-                                (verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                (appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : '')
                               handleInputChange('amountPaid', initialPaid)
                               const total = parseInt(formData.totalAmount) || 0
@@ -2532,8 +3128,8 @@ export function RegisterBusinessPage() {
                         const isPartTime = formData.paymentType === 'part-time'
                         const paidNum = isPartTime
                           ? parseInt(formData.amountPaid) || 0
-                          : verifiedPaymentAmount != null
-                            ? verifiedPaymentAmount
+                          : appliedFromBalance != null
+                            ? appliedFromBalance
                             : parseInt(formData.amountPaid) || 0
                         const remainingNum =
                           (parseInt(formData.totalAmount) || 0) - paidNum
@@ -2544,8 +3140,8 @@ export function RegisterBusinessPage() {
                           paidNum > remainingNum
                         const displayPaidValue = isPartTime
                           ? formData.amountPaid
-                          : verifiedPaymentAmount != null
-                            ? String(verifiedPaymentAmount)
+                          : appliedFromBalance != null
+                            ? String(appliedFromBalance)
                             : formData.totalAmount || ''
                         const isPaidDisabled = !isPartTime
                         return (
@@ -2561,7 +3157,7 @@ export function RegisterBusinessPage() {
                             hint={
                               isPartTime
                                 ? verifiedPaymentAmount != null
-                                  ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
+                                  ? `Editable for part-time (Available: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
                                   : undefined
                                 : verifiedPaymentAmount != null
                                   ? 'Auto-filled from verified Payment ID'
@@ -2673,7 +3269,7 @@ export function RegisterBusinessPage() {
                               id="gstinForInvoice"
                               value={formData.gstinForInvoice}
                               onChange={(e) =>
-                                handleInputChange('gstinForInvoice', e.target.value)
+                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
                               }
                               onBlur={(e) =>
                                 handleFieldBlur('gstinForInvoice', e.target.value)
@@ -2682,6 +3278,11 @@ export function RegisterBusinessPage() {
                               className={inputClass(shouldShowError('gstin'))}
                             />
                           </Field>
+                          <GstinDetailsCard
+                            details={gstinQuery.data}
+                            isLoading={gstinQuery.isFetching}
+                            error={gstinQuery.error}
+                          />
                         </div>
                       )}
                       {formData.invoiceOption === 'address' && (
@@ -3194,6 +3795,11 @@ export function RegisterBusinessPage() {
                           placeholder="e.g. 22AAAAA0000A1Z5"
                           className={inputClass()}
                         />
+                        <GstinDetailsCard
+                          details={gstinQuery.data}
+                          isLoading={gstinQuery.isFetching}
+                          error={gstinQuery.error}
+                        />
                       </div>
                     )}
 
@@ -3467,6 +4073,74 @@ export function RegisterBusinessPage() {
    Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
 
+/* Abstract blue background for the header "Login" button. */
+function LoginBlueBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="loginBlueGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3b82f6" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#loginBlueGrad)" />
+      <circle cx="104" cy="6" r="22" fill="#60a5fa" opacity="0.35" />
+      <circle cx="10" cy="42" r="18" fill="#1e40af" opacity="0.45" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#93c5fd"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#bfdbfe"
+        strokeOpacity="0.4"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
+/* Abstract orange background for the header "HRM Login" button. */
+function HrmOrangeBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="hrmOrangeGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fb923c" />
+          <stop offset="1" stopColor="#ea580c" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#hrmOrangeGrad)" />
+      <circle cx="102" cy="4" r="22" fill="#fdba74" opacity="0.4" />
+      <circle cx="12" cy="42" r="18" fill="#c2410c" opacity="0.4" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#fed7aa"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#ffedd5"
+        strokeOpacity="0.45"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
 function SectionHeading({
   number,
   title,
@@ -3606,10 +4280,10 @@ function FeaturesPanel({
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-amber-950">
-                Package exceeds verified payment
+                Package exceeds available balance
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
-                Price: ₹{cost.toLocaleString('en-IN')} (verified: ₹
+                Price: ₹{cost.toLocaleString('en-IN')} (available: ₹
                 {formatVerifiedRupees(verifiedAmount)}). Review only.
               </p>
             </div>
@@ -3677,7 +4351,7 @@ function FeaturesPanel({
           {selected
             ? 'Remove from selection'
             : exceeding
-              ? 'Exceeds verified payment'
+              ? 'Exceeds available balance'
               : 'Select this plan'}
         </button>
       </div>
@@ -3760,6 +4434,15 @@ function ChoiceCard({
 
 // Payment verification returns rupees. Razorpay and payment_info store the same
 // value in paise, so never render that database value directly in this form.
+/** Same masking as SMSB's PaymentRefCodec.mask: "pay_ABCDEF123456XyZ1" -> "pay_****XyZ1". */
+const maskPaymentId = (paymentId: string): string => {
+  if (paymentId.length <= 8) return '****'
+  const underscore = paymentId.indexOf('_')
+  const prefix =
+    underscore > 0 && underscore < 6 ? paymentId.slice(0, underscore + 1) : ''
+  return `${prefix}****${paymentId.slice(-4)}`
+}
+
 const formatVerifiedRupees = (amount: number): string =>
   amount.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
