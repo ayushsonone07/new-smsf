@@ -205,3 +205,66 @@
     flex-wrap: wrap;
   }
 }
+
+/* -- Leads Management Filter Date Picker Alignment -- */
+.leads-filter-date-picker {
+  position: relative;
+  width: 100%;
+}
+.leads-filter-date-picker .cl-range-picker {
+  width: 100%;
+  display: block;
+}
+.leads-filter-date-picker .cl-range-picker__trigger {
+  width: 100% !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  gap: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  box-sizing: border-box !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger:hover,
+.leads-filter-date-picker .cl-range-picker__trigger.is-open {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger svg {
+  width: 14px !important;
+  height: 14px !important;
+  color: #64748b !important;
+  flex-shrink: 0 !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 12px !important;
+  color: #334155 !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger.has-range {
+  border-color: #3b82f6 !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger.has-range svg {
+  color: #2563eb !important;
+}
+.leads-filter-date-picker .cl-range-picker__trigger.has-range span {
+  color: #1d4ed8 !important;
+  font-weight: 500 !important;
+}
+.leads-filter-date-picker .cl-date-picker {
+  right: 0 !important;
+  top: calc(100% + 4px) !important;
+  z-index: 60 !important;
+}
