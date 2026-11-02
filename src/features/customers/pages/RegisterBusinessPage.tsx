@@ -157,9 +157,9 @@ const SECTIONS: {
 
 /* UI only: steps that move on by themselves a moment after they become complete. */
 const AUTO_ADVANCE: Record<SectionId, boolean> = {
-  business: true,
+  business: false,
   packages: false,
-  financial: true,
+  financial: false,
   final: false,
 }
 const AUTO_ADVANCE_DELAY_MS = 1400
@@ -1424,7 +1424,10 @@ export function RegisterBusinessPage() {
     if (activeStep === 'packages' && !businessComplete) {
       setActiveStep('business')
     }
-  }, [activeStep, businessComplete])
+    if (activeStep === 'final' && !financialComplete) {
+      setActiveStep('financial')
+    }
+  }, [activeStep, businessComplete, financialComplete])
 
   /* ─── Combined validation — same rules/order/messages as before ─── */
   const handleFinalSubmit = useCallback(() => {
@@ -2007,7 +2010,7 @@ export function RegisterBusinessPage() {
         {/* ─── Step card ─── */}
         <main className="min-w-0 flex-1">
           <div
-            key={activeStep}
+            key={pageNumber}
             onInputCapture={() => {
               skipAutoAdvanceRef.current = false
             }}
@@ -2066,8 +2069,8 @@ export function RegisterBusinessPage() {
 
             {/* Card body */}
             <div className="flex-1 p-4 sm:p-[18px]">
-              {!isFirstPage && !unlocked[activeStep] ? (
-                <LockedNotice message={lockedMessages[activeStep]} />
+              {!isFirstPage && (!businessComplete || !packagesComplete) ? (
+                <LockedNotice message="Please complete Business Details and Package Selection on Page 1 first." />
               ) : (
                 <>
                   {/* ═══ 1 — Business Details ═══ */}
