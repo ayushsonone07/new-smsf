@@ -21,6 +21,7 @@ import {
   fetchPlansWithDepartments,
   registerCustomer,
   verifyPayment,
+  type PaymentUsage,
 } from '../../../api/register-business.api'
 import type {
   PlanAmount,
@@ -80,8 +81,21 @@ type PaymentCheck = {
   phone: string
   paymentId: string
   message?: string
+  /** Full payment amount (₹). */
   amount?: number | null
+  /** Still unspent (₹): a payment can fund several businesses of the same customer. */
+  available?: number | null
+  /** Earlier businesses that already used part of this payment. */
+  usedBy?: PaymentUsage[]
   paidAt?: string | null
+}
+
+/** A further verified payment that tops up the first one's remaining balance. */
+type ExtraPayment = {
+  phone: string
+  paymentId: string
+  amount: number
+  available: number
 }
 
 const INITIAL_VALIDATION_ERRORS = {
@@ -291,6 +305,10 @@ export function RegisterBusinessPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const [paymentCheck, setPaymentCheck] = useState<PaymentCheck | null>(null)
+  const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>([])
+  const [extraPaymentInput, setExtraPaymentInput] = useState('')
+  const [extraPaymentError, setExtraPaymentError] = useState('')
+  const [isVerifyingExtra, setIsVerifyingExtra] = useState(false)
 
   /* Wizard: which step card is currently shown */
   const [activeStep, setActiveStep] = useState<SectionId>('business')
@@ -505,6 +523,9 @@ export function RegisterBusinessPage() {
     setIncludeGst(true)
     setViewingPlanId(null)
     setPaymentCheck(null)
+    setExtraPayments([])
+    setExtraPaymentInput('')
+    setExtraPaymentError('')
     autoAdvanceArmed.current = {
       business: true,
       packages: true,
@@ -527,10 +548,36 @@ export function RegisterBusinessPage() {
   const isVerifyingPayment = currentPaymentCheck?.status === 'verifying'
   const paymentVerified =
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
-  const verifiedPaymentAmount =
-    paymentVerified && currentPaymentCheck?.amount != null
-      ? Number(currentPaymentCheck.amount)
-      : null
+  /* Extra payments only count for the phone they were verified against. */
+  const activeExtraPayments = useMemo(
+    () =>
+      paymentVerified
+        ? extraPayments.filter((p) => p.phone === paymentPhone)
+        : [],
+    [paymentVerified, extraPayments, paymentPhone],
+  )
+  const primaryAvailable =
+    paymentVerified && currentPaymentCheck
+      ? Number(currentPaymentCheck.available ?? currentPaymentCheck.amount ?? 0)
+      : 0
+  /*
+   * What can still be spent on this business (₹): what is left of the first
+   * payment after the customer's earlier businesses, plus any top-up payments.
+   * Packages are limited to this amount.
+   */
+  const verifiedPaymentAmount = paymentVerified
+    ? primaryAvailable +
+      activeExtraPayments.reduce((sum, p) => sum + p.available, 0)
+    : null
+  const priorUsage = paymentVerified ? currentPaymentCheck?.usedBy ?? [] : []
+  /* The share of the balance this business takes; anything beyond the total stays as credit. */
+  const enteredTotal = parseInt(formData.totalAmount) || 0
+  const appliedFromBalance =
+    verifiedPaymentAmount == null
+      ? null
+      : enteredTotal > 0
+        ? Math.min(enteredTotal, verifiedPaymentAmount)
+        : verifiedPaymentAmount
 
   const handleVerifyPayment = useCallback(async () => {
     const phone = formData.phoneNumber.trim()
@@ -540,6 +587,8 @@ export function RegisterBusinessPage() {
     const isSameCheck = (prev: PaymentCheck | null) =>
       !!prev && prev.phone === phone && prev.paymentId === paymentId
     setPaymentCheck({ status: 'verifying', phone, paymentId })
+    setExtraPayments([])
+    setExtraPaymentError('')
 
     try {
       const res = await verifyPayment(phone, paymentId)
@@ -551,6 +600,8 @@ export function RegisterBusinessPage() {
               phone,
               paymentId,
               amount: res.data?.amount ?? null,
+              available: res.data?.available ?? res.data?.amount ?? null,
+              usedBy: res.data?.usedBy ?? [],
               paidAt: res.data?.paidAt ?? null,
             }
           : {
@@ -561,14 +612,17 @@ export function RegisterBusinessPage() {
             }
       })
 
-      if (res.success && res.data?.amount != null) {
-        const verifiedAmt = Number(res.data.amount)
+      const available = res.data?.available ?? res.data?.amount
+      if (res.success && available != null) {
+        const availableAmt = Number(available)
         setFormData((prev) => {
           const total = parseInt(prev.totalAmount) || 0
-          const remaining = total - verifiedAmt
+          // Only the package's share is spent; anything left stays as credit.
+          const paid = total > 0 ? Math.min(total, availableAmt) : availableAmt
+          const remaining = total - paid
           return {
             ...prev,
-            amountPaid: String(verifiedAmt),
+            amountPaid: String(paid),
             amountRemaining: remaining > 0 ? String(remaining) : '',
           }
         })
@@ -586,6 +640,44 @@ export function RegisterBusinessPage() {
       )
     }
   }, [formData.phoneNumber, formData.paymentId])
+
+  /* ─── Top-up: another verified payment adds to the available balance. ─── */
+  const handleAddExtraPayment = useCallback(async () => {
+    const phone = formData.phoneNumber.trim()
+    const paymentId = extraPaymentInput.trim()
+    if (!validatePhoneNumber(phone) || !paymentId) return
+    const alreadyAdded =
+      paymentId === formData.paymentId.trim() ||
+      extraPayments.some((p) => p.phone === phone && p.paymentId === paymentId)
+    if (alreadyAdded) {
+      setExtraPaymentError('This payment ID is already added')
+      return
+    }
+
+    setIsVerifyingExtra(true)
+    setExtraPaymentError('')
+    try {
+      const res = await verifyPayment(phone, paymentId)
+      const available = Number(res.data?.available ?? res.data?.amount ?? 0)
+      if (!res.success || available <= 0) {
+        setExtraPaymentError(res.message || 'Payment could not be verified')
+        return
+      }
+      setExtraPayments((prev) => [
+        ...prev,
+        { phone, paymentId, amount: Number(res.data?.amount ?? available), available },
+      ])
+      setExtraPaymentInput('')
+    } catch (error) {
+      setExtraPaymentError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Payment could not be verified',
+      )
+    } finally {
+      setIsVerifyingExtra(false)
+    }
+  }, [formData.phoneNumber, formData.paymentId, extraPaymentInput, extraPayments])
 
   /* ─── Plan pricing from planAmounts ─── */
   const priceOf = useCallback(
@@ -645,8 +737,8 @@ export function RegisterBusinessPage() {
         if (pkgPrice > verifiedPaymentAmount) {
           const extra = pkgPrice - verifiedPaymentAmount
           showToast({
-            title: 'Package Exceeds Verified Payment',
-            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            title: 'Package Exceeds Available Balance',
+            description: `"${pkg.name}" costs ₹${pkgPrice.toLocaleString('en-IN')}, which exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or choose a package within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -670,8 +762,8 @@ export function RegisterBusinessPage() {
         if (totalSelected > verifiedPaymentAmount) {
           const extra = totalSelected - verifiedPaymentAmount
           showToast({
-            title: 'Total Exceeds Verified Payment',
-            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
+            title: 'Total Exceeds Available Balance',
+            description: `Selected packages total ₹${totalSelected.toLocaleString('en-IN')}, which exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or choose packages within ₹${verifiedPaymentAmount.toLocaleString('en-IN')}.`,
             variant: 'destructive',
           })
           return
@@ -705,18 +797,28 @@ export function RegisterBusinessPage() {
 
   /* Total Amount follows the selected plans */
   const lastAutoTotal = useRef(0)
+  const lastAvailable = useRef<number | null>(null)
   useEffect(() => {
-    if (autoTotal === lastAutoTotal.current) return
+    // Re-run when the plans' total changes, or when a top-up changes what is available.
+    if (
+      autoTotal === lastAutoTotal.current &&
+      verifiedPaymentAmount === lastAvailable.current
+    )
+      return
     const hadAutoTotal = lastAutoTotal.current > 0
     lastAutoTotal.current = autoTotal
+    lastAvailable.current = verifiedPaymentAmount
     if (autoTotal <= 0 && !hadAutoTotal) return
     const value = autoTotal > 0 ? String(autoTotal) : ''
     setFormData((prev) => {
       if (verifiedPaymentAmount != null) {
+        // Only the package's share of the balance is spent; the rest stays as credit.
         const currentPaid =
           prev.paymentType === 'part-time' && prev.amountPaid
-            ? parseInt(prev.amountPaid) || 0
-            : verifiedPaymentAmount
+            ? Math.min(parseInt(prev.amountPaid) || 0, verifiedPaymentAmount)
+            : autoTotal > 0
+              ? Math.min(autoTotal, verifiedPaymentAmount)
+              : verifiedPaymentAmount
         const remaining = autoTotal - currentPaid
         return {
           ...prev,
@@ -1002,8 +1104,8 @@ export function RegisterBusinessPage() {
       if (currentTotal > verifiedPaymentAmount) {
         const extra = currentTotal - verifiedPaymentAmount
         showToast({
-          title: 'Total Exceeds Verified Payment',
-          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds your verified payment of ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Please adjust your packages to match the paid amount.`,
+          title: 'Total Exceeds Available Balance',
+          description: `Total amount (₹${currentTotal.toLocaleString('en-IN')}) exceeds the available ₹${verifiedPaymentAmount.toLocaleString('en-IN')} by ₹${extra.toLocaleString('en-IN')}. Top up with another payment ID or adjust the packages.`,
           variant: 'destructive',
         })
         scrollToSection('packages')
@@ -1197,8 +1299,8 @@ export function RegisterBusinessPage() {
         amountPaid:
           formData.paymentType === 'part-time'
             ? formData.amountPaid || '0'
-            : verifiedPaymentAmount != null
-              ? String(verifiedPaymentAmount)
+            : appliedFromBalance != null
+              ? String(appliedFromBalance)
               : formData.amountPaid || '0',
         totalAmountToBeTaken: formData.totalAmount || '0',
         leadType: formData.leadType,
@@ -1211,6 +1313,7 @@ export function RegisterBusinessPage() {
         isWebinarClient: formData.isWebinarClient,
         onboardingCity: formData.onboardingCity,
         paymentId: formData.paymentId.trim(),
+        additionalPaymentIds: activeExtraPayments.map((p) => p.paymentId),
       }
 
       await registerCustomer(customerData)
@@ -1241,7 +1344,8 @@ export function RegisterBusinessPage() {
     showToast,
     resetForm,
     paymentVerified,
-    verifiedPaymentAmount,
+    appliedFromBalance,
+    activeExtraPayments,
     scrollToSection,
   ])
 
@@ -1679,7 +1783,7 @@ export function RegisterBusinessPage() {
                               <p className="leading-relaxed text-blue-700">
                                 Please enter and verify the customer's payment ID
                                 first. Once verified, you will be able to select
-                                packages within your verified payment amount.
+                                packages within the amount still available on it.
                               </p>
                             </div>
                           </div>
@@ -1763,8 +1867,8 @@ export function RegisterBusinessPage() {
                                     Payment Verified:{' '}
                                     <strong>
                                       ₹
-                                      {verifiedPaymentAmount != null &&
-                                        formatVerifiedRupees(verifiedPaymentAmount)}
+                                      {currentPaymentCheck?.amount != null &&
+                                        formatVerifiedRupees(Number(currentPaymentCheck.amount))}
                                     </strong>{' '}
                                     paid
                                     {paidOn &&
@@ -1774,10 +1878,111 @@ export function RegisterBusinessPage() {
                                         month: 'short',
                                         year: 'numeric',
                                       })}`}
+                                    {priorUsage.length > 0 && (
+                                      <>
+                                        {' · '}
+                                        <strong>₹{formatVerifiedRupees(primaryAvailable)}</strong>{' '}
+                                        available
+                                      </>
+                                    )}
                                   </span>
                                 </div>
                               )}
+                              {paymentVerified && priorUsage.length > 0 && (
+                                <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                  <p className="font-semibold">
+                                    Existing customer — this will be registered as a new business.
+                                  </p>
+                                  <p className="mt-0.5 text-blue-800">Already used from this payment:</p>
+                                  <ul className="mt-1 space-y-0.5">
+                                    {priorUsage.map((u, i) => (
+                                      <li key={`${u.businessName ?? 'business'}-${i}`} className="flex justify-between gap-3">
+                                        <span>{u.businessName || 'Earlier business'}</span>
+                                        <span className="font-semibold">
+                                          ₹{formatVerifiedRupees(Number(u.amount ?? 0))}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </Field>
+
+                            {paymentVerified && (
+                              <div className="mt-3 border-t border-slate-200 pt-3">
+                                <p className="text-xs font-semibold text-slate-600">
+                                  Top up with another payment
+                                  <span className="ml-1 font-normal text-slate-400">
+                                    (when the package costs more than what&apos;s available)
+                                  </span>
+                                </p>
+                                {activeExtraPayments.length > 0 && (
+                                  <ul className="mt-2 space-y-1">
+                                    {activeExtraPayments.map((p) => (
+                                      <li
+                                        key={p.paymentId}
+                                        className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-900"
+                                      >
+                                        <span className="truncate">
+                                          <Check className="mr-1 inline h-3.5 w-3.5 text-emerald-600" />
+                                          {p.paymentId}
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                          <strong>+₹{formatVerifiedRupees(p.available)}</strong>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExtraPayments((prev) =>
+                                                prev.filter((x) => x.paymentId !== p.paymentId),
+                                              )
+                                            }
+                                            aria-label={`Remove payment ${p.paymentId}`}
+                                            className="rounded p-0.5 text-emerald-700 hover:bg-emerald-100"
+                                          >
+                                            <X className="h-3.5 w-3.5" />
+                                          </button>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <input
+                                    aria-label="Additional payment ID"
+                                    value={extraPaymentInput}
+                                    disabled={isVerifyingExtra}
+                                    onChange={(e) => {
+                                      setExtraPaymentInput(e.target.value.replace(/\s/g, ''))
+                                      setExtraPaymentError('')
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        void handleAddExtraPayment()
+                                      }
+                                    }}
+                                    placeholder="Another payment ID (e.g. pay_...)"
+                                    className={`${inputClass(!!extraPaymentError)} min-w-0 flex-1`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleAddExtraPayment()}
+                                    disabled={!extraPaymentInput.trim() || isVerifyingExtra}
+                                    className="h-9 shrink-0 whitespace-nowrap rounded-md border border-blue-600 px-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                                  >
+                                    {isVerifyingExtra ? 'Verifying…' : 'Verify & Add'}
+                                  </button>
+                                </div>
+                                {extraPaymentError && (
+                                  <p className="mt-1 text-xs text-red-600">{extraPaymentError}</p>
+                                )}
+                                {activeExtraPayments.length > 0 && verifiedPaymentAmount != null && (
+                                  <p className="mt-1.5 text-xs font-semibold text-slate-700">
+                                    Total available: ₹{formatVerifiedRupees(verifiedPaymentAmount)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1815,11 +2020,11 @@ export function RegisterBusinessPage() {
                               <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
                                 <Check className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                                 <span>
-                                  Verified Payment:{' '}
+                                  Available to spend:{' '}
                                   <strong>
                                     ₹{formatVerifiedRupees(verifiedPaymentAmount)}
                                   </strong>
-                                  . Only packages within this amount can be selected.
+                                  . Packages above this need a top-up payment (above).
                                 </span>
                               </div>
                             )}
@@ -1881,7 +2086,7 @@ export function RegisterBusinessPage() {
                                         if (isExceedingPayment) {
                                           showToast({
                                             title: 'Reviewing Package Features',
-                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds verified payment of ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Viewing features in the side panel.`,
+                                            description: `${pkg.name} (₹${pkgCost.toLocaleString('en-IN')}) exceeds the available ₹${formatVerifiedRupees(verifiedPaymentAmount)}. Add another payment ID above to top up. Viewing features in the side panel.`,
                                             variant: 'default',
                                           })
                                           return
@@ -2108,7 +2313,7 @@ export function RegisterBusinessPage() {
                               const total = parseInt(value) || 0
                               const paid =
                                 verifiedPaymentAmount != null
-                                  ? verifiedPaymentAmount
+                                  ? Math.min(total, verifiedPaymentAmount)
                                   : parseInt(formData.amountPaid) || 0
                               const remaining = total - paid
                               handleInputChange(
@@ -2159,8 +2364,8 @@ export function RegisterBusinessPage() {
                             onSelect={(value) => {
                               handleInputChange('paymentType', value)
                               const fullPaid =
-                                verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : formData.totalAmount || ''
                               handleInputChange('amountPaid', fullPaid)
                               handleInputChange('amountRemaining', '')
@@ -2176,8 +2381,8 @@ export function RegisterBusinessPage() {
                               handleInputChange('paymentType', value)
                               const initialPaid =
                                 formData.amountPaid ||
-                                (verifiedPaymentAmount != null
-                                  ? String(verifiedPaymentAmount)
+                                (appliedFromBalance != null
+                                  ? String(appliedFromBalance)
                                   : '')
                               handleInputChange('amountPaid', initialPaid)
                               const total = parseInt(formData.totalAmount) || 0
@@ -2195,8 +2400,8 @@ export function RegisterBusinessPage() {
                         const isPartTime = formData.paymentType === 'part-time'
                         const paidNum = isPartTime
                           ? parseInt(formData.amountPaid) || 0
-                          : verifiedPaymentAmount != null
-                            ? verifiedPaymentAmount
+                          : appliedFromBalance != null
+                            ? appliedFromBalance
                             : parseInt(formData.amountPaid) || 0
                         const remainingNum =
                           (parseInt(formData.totalAmount) || 0) - paidNum
@@ -2207,8 +2412,8 @@ export function RegisterBusinessPage() {
                           paidNum > remainingNum
                         const displayPaidValue = isPartTime
                           ? formData.amountPaid
-                          : verifiedPaymentAmount != null
-                            ? String(verifiedPaymentAmount)
+                          : appliedFromBalance != null
+                            ? String(appliedFromBalance)
                             : formData.totalAmount || ''
                         const isPaidDisabled = !isPartTime
                         return (
@@ -2224,7 +2429,7 @@ export function RegisterBusinessPage() {
                             hint={
                               isPartTime
                                 ? verifiedPaymentAmount != null
-                                  ? `Editable for part-time (Verified: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
+                                  ? `Editable for part-time (Available: ₹${verifiedPaymentAmount.toLocaleString('en-IN')})`
                                   : undefined
                                 : verifiedPaymentAmount != null
                                   ? 'Auto-filled from verified Payment ID'
@@ -2671,10 +2876,10 @@ function FeaturesPanel({
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-amber-950">
-                Package exceeds verified payment
+                Package exceeds available balance
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
-                Price: ₹{cost.toLocaleString('en-IN')} (verified: ₹
+                Price: ₹{cost.toLocaleString('en-IN')} (available: ₹
                 {formatVerifiedRupees(verifiedAmount)}). Review only.
               </p>
             </div>
@@ -2742,7 +2947,7 @@ function FeaturesPanel({
           {selected
             ? 'Remove from selection'
             : exceeding
-              ? 'Exceeds verified payment'
+              ? 'Exceeds available balance'
               : 'Select this plan'}
         </button>
       </div>

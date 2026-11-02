@@ -37,6 +37,8 @@ export interface CustomerRegistrationRequest {
   isWebinarClient: string
   onboardingCity: string
   paymentId?: string
+  /** Further verified payments that top up paymentId's remaining balance, used in order. */
+  additionalPaymentIds?: string[]
 }
 
 /** Minimal identity kept after registration so the payment screenshot can be uploaded against it. */
