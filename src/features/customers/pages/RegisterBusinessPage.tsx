@@ -33,6 +33,7 @@ import {
 import type {
   PlanAmount,
   PlanWithDepartments,
+  CustomerRegistrationRequest,
 } from '../types/register-business.types'
 import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
@@ -141,6 +142,8 @@ interface RegistrationSuccess {
   total: number
   paid: number
   balance: number
+  gstInfo?: string
+  discountInfo?: string
 }
 
 const SECTIONS: {
@@ -1740,7 +1743,16 @@ export function RegisterBusinessPage() {
           ? formData.gstinForInvoice
           : formData.completeAddress
 
-      const customerData = {
+      const baseWithoutGst = includeGst
+        ? (selectedPlans.length > 0
+            ? selectedPlans.reduce((sum, p) => sum + priceOf(p.name).amount, 0)
+            : Math.round(rawBaseAmount / 1.18))
+        : rawBaseAmount
+      const calculatedGstAmount = includeGst
+        ? Math.max(0, rawBaseAmount - baseWithoutGst)
+        : 0
+
+      const customerData: CustomerRegistrationRequest = {
         clientName: formData.ownerName,
         businessName: formData.businessName,
         clientEmail: formData.email,
@@ -1777,6 +1789,13 @@ export function RegisterBusinessPage() {
         discountPercent: discountPctNum > 0 ? String(discountPctNum) : undefined,
         discountAmount: discountAmount > 0 ? String(discountAmount) : undefined,
         originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
+        includeGst,
+        isGstIncluded: includeGst ? 'true' : 'false',
+        gstRate: includeGst ? '18%' : '0%',
+        gstPercent: includeGst ? '18' : '0',
+        gstAmount: includeGst ? String(calculatedGstAmount) : '0',
+        gst: includeGst ? String(calculatedGstAmount) : '0',
+        baseAmountWithoutGst: String(baseWithoutGst),
         remark:
           discountPctNum > 0
             ? `[Discount: ${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})] ${formData.remark}`.trim()
@@ -1803,6 +1822,13 @@ export function RegisterBusinessPage() {
         total: submittedTotal,
         paid: submittedPaid,
         balance: Math.max(0, submittedTotal - submittedPaid),
+        gstInfo: includeGst
+          ? `18% Incl. (₹${calculatedGstAmount.toLocaleString('en-IN')})`
+          : 'Excluded (0%)',
+        discountInfo:
+          discountPctNum > 0
+            ? `${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})`
+            : undefined,
       })
 
       showToast({
@@ -1834,6 +1860,14 @@ export function RegisterBusinessPage() {
     activeExtraPayments,
     activePickedRef,
     scrollToSection,
+    includeGst,
+    selectedPlans,
+    priceOf,
+    rawBaseAmount,
+    discountPctNum,
+    discountAmount,
+    autoTotal,
+    verifiedPaymentAmount,
   ])
 
   const inputClass = (hasError?: boolean) =>
@@ -1874,6 +1908,12 @@ export function RegisterBusinessPage() {
           ? `₹${registrationSuccess.balance.toLocaleString('en-IN')}`
           : 'Nil',
       ],
+      ...(registrationSuccess.gstInfo
+        ? [['GST', registrationSuccess.gstInfo]]
+        : []),
+      ...(registrationSuccess.discountInfo
+        ? [['Discount', registrationSuccess.discountInfo]]
+        : []),
     ]
 
     return (

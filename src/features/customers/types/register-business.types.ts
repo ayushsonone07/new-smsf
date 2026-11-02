@@ -45,6 +45,13 @@ export interface CustomerRegistrationRequest {
   discountPercent?: string
   discountAmount?: string
   originalAmount?: string
+  includeGst?: boolean
+  isGstIncluded?: string
+  gstRate?: string
+  gstPercent?: string
+  gstAmount?: string
+  gst?: string
+  baseAmountWithoutGst?: string
 }
 
 /** Minimal identity kept after registration so the payment screenshot can be uploaded against it. */

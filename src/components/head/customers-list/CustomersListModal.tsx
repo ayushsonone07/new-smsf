@@ -1464,6 +1464,45 @@ export function CustomersListModal({
                     }
                   />
                   <Field
+                    label="GST Status"
+                    value={
+                      (() => {
+                        const isInc =
+                          apiDetails.profile?.isGstIncluded ??
+                          (apiDetails.profile?.includeGst !== undefined
+                            ? String(apiDetails.profile?.includeGst)
+                            : undefined) ??
+                          rowDetails?.isGstIncluded ??
+                          (rowDetails?.includeGst !== undefined
+                            ? String(rowDetails?.includeGst)
+                            : undefined)
+                        if (isInc === 'true' || isInc === '1' || isInc === 'yes') {
+                          const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount || apiDetails.profile?.gst || rowDetails?.gst
+                          return amt ? `Included (18% · ${formatCurrency(amt)})` : 'Included (18%)'
+                        }
+                        if (isInc === 'false' || isInc === '0' || isInc === 'no') {
+                          return 'Excluded (0%)'
+                        }
+                        return '-'
+                      })()
+                    }
+                  />
+                  {(apiDetails.profile?.discountPercent || rowDetails?.discountPercent || apiDetails.profile?.discountAmount || rowDetails?.discountAmount) ? (
+                    <Field
+                      label="Discount"
+                      value={
+                        (() => {
+                          const pct = apiDetails.profile?.discountPercent || rowDetails?.discountPercent
+                          const amt = apiDetails.profile?.discountAmount || rowDetails?.discountAmount
+                          if (pct && amt) return `${pct}% (${formatCurrency(amt)})`
+                          if (pct) return `${pct}%`
+                          if (amt) return formatCurrency(amt)
+                          return '-'
+                        })()
+                      }
+                    />
+                  ) : null}
+                  <Field
                     label="Service expiry"
                     value={
                       apiDetails.profile?.serviceExpiration ||
@@ -2115,6 +2154,45 @@ export function CustomersListModal({
                         label="Outstanding"
                         value={formatCurrency(billingCustomer.amountPending)}
                       />
+                      <Field
+                        label="GST Status"
+                        value={
+                          (() => {
+                            const isInc =
+                              apiDetails.profile?.isGstIncluded ??
+                              (apiDetails.profile?.includeGst !== undefined
+                                ? String(apiDetails.profile?.includeGst)
+                                : undefined) ??
+                              rowDetails?.isGstIncluded ??
+                              (rowDetails?.includeGst !== undefined
+                                ? String(rowDetails?.includeGst)
+                                : undefined)
+                            if (isInc === 'true' || isInc === '1' || isInc === 'yes') {
+                              const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount || apiDetails.profile?.gst || rowDetails?.gst
+                              return amt ? `Included (18% · ${formatCurrency(amt)})` : 'Included (18%)'
+                            }
+                            if (isInc === 'false' || isInc === '0' || isInc === 'no') {
+                              return 'Excluded (0%)'
+                            }
+                            return '-'
+                          })()
+                        }
+                      />
+                      {(apiDetails.profile?.discountPercent || rowDetails?.discountPercent || apiDetails.profile?.discountAmount || rowDetails?.discountAmount) ? (
+                        <Field
+                          label="Discount"
+                          value={
+                            (() => {
+                              const pct = apiDetails.profile?.discountPercent || rowDetails?.discountPercent
+                              const amt = apiDetails.profile?.discountAmount || rowDetails?.discountAmount
+                              if (pct && amt) return `${pct}% (${formatCurrency(amt)})`
+                              if (pct) return `${pct}%`
+                              if (amt) return formatCurrency(amt)
+                              return '-'
+                            })()
+                          }
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </>
