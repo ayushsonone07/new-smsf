@@ -1370,7 +1370,7 @@ export function RegisterBusinessPage() {
         originalAmount: rawBaseAmount > 0 ? String(rawBaseAmount) : undefined,
         remark:
           discountPctNum > 0
-            ? `[Discount: ${discountPctNum}% (-₹${discountAmount.toLocaleString('en-IN')})] ${formData.remark}`.trim()
+            ? `[Discount: ${discountPctNum}%${discountAmount > 0 ? ` (-₹${discountAmount.toLocaleString('en-IN')})` : ''}] ${formData.remark}`.trim()
             : formData.remark,
       }
 
@@ -2473,7 +2473,7 @@ export function RegisterBusinessPage() {
                             </span>
                             {discountPctNum > 0 && (
                               <span className="font-semibold text-emerald-700">
-                                Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                                Discount ({discountPctNum}%): {discountAmount > 0 ? `-₹${discountAmount.toLocaleString('en-IN')}` : '₹0'}
                               </span>
                             )}
                             <span className="text-slate-700">
@@ -3115,7 +3115,7 @@ export function RegisterBusinessPage() {
                       </span>
                       {discountPctNum > 0 && (
                         <span className="font-semibold text-emerald-700">
-                          Discount ({discountPctNum}%): -₹{discountAmount.toLocaleString('en-IN')}
+                          Discount ({discountPctNum}%): {discountAmount > 0 ? `-₹${discountAmount.toLocaleString('en-IN')}` : '₹0'}
                         </span>
                       )}
                       <span className="text-slate-700">
