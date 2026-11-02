@@ -37,6 +37,7 @@ import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
+import { ScrollableSelect } from '../../../components/ui/ScrollableSelect'
 import '../../customers/pages/AdminCustomersPage.css'
 
 const LEAD_STATUS_OPTIONS = [
@@ -131,6 +132,15 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const [selectedLeadType, setSelectedLeadType] = useState('all')
   const [selectedFunnel, setSelectedFunnel] = useState('all')
   const [funnels, setFunnels] = useState<FunnelItem[]>([])
+  const funnelOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return funnels.flatMap((funnel) => {
+      const name = funnel.funnelName || funnel.funnelType || ''
+      if (!name || seen.has(name)) return []
+      seen.add(name)
+      return [{ value: name, label: name }]
+    })
+  }, [funnels])
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
 
   // Selection
@@ -417,29 +427,6 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                 </button>
               )}
 
-              {/* Quick Funnel Filter */}
-              <div className="relative">
-                <select
-                  value={selectedFunnel}
-                  onChange={(e) => {
-                    setSelectedFunnel(e.target.value)
-                    setCurrentPage(0)
-                  }}
-                  className={`h-8 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-blue-500 ${
-                    selectedFunnel !== 'all'
-                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <option value="all">All Funnels</option>
-                  {funnels.map((f, i) => (
-                    <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                      {f.funnelName || f.funnelType}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <button
                 type="button"
                 onClick={() => setShowFilters(!showFilters)}
@@ -553,21 +540,19 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
                   Funnel Type
                 </label>
-                <select
+                <ScrollableSelect
                   value={selectedFunnel}
-                  onChange={(e) => {
-                    setSelectedFunnel(e.target.value)
+                  pinnedOption={{ value: 'all', label: 'All Funnels' }}
+                  onChange={(value) => {
+                    setSelectedFunnel(value)
                     setCurrentPage(0)
                   }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="all">All Funnels</option>
-                  {funnels.map((f, i) => (
-                    <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                      {f.funnelName || f.funnelType}
-                    </option>
-                  ))}
-                </select>
+                  options={funnelOptions}
+                  placeholder="All Funnels"
+                  pageSize={10}
+                  width="100%"
+                  maxHeight={220}
+                />
               </div>
 
               {hasActiveFilters && (
