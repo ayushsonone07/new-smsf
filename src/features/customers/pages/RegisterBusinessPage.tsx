@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Hash,
+  Info,
   Lock,
   MapPin,
   Package,
@@ -18,7 +19,10 @@ import {
   X,
 } from 'lucide-react'
 import {
+  type GstinDetails,
   fetchPlanAmounts,
+  fetchGstinDetails,
+  fetchPaymentInfo,
   fetchPlansWithDepartments,
   registerCustomer,
   verifyPayment,
@@ -291,6 +295,77 @@ const WIZARD_STYLES = `
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
+function GstinDetailsCard({
+  details,
+  isLoading,
+  error,
+}: {
+  details?: GstinDetails
+  isLoading: boolean
+  error: Error | null
+}) {
+  if (isLoading) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-blue-600" role="status">
+        Verifying GSTIN…
+      </p>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
+        {error.message || 'Unable to verify this GSTIN'}
+      </p>
+    )
+  }
+
+  if (!details) return null
+
+  return (
+    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3" aria-live="polite">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-900">
+          {details.trade_name || details.legal_name || 'GST registered customer'}
+        </p>
+        {details.status && (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${details.status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            {details.status}
+          </span>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-slate-500">Legal name</dt>
+          <dd className="font-semibold text-slate-900">{details.legal_name || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Taxpayer type</dt>
+          <dd className="font-semibold text-slate-900">{details.taxpayer_type || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Business constitution</dt>
+          <dd className="font-semibold text-slate-900">{details.business_constitution || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Registration date</dt>
+          <dd className="font-semibold text-slate-900">{details.registration_date || '—'}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="font-semibold text-slate-500">Registered address</dt>
+          <dd className="font-semibold text-slate-900">{details.address || '—'}</dd>
+        </div>
+        {!!details.nature_of_business?.length && (
+          <div className="sm:col-span-2">
+            <dt className="font-semibold text-slate-500">Nature of business</dt>
+            <dd className="font-semibold text-slate-900">{details.nature_of_business.join(', ')}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  )
+}
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
 
@@ -316,6 +391,39 @@ export function RegisterBusinessPage() {
     (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
+
+  const normalizedGstin = formData.gstinForInvoice.trim().toUpperCase()
+  const gstinQuery = useQuery({
+    queryKey: ['register-business', 'gstin', normalizedGstin],
+    queryFn: () => fetchGstinDetails(normalizedGstin),
+    enabled:
+      formData.invoiceOption === 'gstin' &&
+      validateGSTNumber(normalizedGstin),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+
+  const paymentInfoQuery = useQuery({
+    queryKey: ['register-business', 'payment-info', formData.email.trim().toLowerCase()],
+    queryFn: () => fetchPaymentInfo(formData.email),
+    enabled: validateEmail(formData.email.trim()),
+    staleTime: 30_000,
+    retry: false,
+  })
+
+  const matchedPaymentInfo = useMemo(() => {
+    const normalizedEmail = formData.email.trim().toLowerCase()
+    if (!validateEmail(normalizedEmail)) return null
+
+    return paymentInfoQuery.data?.find(
+      (payment) =>
+        payment.customerEmail?.trim().toLowerCase() === normalizedEmail &&
+        payment.paymentReference?.trim(),
+    )
+  }, [formData.email, paymentInfoQuery.data])
+
+  const paymentReference = matchedPaymentInfo?.paymentReference?.trim() || null
+
   const [validationErrors, setValidationErrors] = useState({
     ...INITIAL_VALIDATION_ERRORS,
   })
@@ -1810,16 +1918,18 @@ export function RegisterBusinessPage() {
             onClick={() => {
               window.location.href = '/hrm/login'
             }}
-            className="hidden h-[34px] cursor-pointer items-center rounded-[10px] border border-[#e2e6ee] bg-white px-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f4f6fb] md:inline-flex"
+            className="relative hidden h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] md:inline-flex"
           >
-            HRM Login
+            <HrmOrangeBg />
+            <span className="relative z-10">HRM Login</span>
           </button>
           <button
             type="button"
             onClick={() => navigate({ to: '/login' as never })}
-            className="inline-flex h-[34px] cursor-pointer items-center rounded-[10px] bg-[#2459e0] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1a45b8] sm:px-4"
+            className="relative inline-flex h-[34px] cursor-pointer items-center overflow-hidden rounded-[10px] px-3 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] sm:px-4"
           >
-            Login
+            <LoginBlueBg />
+            <span className="relative z-10">Login</span>
           </button>
         </div>
         <div className="h-0.5 bg-[#eef1f6] sm:hidden">
@@ -2015,6 +2125,38 @@ export function RegisterBusinessPage() {
                             )}
                           />
                         </Field>
+                        {paymentReference && (
+                          <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-slate-600" aria-live="polite">
+                            <span>
+                              Sold by <strong className="font-bold text-slate-900">{paymentReference}</strong>
+                            </span>
+                            <details className="group relative">
+                              <summary
+                                className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&::-webkit-details-marker]:hidden"
+                                aria-label="View payment information"
+                                title="View payment information"
+                              >
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-blue-500 bg-blue-50 text-blue-600 transition-colors group-open:bg-blue-600 group-open:text-white">
+                                  <Info size={13} strokeWidth={2.5} aria-hidden="true" />
+                                </span>
+                              </summary>
+                              <div className="absolute right-0 z-30 mt-1 w-[min(21rem,calc(100vw-3rem))] rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-600 shadow-xl">
+                                <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 break-words">
+                                  <dt className="text-slate-500">Payment reference</dt>
+                                  <dd className="min-w-0 break-all font-bold text-slate-900">{matchedPaymentInfo?.paymentReference || '—'}</dd>
+                                  <dt className="text-slate-500">Created at</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.createdAt || '—'}</dd>
+                                  <dt className="text-slate-500">Customer phone</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.customerPhone || '—'}</dd>
+                                  <dt className="text-slate-500">Customer email</dt>
+                                  <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.customerEmail || '—'}</dd>
+                                  <dt className="text-slate-500">Amount</dt>
+                                  <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.amount == null ? '—' : `₹${Number(matchedPaymentInfo.amount).toFixed(2)}`}</dd>
+                                </dl>
+                              </div>
+                            </details>
+                          </div>
+                        )}
                       </div>
                       <Field
                         label="Phone Number"
@@ -3127,7 +3269,7 @@ export function RegisterBusinessPage() {
                               id="gstinForInvoice"
                               value={formData.gstinForInvoice}
                               onChange={(e) =>
-                                handleInputChange('gstinForInvoice', e.target.value)
+                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
                               }
                               onBlur={(e) =>
                                 handleFieldBlur('gstinForInvoice', e.target.value)
@@ -3136,6 +3278,11 @@ export function RegisterBusinessPage() {
                               className={inputClass(shouldShowError('gstin'))}
                             />
                           </Field>
+                          <GstinDetailsCard
+                            details={gstinQuery.data}
+                            isLoading={gstinQuery.isFetching}
+                            error={gstinQuery.error}
+                          />
                         </div>
                       )}
                       {formData.invoiceOption === 'address' && (
@@ -3648,6 +3795,11 @@ export function RegisterBusinessPage() {
                           placeholder="e.g. 22AAAAA0000A1Z5"
                           className={inputClass()}
                         />
+                        <GstinDetailsCard
+                          details={gstinQuery.data}
+                          isLoading={gstinQuery.isFetching}
+                          error={gstinQuery.error}
+                        />
                       </div>
                     )}
 
@@ -3920,6 +4072,74 @@ export function RegisterBusinessPage() {
 /* ─────────────────────────────────────────────────────────────────
    Presentational subcomponents
    ───────────────────────────────────────────────────────────────── */
+
+/* Abstract blue background for the header "Login" button. */
+function LoginBlueBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="loginBlueGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3b82f6" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#loginBlueGrad)" />
+      <circle cx="104" cy="6" r="22" fill="#60a5fa" opacity="0.35" />
+      <circle cx="10" cy="42" r="18" fill="#1e40af" opacity="0.45" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#93c5fd"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#bfdbfe"
+        strokeOpacity="0.4"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
+/* Abstract orange background for the header "HRM Login" button. */
+function HrmOrangeBg() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 120 44"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="hrmOrangeGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fb923c" />
+          <stop offset="1" stopColor="#ea580c" />
+        </linearGradient>
+      </defs>
+      <rect width="120" height="44" fill="url(#hrmOrangeGrad)" />
+      <circle cx="102" cy="4" r="22" fill="#fdba74" opacity="0.4" />
+      <circle cx="12" cy="42" r="18" fill="#c2410c" opacity="0.4" />
+      <path
+        d="M0 30 C25 18 45 40 70 28 S105 20 120 30 V44 H0Z"
+        fill="#fed7aa"
+        opacity="0.25"
+      />
+      <path
+        d="M0 14 C20 6 40 22 62 12 S100 4 120 12"
+        stroke="#ffedd5"
+        strokeOpacity="0.45"
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </svg>
+  )
+}
 
 function SectionHeading({
   number,

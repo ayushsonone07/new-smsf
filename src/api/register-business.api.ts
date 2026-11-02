@@ -14,6 +14,33 @@ interface CustomApiResponse<T> {
   data?: T | null
 }
 
+export interface PaymentInfoRecord {
+  paymentReference?: string | null
+  createdAt?: string | null
+  customerPhone?: string | null
+  customerEmail?: string | null
+  amount?: number | null
+  paymentId?: string | null
+  paymentsInfoId?: string | null
+  paymentInfo?: Record<string, unknown> | null
+}
+
+export interface GstinDetails {
+  gstin?: string | null
+  legal_name?: string | null
+  trade_name?: string | null
+  status?: string | null
+  taxpayer_type?: string | null
+  business_constitution?: string | null
+  registration_date?: string | null
+  cancellation_date?: string | null
+  state_code?: string | null
+  state_jurisdiction?: string | null
+  address?: string | null
+  pincode?: string | null
+  nature_of_business?: string[] | null
+}
+
 interface PlansWithDepartmentsEnvelope {
   success?: boolean
   message?: string
@@ -59,24 +86,36 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   return response.data ?? []
 }
 
-/** A business that already used part of a payment. */
-export interface PaymentUsage {
-  businessName?: string | null
-  isDuplicate?: boolean
-  /** Rupees. */
-  amount?: number | null
-  usedAt?: string | null
+/** Fetches payment records used to attribute a registration to its seller. */
+export async function fetchPaymentInfo(
+  customerEmail: string,
+): Promise<PaymentInfoRecord[]> {
+  const session = getSession()
+  const headers: Record<string, string> = {}
+
+  if (session?.token) headers.Authorization = `Bearer ${session.token}`
+  if (session?.user.email || session?.user.username) {
+    headers.username = session.user.email || session.user.username || ''
+  }
+
+  const response = await apiRequest<CustomApiResponse<PaymentInfoRecord[]>>(
+    `/api/payment/info?customerEmail=${encodeURIComponent(customerEmail.trim())}`,
+    { headers },
+  )
+
+  return response.data ?? []
 }
 
-export interface VerifiedPayment {
-  /** Full payment amount in rupees, already converted by SMSB from paise. */
-  amount?: number | null
-  /** Rupees already spent on earlier registrations of this customer. */
-  used?: number | null
-  /** Rupees still left to spend — a payment can fund several businesses. */
-  available?: number | null
-  usedBy?: PaymentUsage[]
-  paidAt?: string | null
+export async function fetchGstinDetails(gstin: string): Promise<GstinDetails> {
+  const response = await apiRequest<CustomApiResponse<GstinDetails>>(
+    `/api/gstin/${encodeURIComponent(gstin.trim().toUpperCase())}`,
+  )
+
+  if (!response.success || !response.data) {
+    throw new Error(response.message || 'Unable to verify this GSTIN')
+  }
+
+  return response.data
 }
 
 export interface VerifyPaymentResult {
