@@ -19,7 +19,9 @@ import {
   X,
 } from 'lucide-react'
 import {
+  type GstinDetails,
   fetchPlanAmounts,
+  fetchGstinDetails,
   fetchPaymentInfo,
   fetchPlansWithDepartments,
   registerCustomer,
@@ -267,6 +269,77 @@ const WIZARD_STYLES = `
 @media (prefers-reduced-motion:reduce){.rb-step-in,.rb-panel-in,.rb-pop{animation:none!important}}
 `
 
+function GstinDetailsCard({
+  details,
+  isLoading,
+  error,
+}: {
+  details?: GstinDetails
+  isLoading: boolean
+  error: Error | null
+}) {
+  if (isLoading) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-blue-600" role="status">
+        Verifying GSTIN…
+      </p>
+    )
+  }
+
+  if (error) {
+    return (
+      <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
+        {error.message || 'Unable to verify this GSTIN'}
+      </p>
+    )
+  }
+
+  if (!details) return null
+
+  return (
+    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3" aria-live="polite">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-900">
+          {details.trade_name || details.legal_name || 'GST registered customer'}
+        </p>
+        {details.status && (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${details.status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            {details.status}
+          </span>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-slate-500">Legal name</dt>
+          <dd className="font-semibold text-slate-900">{details.legal_name || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Taxpayer type</dt>
+          <dd className="font-semibold text-slate-900">{details.taxpayer_type || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Business constitution</dt>
+          <dd className="font-semibold text-slate-900">{details.business_constitution || '—'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Registration date</dt>
+          <dd className="font-semibold text-slate-900">{details.registration_date || '—'}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="font-semibold text-slate-500">Registered address</dt>
+          <dd className="font-semibold text-slate-900">{details.address || '—'}</dd>
+        </div>
+        {!!details.nature_of_business?.length && (
+          <div className="sm:col-span-2">
+            <dt className="font-semibold text-slate-500">Nature of business</dt>
+            <dd className="font-semibold text-slate-900">{details.nature_of_business.join(', ')}</dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  )
+}
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
 
@@ -292,6 +365,17 @@ export function RegisterBusinessPage() {
     (amountsQuery.isFetching && !amountsQuery.isLoading)
 
   const [formData, setFormData] = useState({ ...INITIAL_FORM_DATA })
+
+  const normalizedGstin = formData.gstinForInvoice.trim().toUpperCase()
+  const gstinQuery = useQuery({
+    queryKey: ['register-business', 'gstin', normalizedGstin],
+    queryFn: () => fetchGstinDetails(normalizedGstin),
+    enabled:
+      formData.invoiceOption === 'gstin' &&
+      validateGSTNumber(normalizedGstin),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
 
   const paymentInfoQuery = useQuery({
     queryKey: ['register-business', 'payment-info', formData.email.trim().toLowerCase()],
@@ -2538,7 +2622,7 @@ export function RegisterBusinessPage() {
                               id="gstinForInvoice"
                               value={formData.gstinForInvoice}
                               onChange={(e) =>
-                                handleInputChange('gstinForInvoice', e.target.value)
+                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
                               }
                               onBlur={(e) =>
                                 handleFieldBlur('gstinForInvoice', e.target.value)
@@ -2547,6 +2631,11 @@ export function RegisterBusinessPage() {
                               className={inputClass(shouldShowError('gstin'))}
                             />
                           </Field>
+                          <GstinDetailsCard
+                            details={gstinQuery.data}
+                            isLoading={gstinQuery.isFetching}
+                            error={gstinQuery.error}
+                          />
                         </div>
                       )}
                       {formData.invoiceOption === 'address' && (
@@ -3001,6 +3090,11 @@ export function RegisterBusinessPage() {
                           onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
                           placeholder="e.g. 22AAAAA0000A1Z5"
                           className={inputClass()}
+                        />
+                        <GstinDetailsCard
+                          details={gstinQuery.data}
+                          isLoading={gstinQuery.isFetching}
+                          error={gstinQuery.error}
                         />
                       </div>
                     )}

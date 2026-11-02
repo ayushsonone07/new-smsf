@@ -25,6 +25,22 @@ export interface PaymentInfoRecord {
   paymentInfo?: Record<string, unknown> | null
 }
 
+export interface GstinDetails {
+  gstin?: string | null
+  legal_name?: string | null
+  trade_name?: string | null
+  status?: string | null
+  taxpayer_type?: string | null
+  business_constitution?: string | null
+  registration_date?: string | null
+  cancellation_date?: string | null
+  state_code?: string | null
+  state_jurisdiction?: string | null
+  address?: string | null
+  pincode?: string | null
+  nature_of_business?: string[] | null
+}
+
 interface PlansWithDepartmentsEnvelope {
   success?: boolean
   message?: string
@@ -88,6 +104,18 @@ export async function fetchPaymentInfo(
   )
 
   return response.data ?? []
+}
+
+export async function fetchGstinDetails(gstin: string): Promise<GstinDetails> {
+  const response = await apiRequest<CustomApiResponse<GstinDetails>>(
+    `/api/gstin/${encodeURIComponent(gstin.trim().toUpperCase())}`,
+  )
+
+  if (!response.success || !response.data) {
+    throw new Error(response.message || 'Unable to verify this GSTIN')
+  }
+
+  return response.data
 }
 
 export interface VerifyPaymentResult {
