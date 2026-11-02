@@ -1886,12 +1886,6 @@ export function RegisterBusinessPage() {
                                   <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.customerEmail || '—'}</dd>
                                   <dt className="text-slate-500">Amount</dt>
                                   <dd className="min-w-0 text-slate-900">{matchedPaymentInfo?.amount == null ? '—' : `₹${Number(matchedPaymentInfo.amount).toFixed(2)}`}</dd>
-                                  <dt className="text-slate-500">Payment ID</dt>
-                                  <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.paymentId || '—'}</dd>
-                                  <dt className="text-slate-500">Payments info ID</dt>
-                                  <dd className="min-w-0 break-all text-slate-900">{matchedPaymentInfo?.paymentsInfoId || '—'}</dd>
-                                  <dt className="text-slate-500">Payment info</dt>
-                                  <dd className="min-w-0 break-all text-slate-900">{JSON.stringify(matchedPaymentInfo?.paymentInfo ?? {})}</dd>
                                 </dl>
                               </div>
                             </details>
