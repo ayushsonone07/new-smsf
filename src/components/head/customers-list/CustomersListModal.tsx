@@ -1468,16 +1468,13 @@ export function CustomersListModal({
                     value={
                       (() => {
                         const isInc =
-                          apiDetails.profile?.isGstIncluded ??
-                          (apiDetails.profile?.includeGst !== undefined
+                          apiDetails.profile?.includeGst !== undefined
                             ? String(apiDetails.profile?.includeGst)
-                            : undefined) ??
-                          rowDetails?.isGstIncluded ??
-                          (rowDetails?.includeGst !== undefined
+                            : rowDetails?.includeGst !== undefined
                             ? String(rowDetails?.includeGst)
-                            : undefined)
+                            : apiDetails.profile?.isGstIncluded ?? rowDetails?.isGstIncluded
                         if (isInc === 'true' || isInc === '1' || isInc === 'yes') {
-                          const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount || apiDetails.profile?.gst || rowDetails?.gst
+                          const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount
                           return amt ? `Included (18% · ${formatCurrency(amt)})` : 'Included (18%)'
                         }
                         if (isInc === 'false' || isInc === '0' || isInc === 'no') {
@@ -2159,16 +2156,13 @@ export function CustomersListModal({
                         value={
                           (() => {
                             const isInc =
-                              apiDetails.profile?.isGstIncluded ??
-                              (apiDetails.profile?.includeGst !== undefined
+                              apiDetails.profile?.includeGst !== undefined
                                 ? String(apiDetails.profile?.includeGst)
-                                : undefined) ??
-                              rowDetails?.isGstIncluded ??
-                              (rowDetails?.includeGst !== undefined
+                                : rowDetails?.includeGst !== undefined
                                 ? String(rowDetails?.includeGst)
-                                : undefined)
+                                : apiDetails.profile?.isGstIncluded ?? rowDetails?.isGstIncluded
                             if (isInc === 'true' || isInc === '1' || isInc === 'yes') {
-                              const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount || apiDetails.profile?.gst || rowDetails?.gst
+                              const amt = apiDetails.profile?.gstAmount || rowDetails?.gstAmount
                               return amt ? `Included (18% · ${formatCurrency(amt)})` : 'Included (18%)'
                             }
                             if (isInc === 'false' || isInc === '0' || isInc === 'no') {
