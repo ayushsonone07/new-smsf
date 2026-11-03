@@ -15,6 +15,7 @@ import {
 import { normalizeDepartmentTypeName } from '../../../../api/dynamic-permission.api'
 import { AutowebisionCustomersPage } from './AutowebisionCustomersPage'
 import { DeliveredCustomersPage } from './DeliveredCustomersPage'
+import { LeadsManagementPage } from '../../../sales/pages/LeadsManagementPage'
 
 interface HeadScreenPageProps {
   screenOverride?: string
@@ -99,6 +100,53 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
   )
   if (isSupportDepartment && targetSlug === 'delivered') {
     return <DeliveredCustomersPage feature={feature} />
+  }
+
+  // --- SALES & TELESALES: LEADS MANAGEMENT, SALES SUMMARY, CUSTOMER PAYMENTS ---
+  const isSalesDepartment = Boolean(
+    effectiveDepartmentType && (
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'SALES_DEPARTMENT' ||
+      normalizeDepartmentTypeName(effectiveDepartmentType) === 'TELESALES_DEPARTMENT' ||
+      effectiveDepartmentType.toUpperCase().includes('SALES')
+    ),
+  )
+
+  const isSalesScreen =
+    feature.screen === 'leads' ||
+    feature.screen === ('manage-leads' as any) ||
+    feature.screen === ('sales-summary' as any) ||
+    feature.screen === ('customer-payments' as any) ||
+    targetSlug === 'manage-leads' ||
+    targetSlug === 'leads' ||
+    targetSlug === 'sales-leads' ||
+    targetSlug === 'sales-summary' ||
+    targetSlug === 'customer-payments' ||
+    targetSlug === 'customer-payment' ||
+    targetSlug === 'payments' ||
+    (isSalesDepartment && (
+      targetSlug.includes('lead') ||
+      targetSlug.includes('sales') ||
+      targetSlug.includes('payment') ||
+      feature.name?.toLowerCase().includes('lead') ||
+      feature.name?.toLowerCase().includes('summary') ||
+      feature.name?.toLowerCase().includes('payment')
+    ))
+
+  if (isSalesScreen) {
+    const defaultTab =
+      targetSlug === 'sales-summary' ||
+      (feature.screen as string) === 'sales-summary' ||
+      feature.name?.toLowerCase().includes('summary')
+        ? 'summary'
+        : targetSlug === 'customer-payments' ||
+          targetSlug === 'customer-payment' ||
+          targetSlug === 'payments' ||
+          (feature.screen as string) === 'customer-payments' ||
+          feature.name?.toLowerCase().includes('payment')
+          ? 'payments'
+          : 'leads'
+
+    return <LeadsManagementPage feature={feature} initialTab={defaultTab} />
   }
 
   if (!Screen) {
