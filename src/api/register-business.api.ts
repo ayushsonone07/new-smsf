@@ -25,6 +25,19 @@ export interface PaymentInfoRecord {
   paymentInfo?: Record<string, unknown> | null
 }
 
+export interface GstinAddressDetails {
+  building_number?: string | null
+  building_name?: string | null
+  floor?: string | null
+  street?: string | null
+  locality?: string | null
+  district?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+  landmark?: string | null
+}
+
 export interface GstinDetails {
   gstin?: string | null
   legal_name?: string | null
@@ -37,6 +50,7 @@ export interface GstinDetails {
   state_code?: string | null
   state_jurisdiction?: string | null
   address?: string | null
+  address_details?: GstinAddressDetails | null
   pincode?: string | null
   nature_of_business?: string[] | null
 }
@@ -86,17 +100,24 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   return response.data ?? []
 }
 
-/** Fetches payment records used to attribute a registration to its seller. */
+/**
+ * Fetches payment records for an email so the form can show who sold it.
+ *
+ * Some deployments protect `GET /api/payment/info`, so this is only called for
+ * a signed-in user and forwards their bearer token. Public visitors skip the
+ * lookup instead of generating an unauthenticated 401 on the register page.
+ */
 export async function fetchPaymentInfo(
   customerEmail: string,
 ): Promise<PaymentInfoRecord[]> {
   const session = getSession()
-  const headers: Record<string, string> = {}
+  if (!session?.token) return []
 
-  if (session?.token) headers.Authorization = `Bearer ${session.token}`
-  if (session?.user.email || session?.user.username) {
-    headers.username = session.user.email || session.user.username || ''
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
   }
+  const username = session.user.email || session.user.username
+  if (username) headers.username = username
 
   const response = await apiRequest<CustomApiResponse<PaymentInfoRecord[]>>(
     `/api/payment/info?customerEmail=${encodeURIComponent(customerEmail.trim())}`,

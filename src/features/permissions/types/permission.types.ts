@@ -54,6 +54,9 @@ export type HeadScreenKey =
   | 'billing-list'
   | 'delivered'
   | 'leads'
+  | 'manage-leads'
+  | 'sales-summary'
+  | 'customer-payments'
   | 'custom'
 
 /**

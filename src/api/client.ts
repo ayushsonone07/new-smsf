@@ -91,6 +91,27 @@ function getApiErrorMessage(
   return fallback
 }
 
+/**
+ * Public pages that visitors can use without an account. A 401 from an
+ * optional background lookup here (for example payment info on the register
+ * form) must not bounce them to the login page.
+ */
+const PUBLIC_AUTH_REDIRECT_EXEMPT_PATHS = [
+  '/',
+  '/register-business',
+  '/sales-proposal',
+  '/payment-success',
+]
+
+function isPublicAuthExemptPath(pathname: string): boolean {
+  const normalized = pathname.replace(/\/+$/, '') || '/'
+  return PUBLIC_AUTH_REDIRECT_EXEMPT_PATHS.some((path) =>
+    path === '/'
+      ? normalized === '/'
+      : normalized === path || normalized.startsWith(`${path}/`),
+  )
+}
+
 export class ApiError extends Error {
   status: number
 
@@ -151,7 +172,8 @@ export async function apiRequest<T>(
       response.status === 401 &&
       isAuthenticationFailure(errorData) &&
       typeof window !== 'undefined' &&
-      !window.location.pathname.startsWith('/login')
+      !window.location.pathname.startsWith('/login') &&
+      !isPublicAuthExemptPath(window.location.pathname)
     ) {
       clearSession()
       window.location.href = '/login?expired=true'
