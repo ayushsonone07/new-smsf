@@ -101,15 +101,27 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
 }
 
 /**
- * Fetches payment records for an email. `GET /api/payment/info` is public, so
- * this intentionally sends no auth headers: a stale JWT from an old session
- * must not turn this lookup into a 401 and bounce a public visitor to /login.
+ * Fetches payment records for an email so the form can show who sold it.
+ *
+ * Some deployments protect `GET /api/payment/info`, so this is only called for
+ * a signed-in user and forwards their bearer token. Public visitors skip the
+ * lookup instead of generating an unauthenticated 401 on the register page.
  */
 export async function fetchPaymentInfo(
   customerEmail: string,
 ): Promise<PaymentInfoRecord[]> {
+  const session = getSession()
+  if (!session?.token) return []
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.token}`,
+  }
+  const username = session.user.email || session.user.username
+  if (username) headers.username = username
+
   const response = await apiRequest<CustomApiResponse<PaymentInfoRecord[]>>(
     `/api/payment/info?customerEmail=${encodeURIComponent(customerEmail.trim())}`,
+    { headers },
   )
 
   return response.data ?? []
