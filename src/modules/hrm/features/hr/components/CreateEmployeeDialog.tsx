@@ -81,7 +81,8 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       values.joiningDate.length > 0 ||
       values.departmentId > 0 ||
       Boolean(values.designationId) ||
-      Boolean(values.managerId),
+      Boolean(values.managerId) ||
+      Boolean(values.laptopSerialNumber),
     [candidate, values],
   );
 
@@ -152,7 +153,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       }
     >
       <form onSubmit={submit} noValidate>
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field
               id="emp-name"
@@ -351,6 +352,21 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                 </Select>
               }
             />
+            <Field
+              id="emp-laptop"
+              label="Laptop serial number"
+              input={
+                <input
+                  id="emp-laptop"
+                  value={values.laptopSerialNumber || ""}
+                  onChange={(e) => update("laptopSerialNumber", e.target.value)}
+                  placeholder="e.g. LPT-982341 (optional)"
+                  className={fieldClass()}
+                  disabled={mutation.isPending}
+                />
+              }
+            />
+
           </div>
 
           {mutation.error ? (
@@ -382,7 +398,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
           ) : null}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+        <footer className="sticky bottom-0 z-10 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-6 flex justify-end gap-2 border-t border-slate-100 bg-slate-50/95 backdrop-blur px-6 py-4">
           <button
             type="button"
             onClick={close}
@@ -417,6 +433,7 @@ function emptyValues(candidate: Candidate | null): CreateEmployeeInput {
     departmentId: 0,
     designationId: null,
     managerId: null,
+    laptopSerialNumber: "",
   };
 }
 
