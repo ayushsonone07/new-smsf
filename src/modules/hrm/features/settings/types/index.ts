@@ -7,6 +7,8 @@ export interface CompanyProfile {
   logoUrl: string;
   timezone: string;
   currency: string;
+  isIpRestrictionEnabled?: boolean;
+  allowedOfficeIps?: string | null;
 }
 
 export interface CompanyProfileUpdate {
@@ -19,6 +21,8 @@ export interface CompanyProfileUpdate {
   logoUrl?: string;
   timezone?: string;
   currency?: string;
+  isIpRestrictionEnabled?: boolean;
+  allowedOfficeIps?: string | null;
 }
 
 export interface WorkingHours {

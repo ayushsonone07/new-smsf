@@ -398,7 +398,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
           ) : null}
         </div>
 
-        <footer className="sticky bottom-0 z-10 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-6 flex justify-end gap-2 border-t border-slate-100 bg-slate-50/95 backdrop-blur px-6 py-4">
+        <footer className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4 pb-1">
           <button
             type="button"
             onClick={close}

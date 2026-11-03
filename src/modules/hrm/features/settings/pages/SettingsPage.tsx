@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Building2,
@@ -10,11 +10,14 @@ import {
   Globe,
   Check,
   X,
+  Wifi,
+  Loader2,
 } from "lucide-react";
 
 import { env } from "@config/env";
 import { useAuth, useMyProfile } from "@features/auth";
 import { PageHeader, Card, CardSkeleton, ErrorDisplay, StatusBadge, StaggerContainer, StaggerItem } from "@shared/components/ui";
+import { useToast } from "@shared/components/feedback";
 import { cn } from "@/lib/utils";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 
@@ -22,6 +25,7 @@ import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import {
   useCompanyProfile,
+  useUpdateCompanyProfile,
   useWorkingHours,
   useNotifications,
   useSecuritySettings,
@@ -240,17 +244,159 @@ function CompanySection() {
   const profile = data ?? (DEMO_ENABLED ? COMPANY_DEMO : null);
   if (!profile) return <ErrorDisplay message="Company profile could not be loaded from the server." />;
   return (
-    <SectionCard title="Company Profile" query={query} refreshLabel="company profile">
-      <div className="space-y-3">
-        <Field label="Company Name" value={profile.companyName} />
-        <Field label="Email" value={profile.email} />
-        <Field label="Phone" value={profile.phone} />
-        <Field label="Website" value={profile.website} />
-        <Field label="Address" value={profile.address} />
-        <Field label="Timezone" value={profile.timezone} />
-        <Field label="Currency" value={profile.currency} />
+    <div className="space-y-6">
+      <SectionCard title="Company Profile" query={query} refreshLabel="company profile">
+        <div className="space-y-3">
+          <Field label="Company Name" value={profile.companyName} />
+          <Field label="Email" value={profile.email} />
+          <Field label="Phone" value={profile.phone} />
+          <Field label="Website" value={profile.website} />
+          <Field label="Address" value={profile.address} />
+          <Field label="Timezone" value={profile.timezone} />
+          <Field label="Currency" value={profile.currency} />
+        </div>
+      </SectionCard>
+      <IpRestrictionCard profile={profile} />
+    </div>
+  );
+}
+
+function IpRestrictionCard({ profile }: { profile: CompanyProfile }) {
+  const toast = useToast();
+  const updateMutation = useUpdateCompanyProfile();
+  const [enabled, setEnabled] = useState(Boolean(profile.isIpRestrictionEnabled));
+  const [ips, setIps] = useState(profile.allowedOfficeIps ?? "");
+  const [detecting, setDetecting] = useState(false);
+
+  useEffect(() => {
+    setEnabled(Boolean(profile.isIpRestrictionEnabled));
+    setIps(profile.allowedOfficeIps ?? "");
+  }, [profile.isIpRestrictionEnabled, profile.allowedOfficeIps]);
+
+  const handleDetectIp = async () => {
+    setDetecting(true);
+    try {
+      const res = await fetch("https://api.ipify.org?format=json");
+      const data = await res.json();
+      if (data?.ip) {
+        setIps((prev) => {
+          const currentList = prev.split(",").map((s) => s.trim()).filter(Boolean);
+          if (!currentList.includes(data.ip)) {
+            return currentList.length > 0 ? currentList.join(", ") + ", " + data.ip : data.ip;
+          }
+          return prev;
+        });
+        toast.success("IP Detected", "Added " + data.ip + " to allowed IPs. Remember to save!");
+      }
+    } catch {
+      toast.error("Detect Failed", "Could not detect IP automatically. Please enter it manually.");
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(
+      {
+        companyName: profile.companyName,
+        isIpRestrictionEnabled: enabled,
+        allowedOfficeIps: ips.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Settings Saved", "Office IP restriction settings updated successfully.");
+        },
+        onError: () => {
+          toast.error("Save Failed", "Could not update office IP restriction settings.");
+        },
+      }
+    );
+  };
+
+  const isDirty =
+    enabled !== Boolean(profile.isIpRestrictionEnabled) ||
+    ips.trim() !== (profile.allowedOfficeIps ?? "").trim();
+
+  return (
+    <Card className="p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Wifi size={20} />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-card-foreground">Office Network & IP Restriction</h3>
+            <p className="text-xs text-muted-foreground">
+              Restrict employee Check-in and Check-out to authorized office Wi-Fi / IP addresses
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+              className="peer sr-only"
+            />
+            <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-focus:outline-none" />
+          </label>
+          <span className="text-sm font-medium text-card-foreground">
+            {enabled ? "Active" : "Disabled"}
+          </span>
+        </div>
       </div>
-    </SectionCard>
+
+      <div className="mt-4 space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="allowed-ips" className="text-sm font-medium text-card-foreground">
+              Allowed Office IP Addresses
+            </label>
+            <button
+              type="button"
+              onClick={handleDetectIp}
+              disabled={detecting}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              {detecting ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+              {detecting ? "Detecting..." : "Detect & Add My Current IP"}
+            </button>
+          </div>
+          <input
+            id="allowed-ips"
+            type="text"
+            value={ips}
+            onChange={(e) => setIps(e.target.value)}
+            placeholder="e.g. 103.21.244.5, 122.161.50.12"
+            disabled={!enabled || updateMutation.isPending}
+            className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Enter office public IP addresses separated by commas. If enabled, employees outside these IPs will not be allowed to check in or out.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
+          <Shield size={16} className="mt-0.5 shrink-0 text-primary" />
+          <span>
+            <strong>Admin Exemption:</strong> Company Administrators are always exempt from IP restrictions so you can never be locked out of the system.
+          </span>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!isDirty || updateMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+            {updateMutation.isPending ? "Saving..." : "Save IP Settings"}
+          </button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
