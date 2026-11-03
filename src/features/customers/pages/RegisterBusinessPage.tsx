@@ -2377,6 +2377,84 @@ export function RegisterBusinessPage() {
                           />
                         </div>
                       </div>
+                                            <div className="sm:col-span-2">
+                        <span className="mb-1 block text-xs font-semibold text-slate-600">
+                          Invoice Details <span className="text-red-500">*</span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ChoiceCard
+                            id="invoice-gstin"
+                            value="gstin"
+                            selected={formData.invoiceOption === 'gstin'}
+                            label="GSTIN"
+                            onSelect={(value) => {
+                              handleInputChange('invoiceOption', value)
+                              handleInputChange('completeAddress', '')
+                            }}
+                          />
+                          <ChoiceCard
+                            id="invoice-address"
+                            value="address"
+                            selected={formData.invoiceOption === 'address'}
+                            label="Address"
+                            onSelect={(value) => {
+                              handleInputChange('invoiceOption', value)
+                              handleInputChange('gstinForInvoice', '')
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {formData.invoiceOption === 'gstin' && (
+                        <div className="sm:col-span-2">
+                          <Field
+                            label="GSTIN Number"
+                            htmlFor="gstinForInvoice"
+                            required
+                            hint="15 characters, uppercase"
+                            error={
+                              shouldShowError('gstin') ? validationErrors.gstin : ''
+                            }
+                          >
+                            <input
+                              id="gstinForInvoice"
+                              value={formData.gstinForInvoice}
+                              onChange={(e) =>
+                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
+                              }
+                              onBlur={(e) =>
+                                handleFieldBlur('gstinForInvoice', e.target.value)
+                              }
+                              placeholder="e.g. 22AAAAA0000A1Z5"
+                              className={inputClass(shouldShowError('gstin'))}
+                            />
+                          </Field>
+                          <GstinDetailsCard
+                            details={gstinQuery.data}
+                            isLoading={gstinQuery.isFetching}
+                            error={gstinQuery.error}
+                          />
+                        </div>
+                      )}
+                      {formData.invoiceOption === 'address' && (
+                        <div className="sm:col-span-2">
+                          <Field
+                            label="Complete Address"
+                            htmlFor="completeAddress"
+                            required
+                          >
+                            <textarea
+                              id="completeAddress"
+                              value={formData.completeAddress}
+                              onChange={(e) =>
+                                handleInputChange('completeAddress', e.target.value)
+                              }
+                              placeholder="Enter complete billing address"
+                              rows={3}
+                              className={textareaClass}
+                            />
+                          </Field>
+                        </div>
+                      )}
                       <div className="sm:col-span-2 min-[1100px]:col-span-4">
                         <Field
                           label="Remark (optional)"
@@ -3000,30 +3078,12 @@ export function RegisterBusinessPage() {
 
                       {/* Discount (%) Field */}
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label
-                            htmlFor="discountPercent"
-                            className="block text-xs font-semibold text-slate-600"
-                          >
-                            Discount (%)
-                          </label>
-                          <div className="flex items-center gap-1">
-                            {['0', '10', '20', '30', '50'].map((pct) => (
-                              <button
-                                key={pct}
-                                type="button"
-                                onClick={() => handleDiscountChange(pct)}
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold border transition-colors ${
-                                  discountPercent === pct
-                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
-                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                                }`}
-                              >
-                                {pct}%
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <label
+                          htmlFor="discountPercent"
+                          className="block text-xs font-semibold text-slate-600"
+                        >
+                          Discount (%)
+                        </label>
                         <div className="relative">
                           <input
                             id="discountPercent"
@@ -3046,40 +3106,12 @@ export function RegisterBusinessPage() {
 
                       {/* Total Amount (₹) */}
                       <div className="space-y-1 sm:col-span-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <label
-                            htmlFor="totalAmount"
-                            className="block text-xs font-semibold text-slate-600"
-                          >
-                            Total Amount (₹) <span className="text-red-500">*</span>
-                          </label>
-                          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-px text-xs font-semibold text-slate-600">
-                            <span className="select-none">18% GST</span>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={includeGst}
-                              aria-label="Toggle 18% GST"
-                              onClick={() => setIncludeGst(!includeGst)}
-                              className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-0 transition-colors duration-200 focus:outline-none ${
-                                includeGst ? 'bg-blue-600' : 'bg-slate-300'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none absolute left-0.5 top-0.5 inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-200 ${
-                                  includeGst ? 'translate-x-3' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                            <span
-                              className={`select-none text-[10px] font-bold ${
-                                includeGst ? 'text-emerald-600' : 'text-slate-400'
-                              }`}
-                            >
-                              {includeGst ? 'ON' : 'OFF'}
-                            </span>
-                          </div>
-                        </div>
+                        <label
+                          htmlFor="totalAmount"
+                          className="block text-xs font-semibold text-slate-600"
+                        >
+                          Total Amount (₹) <span className="text-red-500">*</span>
+                        </label>
                         <input
                           id="totalAmount"
                           type="number"
@@ -3309,84 +3341,7 @@ export function RegisterBusinessPage() {
                         </>
                       )}
 
-                      <div>
-                        <span className="mb-1 block text-xs font-semibold text-slate-600">
-                          Invoice Details <span className="text-red-500">*</span>
-                        </span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <ChoiceCard
-                            id="invoice-gstin"
-                            value="gstin"
-                            selected={formData.invoiceOption === 'gstin'}
-                            label="GSTIN"
-                            onSelect={(value) => {
-                              handleInputChange('invoiceOption', value)
-                              handleInputChange('completeAddress', '')
-                            }}
-                          />
-                          <ChoiceCard
-                            id="invoice-address"
-                            value="address"
-                            selected={formData.invoiceOption === 'address'}
-                            label="Address"
-                            onSelect={(value) => {
-                              handleInputChange('invoiceOption', value)
-                              handleInputChange('gstinForInvoice', '')
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {formData.invoiceOption === 'gstin' && (
-                        <div className="sm:col-span-2">
-                          <Field
-                            label="GSTIN Number"
-                            htmlFor="gstinForInvoice"
-                            required
-                            hint="15 characters, uppercase"
-                            error={
-                              shouldShowError('gstin') ? validationErrors.gstin : ''
-                            }
-                          >
-                            <input
-                              id="gstinForInvoice"
-                              value={formData.gstinForInvoice}
-                              onChange={(e) =>
-                                handleInputChange('gstinForInvoice', e.target.value.toUpperCase())
-                              }
-                              onBlur={(e) =>
-                                handleFieldBlur('gstinForInvoice', e.target.value)
-                              }
-                              placeholder="e.g. 22AAAAA0000A1Z5"
-                              className={inputClass(shouldShowError('gstin'))}
-                            />
-                          </Field>
-                          <GstinDetailsCard
-                            details={gstinQuery.data}
-                            isLoading={gstinQuery.isFetching}
-                            error={gstinQuery.error}
-                          />
-                        </div>
-                      )}
-                      {formData.invoiceOption === 'address' && (
-                        <div className="sm:col-span-2">
-                          <Field
-                            label="Complete Address"
-                            htmlFor="completeAddress"
-                            required
-                          >
-                            <textarea
-                              id="completeAddress"
-                              value={formData.completeAddress}
-                              onChange={(e) =>
-                                handleInputChange('completeAddress', e.target.value)
-                              }
-                              placeholder="Enter complete billing address"
-                              rows={3}
-                              className={textareaClass}
-                            />
-                          </Field>
-                        </div>
-                      )}
+                      
                     </div></section>
                   )}
 
@@ -3643,6 +3598,72 @@ export function RegisterBusinessPage() {
                       </button>
                     </div>
                   </div>
+
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Invoice Option <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'gstin')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'gstin'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        GSTIN Number
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('invoiceOption', 'address')}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                          formData.invoiceOption === 'address'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        Billing Address
+                      </button>
+                    </div>
+
+                    {formData.invoiceOption === 'gstin' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          GSTIN Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.gstinForInvoice}
+                          onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className={inputClass()}
+                        />
+                        <GstinDetailsCard
+                          details={gstinQuery.data}
+                          isLoading={gstinQuery.isFetching}
+                          error={gstinQuery.error}
+                        />
+                      </div>
+                    )}
+
+                    {formData.invoiceOption === 'address' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Complete Billing Address <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={formData.completeAddress}
+                          onChange={(e) => handleInputChange('completeAddress', e.target.value)}
+                          placeholder="Enter full address for invoice"
+                          rows={2}
+                          className={textareaClass}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -3835,71 +3856,6 @@ export function RegisterBusinessPage() {
                       />
                     </div>
                   )}
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Invoice Option <span className="text-red-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange('invoiceOption', 'gstin')}
-                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
-                          formData.invoiceOption === 'gstin'
-                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        GSTIN Number
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleInputChange('invoiceOption', 'address')}
-                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
-                          formData.invoiceOption === 'address'
-                            ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        Billing Address
-                      </button>
-                    </div>
-
-                    {formData.invoiceOption === 'gstin' && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          GSTIN Number <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.gstinForInvoice}
-                          onChange={(e) => handleInputChange('gstinForInvoice', e.target.value.toUpperCase())}
-                          placeholder="e.g. 22AAAAA0000A1Z5"
-                          className={inputClass()}
-                        />
-                        <GstinDetailsCard
-                          details={gstinQuery.data}
-                          isLoading={gstinQuery.isFetching}
-                          error={gstinQuery.error}
-                        />
-                      </div>
-                    )}
-
-                    {formData.invoiceOption === 'address' && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Complete Billing Address <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={formData.completeAddress}
-                          onChange={(e) => handleInputChange('completeAddress', e.target.value)}
-                          placeholder="Enter full address for invoice"
-                          rows={2}
-                          className={textareaClass}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
 
