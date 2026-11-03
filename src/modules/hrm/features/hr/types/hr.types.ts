@@ -161,6 +161,7 @@ export interface EmployeeListItem {
   onboardedByName: string | null;
   /** When onboarding was verified/completed; null until VERIFIED. */
   onboardedAt: string | null;
+  laptopSerialNumber?: string | null;
 }
 
 export interface OnboardingCounts {
@@ -180,6 +181,7 @@ export interface CreateEmployeeInput {
   departmentId: number;
   designationId?: number | null;
   managerId?: number | null;
+  laptopSerialNumber?: string;
 }
 
 export interface UpdateEmployeeInput {
@@ -193,6 +195,7 @@ export interface UpdateEmployeeInput {
   departmentId: number;
   designationId: number | null;
   managerId: number | null;
+  laptopSerialNumber?: string | null;
 }
 
 export interface UpdateEmployeeStatusInput {
