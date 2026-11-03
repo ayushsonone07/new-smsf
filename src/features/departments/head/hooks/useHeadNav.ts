@@ -50,6 +50,10 @@ const GOOGLE_HEAD_SCREENS: Array<{
   { key: 'service-flow', label: 'Service Flow', icon: 'flow', slug: 'service-flow', screen: 'service-flow' },
   { key: 'member-flow', label: 'Member Flow', icon: 'perf', slug: 'member-flow', screen: 'member-flow' },
   { key: 'help-support', label: 'Help & Support', icon: 'help', slug: 'help-support', screen: 'help-support' },
+  { key: 'manage-leads', label: 'Manage Leads', icon: 'tag', slug: 'manage-leads', screen: 'leads' },
+  { key: 'leads', label: 'Manage Leads', icon: 'tag', slug: 'leads', screen: 'leads' },
+  { key: 'sales-summary', label: 'Sales Summary', icon: 'trend', slug: 'sales-summary', screen: 'sales-summary' },
+  { key: 'customer-payments', label: 'Customer Payments', icon: 'creditCard', slug: 'customer-payments', screen: 'customer-payments' },
 ]
 
 const GOOGLE_USER_SCREENS: Array<{
