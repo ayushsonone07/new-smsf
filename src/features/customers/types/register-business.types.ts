@@ -15,6 +15,19 @@ export interface PlanAmount {
   featureList?: string[]
 }
 
+export interface GstAddressDetails {
+  buildingNumber: string
+  buildingName: string
+  floor: string
+  street: string
+  locality: string
+  district: string
+  city: string
+  state: string
+  pincode: string
+  landmark: string
+}
+
 /** Payload accepted by `POST /api/auth/customers/register`. */
 export interface CustomerRegistrationRequest {
   clientName: string
@@ -31,6 +44,8 @@ export interface CustomerRegistrationRequest {
   remark: string
   isWebsiteIncluded: string
   gstinOrAddress: string
+  /** Registered address captured from the GST lookup, when the invoice is GSTIN-based. */
+  gstAddress?: GstAddressDetails
   remainingAmountDueDate: string
   whatsappGroupInviteLink: string
   source: string
