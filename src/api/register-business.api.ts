@@ -107,8 +107,11 @@ export async function fetchPaymentInfo(
 }
 
 export async function fetchGstinDetails(gstin: string): Promise<GstinDetails> {
+  // A lookup only: a 401 here (e.g. an older backend) must not sign the user out.
   const response = await apiRequest<CustomApiResponse<GstinDetails>>(
     `/api/gstin/${encodeURIComponent(gstin.trim().toUpperCase())}`,
+    {},
+    true,
   )
 
   if (!response.success || !response.data) {
@@ -196,14 +199,20 @@ export interface EarlierPayment {
 export async function fetchEarlierPayments(
   phoneNumber: string,
 ): Promise<EarlierPayment[]> {
-  const response = await apiRequest<CustomApiResponse<EarlierPayment[]>>(
-    '/api/payment/customer-payments',
-    {
-      method: 'POST',
-      body: JSON.stringify({ phoneNumber }),
-    },
-  )
-  return response.data ?? []
+  // Only a convenience: if the lookup is unavailable, the payment ID can still be typed.
+  try {
+    const response = await apiRequest<CustomApiResponse<EarlierPayment[]>>(
+      '/api/payment/customer-payments',
+      {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber }),
+      },
+      true,
+    )
+    return response.data ?? []
+  } catch {
+    return []
+  }
 }
 
 /**

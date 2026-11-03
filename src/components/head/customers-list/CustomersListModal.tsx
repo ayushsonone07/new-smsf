@@ -1035,7 +1035,7 @@ export function CustomersListModal({
       ? [
           {
             id: 'duplicates' as DrawerTab,
-            label: 'Duplicate businesses',
+            label: 'Linked businesses',
             count: duplicateItems.length,
           },
         ]
@@ -1222,14 +1222,30 @@ export function CustomersListModal({
             </div>
           </motion.div>
 
-          {showAssignTo && (
-            <motion.div
-              className="cl-drawer__status-pills"
-              variants={fadeUpVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.22 }}
-            >
+          <motion.div
+            className="cl-drawer__status-pills"
+            variants={fadeUpVariants}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.22 }}
+          >
+            {(customer?.isLinkedBusiness || customer?.parentCustomerId || customer?.rawCustomer?.parentCustomerId || customer?.rawCustomer?.isLinkedBusiness) && (
+              <span
+                className="cl-drawer__spill"
+                style={{
+                  backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                  color: '#4f46e5',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                🔗 Linked Business
+              </span>
+            )}
+            {showAssignTo && (
               <span className="cl-drawer__spill cl-drawer__spill--info">
                 Service user:{' '}
                 {serviceRow?.assignedUserEmail ||
@@ -1237,8 +1253,8 @@ export function CustomersListModal({
                   assignee?.name ||
                   'Unassigned'}
               </span>
-            </motion.div>
-          )}
+            )}
+          </motion.div>
         </div>
 
         {/* Body */}
@@ -1280,7 +1296,7 @@ export function CustomersListModal({
 
               {duplicatesQuery.isLoading && allBusinesses.length <= 1 ? (
                 <div className="cl-drawer__dup-loading">
-                  Checking duplicate businesses…
+                  Checking linked businesses…
                 </div>
               ) : (
                 <div className="cl-drawer__dup-scroll">
@@ -2498,9 +2514,9 @@ export function CustomersListModal({
               <div className="cl-drawer__card">
                 <div className="cl-drawer__card-head">
                   <div>
-                    <h3>Duplicate businesses ({duplicateItems.length})</h3>
+                    <h3>Linked businesses ({duplicateItems.length})</h3>
                     <p className="cl-drawer__card-meta">
-                      Other businesses registered under the same founder or phone number.
+                      Other businesses registered under the same owner, email, or phone number.
                     </p>
                   </div>
                 </div>

@@ -33,6 +33,8 @@ export interface OnboardingCustomer {
   duplicateCount?: number
   hasDuplicateCustomer?: boolean
   duplicateCustomers?: any[]
+  parentCustomerId?: number | string | null
+  isLinkedBusiness?: boolean
   contactName: string
   contactDate: string
   /** Contact column */
@@ -937,7 +939,7 @@ function CustomerRow({
       customer.hasDuplicateCustomer || (customer.duplicateCount ?? 0) > 0,
     )
     const url =
-      getCustomerFormUrl(customer.phone, isDuplicate) ||
+      getCustomerFormUrl(customer.phone, isDuplicate, customer.id) ||
       customer.formUrl
 
     if (!url) {
@@ -1148,11 +1150,31 @@ function CustomerRow({
               </button>
             )}
 
+            {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
+              <span
+                title="Linked Business"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  borderRadius: '9999px',
+                  border: '1px solid #c7d2fe',
+                  backgroundColor: '#eef2ff',
+                  padding: '2px 7px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#4338ca',
+                }}
+              >
+                🔗 Linked
+              </span>
+            )}
+
             {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
               <button
                 type="button"
                 className="cl-dup-pill-btn"
-                title="View duplicate businesses"
+                title="View linked businesses"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (onOpenDuplicate) {
@@ -1178,8 +1200,8 @@ function CustomerRow({
                 <Icon name="copy" size={11} strokeWidth={2} />
                 <span>
                   {customer.duplicateCount && customer.duplicateCount > 0
-                    ? `${customer.duplicateCount} duplicate${customer.duplicateCount === 1 ? '' : 's'}`
-                    : 'Duplicate'}
+                    ? `${customer.duplicateCount} linked`
+                    : 'Linked'}
                 </span>
               </button>
             )}

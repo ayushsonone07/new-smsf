@@ -8,6 +8,7 @@ import './OnboardingConfirmationPage.css'
 type ConfirmationState = 'loading' | 'verifying' | 'success' | 'failure' | 'error'
 
 interface ConfirmationPayload {
+  customerId?: number | string
   token?: string
   email?: string
   contact?: string
@@ -88,6 +89,7 @@ export function OnboardingConfirmationPage() {
         email,
         contact,
         isDuplicate: String(booleanValue(details.isDuplicate)),
+        ...(details.customerId ? { customerId: String(details.customerId) } : {}),
       })
       if (isDepartment) {
         if (!details.departmentType) {
@@ -158,6 +160,7 @@ export function OnboardingConfirmationPage() {
             isDuplicate: params.get('isDuplicate') || undefined,
             domainConnect: params.get('domainConnect') || undefined,
             themeSelection: params.get('themeSelection') || undefined,
+            customerId: params.get('customerId') || undefined,
           }
 
       const initialService =
