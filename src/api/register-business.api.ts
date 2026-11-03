@@ -25,6 +25,19 @@ export interface PaymentInfoRecord {
   paymentInfo?: Record<string, unknown> | null
 }
 
+export interface GstinAddressDetails {
+  building_number?: string | null
+  building_name?: string | null
+  floor?: string | null
+  street?: string | null
+  locality?: string | null
+  district?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+  landmark?: string | null
+}
+
 export interface GstinDetails {
   gstin?: string | null
   legal_name?: string | null
@@ -37,6 +50,7 @@ export interface GstinDetails {
   state_code?: string | null
   state_jurisdiction?: string | null
   address?: string | null
+  address_details?: GstinAddressDetails | null
   pincode?: string | null
   nature_of_business?: string[] | null
 }
@@ -86,21 +100,16 @@ export async function fetchPlanAmounts(): Promise<PlanAmount[]> {
   return response.data ?? []
 }
 
-/** Fetches payment records used to attribute a registration to its seller. */
+/**
+ * Fetches payment records for an email. `GET /api/payment/info` is public, so
+ * this intentionally sends no auth headers: a stale JWT from an old session
+ * must not turn this lookup into a 401 and bounce a public visitor to /login.
+ */
 export async function fetchPaymentInfo(
   customerEmail: string,
 ): Promise<PaymentInfoRecord[]> {
-  const session = getSession()
-  const headers: Record<string, string> = {}
-
-  if (session?.token) headers.Authorization = `Bearer ${session.token}`
-  if (session?.user.email || session?.user.username) {
-    headers.username = session.user.email || session.user.username || ''
-  }
-
   const response = await apiRequest<CustomApiResponse<PaymentInfoRecord[]>>(
     `/api/payment/info?customerEmail=${encodeURIComponent(customerEmail.trim())}`,
-    { headers },
   )
 
   return response.data ?? []
