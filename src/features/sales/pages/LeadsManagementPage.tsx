@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Search,
   SlidersHorizontal,
@@ -9,6 +10,7 @@ import {
   AlertCircle,
   Eye,
   CheckCircle2,
+  Check,
   Trash2,
   Copy,
   ExternalLink,
@@ -17,6 +19,7 @@ import {
   LayoutGrid,
   CreditCard,
   UserPlus,
+  ChevronDown,
 } from 'lucide-react'
 import {
   getLeads,
@@ -94,10 +97,673 @@ function getCustomerDisplay(lead: LeadInfo): { name: string; initial: string } {
   return { name: `Lead #${lead.leadId?.slice(-4) || '—'}`, initial: 'L' }
 }
 
+
+function formatRepLabel(name?: string, email?: string): string {
+  const n = (name || '').trim()
+  const e = (email || '').trim()
+
+  if (n && !n.includes('@')) {
+    return n
+  }
+
+  const target = n || e
+  if (!target) return 'Not Assigned'
+
+  if (target.includes('@')) {
+    const prefix = target.split('@')[0]
+    const parts = prefix.split(/[._-]/).filter(Boolean)
+    if (parts.length > 1) {
+      return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+    }
+    return prefix.charAt(0).toUpperCase() + prefix.slice(1)
+  }
+
+  return target
+}
+
 export interface LeadsManagementPageProps {
   initialTab?: 'leads' | 'summary' | 'payments'
   feature?: any
   [key: string]: any
+}
+
+
+interface AssignedRepSelectProps {
+  leadId: string
+  currentVal: string
+  options: { value: string; label: string }[]
+  onAssign: (leadId: string, userValue: string) => void
+}
+
+function AssignedRepSelect({ leadId, currentVal, options, onAssign }: AssignedRepSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const hasMatch = Boolean(
+    currentVal && options.some((opt) => opt.value.toLowerCase() === currentVal.toLowerCase())
+  )
+  const displayLabel = formatRepLabel(currentVal)
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = 220
+      const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight
+      setMenuPos({
+        top: openUpwards ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left: Math.max(8, rect.left),
+        width: Math.max(160, rect.width),
+      })
+      setSearch('')
+      setIsOpen(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClose = (e: MouseEvent | TouchEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    const handleScroll = (e: Event) => {
+      // Do not close when scrolling inside the dropdown list
+      if (
+        menuRef.current &&
+        (menuRef.current === e.target || menuRef.current.contains(e.target as Node))
+      ) {
+        return
+      }
+      setIsOpen(false)
+    }
+
+    const handleResize = () => {
+      setIsOpen(false)
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('touchstart', handleClose)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('touchstart', handleClose)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options
+    const q = search.toLowerCase().trim()
+    return options.filter(
+      (opt) => opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)
+    )
+  }, [options, search])
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
+        className={`h-7 w-[112px] px-2 text-[11px] font-semibold rounded-lg border transition-all flex items-center justify-between gap-1 cursor-pointer truncate ${
+          currentVal
+            ? 'bg-blue-50/80 border-blue-200 text-blue-700 hover:bg-blue-100/70 hover:border-blue-300'
+            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+        } focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs`}
+        title={currentVal ? `Assigned to: ${displayLabel}` : 'Not Assigned'}
+      >
+        <span className="truncate">{displayLabel}</span>
+        <ChevronDown
+          className={`w-3 h-3 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${
+            currentVal ? 'text-blue-500' : 'text-slate-400'
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${menuPos.top}px`,
+              left: `${menuPos.left}px`,
+              minWidth: `${menuPos.width}px`,
+              maxWidth: '200px',
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100"
+          >
+            {/* Quick search input if there are more than 5 options */}
+            {options.length > 5 && (
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search user..."
+                  className="w-full h-6.5 pl-2 pr-6 text-[11px] bg-slate-50 border border-slate-200 rounded-md text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Scrollable list with reduced, compact length (max 175px - approx 5 items) */}
+            <div onScroll={(e) => e.stopPropagation()} className="max-h-[175px] overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar">
+              <button
+                type="button"
+                onClick={() => {
+                  onAssign(leadId, '')
+                  setIsOpen(false)
+                }}
+                className={`w-full h-7 px-2 flex items-center justify-between text-[11px] rounded-md transition-colors cursor-pointer ${
+                  !currentVal
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+              >
+                <span>Not Assigned</span>
+                {!currentVal && <Check className="w-3 h-3 text-blue-600 shrink-0" />}
+              </button>
+
+              {/* If current value is not in options, show it */}
+              {currentVal && !hasMatch && (
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full h-7 px-2 flex items-center justify-between text-[11px] rounded-md bg-blue-50 text-blue-700 font-semibold cursor-pointer"
+                >
+                  <span className="truncate">{displayLabel}</span>
+                  <Check className="w-3 h-3 text-blue-600 shrink-0" />
+                </button>
+              )}
+
+              {filteredOptions.length === 0 ? (
+                <div className="py-2 text-center text-[10px] text-slate-400">No users found</div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected =
+                    Boolean(currentVal) && opt.value.toLowerCase() === currentVal.toLowerCase()
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        onAssign(leadId, opt.value)
+                        setIsOpen(false)
+                      }}
+                      className={`w-full h-7 px-2 flex items-center justify-between text-[11px] rounded-md transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate text-left">{opt.label}</span>
+                      {isSelected && <Check className="w-3 h-3 text-blue-600 shrink-0" />}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
+
+interface FunnelFilterSelectProps {
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+}
+
+function FunnelFilterSelect({ value, onChange, options }: FunnelFilterSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const selectedOption = options.find(
+    (opt) => opt.value.toLowerCase() === value.toLowerCase()
+  )
+  const displayLabel = value === 'all' || !value ? 'All Funnels' : selectedOption?.label || value
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = 220
+      const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight
+      setMenuPos({
+        top: openUpwards ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left: Math.max(8, rect.left),
+        width: Math.max(rect.width, 180),
+      })
+      setSearch('')
+      setIsOpen(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClose = (e: MouseEvent | TouchEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    const handleScroll = (e: Event) => {
+      if (
+        menuRef.current &&
+        (menuRef.current === e.target || menuRef.current.contains(e.target as Node))
+      ) {
+        return
+      }
+      setIsOpen(false)
+    }
+
+    const handleResize = () => {
+      setIsOpen(false)
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('touchstart', handleClose)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('touchstart', handleClose)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options
+    const q = search.toLowerCase().trim()
+    return options.filter(
+      (opt) => opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)
+    )
+  }, [options, search])
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
+        className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer flex items-center justify-between gap-1.5 transition-colors hover:bg-slate-50"
+        title={displayLabel}
+      >
+        <span className="truncate text-left font-medium">{displayLabel}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+            isOpen ? 'rotate-180 text-blue-500' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${menuPos.top}px`,
+              left: `${menuPos.left}px`,
+              width: `${menuPos.width}px`,
+              minWidth: '180px',
+              maxWidth: '280px',
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100"
+          >
+            {/* Quick search input */}
+            {options.length > 5 && (
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search funnel..."
+                  className="w-full h-7 pl-2 pr-6 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Scrollable list with reduced length */}
+            <div
+              onScroll={(e) => e.stopPropagation()}
+              className="max-h-[175px] overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('all')
+                  setIsOpen(false)
+                }}
+                className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
+                  value === 'all' || !value
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                <span>All Funnels</span>
+                {(value === 'all' || !value) && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+              </button>
+
+              {filteredOptions.length === 0 ? (
+                <div className="py-2 text-center text-xs text-slate-400">No funnels found</div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected = value.toLowerCase() === opt.value.toLowerCase()
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        onChange(opt.value)
+                        setIsOpen(false)
+                      }}
+                      className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate text-left">{opt.label}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
+
+interface DepartmentUserFilterSelectProps {
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+}
+
+function DepartmentUserFilterSelect({ value, onChange, options }: DepartmentUserFilterSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const selectedOption = options.find(
+    (opt) => opt.value.toLowerCase() === value.toLowerCase()
+  )
+  const displayLabel =
+    value === 'all' || !value
+      ? 'All Department Users'
+      : value === 'unassigned'
+      ? 'Unassigned'
+      : selectedOption?.label || formatRepLabel(value)
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = 220
+      const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight
+      setMenuPos({
+        top: openUpwards ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left: Math.max(8, rect.left),
+        width: Math.max(rect.width, 180),
+      })
+      setSearch('')
+      setIsOpen(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClose = (e: MouseEvent | TouchEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    const handleScroll = (e: Event) => {
+      if (
+        menuRef.current &&
+        (menuRef.current === e.target || menuRef.current.contains(e.target as Node))
+      ) {
+        return
+      }
+      setIsOpen(false)
+    }
+
+    const handleResize = () => {
+      setIsOpen(false)
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('touchstart', handleClose)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('touchstart', handleClose)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options
+    const q = search.toLowerCase().trim()
+    return options.filter(
+      (opt) => opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q)
+    )
+  }, [options, search])
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
+        className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer flex items-center justify-between gap-1.5 transition-colors hover:bg-slate-50"
+        title={displayLabel}
+      >
+        <span className="truncate text-left font-medium">{displayLabel}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+            isOpen ? 'rotate-180 text-blue-500' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${menuPos.top}px`,
+              left: `${menuPos.left}px`,
+              width: `${menuPos.width}px`,
+              minWidth: '180px',
+              maxWidth: '280px',
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100"
+          >
+            {/* Quick search input */}
+            {options.length > 5 && (
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search user..."
+                  className="w-full h-7 pl-2 pr-6 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Scrollable list with reduced length */}
+            <div
+              onScroll={(e) => e.stopPropagation()}
+              className="max-h-[175px] overflow-y-auto space-y-0.5 pr-0.5 custom-scrollbar"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('all')
+                  setIsOpen(false)
+                }}
+                className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
+                  value === 'all' || !value
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                <span>All Department Users</span>
+                {(value === 'all' || !value) && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('unassigned')
+                  setIsOpen(false)
+                }}
+                className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
+                  value === 'unassigned'
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                <span>Unassigned</span>
+                {value === 'unassigned' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+              </button>
+
+              {filteredOptions.length === 0 ? (
+                <div className="py-2 text-center text-xs text-slate-400">No users found</div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected = value.toLowerCase() === opt.value.toLowerCase()
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        onChange(opt.value)
+                        setIsOpen(false)
+                      }}
+                      className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate text-left">{opt.label}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
 }
 
 export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {}) {
@@ -132,9 +798,31 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const [selectedTelecallerStatus, setSelectedTelecallerStatus] = useState('all')
   const [selectedLeadType, setSelectedLeadType] = useState('all')
   const [selectedFunnel, setSelectedFunnel] = useState('all')
+  const [selectedDepartmentUser, setSelectedDepartmentUser] = useState('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [funnels, setFunnels] = useState<FunnelItem[]>([])
+  // Memoized, deduplicated, sorted funnels list
+  const cleanFunnelOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const list: { value: string; label: string }[] = []
+
+    funnels.forEach((f) => {
+      const val = (f.funnelName || f.funnelType || '').trim()
+      if (!val) return
+      const key = val.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        list.push({
+          value: val,
+          label: val,
+        })
+      }
+    })
+
+    return list.sort((a, b) => a.label.localeCompare(b.label))
+  }, [funnels])
+
   const funnelOptions = useMemo(() => {
     const seen = new Set<string>()
     return funnels.flatMap((funnel) => {
@@ -145,6 +833,27 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     })
   }, [funnels])
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
+  // Memoized, deduplicated, sorted assignable users list with clean labels
+  const cleanAssignableOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const list: { value: string; label: string }[] = []
+
+    assignableUsers.forEach((u) => {
+      const val = (u.email || u.username || '').trim()
+      if (!val) return
+      const key = val.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        list.push({
+          value: val,
+          label: formatRepLabel(u.username, u.email),
+        })
+      }
+    })
+
+    return list.sort((a, b) => a.label.localeCompare(b.label))
+  }, [assignableUsers])
+
 
   // Selection
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
@@ -211,12 +920,36 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         telecallerStatus: selectedTelecallerStatus,
         leadType: selectedLeadType,
         funnelType: selectedFunnel,
+        assignedUser: selectedDepartmentUser,
         startDate: startDate ? `${startDate}T00:00:00` : undefined,
         endDate: endDate ? `${endDate}T23:59:59` : undefined,
       })
       setLeads(res.leads)
       setTotalElements(res.totalElements)
       setTotalPages(res.totalPages)
+
+      // Auto-extract and populate any assigned users present in the fetched leads
+      if (res.leads && res.leads.length > 0) {
+        const assignedEmails = res.leads
+          .map((l: any) => (l.assginedUser || l.telecallerAssigned || '').trim())
+          .filter(Boolean)
+        if (assignedEmails.length > 0) {
+          setAssignableUsers((prev) => {
+            const existing = new Set(prev.map((u) => (u.email || u.username).toLowerCase()))
+            const additions: typeof prev = []
+            assignedEmails.forEach((em: string) => {
+              if (!existing.has(em.toLowerCase())) {
+                existing.add(em.toLowerCase())
+                additions.push({
+                  email: em,
+                  username: em.split('@')[0] || em,
+                })
+              }
+            })
+            return additions.length > 0 ? [...prev, ...additions] : prev
+          })
+        }
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load leads from server.')
       setLeads([])
@@ -232,6 +965,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedTelecallerStatus,
     selectedLeadType,
     selectedFunnel,
+    selectedDepartmentUser,
     startDate,
     endDate,
   ])
@@ -299,6 +1033,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedTelecallerStatus !== 'all' ||
     selectedLeadType !== 'all' ||
     selectedFunnel !== 'all' ||
+    selectedDepartmentUser !== 'all' ||
     Boolean(startDate) ||
     Boolean(endDate)
 
@@ -307,6 +1042,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedTelecallerStatus !== 'all',
     selectedLeadType !== 'all',
     selectedFunnel !== 'all',
+    selectedDepartmentUser !== 'all',
     Boolean(startDate || endDate),
   ].filter(Boolean).length
 
@@ -317,6 +1053,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     setSelectedTelecallerStatus('all')
     setSelectedLeadType('all')
     setSelectedFunnel('all')
+    setSelectedDepartmentUser('all')
     setStartDate('')
     setEndDate('')
     setCurrentPage(0)
@@ -497,7 +1234,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
           {/* Collapsible Filter Bar */}
           {showFilters && (
             <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
                     Sales Status
@@ -565,21 +1302,29 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
                     Funnel Type
                   </label>
-                  <select
+                  <FunnelFilterSelect
                     value={selectedFunnel}
-                    onChange={(e) => {
-                      setSelectedFunnel(e.target.value)
+                    onChange={(val) => {
+                      setSelectedFunnel(val)
                       setCurrentPage(0)
                     }}
-                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
-                  >
-                    <option value="all">All Funnels</option>
-                    {funnels.map((f, i) => (
-                      <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                        {f.funnelName || f.funnelType}
-                      </option>
-                    ))}
-                  </select>
+                    options={cleanFunnelOptions}
+                  />
+                </div>
+
+                
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
+                    Department User
+                  </label>
+                  <DepartmentUserFilterSelect
+                    value={selectedDepartmentUser}
+                    onChange={(val) => {
+                      setSelectedDepartmentUser(val)
+                      setCurrentPage(0)
+                    }}
+                    options={cleanAssignableOptions}
+                  />
                 </div>
 
                 <div>
@@ -773,18 +1518,12 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
                         {/* Assigned Rep */}
                         <td className="py-3 px-4">
-                          <select
-                            value={lead.assginedUser || ''}
-                            onChange={(e) => handleAssignUser(lead.leadId, e.target.value)}
-                            className="w-full max-w-[140px] px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer truncate"
-                          >
-                            <option value="">Not Assigned</option>
-                            {assignableUsers.map((u) => (
-                              <option key={u.email || u.username} value={u.email || u.username}>
-                                {u.username}
-                              </option>
-                            ))}
-                          </select>
+                          <AssignedRepSelect
+                            leadId={lead.leadId}
+                            currentVal={(lead.assginedUser || lead.telecallerAssigned || '').trim()}
+                            options={cleanAssignableOptions}
+                            onAssign={handleAssignUser}
+                          />
                         </td>
 
                         {/* Payment */}
@@ -856,7 +1595,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
             <div className="admin-customers-pagination__buttons">
               <button
                 type="button"
-                disabled={currentPage === 0}
+                disabled={currentPage === 0 || loading}
                 onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
@@ -865,7 +1604,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               <span>Page {currentPage + 1} of {Math.max(1, totalPages)}</span>
               <button
                 type="button"
-                disabled={currentPage >= totalPages - 1}
+                disabled={currentPage >= totalPages - 1 || loading}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >

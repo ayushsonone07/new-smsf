@@ -36,11 +36,17 @@ export interface LeadsPageResponse<T> {
   success?: boolean
   data?: T[]
   elementSize?: number
+  totalElements?: number
+  totalPage?: number
   totalPages?: number
+  pageNumber?: number
   currentPage?: number
   pageSize?: number
+  isFirst?: boolean
   isFirstPage?: boolean
+  isLast?: boolean
   isLastPage?: boolean
+  departmentUsers?: string[]
 }
 
 export interface LeadStatsSummary {
@@ -61,6 +67,7 @@ export interface FetchLeadsParams {
   funnelType?: string | null
   startDate?: string | null
   endDate?: string | null
+  assignedUser?: string | null
 }
 
 export interface AssignableUser {
@@ -117,6 +124,7 @@ export async function getLeads(params: FetchLeadsParams = {}): Promise<{
   pageSize: number
   isFirstPage: boolean
   isLastPage: boolean
+  departmentUsers?: string[]
 }> {
   const query = new URLSearchParams()
   query.set('pageNumber', String(params.page ?? 0))
@@ -129,17 +137,33 @@ export async function getLeads(params: FetchLeadsParams = {}): Promise<{
   if (params.funnelType && params.funnelType !== 'all') query.set('funnelType', params.funnelType)
   if (params.startDate) query.set('startDate', params.startDate)
   if (params.endDate) query.set('endDate', params.endDate)
+  if (params.assignedUser && params.assignedUser !== 'all') query.set('assignedUser', params.assignedUser)
 
   const res = await authedApiRequest<any>(`/api/leads?${query.toString()}`)
   const rawList = res?.data || []
+  const totalElements = Number(
+    res?.elementSize ?? res?.totalElements ?? (Array.isArray(rawList) ? rawList.length : 0),
+  )
+  const pageSize = Number(res?.pageSize ?? params.size ?? 10)
+  const computedPages = pageSize > 0 && totalElements > 0 ? Math.ceil(totalElements / pageSize) : 1
+  const backendPages =
+    res?.totalPage !== undefined
+      ? Number(res.totalPage)
+      : res?.totalPages !== undefined
+      ? Number(res.totalPages)
+      : undefined
+  const totalPages = Math.max(1, backendPages ?? computedPages)
+  const currentPage = Number(res?.pageNumber ?? res?.currentPage ?? params.page ?? 0)
+
   return {
     leads: Array.isArray(rawList) ? rawList : [],
-    totalElements: res?.elementSize ?? (Array.isArray(rawList) ? rawList.length : 0),
-    totalPages: res?.totalPages ?? 1,
-    currentPage: res?.currentPage ?? (params.page ?? 0),
-    pageSize: res?.pageSize ?? (params.size ?? 10),
-    isFirstPage: res?.isFirstPage ?? (params.page === 0),
-    isLastPage: res?.isLastPage ?? true,
+    totalElements,
+    totalPages,
+    currentPage,
+    pageSize,
+    isFirstPage: Boolean(res?.isFirst ?? res?.isFirstPage ?? (currentPage === 0)),
+    isLastPage: Boolean(res?.isLast ?? res?.isLastPage ?? (currentPage >= totalPages - 1)),
+    departmentUsers: Array.isArray(res?.departmentUsers) ? res.departmentUsers : undefined,
   }
 }
 
@@ -284,21 +308,79 @@ export async function fetchFunnels(): Promise<FunnelItem[]> {
  * Fetch assignable sales & department members
  */
 export async function fetchAssignableUsers(departmentType?: string): Promise<AssignableUser[]> {
+  // 1. Dedicated leads assignable-users endpoint
   try {
-    const query = departmentType ? `?departmentType=${encodeURIComponent(departmentType)}` : ''
-    const res = await authedApiRequest<any>(`/api/meetings/users/assigning-list${query}`)
+    const res = await authedApiRequest<any>('/api/leads/assignable-users')
     const data = unwrapPayload<any>(res)
-    if (Array.isArray(data)) return data
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((u: any) => ({
+        id: u.id,
+        username: u.username || u.name || u.email,
+        email: u.email,
+        departmentType: u.departmentType,
+        role: u.role,
+      }))
+    }
   } catch {
     // fallback
   }
 
+  // 2. Query SALES_DEPARTMENT
   try {
-    const fallback = await authedApiRequest<any>('/api/help-center/users')
-    const data = unwrapPayload<any>(fallback)
-    if (Array.isArray(data)) return data
+    const dept = departmentType || 'SALES_DEPARTMENT'
+    const res = await authedApiRequest<any>(
+      `/api/meetings/users/assigning-list?departmentType=${encodeURIComponent(dept)}`,
+    )
+    const data = unwrapPayload<any>(res)
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((u: any) => ({
+        username: u.username || u.name || (u.email ? u.email.split("@")[0] : ""),
+        email: u.email || u.username,
+        departmentType: dept,
+      }))
+    }
   } catch {
     // fallback
+  }
+
+  // 3. Query TELESALES_DEPARTMENT
+  try {
+    const res = await authedApiRequest<any>(
+      '/api/meetings/users/assigning-list?departmentType=TELESALES_DEPARTMENT',
+    )
+    const data = unwrapPayload<any>(res)
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((u: any) => ({
+        username: u.username || u.email,
+        email: u.email || u.username,
+        departmentType: 'TELESALES_DEPARTMENT',
+      }))
+    }
+  } catch {
+    // fallback
+  }
+
+  // 4. Admin departments directory fallback
+  try {
+    const res = await authedApiRequest<any>('/api/auth/admin/departments?size=100')
+    const items = res?.data || unwrapPayload<any>(res)
+    if (Array.isArray(items) && items.length > 0) {
+      const salesOrTele = items.filter(
+        (u: any) =>
+          u.departmentType === 'SALES_DEPARTMENT' ||
+          u.departmentType === 'TELESALES_DEPARTMENT',
+      )
+      const list = salesOrTele.length > 0 ? salesOrTele : items
+      return list.map((u: any) => ({
+        id: u.departmentId || u.id,
+        username: u.username || u.email,
+        email: u.email,
+        departmentType: u.departmentType,
+        role: u.role,
+      }))
+    }
+  } catch {
+    // all fallbacks exhausted
   }
 
   return []
