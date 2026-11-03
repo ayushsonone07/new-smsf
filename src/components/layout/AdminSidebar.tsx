@@ -24,6 +24,7 @@ import {
   Bell,
   CalendarCheck,
   LifeBuoy,
+  Mail,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -39,6 +40,7 @@ type NavPath =
   | '/admin/timelines'
   | '/admin/service-flow'
   | '/admin/notification-history'
+  | '/admin/bulk-email'
   | '/admin/help-support'
   | '/manage-leads'
   | '/manage-customers-payment'
@@ -150,6 +152,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/notification-history'),
+  },
+  {
+    to: '/admin/bulk-email',
+    label: 'Bulk Email',
+    icon: Mail,
+    roles: ['ADMIN'],
+    isActive: (pathname) => pathname.startsWith('/admin/bulk-email'),
   },
 ]
 

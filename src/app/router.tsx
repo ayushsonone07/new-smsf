@@ -102,6 +102,9 @@ const SalesProposalPage = lazy(() =>
 const LeadsManagementPage = lazy(() =>
   import('../features/sales/pages/LeadsManagementPage').then((module) => ({ default: module.LeadsManagementPage })),
 )
+const ScheduledBulkEmailPage = lazy(() =>
+  import('../features/sales/pages/ScheduledBulkEmailPage').then((module) => ({ default: module.ScheduledBulkEmailPage })),
+)
 const CustomerDashboardPage = lazy(() =>
   import('../features/customers/pages/CustomerDashboardPage').then((module) => ({ default: module.CustomerDashboardPage })),
 )
@@ -502,6 +505,13 @@ const adminSalesSummaryRoute = createRoute({
   path: '/admin/sales-summary',
   component: SalesSummaryPage,
   beforeLoad: requireRole('ADMIN', 'HEAD'),
+})
+
+const adminBulkEmailRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/bulk-email',
+  component: ScheduledBulkEmailPage,
+  beforeLoad: requireRole('ADMIN'),
 })
 
 const salesSummaryAliasRoute = createRoute({
@@ -908,6 +918,7 @@ const routeTree = rootRoute.addChildren([
     adminPaymentsRoute,
     manageCustomerPaymentsRoute,
     adminSalesSummaryRoute,
+    adminBulkEmailRoute,
     salesSummaryAliasRoute,
     adminPlansRoute,
     plansAliasRoute,
@@ -959,7 +970,6 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
-
 
 
 
