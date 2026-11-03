@@ -25,6 +25,19 @@ export interface PaymentInfoRecord {
   paymentInfo?: Record<string, unknown> | null
 }
 
+export interface GstinAddressDetails {
+  building_number?: string | null
+  building_name?: string | null
+  floor?: string | null
+  street?: string | null
+  locality?: string | null
+  district?: string | null
+  city?: string | null
+  state?: string | null
+  pincode?: string | null
+  landmark?: string | null
+}
+
 export interface GstinDetails {
   gstin?: string | null
   legal_name?: string | null
@@ -37,6 +50,7 @@ export interface GstinDetails {
   state_code?: string | null
   state_jurisdiction?: string | null
   address?: string | null
+  address_details?: GstinAddressDetails | null
   pincode?: string | null
   nature_of_business?: string[] | null
 }

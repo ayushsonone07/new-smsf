@@ -5,7 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Building2,
-  Check,
+  Check,  
   ClipboardList,
   Eye,
   EyeOff,
@@ -39,12 +39,12 @@ import { normalizeAmountToRupees } from '../../../utils/paymentUtils'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
 
 /* ─────────────────────────────────────────────────────────────────
-   Single-page "Register Your Business" form.
-   UI: step-wizard layout (left stepper rail, one step card at a time,
-   docked features panel, Previous / Continue footer).
-   Logic: unchanged — step-locking, payment verification, GST toggle,
-   package selection, validation and passkey submission.
-   ───────────────────────────────────────────────────────────────── */
+Single-page "Register Your Business" form.
+UI: step-wizard layout (left stepper rail, one step card at a time,
+docked features panel, Previous / Continue footer).
+Logic: unchanged — step-locking, payment verification, GST toggle,
+package selection, validation and passkey submission.
+───────────────────────────────────────────────────────────────── */
 
 const INDIAN_CITIES = Object.freeze([
   'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Jaipur', 'Jabalpur',
@@ -122,6 +122,67 @@ const INITIAL_VALIDATION_ERRORS = {
   gstin: '',
   city: '',
 }
+
+/* ─── GST registered-address fields (auto-filled from the GSTIN lookup, editable) ─── */
+type GstAddress = {
+  buildingNumber: string
+  buildingName: string
+  floor: string
+  street: string
+  locality: string
+  district: string
+  city: string
+  state: string
+  pincode: string
+  landmark: string
+}
+
+const EMPTY_GST_ADDRESS: GstAddress = {
+  buildingNumber: '',
+  buildingName: '',
+  floor: '',
+  street: '',
+  locality: '',
+  district: '',
+  city: '',
+  state: '',
+  pincode: '',
+  landmark: '',
+}
+
+/* Anything the GST API returns as null becomes an empty, editable field. */
+const gstAddressFromDetails = (d: GstinDetails): GstAddress => {
+  const a = d.address_details
+  return {
+    buildingNumber: a?.building_number ?? '',
+    buildingName: a?.building_name ?? '',
+    floor: a?.floor ?? '',
+    street: a?.street ?? '',
+    locality: a?.locality ?? '',
+    district: a?.district ?? '',
+    city: a?.city ?? '',
+    state: a?.state ?? '',
+    pincode: a?.pincode ?? d.pincode ?? '',
+    landmark: a?.landmark ?? '',
+  }
+}
+
+const GST_ADDRESS_FIELDS: {
+  key: keyof GstAddress
+  label: string
+  placeholder: string
+}[] = [
+  { key: 'buildingNumber', label: 'Building / Plot No.', placeholder: 'e.g. SR NO 33/1/1' },
+  { key: 'buildingName', label: 'Building Name', placeholder: 'Building name' },
+  { key: 'floor', label: 'Floor', placeholder: 'Floor' },
+  { key: 'street', label: 'Street', placeholder: 'Street' },
+  { key: 'locality', label: 'Locality', placeholder: 'Locality' },
+  { key: 'landmark', label: 'Landmark', placeholder: 'Landmark' },
+  { key: 'district', label: 'District', placeholder: 'District' },
+  { key: 'city', label: 'City', placeholder: 'City' },
+  { key: 'state', label: 'State', placeholder: 'State' },
+  { key: 'pincode', label: 'Pincode', placeholder: '6-digit pincode' },
+]
 
 const REGISTRATION_PASSKEY =
   import.meta.env.VITE_REGISTRATION_PASSKEY || 'MBG@1234'
@@ -369,6 +430,49 @@ function GstinDetailsCard({
   )
 }
 
+/* Editable address fields, pre-filled from the GST lookup. Blank when GST has no value. */
+function GstAddressFields({
+  value,
+  onChange,
+  inputClass,
+  idPrefix = 'gst',
+}: {
+  value: GstAddress
+  onChange: (next: GstAddress) => void
+  inputClass: (hasError?: boolean) => string
+  idPrefix?: string
+}) {
+  return (
+    <div className="mt-3">
+      <p className="mb-2 text-xs font-semibold text-slate-600">
+        Registered address{' '}
+        <span className="font-normal text-slate-400">(auto-filled from GST, editable)</span>
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {GST_ADDRESS_FIELDS.map(({ key, label, placeholder }) => (
+          <Field key={key} label={label} htmlFor={`${idPrefix}-${key}`}>
+            <input
+              id={`${idPrefix}-${key}`}
+              value={value[key]}
+              inputMode={key === 'pincode' ? 'numeric' : undefined}
+              maxLength={key === 'pincode' ? 6 : 200}
+              onChange={(e) => {
+                const v =
+                  key === 'pincode'
+                    ? e.target.value.replace(/\D/g, '')
+                    : e.target.value
+                onChange({ ...value, [key]: v })
+              }}
+              placeholder={placeholder}
+              className={inputClass()}
+            />
+          </Field>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function RegisterBusinessPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -406,6 +510,33 @@ export function RegisterBusinessPage() {
     staleTime: 5 * 60_000,
     retry: false,
   })
+
+  /* Editable address fields filled from the GST lookup. */
+  const [gstAddress, setGstAddress] = useState<GstAddress>({
+    ...EMPTY_GST_ADDRESS,
+  })
+  /* GSTIN the address was last auto-filled for, so a refetch never overwrites user edits. */
+  const gstFilledFor = useRef<string | null>(null)
+
+  useEffect(() => {
+    const active =
+      formData.invoiceOption === 'gstin' && validateGSTNumber(normalizedGstin)
+
+    if (!active) {
+      if (gstFilledFor.current) {
+        gstFilledFor.current = null
+        setGstAddress({ ...EMPTY_GST_ADDRESS })
+      }
+      return
+    }
+
+    const data = gstinQuery.data
+    if (!data || (data.gstin && data.gstin !== normalizedGstin)) return
+    if (gstFilledFor.current === normalizedGstin) return
+
+    gstFilledFor.current = normalizedGstin
+    setGstAddress(gstAddressFromDetails(data))
+  }, [formData.invoiceOption, normalizedGstin, gstinQuery.data])
 
   const paymentInfoQuery = useQuery({
     queryKey: ['register-business', 'payment-info', formData.email.trim().toLowerCase()],
@@ -675,6 +806,8 @@ export function RegisterBusinessPage() {
     setExtraPaymentInput('')
     setExtraPaymentError('')
     setPickedPayment(null)
+    setGstAddress({ ...EMPTY_GST_ADDRESS })
+    gstFilledFor.current = null
     autoPickedPhone.current = null
     autoAdvanceArmed.current = {
       business: true,
@@ -1774,6 +1907,8 @@ export function RegisterBusinessPage() {
         leadType: formData.leadType,
         isWebsiteIncluded,
         gstinOrAddress: gstinOrAddress || '',
+        gstAddress:
+          formData.invoiceOption === 'gstin' ? { ...gstAddress } : undefined,
         remainingAmountDueDate: formData.remainingAmountDueDate || '',
         whatsappGroupInviteLink: formData.groupLink,
         source: 'root',
@@ -1868,6 +2003,7 @@ export function RegisterBusinessPage() {
     discountAmount,
     autoTotal,
     verifiedPaymentAmount,
+    gstAddress,
   ])
 
   const inputClass = (hasError?: boolean) =>
@@ -2433,6 +2569,14 @@ export function RegisterBusinessPage() {
                             isLoading={gstinQuery.isFetching}
                             error={gstinQuery.error}
                           />
+                          {validateGSTNumber(normalizedGstin) &&
+                            !gstinQuery.isFetching && (
+                              <GstAddressFields
+                                value={gstAddress}
+                                onChange={setGstAddress}
+                                inputClass={inputClass}
+                              />
+                            )}
                         </div>
                       )}
                       {formData.invoiceOption === 'address' && (
@@ -3123,7 +3267,7 @@ export function RegisterBusinessPage() {
                             setManualBaseAmount(value)
                             if (
                               value === '' ||
-                              (/^d+$/.test(value) && value.length <= 12)
+                              (/^\d+$/.test(value) && value.length <= 12)
                             ) {
                               const base = parseInt(value) || 0
                               const pct = Math.min(
@@ -3646,6 +3790,15 @@ export function RegisterBusinessPage() {
                           isLoading={gstinQuery.isFetching}
                           error={gstinQuery.error}
                         />
+                        {validateGSTNumber(normalizedGstin) &&
+                          !gstinQuery.isFetching && (
+                            <GstAddressFields
+                              value={gstAddress}
+                              onChange={setGstAddress}
+                              inputClass={inputClass}
+                              idPrefix="gst-modal"
+                            />
+                          )}
                       </div>
                     )}
 
