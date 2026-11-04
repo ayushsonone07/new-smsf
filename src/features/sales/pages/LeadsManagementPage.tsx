@@ -359,7 +359,7 @@ const SALES_STATUS_FILTER_OPTIONS: FilterDropdownOption[] = [
   { value: 'MEETING_SCHEDULED_AT', label: 'MEETING SCHEDULED AT', dotColor: 'bg-cyan-500' },
   { value: 'NOT_CONNECTED', label: 'NOT CONNECTED', dotColor: 'bg-rose-500' },
   { value: 'NOT_INTERESTED', label: 'NOT INTERESTED', dotColor: 'bg-slate-400' },
-  { value: 'DONE', label: 'DONE', dotColor: 'bg-emerald-500' },
+  { value: 'DONE', label: 'SALE WON', dotColor: 'bg-emerald-500' },
 ]
 
 const TELECALLER_STATUS_FILTER_OPTIONS: FilterDropdownOption[] = [
@@ -393,7 +393,9 @@ function FilterDropdownSelect({ value, onChange, options, allLabel }: FilterDrop
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const selectedOption = options.find(
-    (opt) => opt.value.toLowerCase() === (value || '').toLowerCase()
+    (opt) =>
+      opt.value.toLowerCase() === (value || '').toLowerCase() ||
+      (opt.value === 'DONE' && ((value || '').toLowerCase() === 'sale_won' || (value || '').toLowerCase() === 'sale won'))
   )
   const displayLabel = value === 'all' || !value ? allLabel : selectedOption?.label || value
 
@@ -507,7 +509,11 @@ function FilterDropdownSelect({ value, onChange, options, allLabel }: FilterDrop
               {options.map((opt) => {
                 const isSelected =
                   (opt.value === 'all' && (!value || value === 'all')) ||
-                  (opt.value !== 'all' && opt.value.toLowerCase() === (value || '').toLowerCase())
+                  (opt.value !== 'all' &&
+                    (opt.value.toLowerCase() === (value || '').toLowerCase() ||
+                      (opt.value === 'DONE' &&
+                        ((value || '').toLowerCase() === 'sale_won' ||
+                          (value || '').toLowerCase() === 'sale won'))))
 
                 return (
                   <button
@@ -1670,7 +1676,11 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                     const isSelected = selectedLeads.includes(lead.leadId)
                     const customerInfo = getCustomerDisplay(lead)
                     const isPending = (lead.leadStatus || 'PENDING') === 'PENDING'
-                    const isDone = (lead.leadStatus || '').toUpperCase() === 'DONE'
+                    const isDone =
+                      (lead.leadStatus || '').toUpperCase() === 'DONE' ||
+                      (lead.leadStatus || '').toUpperCase() === 'SALE_WON' ||
+                      (lead.leadStatus || '').toUpperCase() === 'SALE WON'
+                    const displayStatus = isDone ? 'SALE WON' : (lead.leadStatus || 'PENDING')
 
                     return (
                       <tr
@@ -1750,7 +1760,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                             }`}
                             title="Click to update status"
                           >
-                            {lead.leadStatus || 'PENDING'}
+                            {displayStatus}
                           </button>
                         </td>
 

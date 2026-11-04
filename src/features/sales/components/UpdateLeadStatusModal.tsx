@@ -38,7 +38,7 @@ export const UpdateLeadStatusModal: React.FC<UpdateLeadStatusModalProps> = ({
     setError(null)
 
     if (isDoneStatus && !meetingLink.trim()) {
-      setError('Meeting link is required when marking lead as DONE.')
+      setError('Meeting link is required when marking lead as SALE WON.')
       return
     }
 
@@ -75,7 +75,7 @@ export const UpdateLeadStatusModal: React.FC<UpdateLeadStatusModalProps> = ({
         <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Update Lead Status: {newStatus.replace(/_/g, ' ')}
+              Update Lead Status: {newStatus === 'DONE' ? 'SALE WON' : newStatus.replace(/_/g, ' ')}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Confirm status change for {leadName || `Lead #${leadId}`}

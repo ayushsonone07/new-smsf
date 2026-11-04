@@ -400,7 +400,7 @@ export function SalesSummaryView() {
 
   const statusCards = [
     {
-      label: 'COMPLETED & DONE',
+      label: 'COMPLETED & SALE WON',
       value: completedLeads + doneLeads,
       icon: CheckCircle2,
       color: 'text-emerald-600',
