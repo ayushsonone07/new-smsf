@@ -173,7 +173,6 @@ export function ScheduledBulkEmailPage() {
             </button>
           )}
         </header>
-
         <form onSubmit={submit} className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block space-y-2 text-sm font-medium text-slate-800">
