@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { AlertTriangle, CalendarClock, Mail, Plus, Send, Trash2, Upload } from 'lucide-react'
+import { CalendarClock, LockKeyhole, Mail, Plus, Send, Trash2, Upload } from 'lucide-react'
+import { ApiError } from '../../../api/client'
 import { PageLayout } from '../../../components/layout/PageLayout'
-import { createScheduledBulkEmail, type ScheduledBulkEmailJob } from '../../../api/scheduled-bulk-email.api'
+import {
+  createScheduledBulkEmail,
+  requestScheduledBulkEmailOtp,
+  verifyScheduledBulkEmailOtp,
+  type ScheduledBulkEmailJob,
+} from '../../../api/scheduled-bulk-email.api'
 
 function defaultScheduleAt() {
   const date = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -25,7 +31,11 @@ export function ScheduledBulkEmailPage() {
   const [excel, setExcel] = useState<File | null>(null)
   const [template, setTemplate] = useState<File | null>(null)
   const [scheduleAt, setScheduleAt] = useState<string[]>([defaultScheduleAt()])
-  const [password, setPassword] = useState('')
+  const [unlockToken, setUnlockToken] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false)
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{
@@ -36,7 +46,14 @@ export function ScheduledBulkEmailPage() {
     skippedDuplicateCount: number
   } | null>(null)
 
-  const configuredPassword = import.meta.env.VITE_BULK_EMAIL_PASSWORD
+  useEffect(() => {
+    if (!unlockToken) return
+    const timeout = window.setTimeout(() => {
+      setUnlockToken('')
+      setError('Your bulk email unlock expired. Verify a new code to continue.')
+    }, 30 * 60 * 1000)
+    return () => window.clearTimeout(timeout)
+  }, [unlockToken])
 
   function updateSchedule(index: number, value: string) {
     setScheduleAt((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))
@@ -50,17 +67,27 @@ export function ScheduledBulkEmailPage() {
     setScheduleAt((current) => current.filter((_, itemIndex) => itemIndex !== index))
   }
 
+  async function beginUnlock() {
+    setError('')
+    setIsRequestingOtp(true)
+    try {
+      await requestScheduledBulkEmailOtp()
+      setOtp('')
+      setOtpDialogOpen(true)
+      setError('')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to send the verification code.')
+    } finally {
+      setIsRequestingOtp(false)
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     setResult(null)
-
-    if (!configuredPassword) {
-      setError('Bulk email password is not configured. Set VITE_BULK_EMAIL_PASSWORD in the frontend environment and rebuild.')
-      return
-    }
-    if (password !== configuredPassword) {
-      setError('The send password is incorrect.')
+    if (!unlockToken) {
+      setError('Unlock scheduled bulk email with email verification before sending.')
       return
     }
     if (!excel || !template) {
@@ -82,7 +109,7 @@ export function ScheduledBulkEmailPage() {
 
     setIsSending(true)
     try {
-      const response = await createScheduledBulkEmail(formData)
+      const response = await createScheduledBulkEmail(formData, unlockToken)
       setResult({
         message: response.message,
         schedules: response.data.schedules,
@@ -90,17 +117,38 @@ export function ScheduledBulkEmailPage() {
         skippedInvalidCount: response.data.skippedInvalidCount,
         skippedDuplicateCount: response.data.skippedDuplicateCount,
       })
-      setPassword('')
     } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 403) {
+        setUnlockToken('')
+        setError('Your bulk email unlock expired. Verify a new code to continue.')
+        return
+      }
       setError(requestError instanceof Error ? requestError.message : 'Unable to schedule the bulk email.')
     } finally {
       setIsSending(false)
     }
   }
 
+  async function verifyCode() {
+    setError('')
+    setIsVerifyingOtp(true)
+    try {
+      const response = await verifyScheduledBulkEmailOtp(otp.trim())
+      setUnlockToken(response.data.unlockToken)
+      setOtpDialogOpen(false)
+      setOtp('')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to verify the code.')
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
   return (
     <PageLayout>
       <div className="mx-auto w-full max-w-5xl space-y-6">
+        <div className="relative">
+          <div className={unlockToken ? '' : 'pointer-events-none select-none blur-sm'}>
         <header className="flex items-start gap-4">
           <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
             <Mail size={24} aria-hidden="true" />
@@ -111,16 +159,20 @@ export function ScheduledBulkEmailPage() {
               Upload recipients and a template to schedule one email campaign per date.
             </p>
           </div>
+          {unlockToken && (
+            <button
+              type="button"
+              onClick={() => {
+                setUnlockToken('')
+                setResult(null)
+                setError('')
+              }}
+              className="ml-auto rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Lock page
+            </button>
+          )}
         </header>
-
-        <div role="note" className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-          <AlertTriangle className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
-          <p>
-            The page password is a frontend-only confirmation and is visible in the deployed app.
-            Superadmin authentication still protects the API; do not treat this password as a secure API credential.
-          </p>
-        </div>
-
         <form onSubmit={submit} className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block space-y-2 text-sm font-medium text-slate-800">
@@ -219,25 +271,6 @@ export function ScheduledBulkEmailPage() {
             ))}
           </section>
 
-          <label className="block max-w-md space-y-2 text-sm font-medium text-slate-800">
-            Send password
-            <input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Enter the configured bulk email password"
-            />
-          </label>
-
-          {error && (
-            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-
           {result && (
             <section role="status" className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
               <p className="font-semibold">{result.message}</p>
@@ -256,21 +289,129 @@ export function ScheduledBulkEmailPage() {
           )}
 
           <div className="flex justify-end border-t border-slate-100 pt-5">
+            {error && (
+              <p role="alert" className="mr-auto self-center rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
-              disabled={isSending || !configuredPassword}
+              disabled={isSending}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send size={17} aria-hidden="true" />
-              {isSending ? 'Scheduling…' : 'Schedule bulk email'}
+              {isSending ? 'Scheduling…' : 'Send Bulk Email'}
             </button>
           </div>
         </form>
 
-        {!configuredPassword && (
-          <p role="status" className="text-sm text-amber-800">
-            Configure VITE_BULK_EMAIL_PASSWORD in the frontend environment, then restart or rebuild the app to enable sending.
-          </p>
+          </div>
+
+          {!unlockToken && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-slate-900/20 p-5">
+              <section className="w-full max-w-md space-y-4 rounded-xl border border-slate-200 bg-white p-6 text-center shadow-xl">
+                <LockKeyhole className="mx-auto text-blue-700" size={32} aria-hidden="true" />
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Bulk email is locked</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Verify the one-time code sent to raj@mbgcard.com to use this feature.
+                  </p>
+                </div>
+                {error && (
+                  <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={isRequestingOtp}
+                  onClick={() => void beginUnlock()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <LockKeyhole size={17} aria-hidden="true" />
+                  {isRequestingOtp ? 'Sending code…' : 'Unlock'}
+                </button>
+              </section>
+            </div>
+          )}
+        </div>
+
+        {otpDialogOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !isVerifyingOtp) {
+                setOtpDialogOpen(false)
+                setOtp('')
+                setError('')
+              }
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="bulk-email-otp-title"
+              className="w-full max-w-md space-y-5 rounded-xl bg-white p-6 shadow-2xl"
+            >
+              <div>
+                <h2 id="bulk-email-otp-title" className="text-lg font-bold text-slate-900">
+                  Verify your email
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  A 6-digit code was sent to raj@mbgcard.com. It expires in 10 minutes.
+                </p>
+              </div>
+              <label className="block space-y-2 text-sm font-medium text-slate-800">
+                Verification code
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void verifyCode()
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Enter 6-digit code"
+                />
+              </label>
+              {error && (
+                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </p>
+              )}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={isVerifyingOtp}
+                  onClick={() => {
+                    setOtpDialogOpen(false)
+                    setOtp('')
+                    setError('')
+                  }}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isVerifyingOtp || otp.length !== 6}
+                  onClick={() => void verifyCode()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <LockKeyhole size={16} aria-hidden="true" />
+                  {isVerifyingOtp ? 'Verifying…' : 'Verify and unlock'}
+                </button>
+              </div>
+            </section>
+          </div>
         )}
       </div>
     </PageLayout>

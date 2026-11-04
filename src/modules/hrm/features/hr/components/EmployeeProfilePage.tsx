@@ -194,6 +194,7 @@ function EmployeeDetails({ employee }: { employee: EmployeeListItem }) {
       <Detail label="Department" value={employee.departmentName} />
       <Detail label="Designation" value={employee.designationName} optional />
       <Detail label="Manager" value={employee.managerName} optional />
+      <Detail label="Laptop serial number" value={employee.laptopSerialNumber ?? null} optional />
       <Detail label="Employment type" value={formatValue(employee.employmentType)} />
       <Detail label="Joining date" value={formatDate(employee.joiningDate)} />
       <Detail label="Exit date" value={formatDate(employee.exitDate)} optional />
@@ -224,6 +225,7 @@ function EmployeeEditForm({
     departmentId: employee.departmentId ?? 0,
     designationId: employee.designationId,
     managerId: employee.managerId,
+    laptopSerialNumber: employee.laptopSerialNumber ?? "",
   }));
 
   const departments = useAppSelector(selectDepartments);
@@ -333,6 +335,19 @@ function EmployeeEditForm({
           onChange={(value) => update("managerId", value)}
         />
       </div>
+
+        <div>
+          <label htmlFor="emp-laptop-serial" className="block text-xs font-medium text-muted-foreground">
+            Laptop serial number
+          </label>
+          <input
+            id="emp-laptop-serial"
+            value={values.laptopSerialNumber || ""}
+            onChange={(e) => update("laptopSerialNumber", e.target.value)}
+            placeholder="e.g. LPT-982341 (optional)"
+            className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+          />
+        </div>
 
       <div className="flex justify-end gap-2 border-t border-border pt-4">
         <button
