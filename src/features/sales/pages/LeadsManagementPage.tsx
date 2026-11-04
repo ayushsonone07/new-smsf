@@ -39,6 +39,7 @@ import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
 import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
+import { DeleteLeadsModal } from '../components/DeleteLeadsModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
 import { ScrollableSelect } from '../../../components/ui/ScrollableSelect'
@@ -858,6 +859,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   // Selection
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+
+  const singleSelectedLead = useMemo(() => {
+    if (selectedLeads.length === 1) {
+      return leads.find((l) => l.leadId === selectedLeads[0]) || null
+    }
+    return null
+  }, [selectedLeads, leads])
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -997,17 +1006,18 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   }
 
   // Delete
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedLeads.length === 0) return
-    if (!window.confirm(`Are you sure you want to delete ${selectedLeads.length} selected lead(s)?`)) {
-      return
-    }
+    setDeleteModalOpen(true)
+  }
 
+  const handleConfirmDelete = async () => {
     setIsDeleting(true)
     try {
       await deleteLeads(selectedLeads, false)
       showToast(`${selectedLeads.length} lead(s) deleted successfully.`, 'success')
       setSelectedLeads([])
+      setDeleteModalOpen(false)
       await fetchLeadsData()
     } catch (err: any) {
       showToast(err?.message || 'Failed to delete selected leads.', 'error')
@@ -1716,6 +1726,15 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
           }}
         />
       )}
+
+      <DeleteLeadsModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        selectedCount={selectedLeads.length}
+        isDeleting={isDeleting}
+        selectedLeadDetails={singleSelectedLead}
+      />
     </div>
   )
 }
