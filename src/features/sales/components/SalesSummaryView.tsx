@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   TrendingUp,
   Users,
@@ -17,6 +18,9 @@ import {
   Target,
   BarChart3,
   Layers,
+  ChevronDown,
+  Check,
+  X,
 } from 'lucide-react'
 import {
   fetchSalesHeadSummary,
@@ -24,6 +28,8 @@ import {
   type TelecallerItem,
 } from '../../../api/sales-summary.api'
 import { fetchFunnels, type FunnelItem } from '../../../api/leads.api'
+import { DateRangePicker } from '../../../components/head/customers-list/CustomersListFilters'
+import '../../customers/pages/AdminCustomersPage.css'
 
 function formatRupees(amount?: number | string | null): string {
   const num = typeof amount === 'number' ? amount : Number(amount) || 0
@@ -32,6 +38,274 @@ function formatRupees(amount?: number | string | null): string {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(num)
+}
+
+function formatRepLabel(name?: string, email?: string): string {
+  const n = (name || '').trim()
+  const e = (email || '').trim()
+
+  if (n && !n.includes('@')) {
+    return n
+  }
+
+  const target = n || e
+  if (!target) return 'All Team Members'
+
+  if (target.includes('@')) {
+    const prefix = target.split('@')[0]
+    const parts = prefix.split(/[._-]/).filter(Boolean)
+    if (parts.length > 1) {
+      return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+    }
+    return prefix.charAt(0).toUpperCase() + prefix.slice(1)
+  }
+
+  return target
+}
+
+interface SearchableDropdownOption {
+  value: string
+  label: string
+  subLabel?: string
+  initial?: string
+}
+
+interface SearchableDropdownProps {
+  value: string
+  onChange: (value: string) => void
+  options: SearchableDropdownOption[]
+  allLabel: string
+  searchPlaceholder?: string
+  prefixIcon?: React.ReactNode
+}
+
+function SearchableDropdown({
+  value,
+  onChange,
+  options,
+  allLabel,
+  searchPlaceholder = 'Search...',
+  prefixIcon,
+}: SearchableDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const selectedOption = options.find(
+    (opt) => opt.value.toLowerCase() === (value || '').toLowerCase()
+  )
+  const displayLabel = !value || value === 'all' ? allLabel : selectedOption?.label || value
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = 250
+      const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight
+      const width = Math.max(rect.width, 220)
+      const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)
+      setMenuPos({
+        top: openUpwards ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left,
+        width,
+      })
+      setSearch('')
+      setIsOpen(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClose = (e: MouseEvent | TouchEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    const handleScroll = (e: Event) => {
+      if (
+        menuRef.current &&
+        (menuRef.current === e.target || menuRef.current.contains(e.target as Node))
+      ) {
+        return
+      }
+      setIsOpen(false)
+    }
+
+    const handleResize = () => setIsOpen(false)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('touchstart', handleClose)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('touchstart', handleClose)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options
+    const q = search.toLowerCase().trim()
+    return options.filter(
+      (opt) =>
+        opt.label.toLowerCase().includes(q) ||
+        opt.value.toLowerCase().includes(q) ||
+        (opt.subLabel && opt.subLabel.toLowerCase().includes(q))
+    )
+  }, [options, search])
+
+  const isSelectedActive = Boolean(value && value !== 'all')
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
+        className={`h-9 px-3 min-w-[170px] max-w-[240px] bg-white border rounded-lg text-xs transition-all cursor-pointer flex items-center justify-between gap-2 shadow-2xs ${
+          isSelectedActive
+            ? 'bg-blue-50/60 border-blue-400 text-blue-900 font-semibold ring-2 ring-blue-500/10'
+            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
+        }`}
+        title={displayLabel}
+      >
+        <span className="flex items-center gap-1.5 truncate text-left font-medium min-w-0">
+          {prefixIcon && <span className="shrink-0">{prefixIcon}</span>}
+          <span className="truncate">{displayLabel}</span>
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+            isOpen ? 'rotate-180 text-blue-600' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${menuPos.top}px`,
+              left: `${menuPos.left}px`,
+              width: `${menuPos.width}px`,
+              minWidth: '200px',
+              maxWidth: '280px',
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100"
+          >
+            {options.length > 5 && (
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full h-7 pl-2 pr-6 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div
+              onScroll={(e) => e.stopPropagation()}
+              className="max-h-[190px] overflow-y-auto space-y-0.5 custom-scrollbar"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('')
+                  setIsOpen(false)
+                }}
+                className={`w-full px-2.5 py-1.5 flex items-center justify-between text-xs rounded-lg transition-colors cursor-pointer ${
+                  !value || value === 'all'
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>{allLabel}</span>
+                {(!value || value === 'all') && (
+                  <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1.5" />
+                )}
+              </button>
+
+              {filteredOptions.length === 0 ? (
+                <div className="py-2.5 text-center text-xs text-slate-400">No results found</div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected = Boolean(value && opt.value.toLowerCase() === value.toLowerCase())
+
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        onChange(opt.value)
+                        setIsOpen(false)
+                      }}
+                      className={`w-full px-2 py-1.5 flex items-center justify-between text-xs rounded-lg transition-colors cursor-pointer text-left ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {opt.initial ? (
+                          <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                            {opt.initial}
+                          </div>
+                        ) : null}
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate">{opt.label}</span>
+                          {opt.subLabel && (
+                            <span className="text-[10px] text-slate-400 truncate font-normal">
+                              {opt.subLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1.5" />
+                      )}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  )
 }
 
 export function SalesSummaryView() {
@@ -55,11 +329,22 @@ export function SalesSummaryView() {
     setLoading(true)
     setError(null)
     try {
+      const formatIsoStart = (d?: string) => {
+        if (!d) return undefined
+        if (d.includes('T')) return d
+        return new Date(`${d}T00:00:00`).toISOString()
+      }
+      const formatIsoEnd = (d?: string) => {
+        if (!d) return undefined
+        if (d.includes('T')) return d
+        return new Date(`${d}T23:59:59.999`).toISOString()
+      }
+
       const res = await fetchSalesHeadSummary({
         totalSummary,
         departmentUser: departmentUser || undefined,
-        startDate: startDate ? new Date(startDate).toISOString() : undefined,
-        endDate: endDate ? new Date(endDate).toISOString() : undefined,
+        startDate: formatIsoStart(startDate),
+        endDate: formatIsoEnd(endDate),
         funnelType: selectedFunnel !== 'all' ? selectedFunnel : undefined,
       })
       setData(res)
@@ -85,6 +370,28 @@ export function SalesSummaryView() {
 
   const telecallers: TelecallerItem[] = data?.telecallers || data?.telecaller || []
   const deptUsers: string[] = data?.departmentUsers || []
+
+  const agentOptions: SearchableDropdownOption[] = useMemo(() => {
+    return deptUsers.map((user) => {
+      const formatted = formatRepLabel('', user)
+      return {
+        value: user,
+        label: formatted,
+        subLabel: formatted !== user ? user : undefined,
+        initial: user.charAt(0).toUpperCase(),
+      }
+    })
+  }, [deptUsers])
+
+  const funnelOptions: SearchableDropdownOption[] = useMemo(() => {
+    return funnels.map((f, i) => {
+      const name = f.funnelName || f.funnelType || ''
+      return {
+        value: name,
+        label: name,
+      }
+    })
+  }, [funnels])
 
   const conversionPct =
     totalLeads > 0
@@ -247,66 +554,56 @@ export function SalesSummaryView() {
             {deptUsers.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-500">Agent:</span>
-                <select
+                <SearchableDropdown
                   value={departmentUser}
-                  onChange={(e) => setDepartmentUser(e.target.value)}
-                  className="py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all"
-                >
-                  <option value="">All Team Members</option>
-                  {deptUsers.map((user) => (
-                    <option key={user} value={user}>
-                      {user}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => {
+                    setDepartmentUser(val)
+                    setTotalSummary(false)
+                  }}
+                  options={agentOptions}
+                  allLabel="All Team Members"
+                  searchPlaceholder="Search agent..."
+                />
               </div>
             )}
 
             {/* Funnel Type Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-500">Funnel:</span>
-              <select
-                value={selectedFunnel}
-                onChange={(e) => {
-                  setSelectedFunnel(e.target.value)
+              <SearchableDropdown
+                value={selectedFunnel === 'all' ? '' : selectedFunnel}
+                onChange={(val) => {
+                  setSelectedFunnel(val || 'all')
                   setTotalSummary(false)
                 }}
-                className="py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all cursor-pointer"
-              >
-                <option value="all">All Funnels</option>
-                {funnels.map((f, i) => (
-                  <option key={f.funnelName || f.id || i} value={f.funnelName || f.funnelType || ''}>
-                    {f.funnelName || f.funnelType}
-                  </option>
-                ))}
-              </select>
+                options={funnelOptions}
+                allLabel="All Funnels"
+                searchPlaceholder="Search funnel..."
+              />
             </div>
 
-            {/* Date Range Pickers */}
+            {/* Date Range Picker (Synced with Leads Management) */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                From:
+                Date Range:
               </span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value)
-                  setTotalSummary(false)
-                }}
-                className="py-1 px-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
-              />
-              <span className="text-xs font-semibold text-slate-500">To:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value)
-                  setTotalSummary(false)
-                }}
-                className="py-1 px-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
-              />
+              <div className="leads-filter-date-picker relative z-30 min-w-[220px]">
+                <DateRangePicker
+                  label="Date Range"
+                  from={startDate}
+                  to={endDate}
+                  onChange={(start, end) => {
+                    setStartDate(start)
+                    setEndDate(end)
+                    setTotalSummary(false)
+                  }}
+                  onReset={() => {
+                    setStartDate('')
+                    setEndDate('')
+                  }}
+                />
+              </div>
             </div>
           </div>
 
