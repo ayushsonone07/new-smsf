@@ -34,6 +34,7 @@ export interface OnboardingCustomer {
   hasDuplicateCustomer?: boolean
   duplicateCustomers?: any[]
   parentCustomerId?: number | string | null
+  parentBusinessName?: string | null
   isLinkedBusiness?: boolean
   contactName: string
   contactDate: string
@@ -1152,21 +1153,29 @@ function CustomerRow({
 
             {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
               <span
-                title="Linked Business"
+                className="cl-linked-branch-pill"
+                title={customer.parentBusinessName || 'Main Business'}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '3px',
+                  gap: '4px',
                   borderRadius: '9999px',
                   border: '1px solid #c7d2fe',
                   backgroundColor: '#eef2ff',
-                  padding: '2px 7px',
+                  padding: '2px 8px',
                   fontSize: '11px',
                   fontWeight: 600,
                   color: '#4338ca',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onOpenDetail) onOpenDetail()
                 }}
               >
-                🔗 Linked
+                <Icon name="link" size={11} strokeWidth={2} />
+                <span>Main View</span>
               </span>
             )}
 
@@ -1174,7 +1183,7 @@ function CustomerRow({
               <button
                 type="button"
                 className="cl-dup-pill-btn"
-                title="View linked businesses"
+                title="View other businesses"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (onOpenDuplicate) {
@@ -1200,8 +1209,8 @@ function CustomerRow({
                 <Icon name="copy" size={11} strokeWidth={2} />
                 <span>
                   {customer.duplicateCount && customer.duplicateCount > 0
-                    ? `${customer.duplicateCount} linked`
-                    : 'Linked'}
+                    ? `${customer.duplicateCount} Other`
+                    : 'Other'}
                 </span>
               </button>
             )}

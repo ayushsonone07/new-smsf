@@ -23,7 +23,9 @@ import {
   Loader2,
   ChevronsUpDown,
   MessageSquare,
-  } from 'lucide-react'
+  Link2,
+  Copy,
+} from 'lucide-react'
 import { LoadingState } from '../../../../components/ui/LoadingState'
 import { notifyCustomerAssigned } from '../../../../api/notification-factory'
 import { ErrorState } from '../../../../components/ui/ErrorState'
@@ -315,7 +317,6 @@ export function AutowebisionCustomersPage({
   } | null>(null)
   const [newClientRemarkText, setNewClientRemarkText] = useState('')
   const [isSubmittingClientRemark, setIsSubmittingClientRemark] = useState(false)
-  const [viewingDuplicate, setViewingDuplicate] = useState<{ name: string; customerId: number } | null>(null)
   const [updatingWebsiteExistsId, setUpdatingWebsiteExistsId] = useState<number | null>(null)
   const [confirmWebsiteExistsTarget, setConfirmWebsiteExistsTarget] = useState<AutowebsionCustomerLightDTO | null>(null)
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null)
@@ -891,6 +892,11 @@ export function AutowebisionCustomersPage({
       services: c.services || [],
       subServiceInfo: c.subServiceInfo || [],
       serviceTags: extractServiceTags(c),
+      duplicateCount: c.duplicateCount ?? 0,
+      hasDuplicateCustomer: Boolean(c.hasDuplicateCustomer) || (c.duplicateCount ?? 0) > 0,
+      parentCustomerId: c.parentCustomerId ?? null,
+      parentBusinessName: c.parentBusinessName ?? null,
+      isLinkedBusiness: Boolean(c.isLinkedBusiness) || Boolean(c.parentCustomerId),
       rawCustomer: c,
     }
   }
@@ -1747,20 +1753,34 @@ export function AutowebisionCustomersPage({
                             <p className="text-xs text-slate-500 truncate max-w-[180px]">
                               {customer.ownerName || '—'}
                             </p>
-                            {customer.hasDuplicateCustomer && (
-                              <button
-                                type="button"
-                                className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
-                                onClick={() =>
-                                  setViewingDuplicate({
-                                    name: customer.businessName || customer.ownerName || 'Customer',
-                                    customerId,
-                                  })
-                                }
-                              >
-                                Other Business
-                              </button>
-                            )}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                                  title={customer.parentBusinessName || 'Main Business'}
+                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                >
+                                  <Link2 size={10} />
+                                  <span>Main View</span>
+                                </span>
+                              )}
+
+                              {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
+                                  title="View other businesses"
+                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                >
+                                  <Copy size={10} />
+                                  <span>
+                                    {customer.duplicateCount && customer.duplicateCount > 0
+                                      ? `${customer.duplicateCount} Other`
+                                      : 'Other'}
+                                  </span>
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </td>
                       )}
@@ -2672,37 +2692,7 @@ export function AutowebisionCustomersPage({
         </div>
       )}
 
-      {/* Duplicate Business Dialog */}
-      {viewingDuplicate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Duplicate Business Notice</h3>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-slate-600 p-1"
-                onClick={() => setViewingDuplicate(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="py-4 text-xs text-slate-600 space-y-2">
-              <p className="font-semibold text-slate-800">{viewingDuplicate.name}</p>
-              <p>This customer is associated with multiple business registrations in the system.</p>
-              <p className="text-slate-400">Customer ID: {viewingDuplicate.customerId}</p>
-            </div>
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl"
-                onClick={() => setViewingDuplicate(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Internal Remarks On-Demand Dialog */}
       {viewingInternalRemarks && (
