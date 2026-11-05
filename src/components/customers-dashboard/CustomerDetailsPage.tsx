@@ -105,6 +105,8 @@ export function CustomerDetailsPage() {
 
   const [phone, setPhone] = useState('')
   const [searchContact, setSearchContact] = useState('')
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  const [isDuplicate, setIsDuplicate] = useState(false)
   const [ownerName, setOwnerName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
@@ -179,10 +181,17 @@ export function CustomerDetailsPage() {
     }
 
     const contact = (decrypted.contact || search.get('contact') || search.get('phone') || '').trim()
-    if (contact) {
-      setPhone(contact)
-      setSearchContact(contact)
-      getCustomerProfileDetails(contact)
+    const rawCustId = (decrypted.customerId || search.get('customerId') || '').trim()
+    if (rawCustId) setCustomerId(rawCustId)
+    const rawIsDup = decrypted.isDuplicate === 'true' || search.get('isDuplicate') === 'true'
+    if (rawIsDup || rawCustId) setIsDuplicate(true)
+
+    if (contact || rawCustId) {
+      if (contact) {
+        setPhone(contact)
+        setSearchContact(contact)
+      }
+      getCustomerProfileDetails(contact, rawCustId ? Number(rawCustId) : undefined)
         .then((profile) => {
           if (profile.phone) setPhone(profile.phone)
           if (profile.ownerName) setOwnerName(profile.ownerName)
@@ -263,6 +272,7 @@ export function CustomerDetailsPage() {
 
     const rawPayload: Record<string, any> = {
       phone: effectivePhone,
+      customerId: customerId ? Number(customerId) : undefined,
       businessName: businessName.trim() || undefined,
       ownerName: ownerName.trim() || undefined,
       email: email.trim() || undefined,
@@ -304,7 +314,7 @@ export function CustomerDetailsPage() {
     setIsSaving(true)
     try {
       console.log('[CustomerDetails] Calling saveCustomerProfileDetails with:', payload)
-      const res = await saveCustomerProfileDetails(payload)
+      const res = await saveCustomerProfileDetails(payload, isDuplicate)
       console.log('[CustomerDetails] saveCustomerProfileDetails success:', res)
 
       setToast({
