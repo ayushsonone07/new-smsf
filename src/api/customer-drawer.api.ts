@@ -86,6 +86,10 @@ export interface CustomerProfileDetails {
   discountAmount?: string
   originalAmount?: string
   baseAmountWithoutGst?: string
+  customerId?: number | string
+  parentCustomerId?: number | string
+  parentBusinessName?: string
+  isLinkedBusiness?: boolean
 }
 
 export interface CustomerServiceRow {
@@ -296,8 +300,13 @@ export async function saveCustomerProfileDetails(
 
 export async function getCustomerProfileDetails(
   contact: string,
+  customerId?: number | string,
 ): Promise<CustomerProfileDetails> {
-  const search = new URLSearchParams({ contact })
+  const search = new URLSearchParams()
+  if (contact) search.set('contact', contact)
+  if (customerId !== undefined && customerId !== null && String(customerId).trim() !== '') {
+    search.set('customerId', String(customerId))
+  }
   const response = await authedApiRequest<
     ApiEnvelope<CustomerProfileDetails> & {
       customerDetails?: CustomerProfileDetails

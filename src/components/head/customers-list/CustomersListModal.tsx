@@ -526,7 +526,11 @@ export function CustomersListModal({
     enabled: Boolean(
       customer &&
         (customer.hasDuplicateCustomer ||
-          (customer.duplicateCount && customer.duplicateCount > 0)),
+          (customer.duplicateCount && customer.duplicateCount > 0) ||
+          customer.isLinkedBusiness ||
+          customer.parentCustomerId ||
+          apiDetails.profile?.parentCustomerId ||
+          apiDetails.profile?.isLinkedBusiness),
     ),
     staleTime: 60_000,
   })
@@ -746,28 +750,60 @@ export function CustomersListModal({
 
   const allBusinesses = useMemo(() => {
     if (!customer) return []
-    const mainId = String(customer.id)
-    const main = {
+    const effectiveParentId = String(
+      customer.parentCustomerId ||
+        apiDetails.profile?.parentCustomerId ||
+        customer.rawCustomer?.parentCustomerId ||
+        '',
+    ).trim()
+    const isCurrentBranch = Boolean(
+      effectiveParentId ||
+        customer.isLinkedBusiness ||
+        apiDetails.profile?.isLinkedBusiness,
+    )
+
+    const currentCustomerNormalized = {
       ...customer,
-      isMainBusiness: true,
+      businessName: customer.businessName || 'Business',
+      contactName: customer.contactName,
+      phone: customer.phone,
+      email: customer.email,
+      status: toOnboardingStatus(customer.status) || 'pending',
+      isMainBusiness: !isCurrentBranch,
     }
-    if (!duplicateItems.length) return [main]
-    const others = duplicateItems
-      .filter((d: any) => String(d.customerId || d.id || '') !== mainId)
-      .map((d: any, index: number) => ({
+
+    if (!duplicateItems.length) return [currentCustomerNormalized]
+
+    const items = duplicateItems.map((d: any, index: number) => {
+      const itemId = String(d.customerId || d.duplicateCustomerId || d.id || `${customer.id}-dup-${index}`)
+      const isItemMain = Boolean(
+        (effectiveParentId && itemId === effectiveParentId) ||
+          (d.businessName && String(d.businessName).includes('(Main)')) ||
+          d.isMainBusiness,
+      )
+      let rawName = d.businessName || d.customerDetails?.businessName || d.brandName || 'Business'
+      if (rawName.endsWith(' (Main)')) {
+        rawName = rawName.substring(0, rawName.length - 7).trim()
+      }
+      return {
         ...d,
-        id: String(d.duplicateCustomerId || d.customerId || d.id || `${customer.id}-dup-${index}`),
-        businessName: d.businessName || d.customerDetails?.businessName || d.brandName || 'Business',
+        id: itemId,
+        businessName: rawName,
         contactName: d.ownerName || d.customerDetails?.ownerName || customer.contactName,
         contactDate: d.createdAt || customer.contactDate,
         phone: d.phoneNumber || d.phone || d.contact || d.customerDetails?.phoneNumber || customer.phone,
         email: d.email || d.customerDetails?.email || customer.email,
         status: toOnboardingStatus(d.onboardingStatus || d.completeServiceStatus || d.status) || 'pending',
         gstNumber: d.gstNumber || d.customerDetails?.gstNumber,
-        isMainBusiness: false,
-      }))
-    return [main, ...others]
-  }, [customer, duplicateItems])
+        isMainBusiness: isItemMain,
+      }
+    })
+
+    const filteredOthers = items.filter((d: any) => String(d.id) !== String(customer.id))
+    const combined = [currentCustomerNormalized, ...filteredOthers]
+
+    return combined.sort((a, b) => (b.isMainBusiness ? 1 : 0) - (a.isMainBusiness ? 1 : 0))
+  }, [customer, duplicateItems, apiDetails.profile])
 
   const completedBusinessesCount = useMemo(() => {
     return allBusinesses.filter((b) => {
@@ -1035,7 +1071,7 @@ export function CustomersListModal({
       ? [
           {
             id: 'duplicates' as DrawerTab,
-            label: 'Duplicate businesses',
+            label: 'Linked businesses',
             count: duplicateItems.length,
           },
         ]
@@ -1222,14 +1258,35 @@ export function CustomersListModal({
             </div>
           </motion.div>
 
-          {showAssignTo && (
-            <motion.div
-              className="cl-drawer__status-pills"
-              variants={fadeUpVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.22 }}
-            >
+          <motion.div
+            className="cl-drawer__status-pills"
+            variants={fadeUpVariants}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.22 }}
+          >
+            {(customer?.isLinkedBusiness || customer?.parentCustomerId || customer?.rawCustomer?.parentCustomerId || customer?.rawCustomer?.isLinkedBusiness || apiDetails.profile?.parentCustomerId || apiDetails.profile?.isLinkedBusiness) && (
+              <span
+                className="cl-drawer__spill"
+                style={{
+                  backgroundColor: '#eef2ff',
+                  color: '#4338ca',
+                  border: '1px solid #c7d2fe',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                🔗 Other Business
+                {(customer?.parentBusinessName || apiDetails.profile?.parentBusinessName) && (
+                  <span style={{ fontWeight: 500, color: '#312e81' }}>
+                    (Main: <strong>{customer?.parentBusinessName || apiDetails.profile?.parentBusinessName}</strong>)
+                  </span>
+                )}
+              </span>
+            )}
+            {showAssignTo && (
               <span className="cl-drawer__spill cl-drawer__spill--info">
                 Service user:{' '}
                 {serviceRow?.assignedUserEmail ||
@@ -1237,8 +1294,8 @@ export function CustomersListModal({
                   assignee?.name ||
                   'Unassigned'}
               </span>
-            </motion.div>
-          )}
+            )}
+          </motion.div>
         </div>
 
         {/* Body */}
@@ -1280,63 +1337,109 @@ export function CustomersListModal({
 
               {duplicatesQuery.isLoading && allBusinesses.length <= 1 ? (
                 <div className="cl-drawer__dup-loading">
-                  Checking duplicate businesses…
+                  Checking linked businesses…
                 </div>
               ) : (
-                <div className="cl-drawer__dup-scroll">
-                  {allBusinesses.map((biz) => {
-                    const isSelected =
-                      String(biz.id) === String(activeCustomer?.id)
-                    const bizStatus = biz.status || 'pending'
-                    const dotColor =
-                      bizStatus === 'completed'
-                        ? '#16a34a'
-                        : bizStatus === 'in-progress'
-                          ? '#2459e0'
-                          : '#ffc629'
-                    const statusText =
-                      bizStatus === 'completed'
-                        ? 'Completed'
-                        : bizStatus === 'in-progress'
-                          ? 'In progress'
-                          : 'Pending'
-                    const rawTitle = biz.businessName || 'Business'
-                    const title = biz.isMainBusiness
-                      ? `Main · ${rawTitle}`
-                      : rawTitle
-                    const subtitle = `${statusText} · form by ${biz.isMainBusiness ? 'Founder' : 'Branch manager'}`
-
+                <>
+                  {(() => {
+                    const mainBiz = allBusinesses.find((b) => b.isMainBusiness)
+                    const currentId = String(current?.id ?? '')
+                    const isViewingBranch = mainBiz && String(mainBiz.id) !== currentId
+                    if (!isViewingBranch) return null
                     return (
-                      <button
-                        key={String(biz.id)}
-                        type="button"
-                        onClick={() => setActiveCustomer(biz as any)}
-                        className={`cl-drawer__dup-btn${isSelected ? ' is-selected' : ''}`}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          backgroundColor: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '8px',
+                          marginBottom: '10px',
+                        }}
                       >
-                        <div className="cl-drawer__dup-btn-head">
-                          <span
-                            className="cl-drawer__dup-dot"
-                            style={{
-                              background:
-                                isSelected && dotColor === '#2459e0'
-                                  ? '#93c5fd'
-                                  : dotColor,
-                            }}
-                          />
-                          <span
-                            className="cl-drawer__dup-btn-title"
-                            title={title}
-                          >
-                            {title}
-                          </span>
-                        </div>
-                        <div className="cl-drawer__dup-btn-sub">
-                          {subtitle}
-                        </div>
-                      </button>
+                        <span style={{ fontSize: '12px', color: '#166534' }}>
+                          🏛️ <strong>Main View:</strong> <strong>{mainBiz.businessName}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveCustomer(mainBiz as any)}
+                          style={{
+                            backgroundColor: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          Switch to Main View ↗
+                        </button>
+                      </div>
                     )
-                  })}
-                </div>
+                  })()}
+
+                  <div className="cl-drawer__dup-scroll">
+                    {allBusinesses.map((biz) => {
+                      const isSelected =
+                        String(biz.id) === String(current?.id)
+                      const bizStatus = biz.status || 'pending'
+                      const dotColor =
+                        bizStatus === 'completed'
+                          ? '#16a34a'
+                          : bizStatus === 'in-progress'
+                            ? '#2459e0'
+                            : '#ffc629'
+                      const statusText =
+                        bizStatus === 'completed'
+                          ? 'Completed'
+                          : bizStatus === 'in-progress'
+                            ? 'In progress'
+                            : 'Pending'
+                      const rawTitle = biz.businessName || 'Business'
+                      const title = biz.isMainBusiness
+                        ? `⭐ Main · ${rawTitle}`
+                        : `🔗 Other · ${rawTitle}`
+                      const subtitle = `${statusText} · form by ${biz.isMainBusiness ? 'Main' : 'Other'}`
+
+                      return (
+                        <button
+                          key={String(biz.id)}
+                          type="button"
+                          onClick={() => setActiveCustomer(biz as any)}
+                          className={`cl-drawer__dup-btn${isSelected ? ' is-selected' : ''}`}
+                        >
+                          <div className="cl-drawer__dup-btn-head">
+                            <span
+                              className="cl-drawer__dup-dot"
+                              style={{
+                                background:
+                                  isSelected && dotColor === '#2459e0'
+                                    ? '#93c5fd'
+                                    : dotColor,
+                              }}
+                            />
+                            <span
+                              className="cl-drawer__dup-btn-title"
+                              title={title}
+                            >
+                              {title}
+                            </span>
+                          </div>
+                          <div className="cl-drawer__dup-btn-sub">
+                            {subtitle}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
               )}
 
               <div className="cl-drawer__dup-footer">
@@ -2498,9 +2601,9 @@ export function CustomersListModal({
               <div className="cl-drawer__card">
                 <div className="cl-drawer__card-head">
                   <div>
-                    <h3>Duplicate businesses ({duplicateItems.length})</h3>
+                    <h3>Other Businesses ({duplicateItems.length})</h3>
                     <p className="cl-drawer__card-meta">
-                      Other businesses registered under the same founder or phone number.
+                      Other businesses registered under the same owner, email, or phone number.
                     </p>
                   </div>
                 </div>

@@ -937,6 +937,8 @@ export interface SendOnboardingConfirmationParams {
   isDuplicate?: boolean
   domainConnect?: boolean
   themeSelection?: boolean
+  /** The business being confirmed; a phone or email can have several. */
+  customerId?: number | string
 }
 
 /**
@@ -955,6 +957,9 @@ export async function sendOnboardingConfirmationMail(
     domainConnect: String(Boolean(params.domainConnect)),
     themeSelection: String(Boolean(params.themeSelection)),
   })
+  // Old duplicates have a UUID, not a customer id: they keep using isDuplicate until migrated.
+  const customerId = Number(params.customerId)
+  if (Number.isInteger(customerId) && customerId > 0) search.set('customerId', String(customerId))
 
   return authedApiRequest<any>(`/api/smtp/onboarding/confirmation?${search.toString()}`, {
     method: 'POST',
