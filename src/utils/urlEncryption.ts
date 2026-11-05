@@ -83,9 +83,13 @@ export function decryptUrlParams(searchParams: URLSearchParams): Record<string, 
  * Builds the encrypted customer details form URL matching SMSF parity.
  * Resulting URL: `/customer-details?contact=${encryptedPhone}&validation=${encryptedToken}`
  */
-export function getCustomerFormUrl(phone?: string | null, isDuplicate = false): string {
+export function getCustomerFormUrl(
+  phone?: string | null,
+  isDuplicate = false,
+  customerId?: number | string | null,
+): string {
   const contact = (phone && phone !== '-' ? phone : '').trim()
-  if (!contact) return ''
+  if (!contact && !customerId) return ''
 
   const session = getSession()
   const rawToken =
@@ -95,12 +99,16 @@ export function getCustomerFormUrl(phone?: string | null, isDuplicate = false): 
 
   const validation = rawToken && rawToken.split('.').length === 3 ? rawToken : 'customer'
 
-  const encryptedParams = encryptUrlParams({
+  const params: Record<string, string> = {
     contact,
     validation,
     ...(isDuplicate ? { isDuplicate: 'true' } : {}),
-  })
+  }
+  if (customerId != null) {
+    params.customerId = String(customerId)
+  }
+
+  const encryptedParams = encryptUrlParams(params)
 
   return `/customer-details?${encryptedParams}`
 }
-

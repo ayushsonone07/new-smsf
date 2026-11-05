@@ -10,6 +10,10 @@ export interface AutowebsionCustomerLightDTO {
   gstNumber?: string | null
   isWebsiteExists?: boolean
   hasDuplicateCustomer?: boolean
+  duplicateCount?: number
+  parentCustomerId?: number | null
+  parentBusinessName?: string | null
+  isLinkedBusiness?: boolean
   serviceTypes?: string[]
   mainStatus?: string
   assignedUserId?: number | null

@@ -40,9 +40,9 @@ export function useCustomerDrawerDetails(
   const isOpen = customer !== null
 
   const profileQuery = useQuery({
-    queryKey: ['customer-drawer-profile', contact],
-    queryFn: () => getCustomerProfileDetails(contact),
-    enabled: isOpen && contact.length > 0,
+    queryKey: ['customer-drawer-profile', customer?.id ?? 'no-id', contact],
+    queryFn: () => getCustomerProfileDetails(contact, hasCustomerId ? customerId : undefined),
+    enabled: isOpen && (contact.length > 0 || hasCustomerId),
     staleTime: 0,
     refetchOnMount: 'always',
   })
