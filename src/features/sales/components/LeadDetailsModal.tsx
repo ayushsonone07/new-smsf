@@ -103,7 +103,7 @@ export const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               <div className="p-3 rounded-xl border border-slate-200">
                 <span className="text-[11px] text-slate-400 block mb-1">Sales Status</span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700">
-                  {lead.leadStatus?.replace(/_/g, ' ') || 'PENDING'}
+                  {lead.leadStatus === 'DONE' ? 'SALE WON' : (lead.leadStatus?.replace(/_/g, ' ') || 'PENDING')}
                 </span>
               </div>
 
