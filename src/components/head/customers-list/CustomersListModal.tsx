@@ -271,15 +271,19 @@ function Field({
   label,
   value,
   full = false,
+  children,
 }: {
   label: string
-  value?: string
+  value?: React.ReactNode
   full?: boolean
+  children?: React.ReactNode
 }) {
   return (
     <div className={`cl-drawer__field${full ? ' cl-drawer__field--full' : ''}`}>
       <div className="cl-drawer__field-label">{label}</div>
-      <div className="cl-drawer__field-value">{show(value)}</div>
+      <div className="cl-drawer__field-value">
+        {children ?? (typeof value === 'string' ? show(value) : (value ?? '—'))}
+      </div>
     </div>
   )
 }
@@ -1610,12 +1614,88 @@ export function CustomersListModal({
                     />
                   ) : null}
                   <Field
-                    label="Service expiry"
+                    label="Created at"
                     value={
-                      apiDetails.profile?.serviceExpiration ||
-                      serviceRow?.serviceExpiration ||
-                      customer.serviceMonths
+                      (() => {
+                        const raw =
+                          customer.createdAt ||
+                          customer.rawCustomer?.createdAt ||
+                          (apiDetails.profile as any)?.createdAt ||
+                          (rowDetails as any)?.createdAt ||
+                          customer.contactDate
+                        if (!raw || raw === '—') return '—'
+                        const p = new Date(raw)
+                        return isNaN(p.getTime())
+                          ? String(raw)
+                          : p.toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true,
+                            })
+                      })()
                     }
+                  />
+                  <Field
+                    label="Expiration"
+                    value={
+                      (() => {
+                        const raw =
+                          customer.serviceExpiration ||
+                          customer.rawCustomer?.serviceExpiration ||
+                          (apiDetails.profile as any)?.serviceExpiration ||
+                          (serviceRow as any)?.serviceExpiration ||
+                          customer.serviceMonths
+                        if (!raw) return 'Not Available'
+                        const p = new Date(raw)
+                        return isNaN(p.getTime())
+                          ? String(raw)
+                          : p.toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                      })()
+                    }
+                  />
+                  <Field
+                    label="Client remark"
+                    value={
+                      (() => {
+                        const latestRemark =
+                          customer.clientRemark ||
+                          customer.rawCustomer?.clientRemark ||
+                          (clientRemarkEntries.length > 0
+                            ? clientRemarkEntries[0]?.remark?.reply || clientRemarkEntries[0]?.remark?.remark
+                            : null)
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {latestRemark || 'No client remark'}
+                            </span>
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#be185d',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                flexShrink: 0,
+                              }}
+                              onClick={() => setActiveTab('remarks')}
+                            >
+                              View all ({clientRemarkEntries.length})
+                            </button>
+                          </div>
+                        )
+                      })()
+                    }
+                    full
                   />
                   <Field
                     label="Amount paid"
