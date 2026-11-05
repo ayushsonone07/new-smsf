@@ -103,15 +103,19 @@ export function AutowebisionCustomersPage({
   const session = getSession()
   const queryClient = useQueryClient()
   const userRole = (session?.user as any)?.role
+  const normalizedRole = (userRole ?? '').toUpperCase().replace(/^ROLE_/, '')
+  const isUserPath =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.toLowerCase().includes('/user') ||
+      window.location.pathname.toLowerCase().includes('-user') ||
+      window.location.pathname.toLowerCase().includes('departmentuser') ||
+      window.location.pathname.toLowerCase().includes('/users'))
+
   const isDepartmentUser =
-    userRole === 'USER' ||
-    userRole === 'DEPARTMENT_USER' ||
-    Boolean(
-      typeof window !== 'undefined' &&
-        (window.location.pathname.includes('/user/') ||
-          window.location.pathname.includes('-user') ||
-          window.location.pathname.includes('/users')),
-    )
+    normalizedRole === 'USER' ||
+    normalizedRole === 'DEPARTMENT_USER' ||
+    (session?.user as any)?.isHead === false ||
+    Boolean(isUserPath)
   const userEmail = session?.user.email || session?.user.username || ''
 
   // Permissions must come from the department that owns the current route.
@@ -140,7 +144,12 @@ export function AutowebisionCustomersPage({
     permissionRouteName,
   )
 
-  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
+  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(() => {
+    if (defaultSubTab && defaultSubTab !== 'ALL') return defaultSubTab
+    if (isWebsiteScreen) return 'WEBSITE'
+    if (isAutomationScreen) return 'AUTOMATION'
+    return 'ALL'
+  })
 
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
@@ -162,23 +171,26 @@ export function AutowebisionCustomersPage({
     : !isDepartmentUser && (isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee'))
   const isActionsVisible = isColumnEnabled('Actions') || isColumnEnabled('Action')
 
-  // Dynamic column permissions are authoritative. The legacy defaults below
-  // only apply until Admin configures the matching column for this route.
-  const canEditWebsiteExists = isColumnConfigured('Website Exists')
-    ? canEditColumn('Website Exists')
-    : isDepartmentUser
-  const canEditStatus = isColumnConfigured('Status')
-    ? canEditColumn('Status')
-    : isDepartmentUser
+  // Dynamic column permissions are authoritative for Heads. Department users are
+  // the primary workers responsible for managing status and remarks.
+  const canEditWebsiteExists =
+    isDepartmentUser || (isColumnConfigured('Website Exists') ? canEditColumn('Website Exists') : false)
+  const canEditStatus =
+    isDepartmentUser || (isColumnConfigured('Status') ? canEditColumn('Status') : false)
   const canEditDraft =
     activeSubTab !== 'AUTOMATION' &&
-    (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : isDepartmentUser)
+    (isDepartmentUser || (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : false))
   const canEditAssignee = isAssigneeConfigured
     ? canEditColumn('Assigned To')
     : !isDepartmentUser
-  const canEditServices = isColumnConfigured('Services')
-    ? canEditColumn('Services')
-    : isDepartmentUser
+  const canEditServices =
+    isDepartmentUser || (isColumnConfigured('Services') ? canEditColumn('Services') : false)
+  const canEditRemark =
+    isDepartmentUser || (
+      isColumnConfigured('Internal Remark') || isColumnConfigured('Remark')
+        ? canEditColumn('Internal Remark') || canEditColumn('Remark')
+        : false
+    )
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -190,11 +202,17 @@ export function AutowebisionCustomersPage({
   const [size, setSize] = useState(10)
 
   useEffect(() => {
-    if (defaultSubTab) {
+    if (defaultSubTab && defaultSubTab !== 'ALL') {
       setActiveSubTab(defaultSubTab)
       setPage(0)
+    } else if (isWebsiteScreen) {
+      setActiveSubTab('WEBSITE')
+      setPage(0)
+    } else if (isAutomationScreen) {
+      setActiveSubTab('AUTOMATION')
+      setPage(0)
     }
-  }, [defaultSubTab])
+  }, [defaultSubTab, isWebsiteScreen, isAutomationScreen])
 
   // Customer whose client remarks are open, so the dialog's refresh button can reload them.
   const clientRemarkCustomerRef = useRef<AutowebsionCustomerLightDTO | null>(null)
@@ -297,6 +315,7 @@ export function AutowebisionCustomersPage({
 
   // Modals state
   const [selectedCustomer, setSelectedCustomer] = useState<OnboardingCustomer | null>(null)
+  const [modalTab, setModalTab] = useState<'overview' | 'duplicates' | undefined>(undefined)
   const [serviceFlowTarget, setServiceFlowTarget] = useState<{
     customer: OnboardingCustomer
     serviceType: 'WEBSITE' | 'AUTOMATION'
@@ -392,11 +411,11 @@ export function AutowebisionCustomersPage({
   }, [toast])
 
   const departmentTypeParam =
-    activeSubTab === 'WEBSITE'
+    activeSubTab === 'WEBSITE' || isWebsiteScreen
       ? 'WEBSITE_DEPARTMENT'
-      : activeSubTab === 'AUTOMATION'
+      : activeSubTab === 'AUTOMATION' || isAutomationScreen
         ? 'AUTOMATION_DEPARTMENT'
-        : undefined
+        : (session?.user?.departmentType || undefined)
 
   // For department users, automatically scope customer requests to their own assigned email
   const effectiveAssignee = isDepartmentUser
@@ -1744,7 +1763,10 @@ export function AutowebisionCustomersPage({
                                   className="autoweb-detail-btn flex-shrink-0"
                                   title="View complete customer details"
                                   aria-label={`View details for ${customer.businessName || customer.ownerName || 'customer'}`}
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                  onClick={() => {
+                                    setSelectedCustomer(toOnboardingCustomer(customer, index))
+                                    setModalTab('overview')
+                                  }}
                                 >
                                   <Eye size={14} />
                                 </button>
@@ -1754,11 +1776,37 @@ export function AutowebisionCustomersPage({
                               {customer.ownerName || '—'}
                             </p>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                                title="Open editable customer form in new tab"
+                                onClick={() => {
+                                  const isDup = Boolean(
+                                    customer.hasDuplicateCustomer ||
+                                    customer.isLinkedBusiness ||
+                                    customer.parentCustomerId ||
+                                    (customer.duplicateCount ?? 0) > 0,
+                                  )
+                                  const url = getCustomerFormUrl(customer.phoneNumber, isDup, customer.customerId)
+                                  if (url) {
+                                    window.open(url, '_blank')
+                                  } else {
+                                    setToast({ type: 'error', message: 'No phone number available for form.' })
+                                  }
+                                }}
+                              >
+                                <FileText size={10} />
+                                <span>Form</span>
+                              </button>
+
                               {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
                                 <span
                                   className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
                                   title={customer.parentBusinessName || 'Main Business'}
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                  onClick={() => {
+                                    setSelectedCustomer(toOnboardingCustomer(customer, index))
+                                    setModalTab('overview')
+                                  }}
                                 >
                                   <Link2 size={10} />
                                   <span>Main View</span>
@@ -1770,7 +1818,10 @@ export function AutowebisionCustomersPage({
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
                                   title="View other businesses"
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
+                                  onClick={() => {
+                                    setSelectedCustomer(toOnboardingCustomer(customer, index))
+                                    setModalTab('duplicates')
+                                  }}
                                 >
                                   <Copy size={10} />
                                   <span>
@@ -2005,7 +2056,7 @@ export function AutowebisionCustomersPage({
                           {canEditStatus ? (
                             /* Department User: Editable status dropdowns */
                             <div className="flex flex-col gap-1.5 items-start">
-                              {activeSubTab === 'WEBSITE' ? (
+                              {activeSubTab === 'WEBSITE' || isWebsiteScreen ? (
                                 <div className="relative inline-flex items-center">
                                   <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
                                   <select
@@ -2020,7 +2071,7 @@ export function AutowebisionCustomersPage({
                                   </select>
                                   <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
                                 </div>
-                              ) : activeSubTab === 'AUTOMATION' ? (
+                              ) : activeSubTab === 'AUTOMATION' || isAutomationScreen ? (
                                 <div className="relative inline-flex items-center">
                                   <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
                                   <select
@@ -2101,7 +2152,7 @@ export function AutowebisionCustomersPage({
                           ) : (
                             /* Head: Read-only status pills matching Screenshot 1 */
                             <div className="flex flex-col gap-1 items-start">
-                              {activeSubTab === 'WEBSITE' ? (
+                              {activeSubTab === 'WEBSITE' || isWebsiteScreen ? (
                                 <div
                                   className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
                                   title="Website Status (Read-only for Head)"
@@ -2109,7 +2160,7 @@ export function AutowebisionCustomersPage({
                                   <Globe size={11} className={getStatusIconColor(websiteStatus)} />
                                   <span>{formatStatusLabel(websiteStatus)}</span>
                                 </div>
-                              ) : activeSubTab === 'AUTOMATION' ? (
+                              ) : activeSubTab === 'AUTOMATION' || isAutomationScreen ? (
                                 <div
                                   className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
                                   title="Automation Status (Read-only for Head)"
@@ -2492,6 +2543,8 @@ export function AutowebisionCustomersPage({
         assignees={assignees}
         showStatus={true}
         showAssignTo={isAssigneeVisible}
+        canEditRemark={canEditRemark}
+        initialTab={modalTab}
         departmentType={
           activeSubTab === 'AUTOMATION' || isAutomationScreen
             ? 'AUTOMATION_DEPARTMENT'
@@ -2503,7 +2556,20 @@ export function AutowebisionCustomersPage({
                     ? 'WEBSITE_DEPARTMENT'
                     : permissionDepartmentType)
         }
-        onClose={() => setSelectedCustomer(null)}
+        onOpenFullPage={(cust) => {
+          const isDup = Boolean(
+            cust.hasDuplicateCustomer ||
+            (cust.duplicateCount ?? 0) > 0 ||
+            (cust as any).isLinkedBusiness ||
+            (cust as any).parentCustomerId,
+          )
+          const url = getCustomerFormUrl(cust.phone, isDup, cust.id)
+          if (url) window.open(url, '_blank')
+        }}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
       />
 
       {/* Sub-Service Flow Modal */}

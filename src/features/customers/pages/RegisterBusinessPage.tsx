@@ -83,10 +83,11 @@ const INITIAL_FORM_DATA = {
 /* Cities where onboarding is currently done. */
 const ONBOARDING_CITIES = ['Jabalpur', 'Delhi']
 
-/* Result of verifying a payment ID, tied to the exact phone + payment ID it was checked for. */
+/* Result of verifying a payment ID, tied to the phone and/or email + payment ID it was checked for. */
 type PaymentCheck = {
   status: 'verifying' | 'verified' | 'failed'
-  phone: string
+  phone?: string
+  email?: string
   paymentId: string
   message?: string
   /** Full payment amount (₹). */
@@ -100,7 +101,8 @@ type PaymentCheck = {
 
 /** A further verified payment that tops up the first one's remaining balance. */
 type ExtraPayment = {
-  phone: string
+  phone?: string
+  email?: string
   /** Typed ID, or the masked ID when picked from the earlier-payments list. */
   paymentId: string
   /** Set when picked from the list: the real ID is only known to the server. */
@@ -111,7 +113,8 @@ type ExtraPayment = {
 
 /** An earlier payment chosen from the list; only its masked ID is ever shown. */
 type PickedPayment = {
-  phone: string
+  phone?: string
+  email?: string
   ref: string
   masked: string
 }
@@ -360,7 +363,6 @@ const WIZARD_STYLES = `
 `
 
 function GstinDetailsCard({
-  details,
   isLoading,
   error,
 }: {
@@ -384,50 +386,7 @@ function GstinDetailsCard({
     )
   }
 
-  if (!details) return null
-
-  return (
-    <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3" aria-live="polite">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-bold text-slate-900">
-          {details.trade_name || details.legal_name || 'GST registered customer'}
-        </p>
-        {details.status && (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${details.status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-            {details.status}
-          </span>
-        )}
-      </div>
-      <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-        <div>
-          <dt className="font-semibold text-slate-500">Legal name</dt>
-          <dd className="font-semibold text-slate-900">{details.legal_name || '—'}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-500">Taxpayer type</dt>
-          <dd className="font-semibold text-slate-900">{details.taxpayer_type || '—'}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-500">Business constitution</dt>
-          <dd className="font-semibold text-slate-900">{details.business_constitution || '—'}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-500">Registration date</dt>
-          <dd className="font-semibold text-slate-900">{details.registration_date || '—'}</dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="font-semibold text-slate-500">Registered address</dt>
-          <dd className="font-semibold text-slate-900">{details.address || '—'}</dd>
-        </div>
-        {!!details.nature_of_business?.length && (
-          <div className="sm:col-span-2">
-            <dt className="font-semibold text-slate-500">Nature of business</dt>
-            <dd className="font-semibold text-slate-900">{details.nature_of_business.join(', ')}</dd>
-          </div>
-        )}
-      </dl>
-    </div>
-  )
+  return null
 }
 
 /* Editable address fields, pre-filled from the GST lookup. Blank when GST has no value. */
@@ -536,6 +495,18 @@ export function RegisterBusinessPage() {
 
     gstFilledFor.current = normalizedGstin
     setGstAddress(gstAddressFromDetails(data))
+
+    setFormData((prev) => {
+      const updates: Partial<typeof prev> = {}
+      if (!prev.businessName.trim() && (data.trade_name || data.legal_name)) {
+        updates.businessName = (data.trade_name || data.legal_name || '').trim()
+      }
+      const gstCity = data.address_details?.city || data.address_details?.district
+      if (!prev.city.trim() && gstCity) {
+        updates.city = gstCity.trim()
+      }
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev
+    })
   }, [formData.invoiceOption, normalizedGstin, gstinQuery.data])
 
   const paymentInfoQuery = useQuery({
@@ -580,8 +551,8 @@ export function RegisterBusinessPage() {
   const [extraPaymentError, setExtraPaymentError] = useState('')
   const [isVerifyingExtra, setIsVerifyingExtra] = useState(false)
   const [pickedPayment, setPickedPayment] = useState<PickedPayment | null>(null)
-  /* Phone whose earlier payments were already auto-picked, so it happens once per number. */
-  const autoPickedPhone = useRef<string | null>(null)
+  /* Contact/email whose earlier payments were already auto-picked, so it happens once per identity. */
+  const autoPickedIdentity = useRef<string | null>(null)
 
   /* Wizard: which step card is currently shown */
   const [activeStep, setActiveStep] = useState<SectionId>('business')
@@ -808,7 +779,7 @@ export function RegisterBusinessPage() {
     setPickedPayment(null)
     setGstAddress({ ...EMPTY_GST_ADDRESS })
     gstFilledFor.current = null
-    autoPickedPhone.current = null
+    autoPickedIdentity.current = null
     autoAdvanceArmed.current = {
       business: true,
       packages: true,
@@ -818,26 +789,35 @@ export function RegisterBusinessPage() {
     goToStep('business')
   }, [goToStep])
 
-  /* ─── Payment ID verification. Tied to exact phone + payment ID checked. ─── */
+  /* ─── Payment ID verification. Tied to phone and/or email checked. ─── */
   const paymentPhone = formData.phoneNumber.trim()
+  const paymentEmail = formData.email.trim().toLowerCase()
   const paymentIdInput = formData.paymentId.trim()
-  const canEnterPaymentId = validatePhoneNumber(paymentPhone)
+  const hasValidPhone = validatePhoneNumber(paymentPhone)
+  const hasValidEmail = validateEmail(paymentEmail)
+  const canEnterPaymentId = hasValidPhone || hasValidEmail
+
   const currentPaymentCheck =
     paymentCheck &&
-    paymentCheck.phone === paymentPhone &&
+    ((hasValidPhone && paymentCheck.phone === paymentPhone) ||
+      (hasValidEmail && paymentCheck.email === paymentEmail)) &&
     paymentCheck.paymentId === paymentIdInput
       ? paymentCheck
       : null
   const isVerifyingPayment = currentPaymentCheck?.status === 'verifying'
   const paymentVerified =
     canEnterPaymentId && currentPaymentCheck?.status === 'verified'
-  /* Extra payments only count for the phone they were verified against. */
+  /* Extra payments only count for the phone/email they were verified against. */
   const activeExtraPayments = useMemo(
     () =>
       paymentVerified
-        ? extraPayments.filter((p) => p.phone === paymentPhone)
+        ? extraPayments.filter(
+            (p) =>
+              (hasValidPhone && p.phone === paymentPhone) ||
+              (hasValidEmail && p.email === paymentEmail),
+          )
         : [],
-    [paymentVerified, extraPayments, paymentPhone],
+    [paymentVerified, extraPayments, hasValidPhone, paymentPhone, hasValidEmail, paymentEmail],
   )
   const primaryAvailable =
     paymentVerified && currentPaymentCheck
@@ -864,64 +844,84 @@ export function RegisterBusinessPage() {
 
   /* Verifies the first payment — typed, or picked from the list (then only its ref is sent). */
   const verifyPrimaryPayment = useCallback(
-    async (phone: string, paymentId: string, paymentRef?: string) => {
-    if (!validatePhoneNumber(phone) || !paymentId) return
+    async (
+      contact: { phone?: string; email?: string },
+      paymentId: string,
+      paymentRef?: string,
+    ) => {
+      const phone = contact.phone?.trim() || ''
+      const email = contact.email?.trim().toLowerCase() || ''
+      const validPhone = validatePhoneNumber(phone)
+      const validEmail = validateEmail(email)
+      if ((!validPhone && !validEmail) || !paymentId) return
 
-    const isSameCheck = (prev: PaymentCheck | null) =>
-      !!prev && prev.phone === phone && prev.paymentId === paymentId
-    setPaymentCheck({ status: 'verifying', phone, paymentId })
-    setExtraPayments([])
-    setExtraPaymentError('')
+      const isSameCheck = (prev: PaymentCheck | null) =>
+        !!prev &&
+        ((validPhone && prev.phone === phone) || (validEmail && prev.email === email)) &&
+        prev.paymentId === paymentId
+      setPaymentCheck({ status: 'verifying', phone, email, paymentId })
+      setExtraPayments([])
+      setExtraPaymentError('')
 
-    try {
-      const res = await verifyPayment(phone, paymentId, { paymentRef })
-      setPaymentCheck((prev) => {
-        if (!isSameCheck(prev)) return prev
-        return res.success
-          ? {
-              status: 'verified',
-              phone,
-              paymentId,
-              amount: res.data?.amount ?? null,
-              available: res.data?.available ?? res.data?.amount ?? null,
-              usedBy: res.data?.usedBy ?? [],
-              paidAt: res.data?.paidAt ?? null,
-            }
-          : {
-              status: 'failed',
-              phone,
-              paymentId,
-              message: res.message || 'Payment could not be verified',
-            }
-      })
-
-      const available = res.data?.available ?? res.data?.amount
-      if (res.success && available != null) {
-        const availableAmt = Number(available)
-        setFormData((prev) => {
-          const total = parseInt(prev.totalAmount) || 0
-          // Only the package's share is spent; anything left stays as credit.
-          const paid = total > 0 ? Math.min(total, availableAmt) : availableAmt
-          const remaining = total - paid
-          return {
-            ...prev,
-            amountPaid: String(paid),
-            amountRemaining: remaining > 0 ? String(remaining) : '',
-          }
+      try {
+        const res = await verifyPayment(
+          {
+            phoneNumber: validPhone ? phone : undefined,
+            customerEmail: validEmail ? email : undefined,
+          },
+          paymentId,
+          { paymentRef },
+        )
+        setPaymentCheck((prev) => {
+          if (!isSameCheck(prev)) return prev
+          return res.success
+            ? {
+                status: 'verified',
+                phone,
+                email,
+                paymentId,
+                amount: res.data?.amount ?? null,
+                available: res.data?.available ?? res.data?.amount ?? null,
+                usedBy: res.data?.usedBy ?? [],
+                paidAt: res.data?.paidAt ?? null,
+              }
+            : {
+                status: 'failed',
+                phone,
+                email,
+                paymentId,
+                message: res.message || 'Payment could not be verified',
+              }
         })
-      }
-    } catch (error: any) {
-      setPaymentCheck((prev) =>
-        isSameCheck(prev)
-          ? {
-              status: 'failed',
-              phone,
-              paymentId,
-              message: error?.message || 'Payment could not be verified',
+
+        const available = res.data?.available ?? res.data?.amount
+        if (res.success && available != null) {
+          const availableAmt = Number(available)
+          setFormData((prev) => {
+            const total = parseInt(prev.totalAmount) || 0
+            // Only the package's share is spent; anything left stays as credit.
+            const paid = total > 0 ? Math.min(total, availableAmt) : availableAmt
+            const remaining = total - paid
+            return {
+              ...prev,
+              amountPaid: String(paid),
+              amountRemaining: remaining > 0 ? String(remaining) : '',
             }
-          : prev,
-      )
-    }
+          })
+        }
+      } catch (error: any) {
+        setPaymentCheck((prev) =>
+          isSameCheck(prev)
+            ? {
+                status: 'failed',
+                phone,
+                email,
+                paymentId,
+                message: error?.message || 'Payment could not be verified',
+              }
+            : prev,
+        )
+      }
     },
     [],
   )
@@ -929,15 +929,24 @@ export function RegisterBusinessPage() {
   /* A picked payment counts only while its masked ID is still what the field shows. */
   const activePickedRef =
     pickedPayment &&
-    pickedPayment.phone === paymentPhone &&
+    ((hasValidPhone && pickedPayment.phone === paymentPhone) ||
+      (hasValidEmail && pickedPayment.email === paymentEmail)) &&
     pickedPayment.masked === paymentIdInput
       ? pickedPayment.ref
       : undefined
 
-  /* ─── Earlier payments of this number, detected as soon as it is valid. ─── */
+  /* ─── Earlier payments of this contact / email, detected as soon as either is valid. ─── */
   const earlierPaymentsQuery = useQuery({
-    queryKey: ['earlier-payments', paymentPhone],
-    queryFn: () => fetchEarlierPayments(paymentPhone),
+    queryKey: [
+      'earlier-payments',
+      hasValidPhone ? paymentPhone : '',
+      hasValidEmail ? paymentEmail : '',
+    ],
+    queryFn: () =>
+      fetchEarlierPayments({
+        phoneNumber: hasValidPhone ? paymentPhone : undefined,
+        customerEmail: hasValidEmail ? paymentEmail : undefined,
+      }),
     enabled: canEnterPaymentId,
     staleTime: 60_000,
     retry: false,
@@ -965,16 +974,18 @@ export function RegisterBusinessPage() {
 
   const handleVerifyPayment = useCallback(() => {
     const phone = formData.phoneNumber.trim()
+    const email = formData.email.trim().toLowerCase()
     const paymentId = formData.paymentId.trim()
     const listed = activePickedRef ? null : listedPaymentMessage(paymentId)
     if (listed) {
-      setPaymentCheck({ status: 'failed', phone, paymentId, message: listed })
+      setPaymentCheck({ status: 'failed', phone, email, paymentId, message: listed })
       return
     }
-    void verifyPrimaryPayment(phone, paymentId, activePickedRef)
+    void verifyPrimaryPayment({ phone, email }, paymentId, activePickedRef)
   }, [
     verifyPrimaryPayment,
     formData.phoneNumber,
+    formData.email,
     formData.paymentId,
     activePickedRef,
     listedPaymentMessage,
@@ -983,30 +994,36 @@ export function RegisterBusinessPage() {
   const pickEarlierPayment = useCallback(
     (payment: EarlierPayment) => {
       const phone = formData.phoneNumber.trim()
+      const email = formData.email.trim().toLowerCase()
       setPickedPayment({
         phone,
+        email,
         ref: payment.paymentRef,
         masked: payment.maskedPaymentId,
       })
       setFormData((prev) => ({ ...prev, paymentId: payment.maskedPaymentId }))
-      void verifyPrimaryPayment(phone, payment.maskedPaymentId, payment.paymentRef)
+      void verifyPrimaryPayment({ phone, email }, payment.maskedPaymentId, payment.paymentRef)
     },
-    [formData.phoneNumber, verifyPrimaryPayment],
+    [formData.phoneNumber, formData.email, verifyPrimaryPayment],
   )
 
-  /* Pick the first payment with money left automatically — once per number, and
+  /* Pick the first payment with money left automatically — once per contact/email, and
      never over a payment ID the staff member already typed. */
   useEffect(() => {
     if (!canEnterPaymentId || !earlierPaymentsQuery.isSuccess) return
-    if (autoPickedPhone.current === paymentPhone) return
-    autoPickedPhone.current = paymentPhone
+    const currentIdentity = `${hasValidPhone ? paymentPhone : ''}_${hasValidEmail ? paymentEmail : ''}`
+    if (autoPickedIdentity.current === currentIdentity) return
+    autoPickedIdentity.current = currentIdentity
     if (formData.paymentId.trim()) return
     const usable = earlierPayments.find((p) => Number(p.available ?? 0) > 0)
     if (usable) pickEarlierPayment(usable)
   }, [
     canEnterPaymentId,
     earlierPaymentsQuery.isSuccess,
+    hasValidPhone,
     paymentPhone,
+    hasValidEmail,
+    paymentEmail,
     formData.paymentId,
     earlierPayments,
     pickEarlierPayment,
@@ -1016,12 +1033,22 @@ export function RegisterBusinessPage() {
   const addEarlierAsTopUp = useCallback(
     async (payment: EarlierPayment) => {
       const phone = formData.phoneNumber.trim()
+      const email = formData.email.trim().toLowerCase()
+      const validPhone = validatePhoneNumber(phone)
+      const validEmail = validateEmail(email)
       setIsVerifyingExtra(true)
       setExtraPaymentError('')
       try {
-        const res = await verifyPayment(phone, payment.maskedPaymentId, {
-          paymentRef: payment.paymentRef,
-        })
+        const res = await verifyPayment(
+          {
+            phoneNumber: validPhone ? phone : undefined,
+            customerEmail: validEmail ? email : undefined,
+          },
+          payment.maskedPaymentId,
+          {
+            paymentRef: payment.paymentRef,
+          },
+        )
         const available = Number(res.data?.available ?? 0)
         if (!res.success || available <= 0) {
           setExtraPaymentError(res.message || 'Payment could not be verified')
@@ -1031,6 +1058,7 @@ export function RegisterBusinessPage() {
           ...prev,
           {
             phone,
+            email,
             paymentId: payment.maskedPaymentId,
             ref: payment.paymentRef,
             amount: Number(res.data?.amount ?? available),
@@ -1047,17 +1075,24 @@ export function RegisterBusinessPage() {
         setIsVerifyingExtra(false)
       }
     },
-    [formData.phoneNumber],
+    [formData.phoneNumber, formData.email],
   )
 
   /* ─── Top-up: another verified payment adds to the available balance. ─── */
   const handleAddExtraPayment = useCallback(async () => {
     const phone = formData.phoneNumber.trim()
+    const email = formData.email.trim().toLowerCase()
+    const validPhone = validatePhoneNumber(phone)
+    const validEmail = validateEmail(email)
     const paymentId = extraPaymentInput.trim()
-    if (!validatePhoneNumber(phone) || !paymentId) return
+    if ((!validPhone && !validEmail) || !paymentId) return
     const alreadyAdded =
       paymentId === formData.paymentId.trim() ||
-      extraPayments.some((p) => p.phone === phone && p.paymentId === paymentId)
+      extraPayments.some(
+        (p) =>
+          ((validPhone && p.phone === phone) || (validEmail && p.email === email)) &&
+          p.paymentId === paymentId,
+      )
     if (alreadyAdded) {
       setExtraPaymentError('This payment ID is already added')
       return
@@ -1076,15 +1111,30 @@ export function RegisterBusinessPage() {
     setIsVerifyingExtra(true)
     setExtraPaymentError('')
     try {
-      const res = await verifyPayment(phone, paymentId)
-      const available = Number(res.data?.available ?? res.data?.amount ?? 0)
+      const res = await verifyPayment(
+        {
+          phoneNumber: validPhone ? phone : undefined,
+          customerEmail: validEmail ? email : undefined,
+        },
+        paymentId,
+      )
+      const available = Number(res.data?.available ?? 0)
       if (!res.success || available <= 0) {
-        setExtraPaymentError(res.message || 'Payment could not be verified')
+        setExtraPaymentError(
+          res.message ||
+            'Payment could not be verified, or has no remaining balance',
+        )
         return
       }
       setExtraPayments((prev) => [
         ...prev,
-        { phone, paymentId, amount: Number(res.data?.amount ?? available), available },
+        {
+          phone,
+          email,
+          paymentId,
+          amount: Number(res.data?.amount ?? available),
+          available,
+        },
       ])
       setExtraPaymentInput('')
     } catch (error) {
@@ -1098,6 +1148,7 @@ export function RegisterBusinessPage() {
     }
   }, [
     formData.phoneNumber,
+    formData.email,
     formData.paymentId,
     extraPaymentInput,
     extraPayments,
@@ -2646,13 +2697,13 @@ export function RegisterBusinessPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                             {canEnterPaymentId && earlierPaymentsQuery.isFetching && earlierPayments.length === 0 && (
                               <p className="mb-3 text-xs text-slate-500">
-                                Looking for earlier payments from {paymentPhone}…
+                                Looking for earlier payments from {hasValidPhone && hasValidEmail ? `${paymentPhone} / ${paymentEmail}` : hasValidPhone ? paymentPhone : paymentEmail}…
                               </p>
                             )}
                             {earlierPayments.length > 0 && (
                               <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
                                 <p className="text-xs font-semibold text-slate-700">
-                                  Earlier payments from this number
+                                  Earlier payments from this contact / email
                                 </p>
                                 <p className="mb-2 text-[11px] text-slate-500">
                                   Use one to pay for this business from what is left on it. IDs are partly hidden.
@@ -2738,12 +2789,12 @@ export function RegisterBusinessPage() {
                               error={paymentError}
                               hint={
                                 !canEnterPaymentId
-                                  ? 'A valid 10-digit phone number in Step 1 is required to verify payment'
+                                  ? 'A valid 10-digit phone number or email address in Step 1 is required to verify payment'
                                   : paymentVerified
                                     ? undefined
                                     : isVerifyingPayment
                                       ? 'Verifying payment with payment gateway…'
-                                      : `Enter payment ID (e.g. pay_…) for phone number ${paymentPhone}`
+                                      : `Enter payment ID (e.g. pay_…) for ${hasValidPhone && hasValidEmail ? `${paymentPhone} or ${paymentEmail}` : hasValidPhone ? paymentPhone : paymentEmail}`
                               }
                             >
                               <div className="flex gap-2">
@@ -2766,7 +2817,7 @@ export function RegisterBusinessPage() {
                                   placeholder={
                                     canEnterPaymentId
                                       ? 'Enter payment ID (e.g. pay_...)'
-                                      : 'Enter phone number in Step 1 first'
+                                      : 'Enter phone number or email in Step 1 first'
                                   }
                                   className={`${inputClass(!!paymentError)} min-w-0 flex-1 ${
                                     paymentVerified

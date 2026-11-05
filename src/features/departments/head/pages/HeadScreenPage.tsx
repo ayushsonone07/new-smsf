@@ -186,12 +186,25 @@ export function HeadScreenPage({ screenOverride }: HeadScreenPageProps = {}) {
       targetSlug === 'automation')
 
   if (isAutowebsionCustomerScreen) {
-    const defaultSubTab =
-      targetSlug === 'website-customers' || targetSlug === 'website' || (feature.screen as string) === 'website-customers'
-        ? 'WEBSITE'
-        : targetSlug === 'automation-customers' || targetSlug === 'automation' || (feature.screen as string) === 'automation-customers'
-          ? 'AUTOMATION'
-          : 'ALL'
+    const isWebsiteDept =
+      normalizeDepartmentTypeName(effectiveDepartmentType || '') === 'WEBSITE_DEPARTMENT' ||
+      effectiveDepartmentType?.toUpperCase().includes('WEBSITE') ||
+      targetSlug === 'website-customers' ||
+      targetSlug === 'website' ||
+      (feature.screen as string) === 'website-customers'
+
+    const isAutomationDept =
+      normalizeDepartmentTypeName(effectiveDepartmentType || '') === 'AUTOMATION_DEPARTMENT' ||
+      effectiveDepartmentType?.toUpperCase().includes('AUTOMATION') ||
+      targetSlug === 'automation-customers' ||
+      targetSlug === 'automation' ||
+      (feature.screen as string) === 'automation-customers'
+
+    const defaultSubTab = isWebsiteDept
+      ? 'WEBSITE'
+      : isAutomationDept
+        ? 'AUTOMATION'
+        : 'ALL'
 
     return <AutowebisionCustomersPage feature={feature} defaultSubTab={defaultSubTab} />
   }

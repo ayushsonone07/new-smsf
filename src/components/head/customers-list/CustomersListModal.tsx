@@ -18,6 +18,7 @@ import { Button } from '../../ui/Button'
 import { Icon } from '../shared/Icon'
 import { RefreshButton } from '../../ui/RefreshButton'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
+import { getCustomerFormUrl } from '../../../utils/urlEncryption'
 import { useCustomerDrawerDetails } from '../../../features/departments/hooks/useCustomerDrawerDetails'
 import type {
   OnboardingCustomer,
@@ -1521,10 +1522,16 @@ export function CustomersListModal({
                     <button
                       type="button"
                       className="cl-drawer__outline-btn"
-                      onClick={() => onOpenFullPage(customer)}
+                      title="Open full editable form in new tab"
+                      onClick={() => onOpenFullPage(current)}
                     >
-                      <Icon name="eye" d={EXTERNAL_ICON} size={13} strokeWidth={2} />
-                      Full page
+                      <Icon
+                        name="eye"
+                        d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                        size={13}
+                        strokeWidth={2}
+                      />
+                      Edit Customer Form
                     </button>
                   )}
                 </div>
@@ -2684,27 +2691,61 @@ export function CustomersListModal({
                               {STATUS_LABEL[status]}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            className="cl-drawer__outline-btn"
-                            onClick={() => {
-                              const matched = allBusinesses.find(
-                                (b) => String(b.id) === dupId,
-                              )
-                              if (matched) {
-                                setActiveCustomer(matched as any)
-                                setActiveTab('overview')
-                              }
-                            }}
-                          >
-                            <Icon
-                              name="eye"
-                              d={EXTERNAL_ICON}
-                              size={13}
-                              strokeWidth={2}
-                            />
-                            {isCurrentlyActive ? 'Viewing now' : 'View details'}
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="cl-drawer__outline-btn"
+                              style={{
+                                color: '#2563eb',
+                                borderColor: '#bfdbfe',
+                                backgroundColor: '#eff6ff',
+                              }}
+                              title="Open editable form for this business in new tab"
+                              onClick={() => {
+                                const url = getCustomerFormUrl(phone, true, dupId)
+                                if (url) {
+                                  window.open(url, '_blank')
+                                } else if (onOpenFullPage) {
+                                  onOpenFullPage({
+                                    ...customer,
+                                    id: dupId,
+                                    phone,
+                                    hasDuplicateCustomer: true,
+                                  })
+                                }
+                              }}
+                            >
+                              <Icon
+                                name="eye"
+                                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                                size={13}
+                                strokeWidth={2}
+                              />
+                              Edit Form
+                            </button>
+
+                            <button
+                              type="button"
+                              className="cl-drawer__outline-btn"
+                              onClick={() => {
+                                const matched = allBusinesses.find(
+                                  (b) => String(b.id) === dupId,
+                                )
+                                if (matched) {
+                                  setActiveCustomer(matched as any)
+                                  setActiveTab('overview')
+                                }
+                              }}
+                            >
+                              <Icon
+                                name="eye"
+                                d={EXTERNAL_ICON}
+                                size={13}
+                                strokeWidth={2}
+                              />
+                              {isCurrentlyActive ? 'Viewing now' : 'View details'}
+                            </button>
+                          </div>
                         </div>
 
                         <h4 className="cl-drawer__dup-card-name">{name}</h4>
