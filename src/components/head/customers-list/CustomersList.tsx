@@ -66,6 +66,9 @@ export interface OnboardingCustomer {
   subServiceInfo?: any[]
   flowSteps?: any[]
   rawCustomer?: any
+  serviceExpiration?: string
+  clientRemark?: string
+  createdAt?: string
 }
 
 export interface CustomersListProps {
