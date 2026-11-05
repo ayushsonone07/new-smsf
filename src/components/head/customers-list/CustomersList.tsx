@@ -33,6 +33,9 @@ export interface OnboardingCustomer {
   duplicateCount?: number
   hasDuplicateCustomer?: boolean
   duplicateCustomers?: any[]
+  parentCustomerId?: number | string | null
+  parentBusinessName?: string | null
+  isLinkedBusiness?: boolean
   contactName: string
   contactDate: string
   /** Contact column */
@@ -63,6 +66,9 @@ export interface OnboardingCustomer {
   subServiceInfo?: any[]
   flowSteps?: any[]
   rawCustomer?: any
+  serviceExpiration?: string
+  clientRemark?: string
+  createdAt?: string
 }
 
 export interface CustomersListProps {
@@ -937,7 +943,7 @@ function CustomerRow({
       customer.hasDuplicateCustomer || (customer.duplicateCount ?? 0) > 0,
     )
     const url =
-      getCustomerFormUrl(customer.phone, isDuplicate) ||
+      getCustomerFormUrl(customer.phone, isDuplicate, customer.id) ||
       customer.formUrl
 
     if (!url) {
@@ -1148,11 +1154,39 @@ function CustomerRow({
               </button>
             )}
 
+            {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
+              <span
+                className="cl-linked-branch-pill"
+                title={customer.parentBusinessName || 'Main Business'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '9999px',
+                  border: '1px solid #c7d2fe',
+                  backgroundColor: '#eef2ff',
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#4338ca',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onOpenDetail) onOpenDetail()
+                }}
+              >
+                <Icon name="link" size={11} strokeWidth={2} />
+                <span>Main View</span>
+              </span>
+            )}
+
             {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
               <button
                 type="button"
                 className="cl-dup-pill-btn"
-                title="View duplicate businesses"
+                title="View other businesses"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (onOpenDuplicate) {
@@ -1178,8 +1212,8 @@ function CustomerRow({
                 <Icon name="copy" size={11} strokeWidth={2} />
                 <span>
                   {customer.duplicateCount && customer.duplicateCount > 0
-                    ? `${customer.duplicateCount} duplicate${customer.duplicateCount === 1 ? '' : 's'}`
-                    : 'Duplicate'}
+                    ? `${customer.duplicateCount} Other`
+                    : 'Other'}
                 </span>
               </button>
             )}

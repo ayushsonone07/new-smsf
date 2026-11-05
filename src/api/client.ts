@@ -125,6 +125,8 @@ export class ApiError extends Error {
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
+  /** Optional lookups pass true so a 401 just fails the call instead of signing the user out. */
+  skipAuthRedirect = false,
 ): Promise<T> {
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   // Route /help-center or /api/help-center through Vite's local dev proxy directly
@@ -166,6 +168,7 @@ export async function apiRequest<T>(
     }
 
     if (
+      !skipAuthRedirect &&
       response.status === 401 &&
       isAuthenticationFailure(errorData) &&
       typeof window !== 'undefined' &&

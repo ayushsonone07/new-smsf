@@ -486,6 +486,9 @@ export function CustomerListPage() {
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
+          parentCustomerId: (c as any).parentCustomerId ?? (c.customerDetails as any)?.parentCustomerId ?? null,
+          parentBusinessName: (c as any).parentBusinessName ?? (c.customerDetails as any)?.parentBusinessName ?? null,
+          isLinkedBusiness: Boolean((c as any).isLinkedBusiness ?? (c.customerDetails as any)?.isLinkedBusiness ?? (c as any).parentCustomerId),
           serviceTags: extractServiceTags(c),
           subServiceInfo: c.subServices || (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
           services: (c as any).services || [],
@@ -549,6 +552,9 @@ export function CustomerListPage() {
           hasDuplicateCustomer: hasDuplicates,
           duplicateCount: dupCount,
           duplicateCustomers: c.duplicateCustomers || [],
+          parentCustomerId: (c as any).parentCustomerId ?? (c.customerDetails as any)?.parentCustomerId ?? null,
+          parentBusinessName: (c as any).parentBusinessName ?? (c.customerDetails as any)?.parentBusinessName ?? null,
+          isLinkedBusiness: Boolean((c as any).isLinkedBusiness ?? (c.customerDetails as any)?.isLinkedBusiness ?? (c as any).parentCustomerId),
           serviceTags: extractServiceTags(c),
           rawCustomer: c,
         }
@@ -1129,6 +1135,16 @@ export function CustomerListPage() {
         canEditRemark={canEditRemark}
         departmentType={currentDepartment}
         initialTab={modalTab}
+        onOpenFullPage={(cust) => {
+          const isDup = Boolean(
+            cust.hasDuplicateCustomer ||
+            (cust.duplicateCount ?? 0) > 0 ||
+            (cust as any).isLinkedBusiness ||
+            (cust as any).parentCustomerId,
+          )
+          const url = getCustomerFormUrl(cust.phone, isDup, cust.id)
+          if (url) window.open(url, '_blank')
+        }}
         onBillUploaded={() => activeCustomerQuery.refetch()}
         onClose={() => {
           setSelectedCustomer(null)

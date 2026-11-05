@@ -72,6 +72,7 @@ export function OnboardingConfirmationModal({
         recipientUsername: email.trim(),
         contact: contact.trim(),
         isDuplicate: Boolean(customer.hasDuplicateCustomer),
+        customerId: customer.id,
         domainConnect,
         themeSelection,
       })
@@ -132,11 +133,15 @@ export function OnboardingConfirmationModal({
               )}
             </div>
           </div>
-          {customer.hasDuplicateCustomer && (
+          {customer.isLinkedBusiness || customer.businessRelationType === 'branch' ? (
+            <span className="text-[11px] px-2 py-0.5 font-medium rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+              Linked Business
+            </span>
+          ) : customer.hasDuplicateCustomer ? (
             <span className="text-[11px] px-2 py-0.5 font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200">
               Duplicate
             </span>
-          )}
+          ) : null}
         </div>
 
         {/* Email & Contact Fields */}

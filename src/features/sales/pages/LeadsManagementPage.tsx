@@ -20,6 +20,7 @@ import {
   CreditCard,
   UserPlus,
   ChevronDown,
+  RotateCcw,
 } from 'lucide-react'
 import {
   getLeads,
@@ -39,6 +40,7 @@ import { TelecallerActionModal } from '../components/TelecallerActionModal'
 import { UpdateLeadStatusModal } from '../components/UpdateLeadStatusModal'
 import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
+import { DeleteLeadsModal } from '../components/DeleteLeadsModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
 import { ScrollableSelect } from '../../../components/ui/ScrollableSelect'
@@ -344,6 +346,211 @@ function AssignedRepSelect({ leadId, currentVal, options, onAssign }: AssignedRe
 }
 
 
+interface FilterDropdownOption {
+  value: string
+  label: string
+  dotColor?: string
+}
+
+const SALES_STATUS_FILTER_OPTIONS: FilterDropdownOption[] = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'PENDING', label: 'PENDING', dotColor: 'bg-amber-500' },
+  { value: 'FOLLOW_UP', label: 'FOLLOW UP', dotColor: 'bg-indigo-500' },
+  { value: 'MEETING_SCHEDULED_AT', label: 'MEETING SCHEDULED AT', dotColor: 'bg-cyan-500' },
+  { value: 'NOT_CONNECTED', label: 'NOT CONNECTED', dotColor: 'bg-rose-500' },
+  { value: 'NOT_INTERESTED', label: 'NOT INTERESTED', dotColor: 'bg-slate-400' },
+  { value: 'DONE', label: 'SALE WON', dotColor: 'bg-emerald-500' },
+]
+
+const TELECALLER_STATUS_FILTER_OPTIONS: FilterDropdownOption[] = [
+  { value: 'all', label: 'All Telecaller Statuses' },
+  { value: 'PENDING', label: 'PENDING', dotColor: 'bg-amber-500' },
+  { value: 'FOLLOW_UP', label: 'FOLLOW UP', dotColor: 'bg-indigo-500' },
+  { value: 'NOT_CONNECTED', label: 'NOT CONNECTED', dotColor: 'bg-rose-500' },
+  { value: 'ASSIGNED', label: 'ASSIGNED', dotColor: 'bg-emerald-500' },
+]
+
+const LEAD_TYPE_FILTER_OPTIONS: FilterDropdownOption[] = [
+  { value: 'all', label: 'All Lead Types' },
+  { value: 'Webinar 999', label: 'Webinar 999', dotColor: 'bg-purple-500' },
+  { value: 'Direct', label: 'Direct', dotColor: 'bg-blue-500' },
+  { value: 'Inbound', label: 'Inbound', dotColor: 'bg-teal-500' },
+  { value: 'Referral', label: 'Referral', dotColor: 'bg-amber-500' },
+  { value: 'Campaign', label: 'Campaign', dotColor: 'bg-rose-500' },
+]
+
+interface FilterDropdownSelectProps {
+  value: string
+  onChange: (value: string) => void
+  options: FilterDropdownOption[]
+  allLabel: string
+}
+
+function FilterDropdownSelect({ value, onChange, options, allLabel }: FilterDropdownSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const selectedOption = options.find(
+    (opt) =>
+      opt.value.toLowerCase() === (value || '').toLowerCase() ||
+      (opt.value === 'DONE' && ((value || '').toLowerCase() === 'sale_won' || (value || '').toLowerCase() === 'sale won'))
+  )
+  const displayLabel = value === 'all' || !value ? allLabel : selectedOption?.label || value
+
+  const handleOpen = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = Math.min(options.length * 36 + 16, 260)
+      const openUpwards = spaceBelow < menuHeight && rect.top > menuHeight
+      const width = Math.max(rect.width, 180)
+      const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)
+      setMenuPos({
+        top: openUpwards ? rect.top - menuHeight - 4 : rect.bottom + 4,
+        left,
+        width,
+      })
+      setIsOpen(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleClose = (e: MouseEvent | TouchEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    const handleScroll = (e: Event) => {
+      if (
+        menuRef.current &&
+        (menuRef.current === e.target || menuRef.current.contains(e.target as Node))
+      ) {
+        return
+      }
+      setIsOpen(false)
+    }
+
+    const handleResize = () => setIsOpen(false)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('touchstart', handleClose)
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('touchstart', handleClose)
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const isSelectedActive = Boolean(value && value !== 'all')
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
+        className={`w-full h-9 px-3 bg-white border rounded-lg text-xs transition-all cursor-pointer flex items-center justify-between gap-1.5 shadow-2xs ${
+          isSelectedActive
+            ? 'bg-blue-50/60 border-blue-400 text-blue-900 font-semibold ring-2 ring-blue-500/10'
+            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
+        }`}
+        title={displayLabel}
+      >
+        <span className="flex items-center gap-1.5 truncate text-left font-medium min-w-0">
+          {isSelectedActive && selectedOption?.dotColor && (
+            <span className={`w-2 h-2 rounded-full shrink-0 ${selectedOption.dotColor}`} />
+          )}
+          <span className="truncate">{displayLabel}</span>
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+            isOpen ? 'rotate-180 text-blue-600' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${menuPos.top}px`,
+              left: `${menuPos.left}px`,
+              width: `${menuPos.width}px`,
+              minWidth: '180px',
+              maxWidth: '260px',
+              zIndex: 9999,
+            }}
+            className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-100"
+          >
+            <div className="max-h-[240px] overflow-y-auto space-y-0.5 custom-scrollbar">
+              {options.map((opt) => {
+                const isSelected =
+                  (opt.value === 'all' && (!value || value === 'all')) ||
+                  (opt.value !== 'all' &&
+                    (opt.value.toLowerCase() === (value || '').toLowerCase() ||
+                      (opt.value === 'DONE' &&
+                        ((value || '').toLowerCase() === 'sale_won' ||
+                          (value || '').toLowerCase() === 'sale won'))))
+
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value)
+                      setIsOpen(false)
+                    }}
+                    className={`w-full px-2.5 py-1.5 flex items-center justify-between text-xs rounded-lg transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 text-blue-700 font-semibold'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {opt.dotColor ? (
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotColor}`} />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full shrink-0 bg-slate-300" />
+                      )}
+                      <span className="truncate">{opt.label}</span>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1.5" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  )
+}
+
 interface FunnelFilterSelectProps {
   value: string
   onChange: (value: string) => void
@@ -439,7 +646,11 @@ function FunnelFilterSelect({ value, onChange, options }: FunnelFilterSelectProp
         ref={triggerRef}
         type="button"
         onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
-        className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer flex items-center justify-between gap-1.5 transition-colors hover:bg-slate-50"
+        className={`w-full h-9 px-3 bg-white border rounded-lg text-xs transition-all cursor-pointer flex items-center justify-between gap-1.5 shadow-2xs ${
+          value && value !== 'all'
+            ? 'bg-blue-50/60 border-blue-400 text-blue-900 font-semibold ring-2 ring-blue-500/10'
+            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
+        }`}
         title={displayLabel}
       >
         <span className="truncate text-left font-medium">{displayLabel}</span>
@@ -563,7 +774,7 @@ function DepartmentUserFilterSelect({ value, onChange, options }: DepartmentUser
   )
   const displayLabel =
     value === 'all' || !value
-      ? 'All Department Users'
+      ? 'All Users'
       : value === 'unassigned'
       ? 'Unassigned'
       : selectedOption?.label || formatRepLabel(value)
@@ -645,7 +856,11 @@ function DepartmentUserFilterSelect({ value, onChange, options }: DepartmentUser
         ref={triggerRef}
         type="button"
         onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
-        className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer flex items-center justify-between gap-1.5 transition-colors hover:bg-slate-50"
+        className={`w-full h-9 px-3 bg-white border rounded-lg text-xs transition-all cursor-pointer flex items-center justify-between gap-1.5 shadow-2xs ${
+          value && value !== 'all'
+            ? 'bg-blue-50/60 border-blue-400 text-blue-900 font-semibold ring-2 ring-blue-500/10'
+            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
+        }`}
         title={displayLabel}
       >
         <span className="truncate text-left font-medium">{displayLabel}</span>
@@ -858,6 +1073,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   // Selection
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+
+  const singleSelectedLead = useMemo(() => {
+    if (selectedLeads.length === 1) {
+      return leads.find((l) => l.leadId === selectedLeads[0]) || null
+    }
+    return null
+  }, [selectedLeads, leads])
 
   // Modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -997,17 +1220,18 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   }
 
   // Delete
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedLeads.length === 0) return
-    if (!window.confirm(`Are you sure you want to delete ${selectedLeads.length} selected lead(s)?`)) {
-      return
-    }
+    setDeleteModalOpen(true)
+  }
 
+  const handleConfirmDelete = async () => {
     setIsDeleting(true)
     try {
       await deleteLeads(selectedLeads, false)
       showToast(`${selectedLeads.length} lead(s) deleted successfully.`, 'success')
       setSelectedLeads([])
+      setDeleteModalOpen(false)
       await fetchLeadsData()
     } catch (err: any) {
       showToast(err?.message || 'Failed to delete selected leads.', 'error')
@@ -1233,74 +1457,99 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
           {/* Collapsible Filter Bar */}
           {showFilters && (
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="px-5 py-3.5 border-t border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-slate-100/50">
+              {/* Header row inside filter bar with active count and clear all */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Filter Leads</span>
+                  </span>
+                  {activeFiltersCount > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                      {activeFiltersCount} active {activeFiltersCount === 1 ? 'filter' : 'filters'}
+                    </span>
+                  )}
+                </div>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset all filters</span>
+                  </button>
+                )}
+              </div>
+
+              {/* 6 Filter inputs in a clean responsive grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {/* 1. Sales Status */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Sales Status
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Sales Status</span>
+                    {selectedLeadStatus !== 'all' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
-                  <select
+                  <FilterDropdownSelect
                     value={selectedLeadStatus}
-                    onChange={(e) => {
-                      setSelectedLeadStatus(e.target.value)
+                    onChange={(val) => {
+                      setSelectedLeadStatus(val)
                       setCurrentPage(0)
                     }}
-                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
-                  >
-                    <option value="all">All Statuses</option>
-                    {LEAD_STATUS_OPTIONS.map((st) => (
-                      <option key={st} value={st}>
-                        {st.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
+                    options={SALES_STATUS_FILTER_OPTIONS}
+                    allLabel="All Statuses"
+                  />
                 </div>
 
+                {/* 2. Telecaller Status */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Telecaller Status
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Telecaller Status</span>
+                    {selectedTelecallerStatus !== 'all' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
-                  <select
+                  <FilterDropdownSelect
                     value={selectedTelecallerStatus}
-                    onChange={(e) => {
-                      setSelectedTelecallerStatus(e.target.value)
+                    onChange={(val) => {
+                      setSelectedTelecallerStatus(val)
                       setCurrentPage(0)
                     }}
-                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
-                  >
-                    <option value="all">All Telecaller Statuses</option>
-                    {TELECALLER_STATUS_OPTIONS.map((st) => (
-                      <option key={st} value={st}>
-                        {st.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
+                    options={TELECALLER_STATUS_FILTER_OPTIONS}
+                    allLabel="All Telecaller Statuses"
+                  />
                 </div>
 
+                {/* 3. Lead Type */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Lead Type
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Lead Type</span>
+                    {selectedLeadType !== 'all' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
-                  <select
+                  <FilterDropdownSelect
                     value={selectedLeadType}
-                    onChange={(e) => {
-                      setSelectedLeadType(e.target.value)
+                    onChange={(val) => {
+                      setSelectedLeadType(val)
                       setCurrentPage(0)
                     }}
-                    className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
-                  >
-                    <option value="all">All Lead Types</option>
-                    {LEAD_TYPE_OPTIONS.map((lt) => (
-                      <option key={lt} value={lt}>
-                        {lt}
-                      </option>
-                    ))}
-                  </select>
+                    options={LEAD_TYPE_FILTER_OPTIONS}
+                    allLabel="All Lead Types"
+                  />
                 </div>
 
+                {/* 4. Funnel Type */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Funnel Type
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Funnel Type</span>
+                    {selectedFunnel !== 'all' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
                   <FunnelFilterSelect
                     value={selectedFunnel}
@@ -1312,10 +1561,13 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   />
                 </div>
 
-                
+                {/* 5. Department User */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Department User
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Department User</span>
+                    {selectedDepartmentUser !== 'all' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
                   <DepartmentUserFilterSelect
                     value={selectedDepartmentUser}
@@ -1327,9 +1579,13 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   />
                 </div>
 
+                {/* 6. Date Range */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">
-                    Date Range
+                  <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                    <span>Date Range</span>
+                    {(startDate || endDate) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    )}
                   </label>
                   <div className="leads-filter-date-picker relative z-30">
                     <DateRangePicker
@@ -1350,18 +1606,6 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   </div>
                 </div>
               </div>
-
-              {hasActiveFilters && (
-                <div className="mt-3 flex justify-end pt-2 border-t border-slate-200/60">
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -1432,7 +1676,11 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                     const isSelected = selectedLeads.includes(lead.leadId)
                     const customerInfo = getCustomerDisplay(lead)
                     const isPending = (lead.leadStatus || 'PENDING') === 'PENDING'
-                    const isDone = (lead.leadStatus || '').toUpperCase() === 'DONE'
+                    const isDone =
+                      (lead.leadStatus || '').toUpperCase() === 'DONE' ||
+                      (lead.leadStatus || '').toUpperCase() === 'SALE_WON' ||
+                      (lead.leadStatus || '').toUpperCase() === 'SALE WON'
+                    const displayStatus = isDone ? 'SALE WON' : (lead.leadStatus || 'PENDING')
 
                     return (
                       <tr
@@ -1512,7 +1760,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                             }`}
                             title="Click to update status"
                           >
-                            {lead.leadStatus || 'PENDING'}
+                            {displayStatus}
                           </button>
                         </td>
 
@@ -1716,6 +1964,15 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
           }}
         />
       )}
+
+      <DeleteLeadsModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        selectedCount={selectedLeads.length}
+        isDeleting={isDeleting}
+        selectedLeadDetails={singleSelectedLead}
+      />
     </div>
   )
 }
