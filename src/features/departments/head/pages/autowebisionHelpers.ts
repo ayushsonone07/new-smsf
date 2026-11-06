@@ -24,12 +24,7 @@ export function getWebsiteServiceStatus(c: AutowebsionCustomerLightDTO): string 
     return 'PENDING'
   }
 
-  const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
-  return fallback.includes('COMPLETE')
-    ? 'COMPLETED'
-    : fallback.includes('PROGRESS')
-      ? 'IN_PROGRESS'
-      : 'PENDING'
+  return 'PENDING'
 }
 
 // Helper to compute automation status
@@ -55,12 +50,7 @@ export function getAutomationServiceStatus(c: AutowebsionCustomerLightDTO): stri
     return 'PENDING'
   }
 
-  const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
-  return fallback.includes('COMPLETE')
-    ? 'COMPLETED'
-    : fallback.includes('PROGRESS')
-      ? 'IN_PROGRESS'
-      : 'PENDING'
+  return 'PENDING'
 }
 
 // Helper to extract sub-services for a customer and service type
@@ -205,16 +195,17 @@ export function getServicePillStatus(
 
   // 1. If SOP sub-services exist:
   if (statuses.length > 0) {
-    // ONLY COMPLETED when 100% of all SOP sub-services are done (and none are awaiting ack):
+    // ONLY COMPLETED when 100% of all SOP sub-services are done:
     if (statuses.every(isDone)) {
       return 'COMPLETED'
     }
-    // If any sub-service is awaiting customer ack:
-    if (statuses.some(isAck)) {
+    // If all unfinished sub-services are awaiting customer ack:
+    const incomplete = statuses.filter((st) => !isDone(st))
+    if (incomplete.length > 0 && incomplete.every(isAck)) {
       return 'WAITING_ACK'
     }
-    // If any sub-service is in progress or partially completed:
-    if (statuses.some(isInProg) || statuses.some(isDone)) {
+    // If any sub-service is in progress, partially completed, or ack:
+    if (statuses.some(isInProg) || statuses.some(isDone) || statuses.some(isAck)) {
       return 'IN_PROGRESS'
     }
     return 'PENDING'
