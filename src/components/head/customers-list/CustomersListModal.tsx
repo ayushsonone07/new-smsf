@@ -18,6 +18,7 @@ import { Button } from '../../ui/Button'
 import { Icon } from '../shared/Icon'
 import { RefreshButton } from '../../ui/RefreshButton'
 import { getDuplicateCustomerSummaries } from '../../../api/department-users.api'
+import { getCustomerFormUrl } from '../../../utils/urlEncryption'
 import { useCustomerDrawerDetails } from '../../../features/departments/hooks/useCustomerDrawerDetails'
 import type {
   OnboardingCustomer,
@@ -270,15 +271,19 @@ function Field({
   label,
   value,
   full = false,
+  children,
 }: {
   label: string
-  value?: string
+  value?: React.ReactNode
   full?: boolean
+  children?: React.ReactNode
 }) {
   return (
     <div className={`cl-drawer__field${full ? ' cl-drawer__field--full' : ''}`}>
       <div className="cl-drawer__field-label">{label}</div>
-      <div className="cl-drawer__field-value">{show(value)}</div>
+      <div className="cl-drawer__field-value">
+        {children ?? (typeof value === 'string' ? show(value) : (value ?? '—'))}
+      </div>
     </div>
   )
 }
@@ -1521,10 +1526,16 @@ export function CustomersListModal({
                     <button
                       type="button"
                       className="cl-drawer__outline-btn"
-                      onClick={() => onOpenFullPage(customer)}
+                      title="Open full editable form in new tab"
+                      onClick={() => onOpenFullPage(current)}
                     >
-                      <Icon name="eye" d={EXTERNAL_ICON} size={13} strokeWidth={2} />
-                      Full page
+                      <Icon
+                        name="eye"
+                        d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                        size={13}
+                        strokeWidth={2}
+                      />
+                      Edit Customer Form
                     </button>
                   )}
                 </div>
@@ -1603,12 +1614,88 @@ export function CustomersListModal({
                     />
                   ) : null}
                   <Field
-                    label="Service expiry"
+                    label="Created at"
                     value={
-                      apiDetails.profile?.serviceExpiration ||
-                      serviceRow?.serviceExpiration ||
-                      customer.serviceMonths
+                      (() => {
+                        const raw =
+                          customer.createdAt ||
+                          customer.rawCustomer?.createdAt ||
+                          (apiDetails.profile as any)?.createdAt ||
+                          (rowDetails as any)?.createdAt ||
+                          customer.contactDate
+                        if (!raw || raw === '—') return '—'
+                        const p = new Date(raw)
+                        return isNaN(p.getTime())
+                          ? String(raw)
+                          : p.toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true,
+                            })
+                      })()
                     }
+                  />
+                  <Field
+                    label="Expiration"
+                    value={
+                      (() => {
+                        const raw =
+                          customer.serviceExpiration ||
+                          customer.rawCustomer?.serviceExpiration ||
+                          (apiDetails.profile as any)?.serviceExpiration ||
+                          (serviceRow as any)?.serviceExpiration ||
+                          customer.serviceMonths
+                        if (!raw) return 'Not Available'
+                        const p = new Date(raw)
+                        return isNaN(p.getTime())
+                          ? String(raw)
+                          : p.toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                      })()
+                    }
+                  />
+                  <Field
+                    label="Client remark"
+                    value={
+                      (() => {
+                        const latestRemark =
+                          customer.clientRemark ||
+                          customer.rawCustomer?.clientRemark ||
+                          (clientRemarkEntries.length > 0
+                            ? clientRemarkEntries[0]?.remark?.reply || clientRemarkEntries[0]?.remark?.remark
+                            : null)
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {latestRemark || 'No client remark'}
+                            </span>
+                            <button
+                              type="button"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#be185d',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                flexShrink: 0,
+                              }}
+                              onClick={() => setActiveTab('remarks')}
+                            >
+                              View all ({clientRemarkEntries.length})
+                            </button>
+                          </div>
+                        )
+                      })()
+                    }
+                    full
                   />
                   <Field
                     label="Amount paid"
@@ -2684,27 +2771,61 @@ export function CustomersListModal({
                               {STATUS_LABEL[status]}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            className="cl-drawer__outline-btn"
-                            onClick={() => {
-                              const matched = allBusinesses.find(
-                                (b) => String(b.id) === dupId,
-                              )
-                              if (matched) {
-                                setActiveCustomer(matched as any)
-                                setActiveTab('overview')
-                              }
-                            }}
-                          >
-                            <Icon
-                              name="eye"
-                              d={EXTERNAL_ICON}
-                              size={13}
-                              strokeWidth={2}
-                            />
-                            {isCurrentlyActive ? 'Viewing now' : 'View details'}
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="cl-drawer__outline-btn"
+                              style={{
+                                color: '#2563eb',
+                                borderColor: '#bfdbfe',
+                                backgroundColor: '#eff6ff',
+                              }}
+                              title="Open editable form for this business in new tab"
+                              onClick={() => {
+                                const url = getCustomerFormUrl(phone, true, dupId)
+                                if (url) {
+                                  window.open(url, '_blank')
+                                } else if (onOpenFullPage) {
+                                  onOpenFullPage({
+                                    ...customer,
+                                    id: dupId,
+                                    phone,
+                                    hasDuplicateCustomer: true,
+                                  })
+                                }
+                              }}
+                            >
+                              <Icon
+                                name="eye"
+                                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6"
+                                size={13}
+                                strokeWidth={2}
+                              />
+                              Edit Form
+                            </button>
+
+                            <button
+                              type="button"
+                              className="cl-drawer__outline-btn"
+                              onClick={() => {
+                                const matched = allBusinesses.find(
+                                  (b) => String(b.id) === dupId,
+                                )
+                                if (matched) {
+                                  setActiveCustomer(matched as any)
+                                  setActiveTab('overview')
+                                }
+                              }}
+                            >
+                              <Icon
+                                name="eye"
+                                d={EXTERNAL_ICON}
+                                size={13}
+                                strokeWidth={2}
+                              />
+                              {isCurrentlyActive ? 'Viewing now' : 'View details'}
+                            </button>
+                          </div>
                         </div>
 
                         <h4 className="cl-drawer__dup-card-name">{name}</h4>

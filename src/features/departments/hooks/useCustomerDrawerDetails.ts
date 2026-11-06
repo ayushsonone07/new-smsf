@@ -13,6 +13,9 @@ import type { CustomerDrawerApiDetails } from '../../../api/customer-drawer.api'
 import type { OnboardingCustomer } from '../../../components/head/customers-list/CustomersList'
 import { getSession } from '../../../app/auth/session'
 
+// Saving a remark refreshes these at once; this only spares repeat opens of the same customer.
+const DRAWER_REMARKS_STALE_MS = 30_000
+
 export function useCustomerDrawerDetails(
   customer: OnboardingCustomer | null,
   options: {
@@ -56,21 +59,21 @@ export function useCustomerDrawerDetails(
       !profileOnly &&
       !isSuperAdmin &&
       customerDepartment.length > 0,
-    staleTime: 0,
+    staleTime: DRAWER_REMARKS_STALE_MS,
   })
 
   const remarksQuery = useQuery({
     queryKey: ['customer-drawer-remarks', customerId, customerDepartment, options.requestUsername],
     queryFn: () => getCustomerRemarks(customerId, customerDepartment, options.requestUsername),
     enabled: isOpen && hasCustomerId && !profileOnly && !isSuperAdmin,
-    staleTime: 0,
+    staleTime: DRAWER_REMARKS_STALE_MS,
   })
 
   const internalRemarksQuery = useQuery({
     queryKey: ['customer-drawer-internal-remarks', customerId, customerDepartment, options.requestUsername],
     queryFn: () => getCustomerInternalRemarks(customerId, customerDepartment, options.requestUsername),
     enabled: isOpen && hasCustomerId && !profileOnly && !isSuperAdmin,
-    staleTime: 0,
+    staleTime: DRAWER_REMARKS_STALE_MS,
   })
 
   const superAdminRemarksQuery = useQuery({

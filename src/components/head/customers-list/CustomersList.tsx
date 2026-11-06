@@ -66,6 +66,9 @@ export interface OnboardingCustomer {
   subServiceInfo?: any[]
   flowSteps?: any[]
   rawCustomer?: any
+  serviceExpiration?: string
+  clientRemark?: string
+  createdAt?: string
 }
 
 export interface CustomersListProps {
@@ -1413,20 +1416,28 @@ function CustomerRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {subServicesList.slice(0, 2).map((sub, sIdx) => {
               const st = (sub.status || 'PENDING').toUpperCase().replace(/-/g, '_')
-              const isCompleted = st === 'COMPLETED'
-              const isInProgress = st === 'IN_PROGRESS' || st === 'INPROGRESS'
+              const isCompleted = st === 'COMPLETED' || st === 'COMPLETE'
+              const isWaitingAck =
+                st.includes('ACK') ||
+                st === 'PENDING_CUSTOMER_ACK' ||
+                st === 'ACKNOWLEDGEMENT_PENDING' ||
+                st === 'WAITING_ACK' ||
+                st.includes('WAITING')
+              const isInProgress = st === 'IN_PROGRESS' || st === 'INPROGRESS' || st.includes('PROGRESS')
 
               const badgeColors = isCompleted
-                ? { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', icon: 'check' as const }
-                : isInProgress
-                  ? { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', icon: 'clock' as const }
-                  : { bg: '#fffbeb', color: '#b45309', border: '#fde68a', icon: 'alert' as const }
+                ? { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', icon: 'check' as const, cls: 'cl-service-pill--completed' }
+                : isWaitingAck
+                  ? { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff', icon: 'clock' as const, cls: 'cl-service-pill--waiting-ack' }
+                  : isInProgress
+                    ? { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', icon: 'clock' as const, cls: 'cl-service-pill--in-progress' }
+                    : { bg: '#fffbeb', color: '#b45309', border: '#fde68a', icon: 'alert' as const, cls: 'cl-service-pill--pending' }
 
               return (
                 <button
                   key={`${sub.name}-${sIdx}`}
                   type="button"
-                  className="cl-service-type-badge"
+                  className={`cl-service-type-badge ${badgeColors.cls}`}
                   onClick={() => onOpenServiceFlow?.(sub.name)}
                   title={`View sub-service flow for ${sub.name}`}
                   style={{

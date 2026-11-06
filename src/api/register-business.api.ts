@@ -168,27 +168,46 @@ export interface VerifyPaymentResult {
   data?: VerifiedPayment
 }
 
+export interface FetchEarlierPaymentsParams {
+  phoneNumber?: string
+  customerEmail?: string
+}
+
+export interface VerifyPaymentParams {
+  phoneNumber?: string
+  customerEmail?: string
+}
+
 /**
- * Verifies a payment ID against a phone number and returns what is left of it.
+ * Verifies a payment ID against a phone number and/or email and returns what is left of it.
  * `POST /api/payment/verify`. A fully used payment fails, with its usage in `data`.
  */
 export async function verifyPayment(
-  phoneNumber: string,
+  contactOrParams: string | VerifyPaymentParams,
   paymentId: string,
   options?: {
     /** Encrypted reference from {@link fetchEarlierPayments}, sent instead of the ID. */
     paymentRef?: string
   },
 ): Promise<VerifyPaymentResult> {
+  const body: Record<string, string> = {}
+  if (typeof contactOrParams === 'string') {
+    if (contactOrParams) body.phoneNumber = contactOrParams
+  } else {
+    if (contactOrParams.phoneNumber) body.phoneNumber = contactOrParams.phoneNumber
+    if (contactOrParams.customerEmail) body.customerEmail = contactOrParams.customerEmail
+  }
+  if (options?.paymentRef) {
+    body.paymentRef = options.paymentRef
+  } else {
+    body.paymentId = paymentId
+  }
+
   const response = await apiRequest<CustomApiResponse<VerifiedPayment>>(
     '/api/payment/verify',
     {
       method: 'POST',
-      body: JSON.stringify(
-        options?.paymentRef
-          ? { phoneNumber, paymentRef: options.paymentRef }
-          : { phoneNumber, paymentId },
-      ),
+      body: JSON.stringify(body),
     },
   )
 
@@ -199,9 +218,9 @@ export async function verifyPayment(
   }
 }
 
-/** An earlier payment from a phone number; its real ID is never sent to the browser. */
+/** An earlier payment from a contact/email; its real ID is never sent to the browser. */
 export interface EarlierPayment {
-  /** Encrypted, phone-bound reference accepted by verify and register. */
+  /** Encrypted, contact/email-bound reference accepted by verify and register. */
   paymentRef: string
   /** e.g. "pay_****XyZ1". */
   maskedPaymentId: string
@@ -213,20 +232,27 @@ export interface EarlierPayment {
 }
 
 /**
- * Earlier payments made from a phone number, with what is left on each — so a new
+ * Earlier payments made from a phone number and/or email, with what is left on each — so a new
  * business can be registered without knowing the old payment ID.
  * `POST /api/payment/customer-payments` (public; IDs are masked).
  */
 export async function fetchEarlierPayments(
-  phoneNumber: string,
+  contactOrParams: string | FetchEarlierPaymentsParams,
 ): Promise<EarlierPayment[]> {
   // Only a convenience: if the lookup is unavailable, the payment ID can still be typed.
   try {
+    const body: Record<string, string> = {}
+    if (typeof contactOrParams === 'string') {
+      if (contactOrParams) body.phoneNumber = contactOrParams
+    } else {
+      if (contactOrParams.phoneNumber) body.phoneNumber = contactOrParams.phoneNumber
+      if (contactOrParams.customerEmail) body.customerEmail = contactOrParams.customerEmail
+    }
     const response = await apiRequest<CustomApiResponse<EarlierPayment[]>>(
       '/api/payment/customer-payments',
       {
         method: 'POST',
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify(body),
       },
       true,
     )

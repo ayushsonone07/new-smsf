@@ -127,6 +127,7 @@ export function CustomerListPage() {
   const [size, setSize] = useState(10)
   const [localAssigneeMap, setLocalAssigneeMap] = useState<Record<string, string | null>>({})
   const [localStatusMap, setLocalStatusMap] = useState<Record<string, OnboardingStatus>>({})
+  const [localSubServiceMap, setLocalSubServiceMap] = useState<Record<string, Record<string, string>>>({})
   const [confirmingCustomer, setConfirmingCustomer] = useState<OnboardingCustomer | null>(null)
   const [validationModal, setValidationModal] = useState<{
     open: boolean
@@ -366,7 +367,7 @@ export function CustomerListPage() {
   const onboardingApiQuery = useOnboardingCustomersList({
     page,
     size,
-    searchParam: search || undefined,
+    searchParam: debouncedSearch.trim() || undefined,
     startDate: dateFrom || undefined,
     endDate: dateTo || undefined,
     status:
@@ -387,7 +388,7 @@ export function CustomerListPage() {
   const rowsParams = {
     page,
     size,
-    searchParam: search || undefined,
+    searchParam: debouncedSearch.trim() || undefined,
     statusFilter:
       activeTab === 'all'
         ? undefined
@@ -490,7 +491,21 @@ export function CustomerListPage() {
           parentBusinessName: (c as any).parentBusinessName ?? (c.customerDetails as any)?.parentBusinessName ?? null,
           isLinkedBusiness: Boolean((c as any).isLinkedBusiness ?? (c.customerDetails as any)?.isLinkedBusiness ?? (c as any).parentCustomerId),
           serviceTags: extractServiceTags(c),
-          subServiceInfo: c.subServices || (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo,
+          subServiceInfo: (() => {
+            const baseSub = c.subServices || (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo
+            const overrides = localSubServiceMap[id]
+            if (!overrides || !Array.isArray(baseSub)) return baseSub
+            return baseSub.map((sub: any) => {
+              const name = sub?.name || sub?.subServiceName || (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : String(sub))
+              const match = Object.entries(overrides).find(([k]) => k.trim().toLowerCase() === name.trim().toLowerCase())
+              if (match) {
+                return typeof sub === 'object' && sub !== null && ('name' in sub || 'subServiceName' in sub)
+                  ? { ...sub, status: match[1], subServiceStatus: match[1] }
+                  : { [name]: match[1] }
+              }
+              return sub
+            })
+          })(),
           services: (c as any).services || [],
           serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
           rawCustomer: c,
@@ -556,6 +571,21 @@ export function CustomerListPage() {
           parentBusinessName: (c as any).parentBusinessName ?? (c.customerDetails as any)?.parentBusinessName ?? null,
           isLinkedBusiness: Boolean((c as any).isLinkedBusiness ?? (c.customerDetails as any)?.isLinkedBusiness ?? (c as any).parentCustomerId),
           serviceTags: extractServiceTags(c),
+          subServiceInfo: (() => {
+            const baseSub = (c as any).subServices || (c as any).subServiceInfo || (c.customerDetails as any)?.subServiceInfo
+            const overrides = localSubServiceMap[id]
+            if (!overrides || !Array.isArray(baseSub)) return baseSub
+            return baseSub.map((sub: any) => {
+              const name = sub?.name || sub?.subServiceName || (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : String(sub))
+              const match = Object.entries(overrides).find(([k]) => k.trim().toLowerCase() === name.trim().toLowerCase())
+              if (match) {
+                return typeof sub === 'object' && sub !== null && ('name' in sub || 'subServiceName' in sub)
+                  ? { ...sub, status: match[1], subServiceStatus: match[1] }
+                  : { [name]: match[1] }
+              }
+              return sub
+            })
+          })(),
           rawCustomer: c,
         }
       })
@@ -602,6 +632,7 @@ export function CustomerListPage() {
     customersQuery.data,
     localAssigneeMap,
     localStatusMap,
+    localSubServiceMap,
     page,
     size,
   ])
@@ -758,6 +789,7 @@ export function CustomerListPage() {
     if (listResult.isSuccess) {
       setLocalStatusMap({})
       setLocalAssigneeMap({})
+      setLocalSubServiceMap({})
     }
   }
 
@@ -973,6 +1005,93 @@ export function CustomerListPage() {
     updateMutation.mutate({ id, data: patch })
   }
 
+  // Update one sub-service status optimistically in UI & cache (0ms instant update, no full list refetch).
+  function updateCachedSubServiceStatus(newStatus: string, subServiceName?: string) {
+    if (!serviceFlowCustomer) return
+    const custId = String(serviceFlowCustomer.id)
+
+    // 1. Optimistic local state override for instant UI badge update
+    setLocalSubServiceMap((prev) => {
+      const current = prev[custId] || {}
+      return {
+        ...prev,
+        [custId]: {
+          ...current,
+          ...(subServiceName ? { [subServiceName]: newStatus } : {}),
+        },
+      }
+    })
+
+    // 2. Also update serviceFlowCustomer so the open modal stays in sync
+    setServiceFlowCustomer((prev) => {
+      if (!prev) return prev
+      const prevSub = Array.isArray(prev.subServiceInfo) ? [...prev.subServiceInfo] : []
+      const updatedSub = prevSub.map((sub: any) => {
+        const name = sub?.name || sub?.subServiceName || (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : String(sub))
+        if (!subServiceName || name.trim().toLowerCase() === subServiceName.trim().toLowerCase()) {
+          return typeof sub === 'object' && sub !== null && ('name' in sub || 'subServiceName' in sub)
+            ? { ...sub, status: newStatus, subServiceStatus: newStatus }
+            : { [name]: newStatus }
+        }
+        return sub
+      })
+      return {
+        ...prev,
+        subServiceInfo: updatedSub,
+      }
+    })
+
+    // 3. Silently patch React Query cache entries (without triggering refetch or loading spinner)
+    const updateCustomerListInCache = (oldData: any) => {
+      if (!oldData) return oldData
+      const listKey = Array.isArray(oldData.customers)
+        ? 'customers'
+        : Array.isArray(oldData.data)
+          ? 'data'
+          : Array.isArray(oldData.content)
+            ? 'content'
+            : Array.isArray(oldData)
+              ? 'SELF'
+              : null
+      if (!listKey) return oldData
+
+      const updateList = (list: any[]) =>
+        list.map((c: any) => {
+          const id = String(c.id ?? c.customerId ?? '')
+          if (id !== custId) return c
+          const baseSub = c.subServices || c.subServiceInfo || (c.customerDetails as any)?.subServiceInfo
+          if (!Array.isArray(baseSub)) return c
+          const updatedSub = baseSub.map((sub: any) => {
+            const name = sub?.name || sub?.subServiceName || (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : String(sub))
+            if (!subServiceName || name.trim().toLowerCase() === subServiceName.trim().toLowerCase()) {
+              return typeof sub === 'object' && sub !== null && ('name' in sub || 'subServiceName' in sub)
+                ? { ...sub, status: newStatus, subServiceStatus: newStatus }
+                : { [name]: newStatus }
+            }
+            return sub
+          })
+          return {
+            ...c,
+            subServices: updatedSub,
+            subServiceInfo: updatedSub,
+          }
+        })
+
+      if (listKey === 'SELF') {
+        return updateList(oldData)
+      }
+      return {
+        ...oldData,
+        [listKey]: updateList(oldData[listKey]),
+      }
+    }
+
+    queryClient.setQueriesData({ queryKey: ['customer-list'] }, updateCustomerListInCache)
+    queryClient.setQueriesData({ queryKey: ['department-customer-rows'] }, updateCustomerListInCache)
+    queryClient.setQueriesData({ queryKey: ['onboarding-customers-list'] }, updateCustomerListInCache)
+    queryClient.setQueriesData({ queryKey: ['departmentCustomers'] }, updateCustomerListInCache)
+  }
+
   const showRoundRobinToggle = useRowsEndpoint && !isDeptUser && !isUser
 
   function handleConfirmRoundRobin() {
@@ -1135,6 +1254,16 @@ export function CustomerListPage() {
         canEditRemark={canEditRemark}
         departmentType={currentDepartment}
         initialTab={modalTab}
+        onOpenFullPage={(cust) => {
+          const isDup = Boolean(
+            cust.hasDuplicateCustomer ||
+            (cust.duplicateCount ?? 0) > 0 ||
+            (cust as any).isLinkedBusiness ||
+            (cust as any).parentCustomerId,
+          )
+          const url = getCustomerFormUrl(cust.phone, isDup, cust.id)
+          if (url) window.open(url, '_blank')
+        }}
         onBillUploaded={() => activeCustomerQuery.refetch()}
         onClose={() => {
           setSelectedCustomer(null)
@@ -1152,11 +1281,15 @@ export function CustomerListPage() {
         isEditable={canEditServiceType}
         departmentType={currentDepartment}
         initialSubServiceName={selectedSubServiceName}
-        onStepsUpdated={() => {
-          activeCustomerQuery.refetch()
+        onStepsUpdated={(steps, subName) => {
+          if (!subName || steps.length === 0) return
+          const done = steps.filter((s) => s.status.toUpperCase() === 'COMPLETED').length
+          const newStatus =
+            done === steps.length ? 'PENDING_CUSTOMER_ACK' : done > 0 ? 'IN_PROGRESS' : 'PENDING'
+          updateCachedSubServiceStatus(newStatus, subName)
         }}
-        onSubServiceStatusUpdated={() => {
-          activeCustomerQuery.refetch()
+        onSubServiceStatusUpdated={(newStatus, subName) => {
+          updateCachedSubServiceStatus(newStatus, subName)
         }}
       />
 
