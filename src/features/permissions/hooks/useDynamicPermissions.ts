@@ -30,6 +30,10 @@ import {
   type UpdateDynamicColumnPayload,
 } from '../../../api/dynamic-permission.api'
 
+// client.ts refetches these as soon as the backend reports a permission change.
+// This time limit is only the backstop if that signal is ever missed.
+const PERMISSIONS_STALE_MS = 5 * 60_000
+
 export function useDepartmentTypes(enabled = true) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'departments'],
@@ -57,7 +61,7 @@ export function useDynamicRoutes(departmentType?: string, enabled = true) {
     queryKey: ['dynamic-permissions', 'routes', departmentType],
     queryFn: () => getDynamicRoutes(departmentType),
     enabled: enabled && Boolean(departmentType),
-    staleTime: 60_000,
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 
@@ -65,8 +69,7 @@ export function useDynamicColumns(departmentType?: string) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'columns', departmentType],
     queryFn: () => getDynamicColumns(departmentType),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 
@@ -85,8 +88,7 @@ export function useUserDynamicPermissions(params?: {
   return useQuery({
     queryKey: ['dynamic-permissions', 'user-permissions', params?.username, params?.departmentType],
     queryFn: () => getUserDynamicPermissions(params),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 
@@ -176,8 +178,7 @@ export function useColumnsByRoute(routeId?: string, departmentType?: string) {
     queryKey: ['dynamic-permissions', 'route-columns', routeId, departmentType],
     queryFn: () => getColumnsByRoute(routeId!, departmentType),
     enabled: Boolean(routeId),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 
@@ -186,8 +187,7 @@ export function useMaxColumnsForRoute(routeId?: string, departmentType?: string)
     queryKey: ['dynamic-permissions', 'route-max-columns', routeId, departmentType],
     queryFn: () => getMaxColumnsForRoute(routeId!, departmentType),
     enabled: Boolean(routeId),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 
@@ -195,8 +195,7 @@ export function useRoutesColumnsSummary(departmentType?: string) {
   return useQuery({
     queryKey: ['dynamic-permissions', 'routes-columns-summary', departmentType],
     queryFn: () => getRoutesColumnsSummary(departmentType),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: PERMISSIONS_STALE_MS,
   })
 }
 

@@ -264,6 +264,17 @@ describe('autowebisionHelpers', () => {
 
       expect(getWebsiteServiceStatus(customer)).toBe('PENDING')
     })
+
+    it('returns PENDING and does not default to COMPLETED when websiteServices are absent, even if mainStatus is COMPLETED', () => {
+      const customer: AutowebsionCustomerLightDTO = {
+        customerId: 23,
+        mainStatus: 'COMPLETED',
+        services: [],
+      }
+
+      expect(getWebsiteServiceStatus(customer)).toBe('PENDING')
+      expect(getServicePillStatus(customer, 'WEBSITE')).toBe('PENDING')
+    })
   })
 
   describe('Automation status calculation (getAutomationServiceStatus)', () => {
@@ -283,6 +294,17 @@ describe('autowebisionHelpers', () => {
       }
 
       expect(getAutomationServiceStatus(customer)).toBe('IN_PROGRESS')
+    })
+
+    it('returns PENDING and does not default to COMPLETED when automationServices are absent, even if mainStatus is COMPLETED', () => {
+      const customer: AutowebsionCustomerLightDTO = {
+        customerId: 32,
+        mainStatus: 'COMPLETED',
+        services: [],
+      }
+
+      expect(getAutomationServiceStatus(customer)).toBe('PENDING')
+      expect(getServicePillStatus(customer, 'AUTOMATION')).toBe('PENDING')
     })
   })
 
