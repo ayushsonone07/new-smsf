@@ -4,6 +4,7 @@ import {
   Bell,
   CheckCircle2,
   Edit3,
+  Eye,
   Loader2,
   Pin,
   Plus,
@@ -54,6 +55,7 @@ export function AnnouncementsPage() {
   const [active, setActive] = useState<boolean | "">("");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Announcement | null>(null);
+  const [viewing, setViewing] = useState<Announcement | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [toDelete, setToDelete] = useState<Announcement | null>(null);
 
@@ -221,6 +223,7 @@ export function AnnouncementsPage() {
             records={records}
             canManage={canManage}
             pending={deleteAnnouncement.isPending || updateAnnouncement.isPending}
+            onView={setViewing}
             onEdit={openEdit}
             onDelete={handleDelete}
             onToggleActive={toggleActive}
@@ -230,6 +233,12 @@ export function AnnouncementsPage() {
       </Card>
 
       <AnnouncementDialog open={showDialog} announcement={editing} onClose={() => setShowDialog(false)} />
+      <ViewAnnouncementDialog
+        announcement={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={openEdit}
+        canManage={canManage}
+      />
       <ConfirmDialog
         open={Boolean(toDelete)}
         title="Delete announcement"
@@ -271,6 +280,7 @@ function AnnouncementList({
   records,
   canManage,
   pending,
+  onView,
   onEdit,
   onDelete,
   onToggleActive,
@@ -279,6 +289,7 @@ function AnnouncementList({
   records: Announcement[];
   canManage: boolean;
   pending: boolean;
+  onView: (announcement: Announcement) => void;
   onEdit: (announcement: Announcement) => void;
   onDelete: (announcement: Announcement) => void;
   onToggleActive: (announcement: Announcement) => void;
@@ -294,17 +305,22 @@ function AnnouncementList({
             <th className="px-4 py-3">Audience</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Posted</th>
-            {canManage ? <th className="px-4 py-3 text-right">Actions</th> : null}
+            <th className="px-4 py-3 text-right">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {records.map((announcement) => (
             <tr key={announcement.id} className="transition-colors hover:bg-surface-hover">
               <td className="px-4 py-3">
-                <p className="flex items-center gap-2 font-semibold text-card-foreground">
+                <button
+                  type="button"
+                  onClick={() => onView(announcement)}
+                  className="group flex items-center gap-2 font-semibold text-card-foreground text-left hover:text-primary transition-colors cursor-pointer"
+                  title="Click to view details"
+                >
                   {announcement.pinned ? <Pin size={14} className="shrink-0 text-primary" /> : null}
-                  {announcement.title}
-                </p>
+                  <span className="group-hover:underline">{announcement.title}</span>
+                </button>
                 {announcement.content ? (
                   <p className="mt-1 max-w-[480px] truncate text-xs text-muted-foreground">
                     {announcement.content}
@@ -328,45 +344,60 @@ function AnnouncementList({
               <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                 {announcement.createdAt ? formatDate(announcement.createdAt) : "-"}
               </td>
-              {canManage ? (
-                <td className="whitespace-nowrap px-4 py-3 text-right">
-                  <div className="inline-flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onTogglePinned(announcement)}
-                      disabled={pending}
-                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-card-foreground shadow hover:bg-muted disabled:opacity-60"
-                    >
-                      {announcement.pinned ? "Unpin" : "Pin"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onToggleActive(announcement)}
-                      disabled={pending}
-                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-card-foreground shadow hover:bg-muted disabled:opacity-60"
-                    >
-                      {announcement.active ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEdit(announcement)}
-                      className="rounded-lg border border-primary/30 bg-primary-soft p-1.5 text-primary hover:bg-primary-soft/80"
-                      aria-label="Edit announcement"
-                    >
-                      <Edit3 size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(announcement)}
-                      disabled={pending}
-                      className="rounded-lg border border-danger/30 bg-danger-soft p-1.5 text-danger hover:bg-danger-soft/80 disabled:opacity-60"
-                      aria-label="Delete announcement"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </td>
-              ) : null}
+              <td className="whitespace-nowrap px-4 py-3 text-right">
+                <div className="inline-flex items-center gap-1.5 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onView(announcement)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-card-foreground shadow hover:border-primary/40 hover:bg-primary-soft hover:text-primary transition-all"
+                    title="View announcement details"
+                  >
+                    <Eye size={13} />
+                    <span>View</span>
+                  </button>
+                  {canManage ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onTogglePinned(announcement)}
+                        disabled={pending}
+                        className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-card-foreground shadow hover:bg-muted disabled:opacity-60 cursor-pointer"
+                        title={announcement.pinned ? "Unpin announcement" : "Pin announcement"}
+                      >
+                        {announcement.pinned ? "Unpin" : "Pin"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onToggleActive(announcement)}
+                        disabled={pending}
+                        className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-card-foreground shadow hover:bg-muted disabled:opacity-60 cursor-pointer"
+                        title={announcement.active ? "Deactivate announcement" : "Activate announcement"}
+                      >
+                        {announcement.active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(announcement)}
+                        className="rounded-lg border border-primary/30 bg-primary-soft p-1.5 text-primary hover:bg-primary-soft/80 cursor-pointer"
+                        aria-label="Edit announcement"
+                        title="Edit announcement"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(announcement)}
+                        disabled={pending}
+                        className="rounded-lg border border-danger/30 bg-danger-soft p-1.5 text-danger hover:bg-danger-soft/80 disabled:opacity-60 cursor-pointer"
+                        aria-label="Delete announcement"
+                        title="Delete announcement"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -547,6 +578,93 @@ function AnnouncementDialog({
           </button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+function ViewAnnouncementDialog({
+  announcement,
+  onClose,
+  onEdit,
+  canManage,
+}: {
+  announcement: Announcement | null;
+  onClose: () => void;
+  onEdit: (announcement: Announcement) => void;
+  canManage: boolean;
+}) {
+  if (!announcement) return null;
+
+  return (
+    <Dialog
+      open={Boolean(announcement)}
+      onClose={onClose}
+      title={announcement.title}
+      description={`Posted on ${announcement.createdAt ? formatDate(announcement.createdAt) : "-"}`}
+      size="lg"
+    >
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AnnouncementTypeBadge type={announcement.type} />
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              announcement.active
+                ? "border-success/30 bg-success-soft text-success"
+                : "border-border bg-surface-muted text-muted-foreground"
+            }`}
+          >
+            {announcement.active ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+            {announcement.active ? "Active" : "Inactive"}
+          </span>
+          {announcement.pinned ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
+              <Pin size={12} />
+              Pinned
+            </span>
+          ) : null}
+          <span className="ml-auto text-xs text-muted-foreground">
+            Audience: <strong className="font-semibold text-card-foreground">{announcement.targetAudience || "Everyone"}</strong>
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Announcement Content
+          </p>
+          {announcement.content ? (
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
+              {announcement.content}
+            </div>
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              No detailed content provided for this announcement.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEdit(announcement);
+              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-primary/30 bg-primary-soft px-4 py-2 text-sm font-semibold text-primary hover:bg-primary-soft/80 transition-all"
+            >
+              <Edit3 size={15} />
+              <span>Edit</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground shadow hover:bg-surface-hover transition-all"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </Dialog>
   );
 }

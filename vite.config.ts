@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => {
     plugins: [tailwindcss(), react()],
     envPrefix: ['VITE_', 'REGISTRATION_', 'HELP_CENTER_'],
     server: {
+      allowedHosts: [
+        'monitor-safeguard-amino.ngrok-free.dev',
+        '.ngrok-free.dev',
+        '.ngrok-free.app',
+        '.ngrok.io',
+      ],
       proxy: {
         // HRM backend proxy — /hrm-api/* → http://localhost:9096/*
         '/hrm-api': {
