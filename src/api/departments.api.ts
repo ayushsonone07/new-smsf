@@ -31,6 +31,12 @@ interface BackendDepartmentUserDTO {
   createdAt?: string
 }
 
+export interface DepartmentServiceStatus {
+  departmentType: string
+  serviceType: string
+  isActive: boolean
+}
+
 interface CustomPageResponse<T> {
   success: boolean
   message: string
@@ -69,15 +75,21 @@ function getAdminUsername(): string {
   return session?.user?.email || session?.user?.username || ''
 }
 
-function mapBackendToDepartment(dto: BackendDepartmentUserDTO): Department {
+function mapBackendToDepartment(
+  dto: BackendDepartmentUserDTO,
+  statusByDepartment?: ReadonlyMap<string, boolean>,
+): Department {
+  const departmentType = dto.departmentType || ''
   return {
     id: String(dto.departmentId ?? dto.id ?? dto.email),
     name: dto.username || dto.email,
-    type: dto.departmentType as Department['type'],
+    type: departmentType as Department['type'],
     username: dto.username,
     email: dto.email,
     contact: dto.contact,
-    status: dto.isHead ? 'ACTIVE' : 'ACTIVE',
+    status: statusByDepartment?.get(departmentType.toUpperCase()) === false
+      ? 'INACTIVE'
+      : 'ACTIVE',
     createdAt: dto.createdAt || new Date().toISOString(),
     role: dto.role || 'DEPARTMENT_HEAD',
   }
@@ -111,17 +123,56 @@ export async function getDepartments(
   const endpoint = `/api/auth/admin/departments${queryString ? `?${queryString}` : ''}`
   const adminUsername = getAdminUsername()
 
-  const response = await authedApiRequest<
-    CustomPageResponse<BackendDepartmentUserDTO>
-  >(endpoint, {
-    headers: adminUsername ? { username: adminUsername } : undefined,
-  })
+  const [response, serviceStatuses] = await Promise.all([
+    authedApiRequest<CustomPageResponse<BackendDepartmentUserDTO>>(endpoint, {
+      headers: adminUsername ? { username: adminUsername } : undefined,
+    }),
+    getDepartmentServiceStatuses().catch(() => []),
+  ])
 
   if (!response.success || !response.data) {
     return []
   }
 
-  return response.data.map(mapBackendToDepartment)
+  const groupedStatuses = new Map<string, boolean>()
+  for (const item of serviceStatuses) {
+    const key = item.departmentType.toUpperCase()
+    groupedStatuses.set(key, (groupedStatuses.get(key) ?? true) && item.isActive)
+  }
+
+  return response.data.map((dto) => mapBackendToDepartment(dto, groupedStatuses))
+}
+
+export async function getDepartmentServiceStatuses(): Promise<DepartmentServiceStatus[]> {
+  const response = await authedApiRequest<CustomApiResponse<Array<{
+    departmentType?: string
+    serviceType?: string
+    isActive?: boolean
+  }>>>('/api/auth/departments/services')
+
+  return (response.data ?? [])
+    .filter((item) => item.departmentType && item.serviceType)
+    .map((item) => ({
+      departmentType: item.departmentType!,
+      serviceType: item.serviceType!,
+      isActive: item.isActive !== false,
+    }))
+}
+
+export async function updateDepartmentStatus(
+  departmentType: string,
+  active: boolean,
+): Promise<void> {
+  const response = await authedApiRequest<CustomApiResponse<unknown>>(
+    '/api/auth/admin/departments/status',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ departmentType, active }),
+    },
+  )
+  if (response.success === false) {
+    throw new Error(response.message || 'Failed to update department status')
+  }
 }
 
 export async function createDepartment(
