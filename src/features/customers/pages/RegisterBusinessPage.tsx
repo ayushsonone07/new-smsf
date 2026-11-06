@@ -952,7 +952,7 @@ export function RegisterBusinessPage() {
     retry: false,
   })
   const earlierPayments = useMemo(
-    () => (canEnterPaymentId ? earlierPaymentsQuery.data ?? [] : []),
+    () => (canEnterPaymentId ? earlierPaymentsQuery.data?.payments ?? [] : []),
     [canEnterPaymentId, earlierPaymentsQuery.data],
   )
 
@@ -2700,6 +2700,15 @@ export function RegisterBusinessPage() {
                                 Looking for earlier payments from {hasValidPhone && hasValidEmail ? `${paymentPhone} / ${paymentEmail}` : hasValidPhone ? paymentPhone : paymentEmail}…
                               </p>
                             )}
+                            {canEnterPaymentId &&
+                              !earlierPaymentsQuery.isFetching &&
+                              !paymentVerified &&
+                              earlierPayments.length === 0 &&
+                              earlierPaymentsQuery.data?.emptyMessage && (
+                                <p className="mb-3 text-xs text-amber-700" role="status">
+                                  {earlierPaymentsQuery.data.emptyMessage}
+                                </p>
+                              )}
                             {earlierPayments.length > 0 && (
                               <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
                                 <p className="text-xs font-semibold text-slate-700">
