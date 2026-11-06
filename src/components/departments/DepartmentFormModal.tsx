@@ -14,6 +14,7 @@ import { useDepartmentTypes } from '../../features/permissions/hooks/useDynamicP
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { AddAdminServiceModal } from './AddAdminServiceModal'
+import { DepartmentServiceSelect } from './DepartmentServiceSelect'
 import {
   DepartmentForm,
   type DepartmentFormField,
@@ -595,9 +596,8 @@ export function DepartmentFormModal({
               </button>
             </div>
 
-            <select
-              id="service-department-select"
-              required
+            <DepartmentServiceSelect
+              options={serviceDropdownOptions}
               value={
                 selectedServiceKey ||
                 serviceDropdownOptions.find(
@@ -607,29 +607,11 @@ export function DepartmentFormModal({
                 )?.key ||
                 ''
               }
-              onChange={(e) => handleServiceOptionChange(e.target.value)}
-              disabled={isLoadingServices || isSubmitting}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#ffffff',
-                color: '#0f172a',
-                fontSize: '0.875rem',
-              }}
-            >
-              <option value="" disabled>
-                {isLoadingServices
-                  ? 'Loading services...'
-                  : 'Select a Service'}
-              </option>
-              {serviceDropdownOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={handleServiceOptionChange}
+              disabled={isSubmitting}
+              isLoading={isLoadingServices}
+              placeholder="Select a Service (Department Type)..."
+            />
 
             {resolvedDepartmentType ? (
               <div
