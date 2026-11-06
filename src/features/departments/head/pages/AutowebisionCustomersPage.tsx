@@ -75,7 +75,25 @@ import {
   type OnboardingCustomer,
   type OnboardingStatus,
 } from '../../../../components/head/customers-list/CustomersList'
+import {
+  CustomersListFilters,
+  type CustomerTab,
+} from '../../../../components/head/customers-list/CustomersListFilters'
+import { CustomersListSearchBar } from '../../../../components/head/customers-list/CustomersListSearchBar'
+import '../../../../components/head/customers-list/CustomersList.css'
 import './AutowebisionCustomers.css'
+import {
+  getWebsiteServiceStatus,
+  getAutomationServiceStatus,
+  getSubServicesForCustomer,
+  checkSubServicesCompletion,
+  getServicePillStatus,
+  getStatusBadgeStyle,
+  getStatusSelectStyle,
+  getStatusIconColor,
+  formatStatusLabel,
+  getServicePillStyle,
+} from './autowebisionHelpers'
 
 function parseSafeDate(raw: any): Date | null {
   if (!raw) return null
@@ -103,15 +121,27 @@ export function AutowebisionCustomersPage({
   const session = getSession()
   const queryClient = useQueryClient()
   const userRole = (session?.user as any)?.role
+  const normalizedRole = (userRole ?? '').toUpperCase().replace(/^ROLE_/, '')
+  const isUserPath =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.toLowerCase().includes('/user') ||
+      window.location.pathname.toLowerCase().includes('-user') ||
+      window.location.pathname.toLowerCase().includes('departmentuser') ||
+      window.location.pathname.toLowerCase().includes('/users'))
+
+  const isHead =
+    normalizedRole.includes('HEAD') ||
+    (session?.user as any)?.isHead === true ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname.toLowerCase().includes('/head') ||
+        window.location.pathname.toLowerCase().includes('-head')))
+
   const isDepartmentUser =
-    userRole === 'USER' ||
-    userRole === 'DEPARTMENT_USER' ||
-    Boolean(
-      typeof window !== 'undefined' &&
-        (window.location.pathname.includes('/user/') ||
-          window.location.pathname.includes('-user') ||
-          window.location.pathname.includes('/users')),
-    )
+    !isHead &&
+    (normalizedRole === 'USER' ||
+      normalizedRole === 'DEPARTMENT_USER' ||
+      normalizedRole === 'DEPARTMENT USER' ||
+      Boolean(isUserPath))
   const userEmail = session?.user.email || session?.user.username || ''
 
   // Permissions must come from the department that owns the current route.
@@ -140,7 +170,12 @@ export function AutowebisionCustomersPage({
     permissionRouteName,
   )
 
-  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(defaultSubTab)
+  const [activeSubTab, setActiveSubTab] = useState<AutowebsionSubTab>(() => {
+    if (defaultSubTab && defaultSubTab !== 'ALL') return defaultSubTab
+    if (isWebsiteScreen) return 'WEBSITE'
+    if (isAutomationScreen) return 'AUTOMATION'
+    return 'ALL'
+  })
 
   const isIndexVisible = isColumnEnabled('Index') || isColumnEnabled('#')
   const isDateVisible = isColumnEnabled('Created') || isColumnEnabled('Date') || isColumnEnabled('Created Date')
@@ -162,23 +197,26 @@ export function AutowebisionCustomersPage({
     : !isDepartmentUser && (isColumnEnabled('Assigned To') || isColumnEnabled('Assign To') || isColumnEnabled('Assignee'))
   const isActionsVisible = isColumnEnabled('Actions') || isColumnEnabled('Action')
 
-  // Dynamic column permissions are authoritative. The legacy defaults below
-  // only apply until Admin configures the matching column for this route.
-  const canEditWebsiteExists = isColumnConfigured('Website Exists')
-    ? canEditColumn('Website Exists')
-    : isDepartmentUser
-  const canEditStatus = isColumnConfigured('Status')
-    ? canEditColumn('Status')
-    : isDepartmentUser
+  // Dynamic column permissions are authoritative for Heads. Department users are
+  // the primary workers responsible for managing status and remarks.
+  const canEditWebsiteExists =
+    isDepartmentUser || (isColumnConfigured('Website Exists') ? canEditColumn('Website Exists') : false)
+  // Status dropdown & edit is strictly for Department Users only. Head accounts see read-only status pills.
+  const canEditStatus = !isHead && isDepartmentUser
   const canEditDraft =
     activeSubTab !== 'AUTOMATION' &&
-    (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : isDepartmentUser)
+    (isDepartmentUser || (isColumnConfigured('Draft Sent') ? canEditColumn('Draft Sent') : false))
   const canEditAssignee = isAssigneeConfigured
     ? canEditColumn('Assigned To')
     : !isDepartmentUser
-  const canEditServices = isColumnConfigured('Services')
-    ? canEditColumn('Services')
-    : isDepartmentUser
+  const canEditServices =
+    isDepartmentUser || (isColumnConfigured('Services') ? canEditColumn('Services') : false)
+  const canEditRemark =
+    isDepartmentUser || (
+      isColumnConfigured('Internal Remark') || isColumnConfigured('Remark')
+        ? canEditColumn('Internal Remark') || canEditColumn('Remark')
+        : false
+    )
   const [activeStatus, setActiveStatus] = useState<AutowebsionStatusFilter>('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -190,11 +228,17 @@ export function AutowebisionCustomersPage({
   const [size, setSize] = useState(10)
 
   useEffect(() => {
-    if (defaultSubTab) {
+    if (defaultSubTab && defaultSubTab !== 'ALL') {
       setActiveSubTab(defaultSubTab)
       setPage(0)
+    } else if (isWebsiteScreen) {
+      setActiveSubTab('WEBSITE')
+      setPage(0)
+    } else if (isAutomationScreen) {
+      setActiveSubTab('AUTOMATION')
+      setPage(0)
     }
-  }, [defaultSubTab])
+  }, [defaultSubTab, isWebsiteScreen, isAutomationScreen])
 
   // Customer whose client remarks are open, so the dialog's refresh button can reload them.
   const clientRemarkCustomerRef = useRef<AutowebsionCustomerLightDTO | null>(null)
@@ -266,9 +310,9 @@ export function AutowebisionCustomersPage({
   const handleOpenClientRemarkDialog = useCallback(
     async (customer: AutowebsionCustomerLightDTO) => {
       const targetDept: 'WEBSITE_DEPARTMENT' | 'AUTOMATION_DEPARTMENT' =
-        activeSubTab === 'AUTOMATION' || isAutomationScreen
+        activeSubTab === 'AUTOMATION'
           ? 'AUTOMATION_DEPARTMENT'
-          : activeSubTab === 'WEBSITE' || isWebsiteScreen
+          : activeSubTab === 'WEBSITE'
             ? 'WEBSITE_DEPARTMENT'
             : (customer.serviceTypes?.some((s: string) => s.toUpperCase().includes('AUTOMATION'))
                 ? 'AUTOMATION_DEPARTMENT'
@@ -297,6 +341,7 @@ export function AutowebisionCustomersPage({
 
   // Modals state
   const [selectedCustomer, setSelectedCustomer] = useState<OnboardingCustomer | null>(null)
+  const [modalTab, setModalTab] = useState<'overview' | 'duplicates' | undefined>(undefined)
   const [serviceFlowTarget, setServiceFlowTarget] = useState<{
     customer: OnboardingCustomer
     serviceType: 'WEBSITE' | 'AUTOMATION'
@@ -531,65 +576,6 @@ export function AutowebisionCustomersPage({
     return counts.all
   }, [countsQuery.data, activeSubTab, customersQuery.data?.totalElements])
 
-  // Helper to compute website status according to user specification:
-  // "is me Website ke do status aate hai to seniro maintain karna jab dono complete ho tabi complete show karna vana pending ya in progress ok"
-  function getWebsiteServiceStatus(c: AutowebsionCustomerLightDTO): string {
-    const services = Array.isArray(c.services) ? c.services : []
-    const websiteServices = services.filter((s: any) => {
-      const st = String(s?.serviceType || '').toUpperCase()
-      return st.includes('WEB')
-    })
-
-    if (websiteServices.length > 0) {
-      const statuses = websiteServices.map((s: any) =>
-        String(s?.status || 'PENDING').toUpperCase().replace(/-/g, '_'),
-      )
-      const allCompleted = statuses.every((st) => st.includes('COMPLETE'))
-      if (allCompleted) return 'COMPLETED'
-
-      const anyStarted = statuses.some((st) => st.includes('PROGRESS') || st.includes('COMPLETE'))
-      if (anyStarted) return 'IN_PROGRESS'
-
-      return 'PENDING'
-    }
-
-    const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
-    return fallback.includes('COMPLETE')
-      ? 'COMPLETED'
-      : fallback.includes('PROGRESS')
-        ? 'IN_PROGRESS'
-        : 'PENDING'
-  }
-
-  // Helper to compute automation status
-  function getAutomationServiceStatus(c: AutowebsionCustomerLightDTO): string {
-    const services = Array.isArray(c.services) ? c.services : []
-    const autoServices = services.filter((s: any) => {
-      const st = String(s?.serviceType || '').toUpperCase()
-      return st.includes('AUTO')
-    })
-
-    if (autoServices.length > 0) {
-      const statuses = autoServices.map((s: any) =>
-        String(s?.status || 'PENDING').toUpperCase().replace(/-/g, '_'),
-      )
-      const allCompleted = statuses.every((st) => st.includes('COMPLETE'))
-      if (allCompleted) return 'COMPLETED'
-
-      const anyStarted = statuses.some((st) => st.includes('PROGRESS') || st.includes('COMPLETE'))
-      if (anyStarted) return 'IN_PROGRESS'
-
-      return 'PENDING'
-    }
-
-    const fallback = String(c.mainStatus || 'PENDING').toUpperCase().replace(/-/g, '_')
-    return fallback.includes('COMPLETE')
-      ? 'COMPLETED'
-      : fallback.includes('PROGRESS')
-        ? 'IN_PROGRESS'
-        : 'PENDING'
-  }
-
   // Update one sub-service status in the cached customer list (no refetch).
   function updateCachedSubServiceStatus(newStatus: string, subServiceName?: string) {
     if (!serviceFlowTarget?.customer) return
@@ -598,10 +584,17 @@ export function AutowebisionCustomersPage({
     queryClient.setQueriesData(
       { queryKey: ['autowebisionCustomers'] },
       (oldData: any) => {
-        if (!oldData || !Array.isArray(oldData.content)) return oldData
+        if (!oldData) return oldData
+        const listKey = Array.isArray(oldData.data)
+          ? 'data'
+          : Array.isArray(oldData.content)
+            ? 'content'
+            : null
+        if (!listKey) return oldData
+
         return {
           ...oldData,
-          content: oldData.content.map((c: AutowebsionCustomerLightDTO) => {
+          [listKey]: oldData[listKey].map((c: AutowebsionCustomerLightDTO) => {
             if (c.customerId !== targetCustomerId) return c
 
             const prevSubList = Array.isArray(c.subServiceInfo) ? [...c.subServiceInfo] : []
@@ -654,193 +647,6 @@ export function AutowebisionCustomersPage({
     )
   }
 
-  // Colour of the Website / Automation service pill. It follows ONLY the sub-services
-  // (completed from the Services column), never the main Status column:
-  // all sub-services done (completed / awaiting customer ack) -> COMPLETED,
-  // any started -> IN_PROGRESS, otherwise PENDING.
-  function getServicePillStatus(
-    c: AutowebsionCustomerLightDTO,
-    targetServiceType: 'WEBSITE' | 'AUTOMATION',
-  ): string {
-    const statuses = getSubServicesForCustomer(c, targetServiceType, false).map((s) =>
-      s.status.toUpperCase().replace(/-/g, '_'),
-    )
-    const isDone = (st: string) => st.includes('COMPLETE') || st.includes('ACK')
-    if (statuses.length > 0 && statuses.every(isDone)) return 'COMPLETED'
-    if (statuses.some((st) => isDone(st) || st.includes('PROGRESS'))) return 'IN_PROGRESS'
-    return 'PENDING'
-  }
-
-  // Status style helpers matching Screenshot 1 (Pending: #fff8eb, text: #b45309, border: border-amber-200/80)
-  function getStatusBadgeStyle(status: string): string {
-    const s = String(status || 'PENDING').toUpperCase()
-    if (s.includes('COMPLETE')) {
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
-    }
-    if (s.includes('PROGRESS')) {
-      return 'bg-blue-50 text-blue-700 border-blue-200/80'
-    }
-    return 'bg-[#fff8eb] text-[#b45309] border-amber-200/80'
-  }
-
-  function getStatusSelectStyle(status: string): string {
-    const s = String(status || 'PENDING').toUpperCase()
-    if (s.includes('COMPLETE')) {
-      return 'bg-emerald-50 text-emerald-700 border-emerald-300 focus:border-emerald-500'
-    }
-    if (s.includes('PROGRESS')) {
-      return 'bg-blue-50 text-blue-700 border-blue-300 focus:border-blue-500'
-    }
-    return 'bg-[#fff8eb] text-[#b45309] border-amber-300 focus:border-amber-500'
-  }
-
-  function getStatusIconColor(status: string): string {
-    const s = String(status || 'PENDING').toUpperCase()
-    if (s.includes('COMPLETE')) return 'text-emerald-600'
-    if (s.includes('PROGRESS')) return 'text-blue-600'
-    return 'text-amber-700'
-  }
-
-  function formatStatusLabel(status: string): string {
-    const s = String(status || 'PENDING').toUpperCase()
-    if (s.includes('COMPLETE')) return 'Completed'
-    if (s.includes('PROGRESS')) return 'In Progress'
-    return 'Pending'
-  }
-
-  function getServicePillStyle(status: string): { btnClass: string; iconClass: string } {
-    const s = String(status || 'PENDING').toUpperCase().replace(/-/g, '_')
-    if (s.includes('COMPLETE')) {
-      return {
-        btnClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100',
-        iconClass: 'text-emerald-600',
-      }
-    }
-    if (s.includes('PROGRESS')) {
-      return {
-        btnClass: 'bg-blue-50 text-blue-700 border-blue-200/80 hover:bg-blue-100',
-        iconClass: 'text-blue-600',
-      }
-    }
-    return {
-      btnClass: 'bg-[#fff8eb] text-[#b45309] border-amber-200/80 hover:bg-amber-100/70',
-      iconClass: 'text-amber-700',
-    }
-  }
-
-  // Helper to extract sub-services for a customer and service type
-  function getSubServicesForCustomer(
-    customer: AutowebsionCustomerLightDTO,
-    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
-    // false: do not fall back to the main service status when there is no sub-service info
-    useMainStatusFallback = true,
-  ): Array<{ name: string; status: string }> {
-    const list: Array<{ name: string; status: string }> = []
-
-    // 1. Check services array if specific service has subServiceInfo
-    if (Array.isArray(customer.services)) {
-      for (const s of customer.services) {
-        const st = String(s?.serviceType || '').toUpperCase()
-        const matchesTarget =
-          !targetServiceType ||
-          (targetServiceType === 'WEBSITE' && (st.includes('WEB') || st.includes('SITE'))) ||
-          (targetServiceType === 'AUTOMATION' && (st.includes('AUTO') || st.includes('BOT')))
-
-        if (matchesTarget && Array.isArray((s as any)?.subServiceInfo)) {
-          for (const sub of (s as any).subServiceInfo) {
-            const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-            const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING')
-            list.push({ name: String(name), status: String(status).toUpperCase() })
-          }
-        }
-      }
-    }
-
-    // 2. If no subServices found in services array, check customer.subServiceInfo
-    if (list.length === 0 && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-      for (const sub of customer.subServiceInfo) {
-        const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : String(sub))
-        const status = sub?.status || (typeof sub === 'object' ? Object.values(sub)[0] : 'PENDING')
-        const normName = String(name).toUpperCase()
-
-        // Filter appropriately if targetServiceType is given
-        if (targetServiceType === 'AUTOMATION') {
-          if (normName.includes('WEBSITE') || normName.includes('SEO') || normName.includes('DRAFT')) {
-            continue
-          }
-        } else if (targetServiceType === 'WEBSITE') {
-          if (normName.includes('BOT') || (normName.includes('AUTOMATION') && !normName.includes('WEB'))) {
-            continue
-          }
-        }
-
-        list.push({ name: String(name), status: String(status).toUpperCase() })
-      }
-    }
-
-    // 3. Fallback: if no subServices found at all, check customer.services array itself
-    if (useMainStatusFallback && list.length === 0 && Array.isArray(customer.services) && customer.services.length > 0) {
-      for (const s of customer.services) {
-        const st = String(s?.serviceType || '').toUpperCase()
-        const matchesTarget =
-          !targetServiceType ||
-          (targetServiceType === 'WEBSITE' && (st.includes('WEB') || st.includes('SITE'))) ||
-          (targetServiceType === 'AUTOMATION' && (st.includes('AUTO') || st.includes('BOT')))
-        if (matchesTarget) {
-          list.push({
-            name: s.serviceType || 'Service',
-            status: String(s.status || 'PENDING').toUpperCase(),
-          })
-        }
-      }
-    }
-
-    return list
-  }
-
-  // Helper to validate sub-service completion status
-  function checkSubServicesCompletion(
-    customer: AutowebsionCustomerLightDTO,
-    targetServiceType?: 'WEBSITE' | 'AUTOMATION',
-  ): {
-    subServices: Array<{ name: string; status: string }>
-    allCompleted: boolean
-    isWaitingAck: boolean
-    incompleteNames: string[]
-  } {
-    const subServices = getSubServicesForCustomer(customer, targetServiceType)
-
-    if (subServices.length === 0) {
-      return {
-        subServices: [],
-        allCompleted: true,
-        isWaitingAck: false,
-        incompleteNames: [],
-      }
-    }
-
-    const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
-    const isAck = (st: string) =>
-      st.includes('ACK') ||
-      st === 'PENDING_CUSTOMER_ACK' ||
-      st === 'ACKNOWLEDGEMENT_PENDING' ||
-      st === 'PENDING_ACK'
-
-    const incomplete = subServices.filter((s) => !isDone(s.status.toUpperCase()))
-    const allCompleted = incomplete.length === 0
-    const incompleteNames = incomplete.map((s) => s.name)
-
-    const hasUnfinished = incomplete.some((s) => !isAck(s.status.toUpperCase()))
-    const isWaitingAck = !allCompleted && !hasUnfinished && incomplete.some((s) => isAck(s.status.toUpperCase()))
-
-    return {
-      subServices,
-      allCompleted,
-      isWaitingAck,
-      incompleteNames,
-    }
-  }
-
   // Convert raw DTO to OnboardingCustomer for detail modal & subservice flow modal
   function toOnboardingCustomer(
     c: AutowebsionCustomerLightDTO,
@@ -874,6 +680,10 @@ export function AutowebisionCustomersPage({
       rowIndex: page * size + index + 1,
       businessName: c.businessName || c.ownerName || 'Customer',
       contactName: c.ownerName || c.businessName || 'Customer',
+      serviceMonths: c.serviceExpiration || undefined,
+      serviceExpiration: c.serviceExpiration || undefined,
+      clientRemark: c.clientRemark || undefined,
+      createdAt: c.createdAt ? String(c.createdAt) : undefined,
       contactDate: c.createdAt
         ? new Date(c.createdAt).toLocaleDateString('en-IN', {
             day: 'numeric',
@@ -1103,7 +913,7 @@ export function AutowebisionCustomersPage({
     newStatus: string,
     targetServiceType?: 'WEBSITE' | 'AUTOMATION',
   ) {
-    if (!canEditStatus) return
+    if (isHead || !canEditStatus) return
     const mapKey = `${customer.customerId}_${targetServiceType || 'ALL'}`
     setLocalStatusMap((prev) => ({ ...prev, [mapKey]: newStatus }))
     setUpdatingStatusId(customer.customerId)
@@ -1149,7 +959,7 @@ export function AutowebisionCustomersPage({
     newStatus: string,
     targetServiceType?: 'WEBSITE' | 'AUTOMATION',
   ) {
-    if (!canEditStatus) return
+    if (isHead || !canEditStatus) return
 
     if (newStatus === 'COMPLETED') {
       const check = checkSubServicesCompletion(customer, targetServiceType)
@@ -1361,6 +1171,37 @@ export function AutowebisionCustomersPage({
       : null
   const totalElements = customersQuery.data?.totalElements ?? 0
 
+  const activeTab: CustomerTab =
+    activeStatus === 'PENDING'
+      ? 'pending'
+      : activeStatus === 'IN_PROGRESS'
+        ? 'in-progress'
+        : activeStatus === 'COMPLETED'
+          ? 'completed'
+          : 'all'
+
+  const handleTabChange = (tab: CustomerTab) => {
+    if (tab === 'pending') setActiveStatus('PENDING')
+    else if (tab === 'in-progress') setActiveStatus('IN_PROGRESS')
+    else if (tab === 'completed') setActiveStatus('COMPLETED')
+    else setActiveStatus('ALL')
+    setPage(0)
+  }
+
+  const tabCounts = {
+    all: statusCounts.total,
+    pending: statusCounts.pending,
+    inProgress: statusCounts.inProgress,
+    completed: statusCounts.completed,
+  }
+
+  function getClStatusClass(status: string) {
+    const s = String(status || 'PENDING').toUpperCase()
+    if (s.includes('COMPLETE')) return 'cl-status-btn--completed'
+    if (s.includes('PROGRESS')) return 'cl-status-btn--in-progress'
+    return 'cl-status-btn--pending'
+  }
+
   return (
     <div className="autoweb-container">
       {/* Toast Notification */}
@@ -1371,60 +1212,35 @@ export function AutowebisionCustomersPage({
         </div>
       )}
 
-      {/* Top Header matching Screenshot 2 */}
-      <div className="flex flex-col gap-0.5">
-        <h1 className="text-xl font-bold text-slate-900">Autowebsion Customers</h1>
-        <p className="text-xs text-slate-500">View all Website &amp; Automation customers in one place</p>
-      </div>
-
-      {/* Top Toolbar matching Screenshot 2 */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white p-3 border border-slate-200 rounded-xl">
-        {/* Search bar */}
-        <div className="flex-1 relative max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            className="w-full pl-10 pr-4 h-9 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
-            placeholder="Search by name, email, or business..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm"
-              onClick={() => setSearch('')}
-            >
-              ×
-            </button>
-          )}
+      {/* Top Header & Sub-Tab Switcher matching Google UI design */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-xl font-bold text-slate-900">Autowebsion Customers</h1>
+          <p className="text-xs text-slate-500">View all Website &amp; Automation customers in one place</p>
         </div>
 
-        {/* Center Pill Switcher Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/80">
+        {/* Center Pill Sub-Tab Switcher Tabs */}
+        <div className="cl-tabs" role="tablist">
           <button
             type="button"
-            className={`h-8 px-3.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-              activeSubTab === 'ALL'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
-            }`}
+            className={`cl-tab ${activeSubTab === 'ALL' ? 'is-active' : ''}`}
             onClick={() => {
               setActiveSubTab('ALL')
               setPage(0)
             }}
           >
             <Layers size={14} />
-            <span>Autowebsion</span>
+            <span>All Services</span>
+            {countsQuery.data?.all?.total !== undefined ? (
+              <span className="cl-tab__count">{countsQuery.data.all.total}</span>
+            ) : (
+              <span className="cl-tab__count">{totalElements}</span>
+            )}
           </button>
 
           <button
             type="button"
-            className={`h-8 px-3.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-              activeSubTab === 'WEBSITE'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
-            }`}
+            className={`cl-tab ${activeSubTab === 'WEBSITE' ? 'is-active' : ''}`}
             onClick={() => {
               setActiveSubTab('WEBSITE')
               setPage(0)
@@ -1432,15 +1248,14 @@ export function AutowebisionCustomersPage({
           >
             <Globe size={14} />
             <span>Website</span>
+            {countsQuery.data?.website?.total !== undefined && (
+              <span className="cl-tab__count">{countsQuery.data.website.total}</span>
+            )}
           </button>
 
           <button
             type="button"
-            className={`h-8 px-3.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-              activeSubTab === 'AUTOMATION'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
-            }`}
+            className={`cl-tab ${activeSubTab === 'AUTOMATION' ? 'is-active' : ''}`}
             onClick={() => {
               setActiveSubTab('AUTOMATION')
               setPage(0)
@@ -1448,166 +1263,67 @@ export function AutowebisionCustomersPage({
           >
             <Bot size={14} />
             <span>Automation</span>
-          </button>
-        </div>
-
-        {/* Right buttons: Filter & Refresh */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowFilterDrawer((prev) => !prev)}
-            className={`h-9 px-3.5 rounded-xl border text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all ${
-              showFilterDrawer || dateFrom || dateTo || selectedAssignee !== 'all'
-                ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-            }`}
-          >
-            {showFilterDrawer || dateFrom || dateTo || selectedAssignee !== 'all' ? (
-              <>
-                <X size={14} />
-                <span>Remove Filter</span>
-              </>
-            ) : (
-              <>
-                <Filter size={14} />
-                <span>Filter</span>
-              </>
+            {countsQuery.data?.automation?.total !== undefined && (
+              <span className="cl-tab__count">{countsQuery.data.automation.total}</span>
             )}
           </button>
+        </div>
+      </div>
 
-          <button
-            type="button"
-            onClick={async () => {
+      {/* Google UI Filters: Status Tabs, Search Bar, Date Range, Assignee Filter, Refresh */}
+      <CustomersListFilters
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        tabCounts={tabCounts}
+        searchSlot={
+          <CustomersListSearchBar
+            value={search}
+            onChange={(val) => {
+              setSearch(val)
+              setPage(0)
+            }}
+            placeholder="Search by name, email, phone, or business..."
+          />
+        }
+        actionsSlot={
+          <RefreshButton
+            onRefresh={async () => {
               const [customersResult] = await Promise.all([
                 customersQuery.refetch(),
                 countsQuery.refetch(),
               ])
-              // Drop optimistic status overrides so the freshly fetched statuses are shown.
               if (customersResult.isSuccess) setLocalStatusMap({})
             }}
-            disabled={customersQuery.isFetching}
-            className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 transition-all shadow-none"
-            title="Refresh customers"
-          >
-            <RefreshCw size={14} className={customersQuery.isFetching ? 'spin' : ''} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
+            isRefreshing={customersQuery.isFetching}
+            label="customers"
+          />
+        }
+        assignees={isAssigneeVisible ? assignees : undefined}
+        selectedAssigneeId={selectedAssignee}
+        onAssigneeChange={(id) => {
+          setSelectedAssignee(id || 'all')
+          setPage(0)
+        }}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateChange={(from, to) => {
+          setDateFrom(from)
+          setDateTo(to)
+          setPage(0)
+        }}
+        onReset={() => {
+          setDateFrom('')
+          setDateTo('')
+          setSelectedAssignee('all')
+          setSearch('')
+          setActiveStatus('ALL')
+          setPage(0)
+        }}
+      />
 
-      {/* Collapsible Date Range & Assignee Filter */}
-      {showFilterDrawer && (
-        <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <span>From:</span>
-            <input
-              type="date"
-              className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value)
-                setPage(0)
-              }}
-            />
-            <span>To:</span>
-            <input
-              type="date"
-              className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs"
-              value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value)
-                setPage(0)
-              }}
-            />
-          </div>
-
-          {assignees.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <span>Assignee:</span>
-              <select
-                className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs"
-                value={selectedAssignee}
-                onChange={(e) => {
-                  setSelectedAssignee(e.target.value)
-                  setPage(0)
-                }}
-              >
-                <option value="all">All Assignees</option>
-                {assignees.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <button
-            type="button"
-            className="text-xs text-blue-600 hover:underline font-semibold ml-auto"
-            onClick={() => {
-              setDateFrom('')
-              setDateTo('')
-              setSelectedAssignee('all')
-              setPage(0)
-            }}
-          >
-            Reset Filters
-          </button>
-        </div>
-      )}
-
-      {/* Status Filter Pill Bar */}
-      <div className="autoweb-status-tabs">
-        <button
-          type="button"
-          className={`autoweb-status-btn ${activeStatus === 'ALL' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveStatus('ALL')
-            setPage(0)
-          }}
-        >
-          All
-          <span className="autoweb-status-badge">{statusCounts.total}</span>
-        </button>
-        <button
-          type="button"
-          className={`autoweb-status-btn ${activeStatus === 'PENDING' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveStatus('PENDING')
-            setPage(0)
-          }}
-        >
-          Pending
-          <span className="autoweb-status-badge pending">{statusCounts.pending}</span>
-        </button>
-        <button
-          type="button"
-          className={`autoweb-status-btn ${activeStatus === 'IN_PROGRESS' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveStatus('IN_PROGRESS')
-            setPage(0)
-          }}
-        >
-          In progress
-          <span className="autoweb-status-badge in-progress">{statusCounts.inProgress}</span>
-        </button>
-        <button
-          type="button"
-          className={`autoweb-status-btn ${activeStatus === 'COMPLETED' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveStatus('COMPLETED')
-            setPage(0)
-          }}
-        >
-          Completed
-          <span className="autoweb-status-badge completed">{statusCounts.completed}</span>
-        </button>
-      </div>
-
-      {/* Main Customers Table Card */}
+      {/* Main Customers Table Card (Google UI cl-table-wrapper & cl-table) */}
       <div
-        className={`autoweb-table-card transition-opacity${
+        className={`cl-table-wrapper autoweb-cl-wrapper transition-opacity${
           customersQuery.isFetching && !customersQuery.isPending ? ' opacity-60 pointer-events-none' : ''
         }`}
         aria-busy={customersQuery.isFetching}
@@ -1621,869 +1337,932 @@ export function AutowebisionCustomersPage({
             onRetry={() => customersQuery.refetch()}
           />
         ) : rawRows.length === 0 ? (
-          <div className="autoweb-empty-state">
-            <Building size={36} className="autoweb-empty-icon" />
-            <p>No customers found matching the selected filters.</p>
+          <div className="cl-empty" style={{ padding: '48px 16px', textAlign: 'center' }}>
+            <Building size={36} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
+            <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 500 }}>
+              No customers found matching the selected filters.
+            </p>
           </div>
         ) : (
-          <div className="autoweb-table-scroll">
-            <table className="autoweb-table">
-              <thead>
-                <tr>
-                  {isIndexVisible && <th style={{ width: '45px' }}>#</th>}
-                  {isDateVisible && <th style={{ minWidth: '130px' }}>CREATED</th>}
-                  {isCustomerVisible && <th style={{ minWidth: '180px' }}>CUSTOMER</th>}
-                  {isContactVisible && <th style={{ minWidth: '180px' }}>CONTACT</th>}
-                  {isRequirementFormVisible && <th style={{ minWidth: '150px' }}>REQUIREMENT FORM</th>}
-                  {isServicesVisible && <th style={{ minWidth: '160px' }}>SERVICES</th>}
-                  {isStatusVisible && <th style={{ minWidth: '140px' }}>STATUS</th>}
-                  {isExpirationVisible && <th style={{ minWidth: '120px' }}>EXPIRATION</th>}
-                  {isClientRemarkVisible && <th style={{ minWidth: '150px' }}>CLIENT REMARK</th>}
-                  {isInternalRemarkVisible && <th style={{ minWidth: '180px' }}>INTERNAL REMARK</th>}
-                  {isDraftSentVisible && <th style={{ minWidth: '130px' }}>DRAFT SENT</th>}
-                  {isAssigneeVisible && <th style={{ minWidth: '180px' }}>ASSIGNED TO</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {rawRows.map((customer, index) => {
-                  const customerId = customer.customerId
-                  const parsedCreated = parseSafeDate(customer.createdAt)
-                  const createdDate = parsedCreated
-                    ? parsedCreated.toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—'
-                  const createdTime = parsedCreated
-                    ? parsedCreated.toLocaleTimeString('en-IN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true,
-                      })
-                    : ''
+          <table className="cl-table autoweb-cl-table">
+            <thead>
+              <tr>
+                {isIndexVisible && <th className="cl-th cl-col-num">#</th>}
+                {isCustomerVisible && <th className="cl-th cl-col-biz">BUSINESS</th>}
+                {isContactVisible && <th className="cl-th cl-col-contact">CONTACT</th>}
+                {isServicesVisible && <th className="cl-th cl-col-services">SERVICES</th>}
+                {isStatusVisible && <th className="cl-th cl-col-status">STATUS</th>}
+                {isInternalRemarkVisible && <th className="cl-th cl-col-internal-remark">INTERNAL REMARK</th>}
+                {isDraftSentVisible && <th className="cl-th cl-col-draft">DRAFT SENT</th>}
+                {isAssigneeVisible && <th className="cl-th cl-col-assign">ASSIGNED TO</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rawRows.map((customer, index) => {
+                const customerId = customer.customerId
+                // Created Date and Expiration are displayed in the Eye icon drawer modal
 
-                  const websiteStatus =
-                    localStatusMap[`${customer.customerId}_WEBSITE`] ||
-                    localStatusMap[`${customer.customerId}_ALL`] ||
-                    getWebsiteServiceStatus(customer)
-                  const automationStatus =
-                    localStatusMap[`${customer.customerId}_AUTOMATION`] ||
-                    localStatusMap[`${customer.customerId}_ALL`] ||
-                    getAutomationServiceStatus(customer)
+                const websiteStatus =
+                  localStatusMap[`${customer.customerId}_WEBSITE`] ||
+                  localStatusMap[`${customer.customerId}_ALL`] ||
+                  getWebsiteServiceStatus(customer)
+                const automationStatus =
+                  localStatusMap[`${customer.customerId}_AUTOMATION`] ||
+                  localStatusMap[`${customer.customerId}_ALL`] ||
+                  getAutomationServiceStatus(customer)
 
-                  const webPill = getServicePillStyle(getServicePillStatus(customer, 'WEBSITE'))
-                  const autoPill = getServicePillStyle(getServicePillStatus(customer, 'AUTOMATION'))
+                const webPill = getServicePillStyle(getServicePillStatus(customer, 'WEBSITE'))
+                const autoPill = getServicePillStyle(getServicePillStatus(customer, 'AUTOMATION'))
 
-                  const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
-                  const services = Array.isArray(customer.services) ? customer.services : []
-                  const hasWebsite =
-                    serviceTypes.some((s) => s.toUpperCase().includes('WEB')) ||
-                    services.some((s) => String(s?.serviceType || '').toUpperCase().includes('WEB'))
-                  const hasAutomation =
-                    serviceTypes.some((s) => s.toUpperCase().includes('AUTO')) ||
-                    services.some((s) => String(s?.serviceType || '').toUpperCase().includes('AUTO'))
+                const serviceTypes = Array.isArray(customer.serviceTypes) ? customer.serviceTypes : []
+                const services = Array.isArray(customer.services) ? customer.services : []
+                const perServiceStatus = Array.isArray((customer as any).perServiceStatus) ? (customer as any).perServiceStatus : []
+                const hasWebsite =
+                  serviceTypes.some((s) => s.toUpperCase().includes('WEB')) ||
+                  services.some((s) => String(s?.serviceType || '').toUpperCase().includes('WEB')) ||
+                  perServiceStatus.some((s: any) => String(s?.serviceType || '').toUpperCase().includes('WEB'))
+                const hasAutomation =
+                  serviceTypes.some((s) => s.toUpperCase().includes('AUTO')) ||
+                  services.some((s) => String(s?.serviceType || '').toUpperCase().includes('AUTO')) ||
+                  perServiceStatus.some((s: any) => String(s?.serviceType || '').toUpperCase().includes('AUTO'))
 
-                  return (
-                    <tr key={customerId || index}>
-                      {/* 1. Row Index */}
-                      {isIndexVisible && <td className="autoweb-td-index">{page * size + index + 1}</td>}
+                return (
+                  <tr key={customerId || index} className="cl-row">
+                    {/* 1. Row Index */}
+                    {isIndexVisible && <td className="cl-td cl-col-num">{page * size + index + 1}</td>}
 
-                      {/* 2. Created Date + Website Exists Globe button */}
-                      {isDateVisible && (
-                        <td className="autoweb-td-date">
-                          <div className="text-xs font-semibold text-slate-800">{createdDate}</div>
-                          {createdTime && <div className="text-[11px] text-slate-400">{createdTime}</div>}
-                          {activeSubTab !== 'AUTOMATION' && (
-                            <div className="mt-1.5">
-                              <button
-                                type="button"
-                                className={`inline-flex items-center justify-center h-7 w-7 rounded-md border transition-all ${
-                                  customer.isWebsiteExists
-                                    ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-not-allowed'
-                                    : canEditWebsiteExists
-                                      ? 'border-slate-200 bg-slate-50 text-slate-400 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
-                                      : 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
-                                }`}
-                                disabled={customer.isWebsiteExists || !canEditWebsiteExists || updatingWebsiteExistsId === customerId}
-                                onClick={() => {
-                                  if (!customer.isWebsiteExists && canEditWebsiteExists) {
-                                    setConfirmWebsiteExistsTarget(customer)
-                                  }
-                                }}
-                                title={
-                                  customer.isWebsiteExists
-                                    ? 'Website Exists: YES (Cannot be turned NO)'
-                                    : canEditWebsiteExists
-                                      ? 'Click to confirm Website Exists'
-                                      : 'Website does not exist (Read-only for Head)'
-                                }
-                              >
-                                {updatingWebsiteExistsId === customerId ? (
-                                  <Loader2 size={13} className="spin" />
-                                ) : (
-                                  <Globe size={13} />
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      )}
-
-                      {/* 3. Customer */}
-                      {isCustomerVisible && (
-                        <td>
-                          <div className="autoweb-business-cell">
-                            <div className="flex items-center gap-2">
-                              <strong className="autoweb-business-title" title={customer.businessName || 'Customer'}>
-                                {customer.businessName || customer.ownerName || 'Customer'}
-                              </strong>
-                              {isActionsVisible && (
-                                <button
-                                  type="button"
-                                  className="autoweb-detail-btn flex-shrink-0"
-                                  title="View complete customer details"
-                                  aria-label={`View details for ${customer.businessName || customer.ownerName || 'customer'}`}
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
-                                >
-                                  <Eye size={14} />
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 truncate max-w-[180px]">
-                              {customer.ownerName || '—'}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
-                                <span
-                                  className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
-                                  title={customer.parentBusinessName || 'Main Business'}
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
-                                >
-                                  <Link2 size={10} />
-                                  <span>Main View</span>
-                                </span>
-                              )}
-
-                              {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
-                                  title="View other businesses"
-                                  onClick={() => setSelectedCustomer(toOnboardingCustomer(customer, index))}
-                                >
-                                  <Copy size={10} />
-                                  <span>
-                                    {customer.duplicateCount && customer.duplicateCount > 0
-                                      ? `${customer.duplicateCount} Other`
-                                      : 'Other'}
-                                  </span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      )}
-
-                      {/* 4. Contact */}
-                      {isContactVisible && (
-                        <td>
-                          <div className="space-y-1">
-                            {customer.email && (
-                              <div className="flex items-center gap-1.5 text-xs text-slate-700 truncate max-w-[180px]">
-                                <Mail size={12} className="text-slate-400 flex-shrink-0" />
-                                <span title={customer.email}>{customer.email}</span>
-                              </div>
-                            )}
-                            {customer.phoneNumber && (
-                              <div className="flex items-center gap-1 text-xs text-slate-700">
-                                <Phone size={12} className="text-slate-400 flex-shrink-0" />
-                                <span>{customer.phoneNumber}</span>
-                                <button
-                                  type="button"
-                                  className="ml-1 inline-flex items-center justify-center h-6 w-6 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
-                                  title={`Click to call ${customer.phoneNumber}`}
-                                  disabled={callingCustomerId === String(customerId)}
-                                  onClick={() =>
-                                    handleCallCustomer(
-                                      customer.phoneNumber || '',
-                                      customer.ownerName || '',
-                                      customerId,
-                                    )
-                                  }
-                                >
-                                  {callingCustomerId === String(customerId) ? (
-                                    <Loader2 size={12} className="spin" />
-                                  ) : (
-                                    <Phone size={12} />
-                                  )}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* 5. Requirement Form */}
-                      {isRequirementFormVisible && (
-                        <td>
+                    {/* 3. Business */}
+                    {isCustomerVisible && (
+                      <td className="cl-td cl-col-biz">
+                        <div className="cl-biz-line">
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
+                            className="cl-biz-name cl-biz-name--link"
                             onClick={() => {
-                              const formUrl = getCustomerFormUrl(customer.phoneNumber)
-                              if (formUrl) {
-                                window.open(formUrl, '_blank')
+                              setSelectedCustomer(toOnboardingCustomer(customer, index))
+                              setModalTab('overview')
+                            }}
+                            title={customer.businessName || customer.ownerName || 'Customer'}
+                          >
+                            {customer.businessName || customer.ownerName || 'Customer'}
+                          </button>
+
+                          {/* Form Button */}
+                          <button
+                            type="button"
+                            className="cl-form-pill"
+                            title="Open editable customer form in new tab"
+                            onClick={() => {
+                              const isDup = Boolean(
+                                customer.hasDuplicateCustomer ||
+                                customer.isLinkedBusiness ||
+                                customer.parentCustomerId ||
+                                (customer.duplicateCount ?? 0) > 0,
+                              )
+                              const url = getCustomerFormUrl(customer.phoneNumber, isDup, customer.customerId)
+                              if (url) {
+                                window.open(url, '_blank')
                               } else {
                                 setToast({ type: 'error', message: 'No phone number available for form.' })
                               }
                             }}
                           >
-                            <FileText size={13} />
-                            Open Form
+                            <FileText size={11} />
+                            <span>Form</span>
                           </button>
-                        </td>
-                      )}
 
-                      {/* 6. Services matching Screenshot 1 */}
-                      {isServicesVisible && (
-                        <td>
-                          <div className="flex flex-col gap-1 items-start">
-                                {activeSubTab === 'WEBSITE' ? (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                      type="button"
-                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
-                                      onClick={() =>
-                                        setServiceFlowTarget({
-                                          customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                          serviceType: 'WEBSITE',
-                                        })
-                                      }
-                                      title="Click to view Website service flow"
-                                    >
-                                      <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
-                                      <span>Website</span>
-                                    </button>
-                                  </div>
-                                ) : activeSubTab === 'AUTOMATION' ? (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                      type="button"
-                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
-                                      onClick={() =>
-                                        setServiceFlowTarget({
-                                          customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                          serviceType: 'AUTOMATION',
-                                        })
-                                      }
-                                      title="Click to view Automation service flow"
-                                    >
-                                      <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
-                                      <span>Automation</span>
-                                    </button>
-                                  </div>
-                                ) : hasWebsite && hasAutomation ? (
-                                  <div className="flex flex-col gap-1 items-start">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <button
-                                        type="button"
-                                        className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
-                                        onClick={() =>
-                                          setServiceFlowTarget({
-                                            customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                            serviceType: 'WEBSITE',
-                                          })
-                                        }
-                                        title="Click to view Website service flow"
-                                      >
-                                        <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
-                                        <span>Website</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
-                                        onClick={() =>
-                                          setServiceFlowTarget({
-                                            customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                            serviceType: 'AUTOMATION',
-                                          })
-                                        }
-                                        title="Click to view Automation service flow"
-                                      >
-                                        <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
-                                        <span>Automation</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : hasAutomation ? (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                      type="button"
-                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${autoPill.btnClass}`}
-                                      onClick={() =>
-                                        setServiceFlowTarget({
-                                          customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
-                                          serviceType: 'AUTOMATION',
-                                        })
-                                      }
-                                      title="Click to view Automation service flow"
-                                    >
-                                      <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} />
-                                      <span>Automation</span>
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                      type="button"
-                                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${webPill.btnClass}`}
-                                      onClick={() =>
-                                        setServiceFlowTarget({
-                                          customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
-                                          serviceType: 'WEBSITE',
-                                        })
-                                      }
-                                      title="Click to view Website service flow"
-                                    >
-                                      <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} />
-                                      <span>Website</span>
-                                    </button>
-                                  </div>
-                                )}
-
-                            {/* Rendered Service Tags: visible to both Department User and Head */}
-                            {(() => {
-                              const targetTab =
-                                activeSubTab === 'WEBSITE'
-                                  ? 'WEBSITE'
-                                  : activeSubTab === 'AUTOMATION'
-                                    ? 'AUTOMATION'
-                                    : undefined
-                              const tags = getServiceTagsForCustomer(customer, targetTab)
-                              if (tags.length === 0) return null
-
-                              return (
-                                <div className="flex flex-wrap gap-1 mt-1 max-w-[210px]">
-                                  {tags.slice(0, 2).map(({ key, label }) => (
-                                    <span
-                                      key={key}
-                                      onClick={() => handleOpenServiceTags(customer, index, targetTab)}
-                                      title={
-                                        isDepartmentUser
-                                          ? `Click to manage tags (${label})`
-                                          : `Service tag: ${label} (Click to view)`
-                                      }
-                                      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
-                                    >
-                                      {label.replace(/_/g, ' ')}
-                                    </span>
-                                  ))}
-                                  {tags.length > 2 && (
-                                    <span
-                                      onClick={() => handleOpenServiceTags(customer, index, targetTab)}
-                                      title={
-                                        isDepartmentUser
-                                          ? 'View & manage all tags'
-                                          : 'View all tags (Read only)'
-                                      }
-                                      className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
-                                    >
-                                      +{tags.length - 2}
-                                    </span>
-                                  )}
-                                </div>
-                              )
-                            })()}
-                          </div>
-                        </td>
-                      )}
-
-                      {/* 7. Status matching Screenshot 1 (Head read-only pills, Department User editable) */}
-                      {isStatusVisible && (
-                        <td>
-                          {canEditStatus ? (
-                            /* Department User: Editable status dropdowns */
-                            <div className="flex flex-col gap-1.5 items-start">
-                              {activeSubTab === 'WEBSITE' ? (
-                                <div className="relative inline-flex items-center">
-                                  <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
-                                  <select
-                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
-                                    value={websiteStatus}
-                                    disabled={updatingStatusId === customerId}
-                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
-                                  >
-                                    <option value="PENDING">Pending</option>
-                                    <option value="IN_PROGRESS">In Progress</option>
-                                    <option value="COMPLETED">Completed</option>
-                                  </select>
-                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                </div>
-                              ) : activeSubTab === 'AUTOMATION' ? (
-                                <div className="relative inline-flex items-center">
-                                  <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
-                                  <select
-                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
-                                    value={automationStatus}
-                                    disabled={updatingStatusId === customerId}
-                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
-                                  >
-                                    <option value="PENDING">Pending</option>
-                                    <option value="IN_PROGRESS">In Progress</option>
-                                    <option value="COMPLETED">Completed</option>
-                                  </select>
-                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                </div>
-                              ) : hasWebsite && hasAutomation ? (
-                                <>
-                                  <div className="relative inline-flex items-center">
-                                    <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
-                                    <select
-                                      className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
-                                      value={websiteStatus}
-                                      disabled={updatingStatusId === customerId}
-                                      onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
-                                    >
-                                      <option value="PENDING">Pending</option>
-                                      <option value="IN_PROGRESS">In Progress</option>
-                                      <option value="COMPLETED">Completed</option>
-                                    </select>
-                                    <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                  </div>
-                                  <div className="relative inline-flex items-center">
-                                    <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
-                                    <select
-                                      className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
-                                      value={automationStatus}
-                                      disabled={updatingStatusId === customerId}
-                                      onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
-                                    >
-                                      <option value="PENDING">Pending</option>
-                                      <option value="IN_PROGRESS">In Progress</option>
-                                      <option value="COMPLETED">Completed</option>
-                                    </select>
-                                    <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                  </div>
-                                </>
-                              ) : hasAutomation ? (
-                                <div className="relative inline-flex items-center">
-                                  <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
-                                  <select
-                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(automationStatus)}`}
-                                    value={automationStatus}
-                                    disabled={updatingStatusId === customerId}
-                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
-                                  >
-                                    <option value="PENDING">Pending</option>
-                                    <option value="IN_PROGRESS">In Progress</option>
-                                    <option value="COMPLETED">Completed</option>
-                                  </select>
-                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                </div>
+                          {/* Website Exists Globe button */}
+                          {activeSubTab !== 'AUTOMATION' && (
+                            <button
+                              type="button"
+                              className={`inline-flex items-center justify-center h-6 w-6 rounded-md border transition-all ${
+                                customer.isWebsiteExists
+                                  ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-not-allowed'
+                                  : canEditWebsiteExists
+                                    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:text-amber-700 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
+                                    : 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
+                              }`}
+                              disabled={customer.isWebsiteExists || !canEditWebsiteExists || updatingWebsiteExistsId === customerId}
+                              onClick={() => {
+                                if (!customer.isWebsiteExists && canEditWebsiteExists) {
+                                  setConfirmWebsiteExistsTarget(customer)
+                                }
+                              }}
+                              title={
+                                customer.isWebsiteExists
+                                  ? 'Website Exists: YES (Cannot be turned NO)'
+                                  : canEditWebsiteExists
+                                    ? 'Click to confirm Website Exists'
+                                    : 'Website does not exist (Read-only for Head)'
+                              }
+                            >
+                              {updatingWebsiteExistsId === customerId ? (
+                                <Loader2 size={12} className="spin" />
                               ) : (
-                                <div className="relative inline-flex items-center">
-                                  <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
-                                  <select
-                                    className={`pl-6 pr-6 py-0.5 rounded-full text-xs font-semibold border cursor-pointer appearance-none transition-all ${getStatusSelectStyle(websiteStatus)}`}
-                                    value={websiteStatus}
-                                    disabled={updatingStatusId === customerId}
-                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
-                                  >
-                                    <option value="PENDING">Pending</option>
-                                    <option value="IN_PROGRESS">In Progress</option>
-                                    <option value="COMPLETED">Completed</option>
-                                  </select>
-                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
-                                </div>
+                                <Globe size={12} />
                               )}
-                            </div>
-                          ) : (
-                            /* Head: Read-only status pills matching Screenshot 1 */
-                            <div className="flex flex-col gap-1 items-start">
-                              {activeSubTab === 'WEBSITE' ? (
-                                <div
-                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
-                                  title="Website Status (Read-only for Head)"
-                                >
-                                  <Globe size={11} className={getStatusIconColor(websiteStatus)} />
-                                  <span>{formatStatusLabel(websiteStatus)}</span>
-                                </div>
-                              ) : activeSubTab === 'AUTOMATION' ? (
-                                <div
-                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
-                                  title="Automation Status (Read-only for Head)"
-                                >
-                                  <Bot size={11} className={getStatusIconColor(automationStatus)} />
-                                  <span>{formatStatusLabel(automationStatus)}</span>
-                                </div>
-                              ) : hasWebsite && hasAutomation ? (
-                                <>
-                                  <div
-                                    className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
-                                    title="Website Status (Read-only for Head)"
-                                  >
-                                    <Globe size={11} className={getStatusIconColor(websiteStatus)} />
-                                    <span>{formatStatusLabel(websiteStatus)}</span>
-                                  </div>
-                                  <div
-                                    className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
-                                    title="Automation Status (Read-only for Head)"
-                                  >
-                                    <Bot size={11} className={getStatusIconColor(automationStatus)} />
-                                    <span>{formatStatusLabel(automationStatus)}</span>
-                                  </div>
-                                </>
-                              ) : hasAutomation ? (
-                                <div
-                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(automationStatus)}`}
-                                  title="Automation Status (Read-only for Head)"
-                                >
-                                  <Bot size={11} className={getStatusIconColor(automationStatus)} />
-                                  <span>{formatStatusLabel(automationStatus)}</span>
-                                </div>
-                              ) : (
-                                <div
-                                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold border select-none ${getStatusBadgeStyle(websiteStatus)}`}
-                                  title="Website Status (Read-only for Head)"
-                                >
-                                  <Globe size={11} className={getStatusIconColor(websiteStatus)} />
-                                  <span>{formatStatusLabel(websiteStatus)}</span>
-                                </div>
-                              )}
-                            </div>
+                            </button>
                           )}
-                        </td>
-                      )}
 
-                      {/* 8. Expiration */}
-                      {isExpirationVisible && (
-                        <td>
-                          <div className="flex items-center gap-1 text-xs text-red-600 font-medium">
-                            <Clock size={12} />
-                            <span>
-                              {(() => {
-                                  const p = parseSafeDate(customer.serviceExpiration)
-                                  return p
-                                    ? p.toLocaleDateString('en-IN', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric',
-                                      })
-                                    : 'Not Available'
-                                })()}
+                          {/* Main View Pill (with hover showing parent business name) */}
+                          {(Boolean(customer.isLinkedBusiness) || Boolean(customer.parentCustomerId)) && (
+                            <span
+                              className="cl-linked-branch-pill"
+                              title={customer.parentBusinessName || 'Main Business'}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                borderRadius: '9999px',
+                                border: '1px solid #c7d2fe',
+                                backgroundColor: '#eef2ff',
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#4338ca',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                              onClick={() => {
+                                setSelectedCustomer(toOnboardingCustomer(customer, index))
+                                setModalTab('overview')
+                              }}
+                            >
+                              <Link2 size={11} />
+                              <span>Main View</span>
                             </span>
-                          </div>
-                        </td>
-                      )}
+                          )}
 
-                      {/* 9. Client Remark */}
-                      {isClientRemarkVisible && (
-                        <td>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenClientRemarkDialog(customer)}
-                            className="inline-flex items-center justify-center bg-pink-50 hover:bg-pink-100 rounded-md px-3 py-1.5 transition-colors border border-pink-100 cursor-pointer"
-                          >
-                            <span className="text-xs font-medium text-pink-700">
-                              Click to View
-                            </span>
-                          </button>
-                        </td>
-                      )}
+                          {/* Other / Duplicate Pill Button */}
+                          {(Boolean(customer.hasDuplicateCustomer) || (customer.duplicateCount ?? 0) > 0) && (
+                            <button
+                              type="button"
+                              className="cl-dup-pill-btn"
+                              title="View other businesses"
+                              onClick={() => {
+                                setSelectedCustomer(toOnboardingCustomer(customer, index))
+                                setModalTab('duplicates')
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                borderRadius: '9999px',
+                                border: '1px solid #ffe19a',
+                                backgroundColor: '#fff5d6',
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#8a5a00',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Copy size={11} />
+                              <span>
+                                {customer.duplicateCount && customer.duplicateCount > 0
+                                  ? `${customer.duplicateCount} Other`
+                                  : 'Other'}
+                              </span>
+                            </button>
+                          )}
+                        </div>
 
-                      {/* 10. Internal Remark (Matching screenshot with View Remark / No Remarks and Popover) */}
-                      {isInternalRemarkVisible && (
-                        <td>
-                          <div className="flex flex-col gap-1 items-start">
-                            {activeSubTab === 'WEBSITE' ? (
-                              <InternalRemarkBadge
-                                customer={customer}
-                                customerId={customerId}
-                                customerName={customer.businessName || customer.ownerName || 'Customer'}
-                                departmentType="WEBSITE_DEPARTMENT"
-                                userEmail={userEmail}
-                                activePopoverKey={activeRemarkPopoverKey}
-                                setActivePopoverKey={setActiveRemarkPopoverKey}
-                                onOpenFullDialog={handleOpenFullRemarkDialog}
-                              />
-                            ) : activeSubTab === 'AUTOMATION' ? (
-                              <InternalRemarkBadge
-                                customer={customer}
-                                customerId={customerId}
-                                customerName={customer.businessName || customer.ownerName || 'Customer'}
-                                departmentType="AUTOMATION_DEPARTMENT"
-                                userEmail={userEmail}
-                                activePopoverKey={activeRemarkPopoverKey}
-                                setActivePopoverKey={setActiveRemarkPopoverKey}
-                                onOpenFullDialog={handleOpenFullRemarkDialog}
-                              />
-                            ) : (
-                              <>
-                                {hasWebsite && (
-                                  <InternalRemarkBadge
-                                    customer={customer}
-                                    customerId={customerId}
-                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
-                                    departmentType="WEBSITE_DEPARTMENT"
-                                    userEmail={userEmail}
-                                    activePopoverKey={activeRemarkPopoverKey}
-                                    setActivePopoverKey={setActiveRemarkPopoverKey}
-                                    onOpenFullDialog={handleOpenFullRemarkDialog}
-                                  />
-                                )}
-                                {hasAutomation && (
-                                  <InternalRemarkBadge
-                                    customer={customer}
-                                    customerId={customerId}
-                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
-                                    departmentType="AUTOMATION_DEPARTMENT"
-                                    userEmail={userEmail}
-                                    activePopoverKey={activeRemarkPopoverKey}
-                                    setActivePopoverKey={setActiveRemarkPopoverKey}
-                                    onOpenFullDialog={handleOpenFullRemarkDialog}
-                                  />
-                                )}
-                                {!hasWebsite && !hasAutomation && (
-                                  <InternalRemarkBadge
-                                    customer={customer}
-                                    customerId={customerId}
-                                    customerName={customer.businessName || customer.ownerName || 'Customer'}
-                                    departmentType="WEBSITE_DEPARTMENT"
-                                    userEmail={userEmail}
-                                    activePopoverKey={activeRemarkPopoverKey}
-                                    setActivePopoverKey={setActiveRemarkPopoverKey}
-                                    onOpenFullDialog={handleOpenFullRemarkDialog}
-                                  />
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                        <div className="cl-biz-meta" title={customer.ownerName || '—'}>
+                          {customer.ownerName || '—'}
+                        </div>
+                      </td>
+                    )}
 
-                      {/* 11. Draft Sent (Head is read-only, Department User can send draft) */}
-                      {isDraftSentVisible && (
-                        <td>
-                          <div className="flex items-center gap-1.5">
-                            {canEditDraft ? (
+                    {/* 4. Contact */}
+                    {isContactVisible && (
+                      <td className="cl-td cl-col-contact">
+                        <div className="cl-email" title={customer.email || '—'}>
+                          {customer.email || '—'}
+                        </div>
+
+                        <div className="cl-phone-row">
+                          <span className="cl-phone-text" title={customer.phoneNumber || '—'}>
+                            {customer.phoneNumber || '—'}
+                          </span>
+                          {customer.phoneNumber && (
+                            <button
+                              type="button"
+                              className="cl-call-icon"
+                              title={`Click to call ${customer.phoneNumber}`}
+                              disabled={callingCustomerId === String(customerId)}
+                              onClick={() =>
+                                handleCallCustomer(
+                                  customer.phoneNumber || '',
+                                  customer.ownerName || '',
+                                  customerId,
+                                )
+                              }
+                            >
+                              {callingCustomerId === String(customerId) ? (
+                                <Loader2 size={12} className="spin" />
+                              ) : (
+                                <Phone size={12} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* 6. Services */}
+                    {isServicesVisible && (
+                      <td className="cl-td cl-col-services">
+                        <div className="flex flex-col gap-1 items-start">
+                          {activeSubTab === 'WEBSITE' ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <button
                                 type="button"
-                                onClick={() => handleOpenDraftModal(customer)}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                                  customer.isMailSent
-                                    ? 'bg-green-50 hover:bg-green-100 text-green-700 border-green-200'
-                                    : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-                                }`}
-                                title={customer.isMailSent ? 'Draft already sent. Click to send another' : 'Click to send draft'}
+                                className={`cl-service-type-badge ${webPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: webPill.inlineStyle.backgroundColor,
+                                  borderColor: webPill.inlineStyle.borderColor,
+                                  color: webPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                    serviceType: 'WEBSITE',
+                                  })
+                                }
+                                title={`Website (${webPill.label}) - Click to view Website service flow`}
                               >
-                                <FileText size={12} />
-                                <span>{customer.isMailSent ? 'Draft Sent' : 'Send Draft'}</span>
+                                <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} style={{ color: webPill.inlineStyle.color }} />
+                                <span>Website</span>
                               </button>
+                            </div>
+                          ) : activeSubTab === 'AUTOMATION' ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                className={`cl-service-type-badge ${autoPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: autoPill.inlineStyle.backgroundColor,
+                                  borderColor: autoPill.inlineStyle.borderColor,
+                                  color: autoPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                    serviceType: 'AUTOMATION',
+                                  })
+                                }
+                                title={`Automation (${autoPill.label}) - Click to view Automation service flow`}
+                              >
+                                <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} style={{ color: autoPill.inlineStyle.color }} />
+                                <span>Automation</span>
+                              </button>
+                            </div>
+                          ) : hasWebsite && hasAutomation ? (
+                            <div className="flex flex-wrap gap-1.5 items-center">
+                              <button
+                                type="button"
+                                className={`cl-service-type-badge ${webPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: webPill.inlineStyle.backgroundColor,
+                                  borderColor: webPill.inlineStyle.borderColor,
+                                  color: webPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                    serviceType: 'WEBSITE',
+                                  })
+                                }
+                                title={`Website (${webPill.label}) - Click to view Website service flow`}
+                              >
+                                <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} style={{ color: webPill.inlineStyle.color }} />
+                                <span>Website</span>
+                              </button>
+                              <button
+                                type="button"
+                                className={`cl-service-type-badge ${autoPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: autoPill.inlineStyle.backgroundColor,
+                                  borderColor: autoPill.inlineStyle.borderColor,
+                                  color: autoPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                    serviceType: 'AUTOMATION',
+                                  })
+                                }
+                                title={`Automation (${autoPill.label}) - Click to view Automation service flow`}
+                              >
+                                <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} style={{ color: autoPill.inlineStyle.color }} />
+                                <span>Automation</span>
+                              </button>
+                            </div>
+                          ) : hasAutomation ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                className={`cl-service-type-badge ${autoPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: autoPill.inlineStyle.backgroundColor,
+                                  borderColor: autoPill.inlineStyle.borderColor,
+                                  color: autoPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'AUTOMATION'),
+                                    serviceType: 'AUTOMATION',
+                                  })
+                                }
+                                title={`Automation (${autoPill.label}) - Click to view Automation service flow`}
+                              >
+                                <Bot size={11} className={`${autoPill.iconClass} flex-shrink-0`} style={{ color: autoPill.inlineStyle.color }} />
+                                <span>Automation</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                className={`cl-service-type-badge ${webPill.btnClass}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  backgroundColor: webPill.inlineStyle.backgroundColor,
+                                  borderColor: webPill.inlineStyle.borderColor,
+                                  color: webPill.inlineStyle.color,
+                                }}
+                                onClick={() =>
+                                  setServiceFlowTarget({
+                                    customer: toOnboardingCustomer(customer, index, 'WEBSITE'),
+                                    serviceType: 'WEBSITE',
+                                  })
+                                }
+                                title={`Website (${webPill.label}) - Click to view Website service flow`}
+                              >
+                                <Globe size={11} className={`${webPill.iconClass} flex-shrink-0`} style={{ color: webPill.inlineStyle.color }} />
+                                <span>Website</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Rendered Service Tags: visible to both Department User and Head */}
+                          {(() => {
+                            const targetTab =
+                              activeSubTab === 'WEBSITE'
+                                ? 'WEBSITE'
+                                : activeSubTab === 'AUTOMATION'
+                                  ? 'AUTOMATION'
+                                  : undefined
+                            const tags = getServiceTagsForCustomer(customer, targetTab)
+                            if (tags.length === 0) return null
+
+                            return (
+                              <div className="flex flex-wrap gap-1 mt-1 max-w-[210px]">
+                                {tags.slice(0, 2).map(({ key, label }) => (
+                                  <span
+                                    key={key}
+                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                    title={
+                                      isDepartmentUser
+                                        ? `Click to manage tags (${label})`
+                                        : `Service tag: ${label} (Click to view)`
+                                    }
+                                    className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                                  >
+                                    {label.replace(/_/g, ' ')}
+                                  </span>
+                                ))}
+                                {tags.length > 2 && (
+                                  <span
+                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                    title={
+                                      isDepartmentUser
+                                        ? 'View & manage all tags'
+                                        : 'View all tags (Read only)'
+                                    }
+                                    className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                                  >
+                                    +{tags.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* 7. Status */}
+                    {isStatusVisible && (
+                      <td className="cl-td cl-col-status">
+                        {canEditStatus ? (
+                          /* Department User: Editable status dropdowns styled with cl-status-btn */
+                          <div className="flex flex-col gap-1.5 items-start">
+                            {activeSubTab === 'WEBSITE' ? (
+                              <div className="relative inline-flex items-center">
+                                <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                <select
+                                  className={`cl-status-btn ${getClStatusClass(websiteStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                  value={websiteStatus}
+                                  disabled={updatingStatusId === customerId}
+                                  onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="COMPLETED">Completed</option>
+                                </select>
+                                <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                              </div>
+                            ) : activeSubTab === 'AUTOMATION' ? (
+                              <div className="relative inline-flex items-center">
+                                <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                <select
+                                  className={`cl-status-btn ${getClStatusClass(automationStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                  value={automationStatus}
+                                  disabled={updatingStatusId === customerId}
+                                  onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="COMPLETED">Completed</option>
+                                </select>
+                                <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                              </div>
+                            ) : hasWebsite && hasAutomation ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <div className="relative inline-flex items-center">
+                                  <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                  <select
+                                    className={`cl-status-btn ${getClStatusClass(websiteStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                    value={websiteStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                  <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                  <select
+                                    className={`cl-status-btn ${getClStatusClass(automationStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                    value={automationStatus}
+                                    disabled={updatingStatusId === customerId}
+                                    onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                  >
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                  </select>
+                                  <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                                </div>
+                              </div>
+                            ) : hasAutomation ? (
+                              <div className="relative inline-flex items-center">
+                                <Bot size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(automationStatus)}`} />
+                                <select
+                                  className={`cl-status-btn ${getClStatusClass(automationStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                  value={automationStatus}
+                                  disabled={updatingStatusId === customerId}
+                                  onChange={(e) => handleStatusChange(customer, e.target.value, 'AUTOMATION')}
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="COMPLETED">Completed</option>
+                                </select>
+                                <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                              </div>
+                            ) : (
+                              <div className="relative inline-flex items-center">
+                                <Globe size={11} className={`absolute left-2.5 pointer-events-none ${getStatusIconColor(websiteStatus)}`} />
+                                <select
+                                  className={`cl-status-btn ${getClStatusClass(websiteStatus)} pl-6 pr-6 cursor-pointer appearance-none`}
+                                  value={websiteStatus}
+                                  disabled={updatingStatusId === customerId}
+                                  onChange={(e) => handleStatusChange(customer, e.target.value, 'WEBSITE')}
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="COMPLETED">Completed</option>
+                                </select>
+                                <ChevronsUpDown size={10} className="absolute right-2 pointer-events-none opacity-60" />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Head: Read-only status pills */
+                          <div className="flex flex-col gap-1 items-start">
+                            {activeSubTab === 'WEBSITE' ? (
+                              <div
+                                className={`cl-status-btn ${getClStatusClass(websiteStatus)} cl-status-btn--locked select-none`}
+                                title="Website Status (Read-only for Head)"
+                              >
+                                <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                <span>{formatStatusLabel(websiteStatus)}</span>
+                              </div>
+                            ) : activeSubTab === 'AUTOMATION' ? (
+                              <div
+                                className={`cl-status-btn ${getClStatusClass(automationStatus)} cl-status-btn--locked select-none`}
+                                title="Automation Status (Read-only for Head)"
+                              >
+                                <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                <span>{formatStatusLabel(automationStatus)}</span>
+                              </div>
+                            ) : hasWebsite && hasAutomation ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <div
+                                  className={`cl-status-btn ${getClStatusClass(websiteStatus)} cl-status-btn--locked select-none`}
+                                  title="Website Status (Read-only for Head)"
+                                >
+                                  <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                  <span>{formatStatusLabel(websiteStatus)}</span>
+                                </div>
+                                <div
+                                  className={`cl-status-btn ${getClStatusClass(automationStatus)} cl-status-btn--locked select-none`}
+                                  title="Automation Status (Read-only for Head)"
+                                >
+                                  <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                  <span>{formatStatusLabel(automationStatus)}</span>
+                                </div>
+                              </div>
+                            ) : hasAutomation ? (
+                              <div
+                                className={`cl-status-btn ${getClStatusClass(automationStatus)} cl-status-btn--locked select-none`}
+                                title="Automation Status (Read-only for Head)"
+                              >
+                                <Bot size={11} className={getStatusIconColor(automationStatus)} />
+                                <span>{formatStatusLabel(automationStatus)}</span>
+                              </div>
                             ) : (
                               <div
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border select-none cursor-default ${
-                                  customer.isMailSent
-                                    ? 'bg-green-50 text-green-700 border-green-200'
-                                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                                }`}
-                                title={customer.isMailSent ? 'Draft already sent (Read-only for Head)' : 'Not Sent (Read-only for Head)'}
+                                className={`cl-status-btn ${getClStatusClass(websiteStatus)} cl-status-btn--locked select-none`}
+                                title="Website Status (Read-only for Head)"
                               >
-                                <FileText size={12} />
-                                <span>{customer.isMailSent ? 'Draft Sent' : 'Not Sent'}</span>
+                                <Globe size={11} className={getStatusIconColor(websiteStatus)} />
+                                <span>{formatStatusLabel(websiteStatus)}</span>
                               </div>
                             )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenDraftHistoryModal(customer)}
-                              className="inline-flex items-center justify-center h-7 w-7 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-teal-50 border border-slate-200 hover:border-teal-200 transition-colors cursor-pointer"
-                              title="View Website Draft History"
-                            >
-                              <Clock size={12} />
-                            </button>
                           </div>
-                        </td>
-                      )}
+                        )}
+                      </td>
+                    )}
 
-                      {/* 12. Assigned To matching Screenshot 1 */}
-                      {isAssigneeVisible && (
-                        <td>
-                          <div className="relative flex flex-col gap-1 items-start">
-                            {/* Website Assigned User Pill */}
-                            {(customer.websiteAssignedUserName || customer.websiteAssignedUserEmail) && (
-                              <div
-                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"
-                                title={`Website Assigned to: ${customer.websiteAssignedUserEmail || customer.websiteAssignedUserName}`}
-                              >
-                                <Globe size={11} className="text-blue-600 flex-shrink-0" />
-                                <span className="truncate max-w-[130px]">
-                                  {customer.websiteAssignedUserName || customer.websiteAssignedUserEmail}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Automation Assigned User Pill */}
-                            {(customer.automationAssignedUserName || customer.automationAssignedUserEmail) && (
-                              <div
-                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200"
-                                title={`Automation Assigned to: ${customer.automationAssignedUserEmail || customer.automationAssignedUserName}`}
-                              >
-                                <Bot size={11} className="text-purple-600 flex-shrink-0" />
-                                <span className="truncate max-w-[130px]">
-                                  {customer.automationAssignedUserName || customer.automationAssignedUserEmail}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Fallback general assigned pill if neither specific is present */}
-                            {!customer.websiteAssignedUserEmail &&
-                              !customer.automationAssignedUserEmail &&
-                              (customer.assignedUserName || customer.assignedUserEmail) && (
-                                <div
-                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-                                  title={`Assigned to: ${customer.assignedUserEmail || customer.assignedUserName}`}
-                                >
-                                  <Layers size={11} className="text-slate-500 flex-shrink-0" />
-                                  <span className="truncate max-w-[130px]">
-                                    {customer.assignedUserName || customer.assignedUserEmail}
-                                  </span>
-                                </div>
+                    {/* 10. Internal Remark */}
+                    {isInternalRemarkVisible && (
+                      <td className="cl-td cl-col-internal-remark">
+                        <div className="flex flex-col gap-1 items-start">
+                          {activeSubTab === 'WEBSITE' ? (
+                            <InternalRemarkBadge
+                              customer={customer}
+                              customerId={customerId}
+                              customerName={customer.businessName || customer.ownerName || 'Customer'}
+                              departmentType="WEBSITE_DEPARTMENT"
+                              userEmail={userEmail}
+                              activePopoverKey={activeRemarkPopoverKey}
+                              setActivePopoverKey={setActiveRemarkPopoverKey}
+                              onOpenFullDialog={handleOpenFullRemarkDialog}
+                            />
+                          ) : activeSubTab === 'AUTOMATION' ? (
+                            <InternalRemarkBadge
+                              customer={customer}
+                              customerId={customerId}
+                              customerName={customer.businessName || customer.ownerName || 'Customer'}
+                              departmentType="AUTOMATION_DEPARTMENT"
+                              userEmail={userEmail}
+                              activePopoverKey={activeRemarkPopoverKey}
+                              setActivePopoverKey={setActiveRemarkPopoverKey}
+                              onOpenFullDialog={handleOpenFullRemarkDialog}
+                            />
+                          ) : (
+                            <>
+                              {hasWebsite && (
+                                <InternalRemarkBadge
+                                  customer={customer}
+                                  customerId={customerId}
+                                  customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                  departmentType="WEBSITE_DEPARTMENT"
+                                  userEmail={userEmail}
+                                  activePopoverKey={activeRemarkPopoverKey}
+                                  setActivePopoverKey={setActiveRemarkPopoverKey}
+                                  onOpenFullDialog={handleOpenFullRemarkDialog}
+                                />
                               )}
+                              {hasAutomation && (
+                                <InternalRemarkBadge
+                                  customer={customer}
+                                  customerId={customerId}
+                                  customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                  departmentType="AUTOMATION_DEPARTMENT"
+                                  userEmail={userEmail}
+                                  activePopoverKey={activeRemarkPopoverKey}
+                                  setActivePopoverKey={setActiveRemarkPopoverKey}
+                                  onOpenFullDialog={handleOpenFullRemarkDialog}
+                                />
+                              )}
+                              {!hasWebsite && !hasAutomation && (
+                                <InternalRemarkBadge
+                                  customer={customer}
+                                  customerId={customerId}
+                                  customerName={customer.businessName || customer.ownerName || 'Customer'}
+                                  departmentType="WEBSITE_DEPARTMENT"
+                                  userEmail={userEmail}
+                                  activePopoverKey={activeRemarkPopoverKey}
+                                  setActivePopoverKey={setActiveRemarkPopoverKey}
+                                  onOpenFullDialog={handleOpenFullRemarkDialog}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
 
-                            {/* Assign Button matching Screenshot 1 */}
+                    {/* 11. Draft Sent */}
+                    {isDraftSentVisible && (
+                      <td className="cl-td cl-col-draft">
+                        <div className="flex items-center gap-1.5">
+                          {canEditDraft ? (
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setAssignSearchQuery('')
-                                setOpenAssignDropdownId((prev) =>
-                                  prev === customerId ? null : customerId,
-                                )
-                              }}
-                              disabled={!canEditAssignee}
-                              title={canEditAssignee ? 'Click to assign user' : 'Read only'}
+                              onClick={() => handleOpenDraftModal(customer)}
+                              className={`cl-form-pill cursor-pointer transition-colors ${
+                                customer.isMailSent ? 'cl-draft-pill--sent' : 'cl-draft-pill--unsent'
+                              }`}
+                              style={
+                                customer.isMailSent
+                                  ? { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
+                                  : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }
+                              }
+                              title={
+                                customer.isMailSent
+                                  ? 'Draft already sent. Click to send another'
+                                  : 'Click to send draft'
+                              }
                             >
-                              <Layers size={12} className="text-indigo-600" />
-                              <span>Assign</span>
-                              <ChevronsUpDown size={12} className="text-indigo-400" />
+                              <FileText size={12} />
+                              <span>{customer.isMailSent ? 'Draft Sent' : 'Send Draft'}</span>
                             </button>
+                          ) : (
+                            <div
+                              className={`cl-form-pill select-none cursor-default ${
+                                customer.isMailSent ? 'cl-draft-pill--sent' : 'cl-draft-pill--unsent'
+                              }`}
+                              style={
+                                customer.isMailSent
+                                  ? { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#15803d' }
+                                  : { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }
+                              }
+                              title={
+                                customer.isMailSent
+                                  ? 'Draft Sent (Read-only for Head)'
+                                  : 'Send Draft (Read-only for Head)'
+                              }
+                            >
+                              <FileText size={12} />
+                              <span>{customer.isMailSent ? 'Draft Sent' : 'Send Draft'}</span>
+                            </div>
+                          )}
 
-                            {/* Dropdown Menu matching Screenshot 1 */}
-                            {openAssignDropdownId === customerId && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDraftHistoryModal(customer)}
+                            className="cl-row-view"
+                            style={{ width: '26px', height: '26px' }}
+                            title="View Website Draft History"
+                          >
+                            <Clock size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+
+                    {/* 12. Assigned To */}
+                    {isAssigneeVisible && (
+                      <td className="cl-td cl-col-assign">
+                        <div className="relative flex flex-col gap-1 items-start">
+                          {/* Website Assigned User Pill */}
+                          {(customer.websiteAssignedUserName || customer.websiteAssignedUserEmail) && (
+                            <div
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"
+                              title={`Website Assigned to: ${customer.websiteAssignedUserEmail || customer.websiteAssignedUserName}`}
+                            >
+                              <Globe size={11} className="text-blue-600 flex-shrink-0" />
+                              <span className="truncate max-w-[130px]">
+                                {customer.websiteAssignedUserName || customer.websiteAssignedUserEmail}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Automation Assigned User Pill */}
+                          {(customer.automationAssignedUserName || customer.automationAssignedUserEmail) && (
+                            <div
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200"
+                              title={`Automation Assigned to: ${customer.automationAssignedUserEmail || customer.automationAssignedUserName}`}
+                            >
+                              <Bot size={11} className="text-purple-600 flex-shrink-0" />
+                              <span className="truncate max-w-[130px]">
+                                {customer.automationAssignedUserName || customer.automationAssignedUserEmail}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Fallback general assigned pill if neither specific is present */}
+                          {!customer.websiteAssignedUserEmail &&
+                            !customer.automationAssignedUserEmail &&
+                            (customer.assignedUserName || customer.assignedUserEmail) && (
                               <div
-                                ref={assignDropdownRef}
-                                className="absolute left-0 top-full mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-30 py-1.5 animate-in fade-in duration-100"
-                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+                                title={`Assigned to: ${customer.assignedUserEmail || customer.assignedUserName}`}
                               >
-                                {/* Search box */}
-                                <div className="p-2 border-b border-slate-100">
-                                  <div className="relative">
-                                    <Search
-                                      size={13}
-                                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-                                    />
-                                    <input
-                                      type="text"
-                                      placeholder="Search users..."
-                                      value={assignSearchQuery}
-                                      onChange={(e) => setAssignSearchQuery(e.target.value)}
-                                      autoFocus
-                                      className="w-full pl-8 pr-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="max-h-60 overflow-y-auto py-1">
-                                  {/* Unassigned Option matching Screenshot 1 */}
-                                  <div className="px-2 py-1">
-                                    <button
-                                      type="button"
-                                      className="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100/70 hover:bg-amber-200/70 rounded-lg transition-colors"
-                                      onClick={() => {
-                                        setOpenAssignDropdownId(null)
-                                      }}
-                                    >
-                                      Unassigned
-                                    </button>
-                                  </div>
-
-                                  {/* Autowebision Users Header matching Screenshot 1 */}
-                                  <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400">
-                                    Autowebision Users
-                                  </div>
-
-                                  {/* User List matching Screenshot 1 */}
-                                  {filteredAssignees.length > 0 ? (
-                                    filteredAssignees.map((user) => {
-                                      const displayName = user.name.includes(' (')
-                                        ? user.name.split(' (')[0]
-                                        : user.name
-                                      return (
-                                        <button
-                                          type="button"
-                                          key={user.id}
-                                          onClick={() => {
-                                            setOpenAssignDropdownId(null)
-                                            setAssignModalTarget({
-                                              customer,
-                                              user: {
-                                                email: user.id,
-                                                name: displayName,
-                                              },
-                                            })
-                                          }}
-                                          className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
-                                        >
-                                          <Layers
-                                            size={14}
-                                            className="text-indigo-600 mt-0.5 flex-shrink-0"
-                                          />
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold text-slate-800 truncate">
-                                              {displayName}
-                                            </div>
-                                            <div className="text-[11px] text-slate-400 truncate">
-                                              {user.id}
-                                            </div>
-                                          </div>
-                                        </button>
-                                      )
-                                    })
-                                  ) : (
-                                    <div className="px-3 py-2 text-xs text-slate-400 text-center">
-                                      No users found
-                                    </div>
-                                  )}
-                                </div>
+                                <Layers size={11} className="text-slate-500 flex-shrink-0" />
+                                <span className="truncate max-w-[130px]">
+                                  {customer.assignedUserName || customer.assignedUserEmail}
+                                </span>
                               </div>
                             )}
-                          </div>
-                        </td>
-                      )}
 
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          {/* Assign Button using cl-assign-btn */}
+                          <button
+                            type="button"
+                            className="cl-assign-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAssignSearchQuery('')
+                              setOpenAssignDropdownId((prev) =>
+                                prev === customerId ? null : customerId,
+                              )
+                            }}
+                            disabled={!canEditAssignee}
+                            title={canEditAssignee ? 'Click to assign user' : 'Read only'}
+                          >
+                            <Layers size={12} className="text-indigo-600" />
+                            <span>Assign</span>
+                            <ChevronsUpDown size={12} className="text-slate-400" />
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {openAssignDropdownId === customerId && (
+                            <div
+                              ref={assignDropdownRef}
+                              className="absolute left-0 top-full mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-30 py-1.5 animate-in fade-in duration-100"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {/* Search box */}
+                              <div className="p-2 border-b border-slate-100">
+                                <div className="relative">
+                                  <Search
+                                    size={13}
+                                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={assignSearchQuery}
+                                    onChange={(e) => setAssignSearchQuery(e.target.value)}
+                                    autoFocus
+                                    className="w-full pl-8 pr-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:border-blue-500"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="max-h-60 overflow-y-auto py-1">
+                                {/* Unassigned Option */}
+                                <div className="px-2 py-1">
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100/70 hover:bg-amber-200/70 rounded-lg transition-colors"
+                                    onClick={() => {
+                                      setOpenAssignDropdownId(null)
+                                    }}
+                                  >
+                                    Unassigned
+                                  </button>
+                                </div>
+
+                                {/* Autowebision Users Header */}
+                                <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-slate-400">
+                                  Autowebision Users
+                                </div>
+
+                                {/* User List */}
+                                {filteredAssignees.length > 0 ? (
+                                  filteredAssignees.map((user) => {
+                                    const displayName = user.name.includes(' (')
+                                      ? user.name.split(' (')[0]
+                                      : user.name
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={user.id}
+                                        onClick={() => {
+                                          setOpenAssignDropdownId(null)
+                                          setAssignModalTarget({
+                                            customer,
+                                            user: {
+                                              email: user.id,
+                                              name: displayName,
+                                            },
+                                          })
+                                        }}
+                                        className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                                      >
+                                        <Layers
+                                          size={14}
+                                          className="text-indigo-600 mt-0.5 flex-shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-xs font-semibold text-slate-800 truncate">
+                                            {displayName}
+                                          </div>
+                                          <div className="text-[11px] text-slate-400 truncate">
+                                            {user.id}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    )
+                                  })
+                                ) : (
+                                  <div className="px-3 py-2 text-xs text-slate-400 text-center">
+                                    No users found
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
 
-        {/* Pagination */}
-        <TablePagination
-          page={page}
-          pageSize={size}
-          totalResults={totalElements}
-          onPageChange={(newPage) => setPage(newPage)}
-          onPageSizeChange={(newSize) => {
-            setSize(newSize)
-            setPage(0)
-          }}
-          pageSizeOptions={[10, 20, 50, 100]}
-          disabled={customersQuery.isFetching}
-        />
+        {/* Pagination matching Google UI styling */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+          <TablePagination
+            page={page}
+            pageSize={size}
+            totalResults={totalElements}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setSize(newSize)
+              setPage(0)
+            }}
+            pageSizeOptions={[10, 20, 50, 100]}
+            disabled={customersQuery.isFetching}
+          />
+        </div>
       </div>
 
       {/* Customer Profile Drawer Modal */}
@@ -2492,10 +2271,12 @@ export function AutowebisionCustomersPage({
         assignees={assignees}
         showStatus={true}
         showAssignTo={isAssigneeVisible}
+        canEditRemark={canEditRemark}
+        initialTab={modalTab}
         departmentType={
-          activeSubTab === 'AUTOMATION' || isAutomationScreen
+          activeSubTab === 'AUTOMATION'
             ? 'AUTOMATION_DEPARTMENT'
-            : activeSubTab === 'WEBSITE' || isWebsiteScreen
+            : activeSubTab === 'WEBSITE'
               ? 'WEBSITE_DEPARTMENT'
               : (selectedCustomer?.serviceType?.toUpperCase().includes('AUTOMATION')
                   ? 'AUTOMATION_DEPARTMENT'
@@ -2503,7 +2284,20 @@ export function AutowebisionCustomersPage({
                     ? 'WEBSITE_DEPARTMENT'
                     : permissionDepartmentType)
         }
-        onClose={() => setSelectedCustomer(null)}
+        onOpenFullPage={(cust) => {
+          const isDup = Boolean(
+            cust.hasDuplicateCustomer ||
+            (cust.duplicateCount ?? 0) > 0 ||
+            (cust as any).isLinkedBusiness ||
+            (cust as any).parentCustomerId,
+          )
+          const url = getCustomerFormUrl(cust.phone, isDup, cust.id)
+          if (url) window.open(url, '_blank')
+        }}
+        onClose={() => {
+          setSelectedCustomer(null)
+          setModalTab(undefined)
+        }}
       />
 
       {/* Sub-Service Flow Modal */}

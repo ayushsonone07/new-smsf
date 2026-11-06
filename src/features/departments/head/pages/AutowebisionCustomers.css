@@ -613,4 +613,257 @@
   border-color: #2563eb;
 }
 
+/* ── Autowebsion Google UI Table Layout & Overlap Fix ────────────────── */
+.autoweb-cl-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  width: 100%;
+}
+
+.autoweb-cl-table {
+  width: 100% !important;
+  min-width: 880px !important;
+  table-layout: auto !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: 12.5px !important;
+}
+
+.autoweb-cl-table thead tr {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.autoweb-cl-table .cl-th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: #f8fafc !important;
+  padding: 8px 10px !important;
+  text-align: left !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  white-space: nowrap !important;
+}
+
+.autoweb-cl-table .cl-td {
+  padding: 8px 10px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  vertical-align: middle !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  font-size: 12.5px !important;
+}
+
+.autoweb-cl-table .cl-row:hover .cl-td {
+  background: #fbfcfe !important;
+}
+
+/* Explicit compact widths for each column to eliminate horizontal scroll */
+.autoweb-cl-table .cl-col-num {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  text-align: center !important;
+  padding-left: 6px !important;
+  padding-right: 4px !important;
+}
+
+.autoweb-cl-table .cl-col-biz {
+  min-width: 180px !important;
+  max-width: 240px !important;
+  white-space: normal !important;
+}
+
+.autoweb-cl-table .cl-col-biz .cl-biz-name {
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 220px !important;
+  display: block !important;
+  font-size: 12.5px !important;
+}
+
+.autoweb-cl-table .cl-col-biz .cl-biz-line {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  margin-bottom: 2px !important;
+}
+
+/* Contact Column - Compact spacing */
+.autoweb-cl-table .cl-col-contact {
+  min-width: 135px !important;
+  max-width: 175px !important;
+}
+
+.autoweb-cl-table .cl-col-contact .cl-email {
+  max-width: 155px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+}
+
+.autoweb-cl-table .cl-col-contact .cl-phone-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 2px !important;
+}
+
+.autoweb-cl-table .cl-col-contact .cl-phone-text {
+  font-size: 12px !important;
+}
+
+/* Services Column - Compact spacing */
+.autoweb-cl-table .cl-col-services {
+  min-width: 110px !important;
+}
+
+.autoweb-cl-table .cl-col-services .cl-service-type-badge {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  gap: 4px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+}
+
+/* Completed: Green */
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--completed {
+  background: #f0fdf4 !important;
+  border: 1px solid #bbf7d0 !important;
+  color: #15803d !important;
+}
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--completed:hover {
+  background: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+}
+
+/* Waiting Customer Acknowledgment: Violet / Purple */
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--waiting-ack {
+  background: #faf5ff !important;
+  border: 1px solid #e9d5ff !important;
+  color: #7e22ce !important;
+}
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--waiting-ack:hover {
+  background: #f3e8ff !important;
+  border-color: #d8b4fe !important;
+  color: #6b21a8 !important;
+}
+
+/* In Progress: Blue */
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--in-progress {
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--in-progress:hover {
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+}
+
+/* Pending: Amber / Yellow */
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--pending {
+  background: #fff8eb !important;
+  border: 1px solid #fde68a !important;
+  color: #b45309 !important;
+}
+.autoweb-cl-table .cl-col-services .cl-service-type-badge.cl-service-pill--pending:hover {
+  background: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+
+/* Status Column - Compact spacing */
+.autoweb-cl-table .cl-col-status {
+  min-width: 120px !important;
+}
+
+.autoweb-cl-table .cl-col-status .cl-status-btn {
+  padding: 4px 8px !important;
+  font-size: 11.5px !important;
+  gap: 4px !important;
+}
+
+.autoweb-cl-table .cl-col-status select.cl-status-btn {
+  min-width: 110px !important;
+  padding-left: 20px !important;
+  padding-right: 18px !important;
+}
+
+.autoweb-cl-table .cl-col-internal-remark {
+  min-width: 120px !important;
+}
+
+.autoweb-cl-table .cl-col-draft {
+  min-width: 110px !important;
+}
+
+/* Draft Pill Styles: Sent = Green, Send Draft = Blue */
+.autoweb-cl-table .cl-draft-pill--sent,
+.cl-draft-pill--sent {
+  background: #f0fdf4 !important;
+  border: 1px solid #bbf7d0 !important;
+  color: #15803d !important;
+}
+
+.autoweb-cl-table .cl-draft-pill--sent:hover,
+.cl-draft-pill--sent:hover {
+  background: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+}
+
+.autoweb-cl-table .cl-draft-pill--unsent,
+.cl-draft-pill--unsent {
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+
+.autoweb-cl-table .cl-draft-pill--unsent:hover,
+.cl-draft-pill--unsent:hover {
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+}
+
+.autoweb-cl-table .cl-col-assign {
+  min-width: 135px !important;
+}
+
+/* Read-only status pills for Head (no dropdown, non-clickable) */
+.autoweb-cl-table .cl-status-btn--locked,
+.cl-status-btn--locked {
+  cursor: default !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.autoweb-cl-table .cl-status-btn--locked:hover,
+.cl-status-btn--locked:hover {
+  opacity: 1 !important;
+}
+
+
+
 

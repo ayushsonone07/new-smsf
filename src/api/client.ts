@@ -1,5 +1,6 @@
 import { getSession, clearSession } from '../app/auth/session'
 import { ACTIVE_API_BASE_URL } from '../config/api.config'
+import { queryClient } from '../app/queryClient'
 
 const API_BASE_URL = (
   import.meta.env.DEV
@@ -21,6 +22,20 @@ export function subscribeToApiActivity(listener: ApiActivityListener) {
   listener(activeApiRequests)
   return () => {
     apiActivityListeners.delete(listener)
+  }
+}
+
+let latestPermissionVersion = 0
+
+/** SMSB raises this number on every permission change; refetch permissions only when it does. */
+function trackPermissionVersion(response: Response) {
+  const version = Number(response.headers?.get('X-Permission-Version'))
+  if (!Number.isFinite(version) || version <= latestPermissionVersion) return
+
+  const changed = latestPermissionVersion > 0
+  latestPermissionVersion = version
+  if (changed) {
+    void queryClient.invalidateQueries({ queryKey: ['dynamic-permissions'] })
   }
 }
 
@@ -155,6 +170,8 @@ export async function apiRequest<T>(
   } finally {
     publishApiActivity(-1)
   }
+
+  trackPermissionVersion(response)
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`
