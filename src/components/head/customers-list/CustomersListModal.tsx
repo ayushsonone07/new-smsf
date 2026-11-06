@@ -1661,56 +1661,6 @@ export function CustomersListModal({
                     }
                   />
                   <Field
-                    label="Client remark"
-                    value={
-                      (() => {
-                        const latestRemark =
-                          customer.clientRemark ||
-                          customer.rawCustomer?.clientRemark ||
-                          (clientRemarkEntries.length > 0
-                            ? clientRemarkEntries[0]?.remark?.reply || clientRemarkEntries[0]?.remark?.remark
-                            : null)
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {latestRemark || 'No client remark'}
-                            </span>
-                            <button
-                              type="button"
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: '#be185d',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                                flexShrink: 0,
-                              }}
-                              onClick={() => setActiveTab('remarks')}
-                            >
-                              View all ({clientRemarkEntries.length})
-                            </button>
-                          </div>
-                        )
-                      })()
-                    }
-                    full
-                  />
-                  <Field
-                    label="Amount paid"
-                    value={formatCurrency(
-                      apiDetails.profile?.amountPaid || rowDetails?.amountPaid
-                    )}
-                  />
-                  <Field
-                    label="Amount pending"
-                    value={formatCurrency(
-                      apiDetails.profile?.amountPending ||
-                      rowDetails?.amountPending
-                    )}
-                  />
-                  <Field
                     label="Sales person"
                     value={
                       serviceRow?.assignedUserName ||
@@ -1723,51 +1673,6 @@ export function CustomersListModal({
                     value={assignee?.name || serviceRow?.assignedUserName}
                   />
                 </div>
-              </div>
-
-              <div className="cl-drawer__card">
-                <div className="cl-drawer__card-head">
-                  <h3>Included services</h3>
-                  <span className="cl-drawer__card-meta">
-                    {hasDepartmentServiceSummary
-                      ? `${doneCount}/${services.length} completed`
-                      : 'Summary unavailable'}
-                  </span>
-                </div>
-
-                {!hasDepartmentServiceSummary ? (
-                  <div className="cl-drawer__card-meta">
-                    Service status summary was not returned by the backend.
-                  </div>
-                ) : services.length === 0 ? (
-                  <div className="cl-drawer__card-meta">
-                    No services added yet.
-                  </div>
-                ) : (
-                  <ul className="cl-drawer__services">
-                    {services.map((service, idx) => (
-                      <li key={`${service.name}-${idx}`} className="cl-drawer__service">
-                        <span
-                          className="cl-drawer__service-dot"
-                          style={{
-                            background:
-                              SERVICE_DOT_COLORS[idx % SERVICE_DOT_COLORS.length],
-                          }}
-                        />
-                        <span className="cl-drawer__service-name">
-                          {service.name}
-                        </span>
-                        <span
-                          className={`cl-drawer__service-pill cl-drawer__service-pill--${service.status ?? 'unavailable'}`}
-                        >
-                          {service.status
-                            ? STATUS_LABEL[service.status]
-                            : 'Status unavailable'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </motion.div>
           )}

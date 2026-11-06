@@ -231,6 +231,12 @@ export interface EarlierPayment {
   paidAt?: string | null
 }
 
+export interface EarlierPaymentsResult {
+  payments: EarlierPayment[]
+  /** Why the list is empty. Absent if the lookup itself failed, so no false "not found" is shown. */
+  emptyMessage?: string
+}
+
 /**
  * Earlier payments made from a phone number and/or email, with what is left on each — so a new
  * business can be registered without knowing the old payment ID.
@@ -238,7 +244,7 @@ export interface EarlierPayment {
  */
 export async function fetchEarlierPayments(
   contactOrParams: string | FetchEarlierPaymentsParams,
-): Promise<EarlierPayment[]> {
+): Promise<EarlierPaymentsResult> {
   // Only a convenience: if the lookup is unavailable, the payment ID can still be typed.
   try {
     const body: Record<string, string> = {}
@@ -256,9 +262,10 @@ export async function fetchEarlierPayments(
       },
       true,
     )
-    return response.data ?? []
+    const payments = response.data ?? []
+    return { payments, emptyMessage: payments.length === 0 ? response.message : undefined }
   } catch {
-    return []
+    return { payments: [] }
   }
 }
 
