@@ -39,6 +39,7 @@ import {
 } from '../../../utils/customerActivity'
 import { getRecurringTimeline } from '../../../api/history.api'
 import { notifyBillGenerated } from '../../../api/notification-factory'
+import { getDepartmentServiceStatuses } from '../../../api/departments.api'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -82,6 +83,13 @@ const SERVICE_DOT_COLORS = [
   '#7c3aed',
   '#0891b2',
 ]
+
+function normalizeServiceStatusKey(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/_(DEPARTMENT|SERVICE)$/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+}
 
 const PROFILE_FIELD_GROUPS: {
   title: string
@@ -347,6 +355,12 @@ export function CustomersListModal({
   const sessionUser = getSession()?.user as any
   const sessionUserRole = ((sessionUser?.role as string) || '').toUpperCase()
   const isSuperAdmin = sessionUserRole === 'ADMIN' || sessionUserRole === 'SUPERADMIN'
+  const departmentServiceStatusesQuery = useQuery({
+    queryKey: ['department-service-statuses'],
+    queryFn: getDepartmentServiceStatuses,
+    staleTime: 30_000,
+    enabled: Boolean(customer),
+  })
 
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
   const isUserPath =
@@ -831,9 +845,10 @@ export function CustomersListModal({
     name: string
     status?: OnboardingStatus
     row?: CustomerServiceRow
+    departmentType?: string
   }
 
-  const services: DrawerDepartmentServiceItem[] = useMemo(() => {
+  const unfilteredServices: DrawerDepartmentServiceItem[] = useMemo(() => {
     if (serviceRow?.departmentStatuses != null) {
       return getDepartmentServices(
         serviceRow.departmentStatuses,
@@ -924,6 +939,29 @@ export function CustomersListModal({
 
     return []
   }, [serviceRow, departmentType, current, apiDetails.superAdminRemarks, apiDetails.profile?.packageName])
+
+  const services = useMemo(() => {
+    const registry = departmentServiceStatusesQuery.data
+    if (!registry) return unfilteredServices
+
+    const activeByKey = new Map<string, boolean>()
+    for (const item of registry) {
+      for (const rawKey of [item.departmentType, item.serviceType]) {
+        const key = normalizeServiceStatusKey(rawKey)
+        activeByKey.set(key, (activeByKey.get(key) ?? false) || item.isActive)
+      }
+    }
+
+    return unfilteredServices.filter((service) => {
+      const departmentKey = service.departmentType
+        ? normalizeServiceStatusKey(service.departmentType)
+        : ''
+      if (departmentKey && activeByKey.has(departmentKey)) {
+        return activeByKey.get(departmentKey) !== false
+      }
+      return activeByKey.get(normalizeServiceStatusKey(service.name)) !== false
+    })
+  }, [unfilteredServices, departmentServiceStatusesQuery.data])
 
   const hasDepartmentServiceSummary =
     serviceRow?.departmentStatuses != null || services.length > 0
@@ -1661,56 +1699,6 @@ export function CustomersListModal({
                     }
                   />
                   <Field
-                    label="Client remark"
-                    value={
-                      (() => {
-                        const latestRemark =
-                          customer.clientRemark ||
-                          customer.rawCustomer?.clientRemark ||
-                          (clientRemarkEntries.length > 0
-                            ? clientRemarkEntries[0]?.remark?.reply || clientRemarkEntries[0]?.remark?.remark
-                            : null)
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {latestRemark || 'No client remark'}
-                            </span>
-                            <button
-                              type="button"
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: '#be185d',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                                flexShrink: 0,
-                              }}
-                              onClick={() => setActiveTab('remarks')}
-                            >
-                              View all ({clientRemarkEntries.length})
-                            </button>
-                          </div>
-                        )
-                      })()
-                    }
-                    full
-                  />
-                  <Field
-                    label="Amount paid"
-                    value={formatCurrency(
-                      apiDetails.profile?.amountPaid || rowDetails?.amountPaid
-                    )}
-                  />
-                  <Field
-                    label="Amount pending"
-                    value={formatCurrency(
-                      apiDetails.profile?.amountPending ||
-                      rowDetails?.amountPending
-                    )}
-                  />
-                  <Field
                     label="Sales person"
                     value={
                       serviceRow?.assignedUserName ||
@@ -1723,51 +1711,6 @@ export function CustomersListModal({
                     value={assignee?.name || serviceRow?.assignedUserName}
                   />
                 </div>
-              </div>
-
-              <div className="cl-drawer__card">
-                <div className="cl-drawer__card-head">
-                  <h3>Included services</h3>
-                  <span className="cl-drawer__card-meta">
-                    {hasDepartmentServiceSummary
-                      ? `${doneCount}/${services.length} completed`
-                      : 'Summary unavailable'}
-                  </span>
-                </div>
-
-                {!hasDepartmentServiceSummary ? (
-                  <div className="cl-drawer__card-meta">
-                    Service status summary was not returned by the backend.
-                  </div>
-                ) : services.length === 0 ? (
-                  <div className="cl-drawer__card-meta">
-                    No services added yet.
-                  </div>
-                ) : (
-                  <ul className="cl-drawer__services">
-                    {services.map((service, idx) => (
-                      <li key={`${service.name}-${idx}`} className="cl-drawer__service">
-                        <span
-                          className="cl-drawer__service-dot"
-                          style={{
-                            background:
-                              SERVICE_DOT_COLORS[idx % SERVICE_DOT_COLORS.length],
-                          }}
-                        />
-                        <span className="cl-drawer__service-name">
-                          {service.name}
-                        </span>
-                        <span
-                          className={`cl-drawer__service-pill cl-drawer__service-pill--${service.status ?? 'unavailable'}`}
-                        >
-                          {service.status
-                            ? STATUS_LABEL[service.status]
-                            : 'Status unavailable'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </motion.div>
           )}
@@ -3075,6 +3018,7 @@ function getDepartmentServices(
           details?.status || (details?.onboarded ? 'COMPLETED' : undefined),
         ),
         row: isCurrentDepartment ? serviceRow : undefined,
+        departmentType: department,
       }
     })
 }

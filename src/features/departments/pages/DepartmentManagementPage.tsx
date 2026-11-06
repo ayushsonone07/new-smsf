@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useDepartments } from '../hooks/useDepartments'
 import { useUpdateDepartment } from '../hooks/useUpdateDepartment'
+import { useUpdateDepartmentStatus } from '../hooks/useUpdateDepartmentStatus'
 import { useDeleteDepartment } from '../hooks/useDeleteDepartment'
 import { useLoginAsDepartment } from '../../auth/hooks/useLoginAsDepartment'
 import {
@@ -77,6 +78,7 @@ export function DepartmentManagementPage() {
 
   const departmentsQuery = useDepartments()
   const updateMutation = useUpdateDepartment()
+  const updateStatusMutation = useUpdateDepartmentStatus()
   const deleteMutation = useDeleteDepartment()
   const loginAsMutation = useLoginAsDepartment()
 
@@ -226,15 +228,10 @@ export function DepartmentManagementPage() {
   }
 
   function handleToggleStatus(department: Department) {
-    const newStatus = department.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    updateMutation.mutate({
-      id: department.id,
-      data: {
-        email: department.email,
-        username: department.username,
-        name: department.name,
-        type: department.type,
-      },
+    if (!department.type || updateStatusMutation.isPending) return
+    updateStatusMutation.mutate({
+      departmentType: department.type,
+      active: department.status !== 'ACTIVE',
     })
   }
 

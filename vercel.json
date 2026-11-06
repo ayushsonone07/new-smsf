@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/hrm-api/:path*",
+      "destination": "https://hrm.techmbgcard.com/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://taskmbg.techmbgcard.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
