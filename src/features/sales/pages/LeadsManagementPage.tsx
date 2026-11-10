@@ -552,8 +552,8 @@ function FilterDropdownSelect({ value, onChange, options, allLabel }: FilterDrop
 }
 
 interface FunnelFilterSelectProps {
-  value: string
-  onChange: (value: string) => void
+  value: string[]
+  onChange: (value: string[]) => void
   options: { value: string; label: string }[]
 }
 
@@ -564,10 +564,13 @@ function FunnelFilterSelect({ value, onChange, options }: FunnelFilterSelectProp
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
-  const selectedOption = options.find(
-    (opt) => opt.value.toLowerCase() === value.toLowerCase()
-  )
-  const displayLabel = value === 'all' || !value ? 'All Funnels' : selectedOption?.label || value
+  const selectedValues = new Set(value.map((item) => item.toLowerCase()))
+  const displayLabel =
+    value.length === 0
+      ? 'All Funnels'
+      : value.length === 1
+        ? options.find((opt) => opt.value.toLowerCase() === value[0].toLowerCase())?.label || value[0]
+        : `${value.length} Funnels`
 
   const handleOpen = () => {
     if (triggerRef.current) {
@@ -647,7 +650,7 @@ function FunnelFilterSelect({ value, onChange, options }: FunnelFilterSelectProp
         type="button"
         onClick={() => (isOpen ? setIsOpen(false) : handleOpen())}
         className={`w-full h-9 px-3 bg-white border rounded-lg text-xs transition-all cursor-pointer flex items-center justify-between gap-1.5 shadow-2xs ${
-          value && value !== 'all'
+          value.length > 0
             ? 'bg-blue-50/60 border-blue-400 text-blue-900 font-semibold ring-2 ring-blue-500/10'
             : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
         }`}
@@ -709,31 +712,34 @@ function FunnelFilterSelect({ value, onChange, options }: FunnelFilterSelectProp
               <button
                 type="button"
                 onClick={() => {
-                  onChange('all')
+                  onChange([])
                   setIsOpen(false)
                 }}
                 className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
-                  value === 'all' || !value
+                  value.length === 0
                     ? 'bg-blue-50 text-blue-700 font-semibold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
                 }`}
               >
                 <span>All Funnels</span>
-                {(value === 'all' || !value) && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                {value.length === 0 && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
               </button>
 
               {filteredOptions.length === 0 ? (
                 <div className="py-2 text-center text-xs text-slate-400">No funnels found</div>
               ) : (
                 filteredOptions.map((opt) => {
-                  const isSelected = value.toLowerCase() === opt.value.toLowerCase()
+                  const isSelected = selectedValues.has(opt.value.toLowerCase())
                   return (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => {
-                        onChange(opt.value)
-                        setIsOpen(false)
+                        onChange(
+                          isSelected
+                            ? value.filter((item) => item.toLowerCase() !== opt.value.toLowerCase())
+                            : [...value, opt.value],
+                        )
                       }}
                       className={`w-full h-7 px-2 flex items-center justify-between text-xs rounded-md transition-colors cursor-pointer ${
                         isSelected
@@ -1012,7 +1018,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
   const [selectedLeadStatus, setSelectedLeadStatus] = useState('all')
   const [selectedTelecallerStatus, setSelectedTelecallerStatus] = useState('all')
   const [selectedLeadType, setSelectedLeadType] = useState('all')
-  const [selectedFunnel, setSelectedFunnel] = useState('all')
+  const [selectedFunnels, setSelectedFunnels] = useState<string[]>([])
   const [selectedDepartmentUser, setSelectedDepartmentUser] = useState('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -1142,7 +1148,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
         leadStatus: selectedLeadStatus,
         telecallerStatus: selectedTelecallerStatus,
         leadType: selectedLeadType,
-        funnelType: selectedFunnel,
+        funnelType: selectedFunnels.join(','),
         assignedUser: selectedDepartmentUser,
         startDate: startDate ? `${startDate}T00:00:00` : undefined,
         endDate: endDate ? `${endDate}T23:59:59` : undefined,
@@ -1187,7 +1193,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedLeadStatus,
     selectedTelecallerStatus,
     selectedLeadType,
-    selectedFunnel,
+    selectedFunnels,
     selectedDepartmentUser,
     startDate,
     endDate,
@@ -1256,7 +1262,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedLeadStatus !== 'all' ||
     selectedTelecallerStatus !== 'all' ||
     selectedLeadType !== 'all' ||
-    selectedFunnel !== 'all' ||
+    selectedFunnels.length > 0 ||
     selectedDepartmentUser !== 'all' ||
     Boolean(startDate) ||
     Boolean(endDate)
@@ -1265,7 +1271,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     selectedLeadStatus !== 'all',
     selectedTelecallerStatus !== 'all',
     selectedLeadType !== 'all',
-    selectedFunnel !== 'all',
+    selectedFunnels.length > 0,
     selectedDepartmentUser !== 'all',
     Boolean(startDate || endDate),
   ].filter(Boolean).length
@@ -1276,7 +1282,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
     setSelectedLeadStatus('all')
     setSelectedTelecallerStatus('all')
     setSelectedLeadType('all')
-    setSelectedFunnel('all')
+    setSelectedFunnels([])
     setSelectedDepartmentUser('all')
     setStartDate('')
     setEndDate('')
@@ -1375,7 +1381,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
             {/* Action Bar Controls */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Search Box */}
-              <div className="relative w-64 max-w-xs">
+              <div className="relative w-80 max-w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="text"
@@ -1547,14 +1553,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                 <div>
                   <label className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
                     <span>Funnel Type</span>
-                    {selectedFunnel !== 'all' && (
+                    {selectedFunnels.length > 0 && (
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     )}
                   </label>
                   <FunnelFilterSelect
-                    value={selectedFunnel}
+                    value={selectedFunnels}
                     onChange={(val) => {
-                      setSelectedFunnel(val)
+                      setSelectedFunnels(val)
                       setCurrentPage(0)
                     }}
                     options={cleanFunnelOptions}
