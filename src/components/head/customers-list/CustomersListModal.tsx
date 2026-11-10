@@ -39,6 +39,7 @@ import {
 } from '../../../utils/customerActivity'
 import { getRecurringTimeline } from '../../../api/history.api'
 import { notifyBillGenerated } from '../../../api/notification-factory'
+import { getDepartmentServiceStatuses } from '../../../api/departments.api'
 
 export interface CustomersListModalProps {
   customer: OnboardingCustomer | null
@@ -82,6 +83,13 @@ const SERVICE_DOT_COLORS = [
   '#7c3aed',
   '#0891b2',
 ]
+
+function normalizeServiceStatusKey(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/_(DEPARTMENT|SERVICE)$/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+}
 
 const PROFILE_FIELD_GROUPS: {
   title: string
@@ -347,6 +355,12 @@ export function CustomersListModal({
   const sessionUser = getSession()?.user as any
   const sessionUserRole = ((sessionUser?.role as string) || '').toUpperCase()
   const isSuperAdmin = sessionUserRole === 'ADMIN' || sessionUserRole === 'SUPERADMIN'
+  const departmentServiceStatusesQuery = useQuery({
+    queryKey: ['department-service-statuses'],
+    queryFn: getDepartmentServiceStatuses,
+    staleTime: 30_000,
+    enabled: Boolean(customer),
+  })
 
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : ''
   const isUserPath =
@@ -831,9 +845,10 @@ export function CustomersListModal({
     name: string
     status?: OnboardingStatus
     row?: CustomerServiceRow
+    departmentType?: string
   }
 
-  const services: DrawerDepartmentServiceItem[] = useMemo(() => {
+  const unfilteredServices: DrawerDepartmentServiceItem[] = useMemo(() => {
     if (serviceRow?.departmentStatuses != null) {
       return getDepartmentServices(
         serviceRow.departmentStatuses,
@@ -924,6 +939,29 @@ export function CustomersListModal({
 
     return []
   }, [serviceRow, departmentType, current, apiDetails.superAdminRemarks, apiDetails.profile?.packageName])
+
+  const services = useMemo(() => {
+    const registry = departmentServiceStatusesQuery.data
+    if (!registry) return unfilteredServices
+
+    const activeByKey = new Map<string, boolean>()
+    for (const item of registry) {
+      for (const rawKey of [item.departmentType, item.serviceType]) {
+        const key = normalizeServiceStatusKey(rawKey)
+        activeByKey.set(key, (activeByKey.get(key) ?? false) || item.isActive)
+      }
+    }
+
+    return unfilteredServices.filter((service) => {
+      const departmentKey = service.departmentType
+        ? normalizeServiceStatusKey(service.departmentType)
+        : ''
+      if (departmentKey && activeByKey.has(departmentKey)) {
+        return activeByKey.get(departmentKey) !== false
+      }
+      return activeByKey.get(normalizeServiceStatusKey(service.name)) !== false
+    })
+  }, [unfilteredServices, departmentServiceStatusesQuery.data])
 
   const hasDepartmentServiceSummary =
     serviceRow?.departmentStatuses != null || services.length > 0
@@ -2980,6 +3018,7 @@ function getDepartmentServices(
           details?.status || (details?.onboarded ? 'COMPLETED' : undefined),
         ),
         row: isCurrentDepartment ? serviceRow : undefined,
+        departmentType: department,
       }
     })
 }
