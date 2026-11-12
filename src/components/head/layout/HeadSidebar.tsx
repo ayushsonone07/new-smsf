@@ -80,7 +80,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'member performance': ChartNoAxesColumnIncreasing,
   attendance: Clock3,
   analytics: ChartColumnIncreasing,
-  'help & support': CircleHelp,
+  '': CircleHelp,
 }
 
 function getMenuIcon(item: HeadNavItem): LucideIcon {
@@ -168,7 +168,7 @@ export function HeadSidebar({
       </button>
     )
 
-    // Sub-tabs appear only while Help & Support is the open screen.
+    // Sub-tabs appear only while  is the open screen.
     if (!active || !isHelpSupportNavItem(item)) return button
 
     return (

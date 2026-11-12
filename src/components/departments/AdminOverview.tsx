@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
   Users,
@@ -17,7 +17,7 @@ import {
   Check,
 } from 'lucide-react'
 import {
-  getAdminDepartmentSummary,
+  getAdminAllDepartmentsSummary,
   toLocalDateTimeParam,
   type AdminDepartmentSummary,
 } from '../../api/admin-summary.api'
@@ -142,10 +142,10 @@ export function AdminOverview({
   // Check if admin is currently impersonating/parking
   const adminBackup = useMemo(() => getAdminBackup(), [])
 
-  // 1. Fetch Company-wide Totals
+  // 1. Fetch Company-wide Totals and All Departments Breakdown in 1 Single Query
   const totalsQuery = useQuery({
-    queryKey: ['admin-summary', preset, 'ALL'],
-    queryFn: () => getAdminDepartmentSummary(range),
+    queryKey: ['admin-summary-all', preset],
+    queryFn: () => getAdminAllDepartmentsSummary(range),
     staleTime: 60_000,
   })
 
@@ -180,19 +180,22 @@ export function AdminOverview({
     return map
   }, [departments])
 
-  // 3. Fetch summary for each department
-  const departmentQueries = useQueries({
-    queries: departmentTypes.map((departmentType) => ({
-      queryKey: ['admin-summary', preset, departmentType],
-      queryFn: () => getAdminDepartmentSummary({ ...range, departmentType }),
-      staleTime: 60_000,
-    })),
-  })
+  // 3. Map departmentType -> summary object from the single query
+  const summaryByDept = useMemo(() => {
+    const map = new Map<string, AdminDepartmentSummary>()
+    const list = totalsQuery.data?.departments ?? []
+    for (const item of list) {
+      if (item.departmentType) {
+        map.set(item.departmentType.toUpperCase(), item)
+      }
+    }
+    return map
+  }, [totalsQuery.data])
 
   // Combine query data with department details
   const enrichedDepartments = useMemo(() => {
-    return departmentTypes.map((departmentType, index) => {
-      const summary = departmentQueries[index]?.data
+    return departmentTypes.map((departmentType) => {
+      const summary = summaryByDept.get(departmentType.toUpperCase())
       const head = headByDept.get(departmentType)
       const headFromUsers = adminUsersQuery.data?.data?.find(
         (u) => u.departmentType === departmentType && u.isHead,
@@ -235,10 +238,10 @@ export function AdminOverview({
         totalServices,
         completionPercent,
         delayPercent,
-        isPending: departmentQueries[index]?.isPending ?? true,
+        isPending: totalsQuery.isPending,
       }
     })
-  }, [departmentTypes, departmentQueries, headByDept, adminUsersQuery.data, userCountByDept])
+  }, [departmentTypes, summaryByDept, headByDept, adminUsersQuery.data, userCountByDept, totalsQuery.isPending])
 
   // Sorted departments for Department Health
   const sortedDepartments = useMemo(() => {
@@ -280,14 +283,13 @@ export function AdminOverview({
 
   const isRefreshing =
     (totalsQuery.isFetching && !totalsQuery.isPending) ||
-    departmentQueries.some((query) => query.isFetching && !query.isPending)
+    (adminUsersQuery.isFetching && !adminUsersQuery.isPending)
 
   const handleRefresh = async () => {
     onRefreshAll?.()
     await Promise.all([
       totalsQuery.refetch(),
       adminUsersQuery.refetch(),
-      ...departmentQueries.map((query) => query.refetch()),
     ])
   }
 
@@ -324,7 +326,7 @@ export function AdminOverview({
     })
   }
 
-  const totals = totalsQuery.data
+  const totals = totalsQuery.data?.totals
   const totalServices =
     (totals?.completedServices ?? 0) +
     (totals?.inProgressServices ?? 0) +

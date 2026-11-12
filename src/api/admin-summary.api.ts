@@ -16,6 +16,11 @@ export interface AdminDepartmentSummary {
   delayedServices: number
 }
 
+export interface AdminAllDepartmentsSummary {
+  totals: AdminDepartmentSummary
+  departments: AdminDepartmentSummary[]
+}
+
 interface ApiEnvelope<T> {
   data?: T
   message?: string
@@ -43,6 +48,20 @@ export async function getAdminDepartmentSummary(params: {
   )
   if (!response?.data) {
     throw new Error(response?.message || 'Department summary returned no data')
+  }
+  return response.data
+}
+
+export async function getAdminAllDepartmentsSummary(params: {
+  startDate: string
+  endDate: string
+}): Promise<AdminAllDepartmentsSummary> {
+  const search = new URLSearchParams({ startDate: params.startDate, endDate: params.endDate })
+  const response = await authedApiRequest<ApiEnvelope<AdminAllDepartmentsSummary>>(
+    `/api/auth/admin/summary/all?${search.toString()}`,
+  )
+  if (!response?.data) {
+    throw new Error(response?.message || 'All departments summary returned no data')
   }
   return response.data
 }
