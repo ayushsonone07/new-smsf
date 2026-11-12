@@ -14,7 +14,6 @@ import { Icon } from '../head/shared/Icon'
 import {
   LayoutDashboard,
   Building2,
-  CirclePlus,
   ListChecks,
   CreditCard,
   Workflow,
@@ -72,17 +71,8 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname === '/admin' ||
-      (pathname.startsWith('/admin/departments') &&
-        !pathname.includes('/create')),
-  },
-  {
-    to: '/admin/create-department',
-    label: 'Create Department',
-    icon: CirclePlus,
-    roles: ['ADMIN'],
-    isActive: (pathname) =>
-      pathname === '/admin/create-department' ||
-      pathname === '/admin/departments/create',
+      pathname.startsWith('/admin/departments') ||
+      pathname === '/admin/create-department',
   },
   {
     to: '/admin/services',

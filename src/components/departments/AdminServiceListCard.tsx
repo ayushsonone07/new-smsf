@@ -52,6 +52,9 @@ export function AdminServiceListCard({
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   // Plans state
+  const [serviceStatusFilter, setServiceStatusFilter] = useState<
+    'ALL' | 'ACTIVE' | 'INACTIVE'
+  >('ALL')
   const [planSearch, setPlanSearch] = useState('')
   const [planPage, setPlanPage] = useState(0)
   const [planPageSize, setPlanPageSize] = useState(10)
@@ -104,16 +107,28 @@ export function AdminServiceListCard({
     [services],
   )
 
+  const activeCount = useMemo(
+    () => services.filter((s) => s.isServiceActive).length,
+    [services],
+  )
+  const inactiveCount = services.length - activeCount
+
   const filteredServices = useMemo(() => {
+    let result = services
+    if (serviceStatusFilter === 'ACTIVE') {
+      result = result.filter((s) => s.isServiceActive)
+    } else if (serviceStatusFilter === 'INACTIVE') {
+      result = result.filter((s) => !s.isServiceActive)
+    }
     const q = search.trim().toLowerCase()
-    if (!q) return services
-    return services.filter((item) =>
+    if (!q) return result
+    return result.filter((item) =>
       [item.serviceType, item.departmentType, String(item.id)]
         .join(' ')
         .toLowerCase()
         .includes(q),
     )
-  }, [services, search])
+  }, [services, search, serviceStatusFilter])
 
   // Plans query
   const plansQuery = useQuery({
@@ -565,13 +580,147 @@ export function AdminServiceListCard({
                 />
               )}
             </div>
-            <p>
-              {onlyServiceList
-                ? `Total ${services.length} service(s) registered in the system.`
-                : showPlans
+            {onlyServiceList ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setServiceStatusFilter('ALL')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: serviceStatusFilter === 'ALL' ? '#e2e8f0' : '#f1f5f9',
+                    color: '#334155',
+                    border: `1px solid ${serviceStatusFilter === 'ALL' ? '#94a3b8' : '#e2e8f0'}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Show all services"
+                >
+                  <span>Total:</span>
+                  <strong
+                    style={{
+                      backgroundColor: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      fontSize: '0.72rem',
+                      color: '#0f172a',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    {services.length}
+                  </strong>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setServiceStatusFilter(
+                      serviceStatusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE',
+                    )
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor:
+                      serviceStatusFilter === 'ACTIVE' ? '#dcfce7' : '#ecfdf5',
+                    color: '#059669',
+                    border: `1px solid ${
+                      serviceStatusFilter === 'ACTIVE' ? '#4ade80' : '#a7f3d0'
+                    }`,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Filter active services"
+                >
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10b981',
+                    }}
+                  />
+                  <span>Active:</span>
+                  <strong
+                    style={{
+                      backgroundColor: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      fontSize: '0.72rem',
+                      color: '#059669',
+                      border: '1px solid #a7f3d0',
+                    }}
+                  >
+                    {activeCount}
+                  </strong>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setServiceStatusFilter(
+                      serviceStatusFilter === 'INACTIVE' ? 'ALL' : 'INACTIVE',
+                    )
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor:
+                      serviceStatusFilter === 'INACTIVE' ? '#fee2e2' : '#fef2f2',
+                    color: '#dc2626',
+                    border: `1px solid ${
+                      serviceStatusFilter === 'INACTIVE' ? '#f87171' : '#fecaca'
+                    }`,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Filter inactive services"
+                >
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ef4444',
+                    }}
+                  />
+                  <span>Inactive:</span>
+                  <strong
+                    style={{
+                      backgroundColor: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      fontSize: '0.72rem',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                    }}
+                  >
+                    {inactiveCount}
+                  </strong>
+                </button>
+              </div>
+            ) : (
+              <p>
+                {showPlans
                   ? 'View and manage plans, department types, and associated subservices.'
                   : 'Create a new Service here — once created, "Step 2: Create Department Login" will open automatically.'}
-            </p>
+              </p>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
