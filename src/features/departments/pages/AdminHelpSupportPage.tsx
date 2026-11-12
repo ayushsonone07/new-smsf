@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Link } from '@tanstack/react-router'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   Clock,
@@ -18,6 +17,8 @@ import {
   Shield,
   History as HistoryIcon,
   Loader2,
+  ChevronDown,
+  Eye,
 } from 'lucide-react'
 import {
   fetchAllTickets,
@@ -33,7 +34,6 @@ import type {
 } from '../types/help-center.types'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
-import { ProfileChip } from '../../../components/common/ProfileChip'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { LoadingState } from '../../../components/ui/LoadingState'
@@ -67,20 +67,20 @@ interface DepartmentSummary extends Counts {
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_CUSTOMER', 'ESCALATED', 'RESOLVED', 'CLOSED']
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
 
-const STATUS_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
-  OPEN: { bg: '#edf3ff', fg: '#2864db', dot: '#2864db' },
-  IN_PROGRESS: { bg: '#fff7ed', fg: '#c2410c', dot: '#ea580c' },
-  WAITING_ON_CUSTOMER: { bg: '#fef3c7', fg: '#b45309', dot: '#d97706' },
-  ESCALATED: { bg: '#fef2f2', fg: '#b91c1c', dot: '#dc2626' },
-  RESOLVED: { bg: '#ecfdf5', fg: '#047857', dot: '#10b981' },
-  CLOSED: { bg: '#f1f5f9', fg: '#475569', dot: '#64748b' },
+const STATUS_COLORS: Record<string, { bg: string; fg: string; dot: string; border: string }> = {
+  OPEN: { bg: '#eff6ff', fg: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe' },
+  IN_PROGRESS: { bg: '#fff7ed', fg: '#c2410c', dot: '#ea580c', border: '#fed7aa' },
+  WAITING_ON_CUSTOMER: { bg: '#faf5ff', fg: '#7e22ce', dot: '#a855f7', border: '#e9d5ff' },
+  ESCALATED: { bg: '#fef2f2', fg: '#b91c1c', dot: '#ef4444', border: '#fecaca' },
+  RESOLVED: { bg: '#ecfdf5', fg: '#047857', dot: '#10b981', border: '#a7f3d0' },
+  CLOSED: { bg: '#f8fafc', fg: '#475569', dot: '#94a3b8', border: '#e2e8f0' },
 }
 
-const PRIORITY_COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
-  LOW: { bg: '#f1f5f9', fg: '#475569', dot: '#94a3b8' },
-  MEDIUM: { bg: '#edf3ff', fg: '#2563eb', dot: '#3b82f6' },
-  HIGH: { bg: '#fff0e9', fg: '#cf672e', dot: '#f97316' },
-  URGENT: { bg: '#fef2f2', fg: '#dc2626', dot: '#ef4444' },
+const PRIORITY_COLORS: Record<string, { bg: string; fg: string; dot: string; border: string }> = {
+  LOW: { bg: '#f8fafc', fg: '#475569', dot: '#94a3b8', border: '#e2e8f0' },
+  MEDIUM: { bg: '#eff6ff', fg: '#1d4ed8', dot: '#3b82f6', border: '#bfdbfe' },
+  HIGH: { bg: '#fff7ed', fg: '#c2410c', dot: '#ea580c', border: '#fed7aa' },
+  URGENT: { bg: '#fef2f2', fg: '#b91c1c', dot: '#ef4444', border: '#fecaca' },
 }
 
 const EMPTY_COUNTS: Counts = { total: 0, open: 0, inProgress: 0, waiting: 0, escalated: 0, resolved: 0, closed: 0 }
@@ -133,15 +133,43 @@ function summarizeDepartments(users: HelpCenterDashboardUserAnalytics[]): Depart
   return [...byId.values()].sort((a, b) => b.total - a.total)
 }
 
+function formatDepartment(raw?: string): { label: string; className: string } {
+  if (!raw) return { label: '—', className: 'bg-slate-50 text-slate-600 border-slate-200' }
+  const clean = raw.replace(/_DEPARTMENT$/i, '').replace(/_/g, ' ').trim()
+  const upper = raw.toUpperCase()
+  let className = 'bg-slate-50 text-slate-700 border-slate-200'
+  if (upper.includes('GOOGLE')) {
+    className = 'bg-sky-50 text-sky-700 border-sky-200/90'
+  } else if (upper.includes('AUTOMATION')) {
+    className = 'bg-purple-50 text-purple-700 border-purple-200/90'
+  } else if (upper.includes('WEBSITE') || upper.includes('WEB')) {
+    className = 'bg-emerald-50 text-emerald-700 border-emerald-200/90'
+  } else if (upper.includes('SEO')) {
+    className = 'bg-amber-50 text-amber-700 border-amber-200/90'
+  } else if (upper.includes('SMO') || upper.includes('SOCIAL')) {
+    className = 'bg-indigo-50 text-indigo-700 border-indigo-200/90'
+  } else if (upper.includes('SALE')) {
+    className = 'bg-rose-50 text-rose-700 border-rose-200/90'
+  } else if (upper.includes('DELIVERY') || upper.includes('SUPPORT')) {
+    className = 'bg-teal-50 text-teal-700 border-teal-200/90'
+  } else if (upper.includes('ONBOARDING')) {
+    className = 'bg-blue-50 text-blue-700 border-blue-200/90'
+  } else if (upper.includes('AUTOWEBISION')) {
+    className = 'bg-violet-50 text-violet-700 border-violet-200/90'
+  }
+  const label = clean.replace(/\b\w/g, (c) => c.toUpperCase())
+  return { label, className }
+}
+
 function StatusBadge({ status }: { status?: string }) {
   const norm = (status || 'CLOSED').toUpperCase()
   const cfg = STATUS_COLORS[norm] ?? STATUS_COLORS.CLOSED
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold"
-      style={{ backgroundColor: cfg.bg, color: cfg.fg }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-2xs"
+      style={{ backgroundColor: cfg.bg, color: cfg.fg, borderColor: cfg.border }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
       {humanize(status)}
     </span>
   )
@@ -152,10 +180,10 @@ function PriorityBadge({ priority }: { priority?: string }) {
   const cfg = PRIORITY_COLORS[norm] ?? PRIORITY_COLORS.MEDIUM
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold"
-      style={{ backgroundColor: cfg.bg, color: cfg.fg }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-2xs"
+      style={{ backgroundColor: cfg.bg, color: cfg.fg, borderColor: cfg.border }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
       {humanize(priority)}
     </span>
   )
@@ -525,6 +553,7 @@ function TicketsListSection({
   const [deptFilter, setDeptFilter] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
+  const [copiedTicket, setCopiedTicket] = useState<string | null>(null)
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -558,17 +587,37 @@ function TicketsListSection({
   const totalRecords = ticketsQuery.data?.totalRecords ?? 0
   const isRefreshing = ticketsQuery.isFetching && !ticketsQuery.isLoading
 
+  const hasActiveFilters = Boolean(searchInput || status || priority || deptFilter)
+
+  const handleResetFilters = () => {
+    setSearchInput('')
+    setSearch('')
+    setStatus('')
+    setPriority('')
+    setDeptFilter('')
+    setPage(0)
+  }
+
+  const handleCopyTicket = (e: React.MouseEvent, ticketNumber: string) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(ticketNumber)
+    setCopiedTicket(ticketNumber)
+    setTimeout(() => {
+      setCopiedTicket((prev) => (prev === ticketNumber ? null : prev))
+    }, 1500)
+  }
+
   return (
     <div className="bg-white border border-[#e7ebf3] rounded-2xl shadow-sm overflow-hidden mb-6">
-      <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#e7ebf3]">
+      <div className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#e7ebf3] bg-gradient-to-r from-white via-white to-slate-50/50">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-bold text-[#17243c] tracking-tight">Tickets</h2>
-          <span className="text-xs font-semibold text-[#73829c] bg-[#f5f7fb] px-2.5 py-1 rounded-full border border-[#e7edf5]">
-            {totalRecords} total
+          <span className="text-xs font-semibold text-[#5c6d88] bg-[#f5f7fb] px-2.5 py-1 rounded-full border border-[#e2e8f0]">
+            {totalRecords.toLocaleString()} total
           </span>
           <button
             onClick={() => ticketsQuery.refetch()}
-            className="w-8 h-8 rounded-lg border border-[#e7ebf3] bg-white flex items-center justify-center text-[#5c6d88] hover:text-[#315fe8] hover:bg-[#f8fafe] transition-colors"
+            className="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white flex items-center justify-center text-[#5c6d88] hover:text-[#315fe8] hover:bg-[#f8fafe] transition-colors shadow-2xs"
             title="Refresh tickets"
           >
             <RotateCw className={`w-3.5 h-3.5 ${ticketsQuery.isFetching ? 'animate-spin' : ''}`} />
@@ -576,66 +625,105 @@ function TicketsListSection({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[220px]">
-            <Search className="w-4 h-4 text-[#9aa6b9] absolute left-3 top-1/2 -translate-y-1/2" />
+          {/* Search Box */}
+          <div className="relative min-w-[240px] flex-1 sm:flex-initial">
+            <Search className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              className="w-full h-9 pl-9 pr-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] placeholder-[#9aa6b9] focus:outline-none focus:border-[#315fe8]"
+              className="w-full h-9 pl-9 pr-8 bg-white border border-[#e2e8f0] rounded-lg text-xs text-[#17243c] placeholder-[#94a3b8] focus:outline-none focus:border-[#315fe8] focus:ring-2 focus:ring-[#315fe8]/15 transition-all shadow-2xs"
               placeholder="Search ticket # or subject"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('')
+                  setSearch('')
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-[#94a3b8] hover:text-[#475569] rounded-full hover:bg-[#f1f5f9] transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
+          {/* Department Filter */}
           {departmentId === undefined && (
+            <div className="relative">
+              <select
+                className="h-9 appearance-none pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8] focus:ring-2 focus:ring-[#315fe8]/15 transition-all cursor-pointer shadow-2xs hover:bg-[#f8fafc]"
+                value={deptFilter}
+                onChange={(e) => {
+                  setDeptFilter(e.target.value)
+                  setPage(0)
+                }}
+              >
+                <option value="">All departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name.replace(/_DEPARTMENT$/i, '').replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#94a3b8] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+            </div>
+          )}
+
+          {/* Status Filter */}
+          <div className="relative">
             <select
-              className="h-9 px-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8]"
-              value={deptFilter}
+              className="h-9 appearance-none pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8] focus:ring-2 focus:ring-[#315fe8]/15 transition-all cursor-pointer shadow-2xs hover:bg-[#f8fafc]"
+              value={status}
               onChange={(e) => {
-                setDeptFilter(e.target.value)
+                setStatus(e.target.value)
                 setPage(0)
               }}
             >
-              <option value="">All departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {humanize(s)}
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-[#94a3b8] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+          </div>
+
+          {/* Priority Filter */}
+          <div className="relative">
+            <select
+              className="h-9 appearance-none pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8] focus:ring-2 focus:ring-[#315fe8]/15 transition-all cursor-pointer shadow-2xs hover:bg-[#f8fafc]"
+              value={priority}
+              onChange={(e) => {
+                setPriority(e.target.value)
+                setPage(0)
+              }}
+            >
+              <option value="">All priorities</option>
+              {PRIORITY_OPTIONS.map((p) => (
+                <option key={p} value={p}>
+                  {humanize(p)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-[#94a3b8] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+          </div>
+
+          {/* Reset Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-dashed border-[#cbd5e1] text-xs font-semibold text-[#475569] hover:text-[#0f172a] hover:border-[#94a3b8] hover:bg-[#f8fafc] transition-colors"
+              title="Reset all filters"
+            >
+              <X className="w-3.5 h-3.5 text-[#94a3b8]" />
+              <span>Reset</span>
+            </button>
           )}
-
-          <select
-            className="h-9 px-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8]"
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
-              setPage(0)
-            }}
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {humanize(s)}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="h-9 px-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] font-medium focus:outline-none focus:border-[#315fe8]"
-            value={priority}
-            onChange={(e) => {
-              setPriority(e.target.value)
-              setPage(0)
-            }}
-          >
-            <option value="">All priorities</option>
-            {PRIORITY_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {humanize(p)}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -660,15 +748,32 @@ function TicketsListSection({
         </div>
       ) : rows.length === 0 ? (
         <div className="py-14 text-center">
+          <div className="w-12 h-12 rounded-full bg-[#f8fafc] border border-[#e2e8f0] flex items-center justify-center mx-auto mb-3 text-[#94a3b8]">
+            <FileText className="w-5 h-5" />
+          </div>
           <strong className="block text-sm font-bold text-[#1e293b]">No tickets found</strong>
-          <span className="text-xs text-[#64748b] mt-1 block">Try clearing the search or filters.</span>
+          <span className="text-xs text-[#64748b] mt-1 block">
+            {hasActiveFilters
+              ? 'No tickets match your search or filter criteria.'
+              : 'No tickets are currently available.'}
+          </span>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="mt-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#cbd5e1] bg-white text-xs font-semibold text-[#334155] hover:bg-[#f8fafc] shadow-2xs transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear filters</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className={`transition-opacity ${isRefreshing ? 'opacity-60 pointer-events-none' : ''}`}>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
               <thead>
-                <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#7b89a1] tracking-wider uppercase">
+                <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#64748b] tracking-wider uppercase">
                   <th className="py-3 px-4">TICKET #</th>
                   <th className="py-3 px-4">SUBJECT</th>
                   <th className="py-3 px-4">DEPARTMENT</th>
@@ -678,40 +783,75 @@ function TicketsListSection({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eff2f7]">
-                {rows.map((row) => (
-                  <tr key={row.ticketNumber} className="hover:bg-[#f9fbff] transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-[#17243c]">
-                      {row.ticketNumber}
-                    </td>
-                    <td className="py-3.5 px-4 text-[#334155] max-w-[340px] truncate">
-                      {row.subject || '—'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-block bg-[#f1f5f9] text-[#475569] font-semibold text-[11px] px-2.5 py-0.5 rounded border border-[#e2e8f0]">
-                        {row.department || '—'}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <StatusBadge status={status || 'OPEN'} />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <PriorityBadge priority={priority || 'MEDIUM'} />
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => onViewTicket(row.ticketNumber)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-bold text-xs hover:bg-[#315fe8] hover:text-white transition-all shadow-sm"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const deptStyle = formatDepartment(row.department)
+                  return (
+                    <tr
+                      key={row.ticketNumber}
+                      onClick={() => onViewTicket(row.ticketNumber)}
+                      className="group hover:bg-[#f6f9fe] transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-semibold text-[#1e293b] bg-[#f1f5f9] border border-[#e2e8f0] px-2 py-0.5 rounded-md">
+                            {row.ticketNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyTicket(e, row.ticketNumber)}
+                            className="p-1 rounded-md text-[#94a3b8] hover:text-[#334155] hover:bg-[#e2e8f0] transition-colors opacity-60 group-hover:opacity-100"
+                            title="Copy ticket number"
+                          >
+                            {copiedTicket === row.ticketNumber ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className="block max-w-[340px] lg:max-w-[460px] truncate text-xs font-medium text-[#1e293b] group-hover:text-[#315fe8] transition-colors"
+                          title={row.subject || undefined}
+                        >
+                          {row.subject || '—'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${deptStyle.className}`}
+                        >
+                          {deptStyle.label}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <StatusBadge status={(row as any).status || status || 'OPEN'} />
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <PriorityBadge priority={(row as any).priority || priority || 'MEDIUM'} />
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onViewTicket(row.ticketNumber)
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-semibold text-xs hover:bg-[#315fe8] hover:text-white transition-all shadow-2xs group/btn active:scale-[0.98]"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#315fe8] group-hover/btn:text-white transition-colors" />
+                          <span>View</span>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
-          <div className="p-4 border-t border-[#e7ebf3]">
+          <div className="p-4 border-t border-[#e7ebf3] bg-[#fafcff]/60">
             <TablePagination
               page={page}
               pageSize={pageSize}
@@ -1177,27 +1317,6 @@ export function AdminHelpSupportPage() {
   return (
     <PageLayout>
       <PageHeader
-        breadcrumb={
-          <>
-            <Link to="/admin">Administration</Link>
-            {' / '}
-            {selectedDept && tab === 'overview' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDeptId(null)}
-                  className="text-[#315fe8] hover:underline font-semibold"
-                >
-                  Help &amp; Support
-                </button>
-                {' / '}
-                <span className="text-[#17243c] font-bold">{selectedDept.name}</span>
-              </>
-            ) : (
-              <span className="text-[#17243c] font-bold">Help &amp; Support</span>
-            )}
-          </>
-        }
         title={
           selectedDept && tab === 'overview'
             ? `${selectedDept.name} — Help & Support`
@@ -1209,14 +1328,11 @@ export function AdminHelpSupportPage() {
             : 'Monitor ticket activity and department performance in one place.'
         }
         actions={
-          <div className="flex items-center gap-3">
-            <RefreshButton
-              onRefresh={() => analyticsQuery.refetch()}
-              isRefreshing={analyticsQuery.isFetching}
-              label="overview"
-            />
-            <ProfileChip />
-          </div>
+          <RefreshButton
+            onRefresh={() => analyticsQuery.refetch()}
+            isRefreshing={analyticsQuery.isFetching}
+            label="overview"
+          />
         }
       />
 
