@@ -774,12 +774,12 @@ function TicketsListSection({
             <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
               <thead>
                 <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#64748b] tracking-wider uppercase">
-                  <th className="py-3 px-4 w-[180px] min-w-[180px]">TICKET #</th>
-                  <th className="py-3 px-4 w-[300px] min-w-[300px] max-w-[300px]">SUBJECT</th>
-                  <th className="py-3 px-4 w-[160px] min-w-[160px]">DEPARTMENT</th>
-                  <th className="py-3 px-4 w-[130px] min-w-[130px]">STATUS</th>
-                  <th className="py-3 px-4 w-[130px] min-w-[130px]">PRIORITY</th>
-                  <th className="py-3 px-4 text-right w-[100px] min-w-[100px]">DETAILS</th>
+                  <th className="py-2.5 px-3 w-[155px]">TICKET #</th>
+                  <th className="py-2.5 px-3 min-w-[180px] max-w-[260px]">SUBJECT</th>
+                  <th className="py-2.5 px-2.5 w-[125px]">DEPARTMENT</th>
+                  <th className="py-2.5 px-2 w-[90px]">STATUS</th>
+                  <th className="py-2.5 px-2 w-[90px]">PRIORITY</th>
+                  <th className="py-2.5 px-3 text-right w-[75px]">DETAILS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eff2f7]">
@@ -792,7 +792,7 @@ function TicketsListSection({
                       onClick={() => onViewTicket(row.ticketNumber)}
                       className="group hover:bg-[#f6f9fe] transition-colors cursor-pointer"
                     >
-                      <td className="py-3.5 px-4 w-[180px] min-w-[180px]">
+                      <td className="py-2.5 px-3 w-[155px]">
                         <div className="inline-flex items-center gap-1.5">
                           <span className="font-mono text-xs font-semibold text-[#1e293b] bg-[#f1f5f9] border border-[#e2e8f0] px-2 py-0.5 rounded-md">
                             {row.ticketNumber}
@@ -811,43 +811,43 @@ function TicketsListSection({
                           </button>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 w-[300px] min-w-[300px] max-w-[300px]">
+                      <td className="py-2.5 px-3 min-w-[180px] max-w-[260px]">
                         <div className="relative group/subject inline-block max-w-full align-middle">
                           <span className="block truncate text-xs font-medium text-[#1e293b] group-hover:text-[#315fe8] transition-colors">
                             {row.subject || '—'}
                           </span>
-                          {row.subject && row.subject.length > 28 && (
+                          {row.subject && row.subject.length > 24 && (
                             <div
                               className={`pointer-events-none absolute left-0 ${
                                 isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-                              } hidden group-hover/subject:block z-50 w-max max-w-[360px] rounded-lg bg-white px-3 py-2 text-xs font-normal text-[#17243c] shadow-lg border border-[#e2e8f0] whitespace-normal break-words leading-relaxed animate-in fade-in duration-150 ring-1 ring-black/5`}
+                              } hidden group-hover/subject:block z-50 w-max max-w-[340px] rounded-lg bg-white px-3 py-2 text-xs font-normal text-[#17243c] shadow-lg border border-[#e2e8f0] whitespace-normal break-words leading-relaxed animate-in fade-in duration-150 ring-1 ring-black/5`}
                             >
                               {row.subject}
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 w-[160px] min-w-[160px]">
+                      <td className="py-2.5 px-2.5 w-[125px]">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${deptStyle.className}`}
                         >
                           {deptStyle.label}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 w-[130px] min-w-[130px]">
+                      <td className="py-2.5 px-2 w-[90px]">
                         <StatusBadge status={(row as any).status || status || 'OPEN'} />
                       </td>
-                      <td className="py-3.5 px-4 w-[130px] min-w-[130px]">
+                      <td className="py-2.5 px-2 w-[90px]">
                         <PriorityBadge priority={(row as any).priority || priority || 'MEDIUM'} />
                       </td>
-                      <td className="py-3.5 px-4 text-right w-[100px] min-w-[100px]">
+                      <td className="py-2.5 px-3 text-right w-[75px]">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             onViewTicket(row.ticketNumber)
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-semibold text-xs hover:bg-[#315fe8] hover:text-white transition-all shadow-2xs group/btn active:scale-[0.98]"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-semibold text-xs hover:bg-[#315fe8] hover:text-white transition-all shadow-2xs group/btn active:scale-[0.98]"
                         >
                           <Eye className="w-3.5 h-3.5 text-[#315fe8] group-hover/btn:text-white transition-colors" />
                           <span>View</span>
