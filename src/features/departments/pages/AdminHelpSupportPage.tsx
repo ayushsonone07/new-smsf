@@ -813,22 +813,16 @@ function TicketsListSection({
                       </td>
                       <td className="py-3.5 px-4 w-[300px] min-w-[300px] max-w-[300px]">
                         <div className="relative group/subject inline-block max-w-full align-middle">
-                          <span
-                            className="block truncate text-xs font-medium text-[#1e293b] group-hover:text-[#315fe8] transition-colors"
-                            title={row.subject || undefined}
-                          >
+                          <span className="block truncate text-xs font-medium text-[#1e293b] group-hover:text-[#315fe8] transition-colors">
                             {row.subject || '—'}
                           </span>
-                          {row.subject && (
+                          {row.subject && row.subject.length > 28 && (
                             <div
                               className={`pointer-events-none absolute left-0 ${
                                 isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-                              } hidden group-hover/subject:block z-50 w-max max-w-[360px] rounded-lg bg-[#0f172a] p-2.5 text-xs text-white shadow-xl whitespace-normal break-words leading-relaxed border border-slate-700/80 animate-in fade-in duration-150`}
+                              } hidden group-hover/subject:block z-50 w-max max-w-[360px] rounded-lg bg-white px-3 py-2 text-xs font-normal text-[#17243c] shadow-lg border border-[#e2e8f0] whitespace-normal break-words leading-relaxed animate-in fade-in duration-150 ring-1 ring-black/5`}
                             >
-                              <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
-                                Full Subject
-                              </span>
-                              <span className="font-medium text-slate-100">{row.subject}</span>
+                              {row.subject}
                             </div>
                           )}
                         </div>
