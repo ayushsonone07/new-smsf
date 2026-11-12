@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   RotateCw,
-  Bell,
   Search,
   Plus,
 } from 'lucide-react'
@@ -19,8 +18,9 @@ import {
   prepareLoginWindow,
 } from '../../../app/auth/session'
 import {
-  getAdminDepartmentSummary,
+  getAdminAllDepartmentsSummary,
   toLocalDateTimeParam,
+  type AdminDepartmentSummary,
 } from '../../../api/admin-summary.api'
 import { getAdminDepartments } from '../../../api/admin-departments.api'
 import type {
@@ -126,20 +126,28 @@ export function DepartmentManagementPage() {
     return { startDate: toLocalDateTimeParam(start), endDate: toLocalDateTimeParam(end) }
   }, [])
 
-  const departmentSummaryQueries = useQueries({
-    queries: departmentTypes.map((departmentType) => ({
-      queryKey: ['admin-summary', '30d', departmentType],
-      queryFn: () => getAdminDepartmentSummary({ ...range, departmentType }),
-      staleTime: 60_000,
-    })),
+  const summaryAllQuery = useQuery({
+    queryKey: ['admin-summary-all', '30d'],
+    queryFn: () => getAdminAllDepartmentsSummary(range),
+    staleTime: 60_000,
   })
+
+  const summaryByDept = useMemo(() => {
+    const map = new Map<string, AdminDepartmentSummary>()
+    const list = summaryAllQuery.data?.departments ?? []
+    for (const item of list) {
+      if (item.departmentType) {
+        map.set(item.departmentType.toUpperCase(), item)
+      }
+    }
+    return map
+  }, [summaryAllQuery.data])
 
   // 3. Build Enriched Department list
   const enrichedList: EnrichedDepartment[] = useMemo(() => {
     return uniqueHeads.map((dept) => {
       const type = dept.type || 'UNKNOWN'
-      const typeIndex = departmentTypes.indexOf(type)
-      const summary = typeIndex >= 0 ? departmentSummaryQueries[typeIndex]?.data : undefined
+      const summary = summaryByDept.get(type.toUpperCase())
 
       const label = departmentLabel(type)
       const headFromUsers = adminUsersQuery.data?.data?.find(
@@ -179,7 +187,7 @@ export function DepartmentManagementPage() {
         visual: getDepartmentVisual(label),
       }
     })
-  }, [uniqueHeads, departmentTypes, departmentSummaryQueries, adminUsersQuery.data, userCountByDept])
+  }, [uniqueHeads, summaryByDept, adminUsersQuery.data, userCountByDept])
 
   // Filtered by Search & Status
   const filteredDepartments = useMemo(() => {
@@ -291,12 +299,13 @@ export function DepartmentManagementPage() {
     )
   }
 
-  const isRefreshing = departmentsQuery.isFetching || adminUsersQuery.isFetching
+  const isRefreshing =
+    departmentsQuery.isFetching || adminUsersQuery.isFetching || summaryAllQuery.isFetching
 
   const handleRefreshAll = () => {
     departmentsQuery.refetch()
     adminUsersQuery.refetch()
-    departmentSummaryQueries.forEach((q) => q.refetch())
+    summaryAllQuery.refetch()
   }
 
   if (departmentsQuery.isPending) {
@@ -322,54 +331,26 @@ export function DepartmentManagementPage() {
   return (
     <PageLayout>
       <div className="dept-page-container">
-        {/* 1. TOP HEADER BAR */}
-        <header className="dept-page-header">
-          <div className="flex items-baseline gap-3">
-            <h1 className="dept-page-title">Departments</h1>
-            <span className="dept-page-subtitle">
-              Heads, users and status of every department
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="dept-header-icon-btn"
-              onClick={handleRefreshAll}
-              title="Refresh departments"
-              disabled={isRefreshing}
-            >
-              <RotateCw className={`w-4 h-4 text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              type="button"
-              className="dept-header-icon-btn"
-              onClick={() => navigate({ to: '/admin/notification-history' as any })}
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-        </header>
-
-        {/* 2. MAIN WHITE CARD WITH TOOLBAR & TABLE */}
+        {/* MAIN WHITE CARD WITH TOOLBAR & TABLE */}
         <div className="dept-main-card">
-          {/* Toolbar: Search on Left, Status Pills + Create Button on Right */}
+          {/* Single Toolbar Line: Departments Title + Search + Filter Pills + Create Dept + Refresh */}
           <div className="dept-toolbar">
-            {/* Search Input */}
-            <div className="dept-search-wrapper">
-              <Search className="dept-search-icon" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search department, head or email"
-                className="dept-search-input"
-              />
+            {/* Left: Departments Title + Search Input */}
+            <div className="flex items-center gap-4 flex-1 min-w-[280px]">
+              <h1 className="dept-page-title whitespace-nowrap">Departments</h1>
+              <div className="dept-search-wrapper">
+                <Search className="dept-search-icon" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search department, head or email"
+                  className="dept-search-input"
+                />
+              </div>
             </div>
 
-            {/* Right Controls: Pills + Create Button */}
+            {/* Right Controls: Pills + Create Button + Refresh */}
             <div className="dept-toolbar-right">
               {/* Status Filter Pills */}
               <div className="dept-status-pills">
@@ -404,6 +385,17 @@ export function DepartmentManagementPage() {
               >
                 <Plus className="w-4 h-4" />
                 <span>Create Department</span>
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                type="button"
+                className="dept-header-icon-btn"
+                onClick={handleRefreshAll}
+                title="Refresh departments"
+                disabled={isRefreshing}
+              >
+                <RotateCw className={`w-4 h-4 text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
               </button>
             </div>
           </div>
