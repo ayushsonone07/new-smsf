@@ -402,7 +402,7 @@ export function DepartmentManagementPage() {
 
           {/* Department Table */}
           <div
-            className={`transition-opacity duration-200 ${
+            className={`transition-opacity duration-200 flex-1 min-h-0 flex flex-col ${
               isRefreshing ? 'pointer-events-none opacity-60' : ''
             }`}
             aria-busy={isRefreshing}
