@@ -1,6 +1,11 @@
 import type { ManualOnboardingInput } from "../types";
 
 export interface OnboardingFormErrors {
+  workLocation?: string;
+  rcNumber?: string;
+  drivingLicenceNumber?: string;
+  rcDocument?: string;
+  drivingLicence?: string;
   dateOfBirth?: string;
   gender?: string;
   bloodGroup?: string;
@@ -8,6 +13,7 @@ export interface OnboardingFormErrors {
   guardianRelation?: string;
   guardianNumber?: string;
   address?: string;
+  currentAddress?: string;
   vehicleNumber?: string;
   vehicleBrand?: string;
   panNumber?: string;
@@ -27,6 +33,14 @@ export interface OnboardingFormErrors {
 }
 
 export const MAX_ONBOARDING_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
+
+export const VALID_GUARDIAN_RELATIONS = [
+  "Father",
+  "Mother",
+  "Brother",
+  "Sister",
+  "Spouse",
+] as const;
 
 export const VALID_BLOOD_GROUPS = [
   "A+",
@@ -117,8 +131,9 @@ export function validateGuardianRelation(rel: string): string | null {
   if (!rel || !rel.trim()) {
     return "Guardian relation is required";
   }
-  if (rel.trim().length < 2) {
-    return "Guardian relation must be at least 2 characters (e.g. Father, Mother)";
+  const valid = (VALID_GUARDIAN_RELATIONS as readonly string[]).map((r) => r.toLowerCase());
+  if (!valid.includes(rel.trim().toLowerCase())) {
+    return "Please select a valid guardian relation";
   }
   return null;
 }
@@ -147,6 +162,16 @@ export function validateAddress(address: string): string | null {
   return null;
 }
 
+export function validateCurrentAddress(address: string): string | null {
+  if (!address || !address.trim()) {
+    return null; // optional
+  }
+  if (address.trim().length < 5) {
+    return "Current address must be at least 5 characters";
+  }
+  return null;
+}
+
 export function validateAadhaarNumber(aadhaar: string): string | null {
   if (!aadhaar || !aadhaar.trim()) {
     return "Aadhaar number is required";
@@ -163,7 +188,7 @@ export function validateAadhaarNumber(aadhaar: string): string | null {
 
 export function validatePanNumber(pan: string): string | null {
   if (!pan || !pan.trim()) {
-    return null; // optional
+    return "PAN number is required";
   }
   const cleaned = pan.trim().toUpperCase();
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
@@ -245,6 +270,41 @@ export function validateOnboardingForm(
   const errors: OnboardingFormErrors = {};
   const urls = options?.existingUrls ?? {};
 
+  if (!values.workLocation || !values.workLocation.trim()) {
+    errors.workLocation = "Office location is required";
+  }
+
+  const isNoida = values.workLocation?.toUpperCase() === "NOIDA";
+
+  if (isNoida) {
+    if (!values.vehicleNumber || !values.vehicleNumber.trim()) {
+      errors.vehicleNumber = "Vehicle number is required for Noida location";
+    }
+    if (!values.vehicleBrand || !values.vehicleBrand.trim()) {
+      errors.vehicleBrand = "Vehicle brand / model is required for Noida location";
+    }
+    if (!values.rcNumber || !values.rcNumber.trim()) {
+      errors.rcNumber = "RC number is required for Noida location";
+    }
+    if (!values.drivingLicenceNumber || !values.drivingLicenceNumber.trim()) {
+      errors.drivingLicenceNumber = "Driving licence number is required for Noida location";
+    }
+    const rcDocErr = validateFile(values.rcDocument, "RC document", true, ALLOWED_DOC_EXTENSIONS, urls.rcDocument);
+    if (rcDocErr) errors.rcDocument = rcDocErr;
+
+    const dlDocErr = validateFile(values.drivingLicence, "Driving licence", true, ALLOWED_DOC_EXTENSIONS, urls.drivingLicence);
+    if (dlDocErr) errors.drivingLicence = dlDocErr;
+  } else if (values.workLocation) {
+    if (values.rcDocument) {
+      const rcDocErr = validateFile(values.rcDocument, "RC document", false, ALLOWED_DOC_EXTENSIONS, urls.rcDocument);
+      if (rcDocErr) errors.rcDocument = rcDocErr;
+    }
+    if (values.drivingLicence) {
+      const dlDocErr = validateFile(values.drivingLicence, "Driving licence", false, ALLOWED_DOC_EXTENSIONS, urls.drivingLicence);
+      if (dlDocErr) errors.drivingLicence = dlDocErr;
+    }
+  }
+
   const dobErr = validateDateOfBirth(values.dateOfBirth);
   if (dobErr) errors.dateOfBirth = dobErr;
 
@@ -265,6 +325,9 @@ export function validateOnboardingForm(
 
   const addrErr = validateAddress(values.address);
   if (addrErr) errors.address = addrErr;
+
+  const cAddrErr = validateCurrentAddress(values.currentAddress);
+  if (cAddrErr) errors.currentAddress = cAddrErr;
 
   const aadhaarErr = validateAadhaarNumber(values.aadhaarNumber);
   if (aadhaarErr) errors.aadhaarNumber = aadhaarErr;
@@ -288,7 +351,7 @@ export function validateOnboardingForm(
   const aadhaarCardErr = validateFile(values.aadhaarCard, "Aadhaar card", true, ALLOWED_DOC_EXTENSIONS, urls.aadhaarCard);
   if (aadhaarCardErr) errors.aadhaarCard = aadhaarCardErr;
 
-  const panCardErr = validateFile(values.panCard, "PAN card", false, ALLOWED_DOC_EXTENSIONS, urls.panCard);
+  const panCardErr = validateFile(values.panCard, "PAN card", true, ALLOWED_DOC_EXTENSIONS, urls.panCard);
   if (panCardErr) errors.panCard = panCardErr;
 
   const passbookErr = validateFile(values.bankPassbook, "Bank passbook", true, ALLOWED_DOC_EXTENSIONS, urls.bankPassbook);
