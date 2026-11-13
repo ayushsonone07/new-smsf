@@ -23,7 +23,7 @@ import {
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useToast } from "@shared/components/feedback";
-import { DatePicker, Dialog } from "@shared/components/ui";
+import { ConfirmDialog, DatePicker, Dialog } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 
@@ -53,6 +53,13 @@ export function EmployeeOnboardingPage() {
   const qc = useQueryClient();
   const [lastExpiry, setLastExpiry] = useState<string | null>(null);
   const [lastFormUrl, setLastFormUrl] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    confirmVariant?: "default" | "destructive";
+    onConfirm: () => void;
+  } | null>(null);
   const backState = location.state as OnboardingBackState | null;
   const backTo = backState?.from || "/hrm/employees";
   const backLabel = backState?.label || "Back to employees";
@@ -148,31 +155,65 @@ export function EmployeeOnboardingPage() {
               }}
               onSend={() => linkMutation.mutate()}
               onResend={() => {
-                if (
-                  window.confirm("Resend the onboarding link? The old link will stop being useful.")
-                ) {
-                  linkMutation.mutate();
-                }
+                setConfirmDialog({
+                  title: "Resend Onboarding Link",
+                  description:
+                    "Are you sure you want to resend the onboarding link? The previous link will become invalid and a fresh link will be generated.",
+                  confirmLabel: "Resend Link",
+                  confirmVariant: "default",
+                  onConfirm: () => {
+                    linkMutation.mutate();
+                    setConfirmDialog(null);
+                  },
+                });
               }}
               onVerify={() => {
-                if (window.confirm("Verify and complete onboarding for this employee?")) {
-                  verifyMutation.mutate();
-                }
+                setConfirmDialog({
+                  title: "Verify & Complete Onboarding",
+                  description:
+                    "Are you sure you want to verify and complete onboarding for this employee? This will confirm all submitted details and documents.",
+                  confirmLabel: "Verify & Complete",
+                  confirmVariant: "default",
+                  onConfirm: () => {
+                    verifyMutation.mutate();
+                    setConfirmDialog(null);
+                  },
+                });
               }}
               onResendPasswordSetup={() => {
-                if (
-                  window.confirm(
-                    "Resend the password setup link? The old link will stop being useful."
-                  )
-                ) {
-                  resendPasswordSetupMutation.mutate();
-                }
+                setConfirmDialog({
+                  title: "Resend Password Setup Link",
+                  description:
+                    "Are you sure you want to resend the password setup link? The previous setup link will stop being useful.",
+                  confirmLabel: "Resend Setup Link",
+                  confirmVariant: "default",
+                  onConfirm: () => {
+                    resendPasswordSetupMutation.mutate();
+                    setConfirmDialog(null);
+                  },
+                });
               }}
             />
             <ReviewGrid view={view} />
           </div>
         ) : null}
       </div>
+      {confirmDialog ? (
+        <ConfirmDialog
+          open={Boolean(confirmDialog)}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          confirmVariant={confirmDialog.confirmVariant ?? "default"}
+          loading={
+            linkMutation.isPending ||
+            verifyMutation.isPending ||
+            resendPasswordSetupMutation.isPending
+          }
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      ) : null}
     </>
   );
 }
@@ -1267,6 +1308,7 @@ function DocumentLink({
   const qc = useQueryClient();
   const [busyAction, setBusyAction] = useState<"view" | "download" | "delete" | null>(null);
   const [preview, setPreview] = useState<{ title: string; url: string; mime: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const missing = !url;
 
   async function download() {
@@ -1304,13 +1346,12 @@ function DocumentLink({
 
   async function deleteDocument() {
     if (!url) return;
-    if (!window.confirm(`Delete ${label}? This will remove the stored document.`)) return;
-
     setBusyAction("delete");
     try {
       const message = await hrService.deleteOnboardingDocument(url);
       await qc.invalidateQueries({ queryKey: ["hr", "employee-onboarding"] });
       toast.success(message || "Document deleted");
+      setShowDeleteConfirm(false);
     } catch (err) {
       toast.error("Delete failed", getApiErrorMessage(err));
     } finally {
@@ -1350,7 +1391,7 @@ function DocumentLink({
             loading={busyAction === "delete"}
             disabled={missing || busyAction !== null}
             tone="danger"
-            onClick={() => void deleteDocument()}
+            onClick={() => setShowDeleteConfirm(true)}
           />
         </div>
       </div>
@@ -1360,6 +1401,16 @@ function DocumentLink({
           if (preview) URL.revokeObjectURL(preview.url);
           setPreview(null);
         }}
+      />
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Document"
+        description={`Are you sure you want to delete ${label}? This will remove the stored document.`}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        loading={busyAction === "delete"}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => void deleteDocument()}
       />
     </>
   );

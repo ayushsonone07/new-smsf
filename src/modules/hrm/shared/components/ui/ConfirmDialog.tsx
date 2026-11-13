@@ -1,5 +1,5 @@
 import { Button } from "@hrm/components/ui/button";
-import { Dialog, DialogDescription, DialogFooter } from "@hrm/components/ui/dialog";
+import { Dialog, DialogFooter } from "@hrm/components/ui/dialog";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   description?: string | undefined;
   confirmLabel?: string;
   cancelLabel?: string;
+  confirmVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   loading?: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -18,20 +19,21 @@ export function ConfirmDialog({
   description,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
+  confirmVariant = "destructive",
   loading = false,
   onClose,
   onConfirm,
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} title={title} description={description ?? undefined} size="sm">
-      <div className="pt-2">
-        {description ? <DialogDescription>{description}</DialogDescription> : null}
-      </div>
+    <Dialog open={open} onClose={onClose} title={title} size="sm">
+      {description ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+      ) : null}
       <DialogFooter>
         <Button variant="ghost" onClick={onClose} disabled={loading}>
           {cancelLabel}
         </Button>
-        <Button variant="destructive" onClick={onConfirm} disabled={loading}>
+        <Button variant={confirmVariant} onClick={onConfirm} disabled={loading}>
           {loading ? "Loading..." : confirmLabel}
         </Button>
       </DialogFooter>
