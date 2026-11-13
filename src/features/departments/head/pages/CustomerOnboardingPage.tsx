@@ -303,7 +303,6 @@ export function CustomerOnboardingPage({ feature }: { feature: FeaturePermission
         onClose={() => setConfirmingCustomer(null)}
         onSuccess={() => {
           setConfirmingCustomer(null)
-          customersQuery.refetch()
         }}
       />
     </>
