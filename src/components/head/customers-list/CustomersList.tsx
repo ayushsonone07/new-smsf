@@ -979,7 +979,48 @@ function CustomerRow({
     Boolean(customer.serviceType?.toUpperCase().includes('CREATIVE'))
 
   const subServicesList = useMemo(() => {
-    // 1. From customer.subServiceInfo
+    const subServiceStatuses: string[] = []
+    if (Array.isArray(customer.subServiceInfo)) {
+      for (const item of customer.subServiceInfo) {
+        if (!item || typeof item !== 'object') continue
+        const rawStatus =
+          item.status ||
+          item.subServiceStatus ||
+          Object.values(item)[0]
+        if (rawStatus) subServiceStatuses.push(String(rawStatus).trim().toUpperCase())
+      }
+    }
+    const hasSubServices = subServiceStatuses.length > 0
+    const allSubServicesCompleted =
+      hasSubServices &&
+      subServiceStatuses.every((status) => status === 'COMPLETED' || status === 'COMPLETE')
+
+    // 1. The Services column is driven by the service API status. A service is
+    // only displayed as completed when its own status and every sub-service are complete.
+    if (Array.isArray(customer.services) && customer.services.length > 0) {
+      const seen = new Set<string>()
+      const list: Array<{ name: string; status: string }> = []
+      for (const service of customer.services) {
+        const name = String(service.name || (service as any).serviceType || '').trim()
+        if (!name || seen.has(name.toLowerCase())) continue
+
+        seen.add(name.toLowerCase())
+        const rawStatus = String(service.status || 'PENDING').trim().toUpperCase()
+        const serviceCompleted = rawStatus === 'COMPLETED' || rawStatus === 'COMPLETE'
+        list.push({
+          name: name.replace(/_/g, ' '),
+          status:
+            serviceCompleted && (!hasSubServices || allSubServicesCompleted)
+              ? 'COMPLETED'
+              : serviceCompleted
+                ? 'IN_PROGRESS'
+                : rawStatus,
+        })
+      }
+      if (list.length > 0) return list
+    }
+
+    // 2. Fall back to sub-service data when the API does not return a service row.
     if (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
       const seen = new Set<string>()
       const list: Array<{ name: string; status: string }> = []
@@ -1005,20 +1046,6 @@ function CustomerRow({
         if (name && !seen.has(name.toLowerCase())) {
           seen.add(name.toLowerCase())
           list.push({ name, status })
-        }
-      }
-      if (list.length > 0) return list
-    }
-
-    // 2. From customer.services
-    if (Array.isArray(customer.services) && customer.services.length > 0) {
-      const seen = new Set<string>()
-      const list: Array<{ name: string; status: string }> = []
-      for (const s of customer.services) {
-        const name = String(s.name || (s as any).serviceType || '').trim()
-        if (name && !seen.has(name.toLowerCase())) {
-          seen.add(name.toLowerCase())
-          list.push({ name, status: String(s.status || 'PENDING') })
         }
       }
       if (list.length > 0) return list

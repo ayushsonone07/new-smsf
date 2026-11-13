@@ -431,7 +431,14 @@ export function CustomerListPage() {
           'Customer'
         const email = c.email || c.customerDetails?.email || ''
         const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
-        const s = (c.status || c.onboardingStatus || 'pending').toLowerCase()
+        // `status` on a department customer row is the service status.  Keep it
+        // out of the customer Status column, which must use onboarding status.
+        const s = String(
+          c.onboardingStatus ||
+          (c.customerDetails as any)?.onboardingStatus ||
+          (c.customerDetails as any)?.status ||
+          'pending',
+        ).toLowerCase()
         const status = s.includes('complete')
           ? 'completed'
           : s.includes('progress') || s === 'active'
@@ -477,7 +484,7 @@ export function CustomerListPage() {
             '',
           serviceType: c.serviceType || serviceFallback,
           callStatus: 'connected',
-          status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
+          status,
           assigneeId: assigned,
           remark:
             c.latestInternalRemark ||
@@ -506,7 +513,18 @@ export function CustomerListPage() {
               return sub
             })
           })(),
-          services: (c as any).services || [],
+          services: (() => {
+            const apiServices = Array.isArray((c as any).services)
+              ? (c as any).services
+              : []
+            if (apiServices.length > 0) return apiServices
+
+            return [{
+              name: c.serviceType || serviceFallback,
+              serviceType: c.serviceType || serviceFallback,
+              status: localStatusMap[id] || c.status || 'PENDING',
+            }]
+          })(),
           serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
           rawCustomer: c,
         }

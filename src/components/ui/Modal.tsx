@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
 
@@ -64,10 +64,6 @@ export function Modal({
       )
   }, [open, closeOnEscape, onClose])
 
-  if (!open) {
-    return null
-  }
-
   const classes = [
     'modal',
     SIZE_CLASSES[size],
@@ -78,24 +74,28 @@ export function Modal({
     .join(' ')
 
   return createPortal(
-    <motion.div
-      className="modal-backdrop"
-      onMouseDown={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.18 }}
-    >
-      <motion.div
-        className={classes}
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(event) =>
-          event.stopPropagation()
-        }
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.18 }}
-      >
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="modal-backdrop"
+          onMouseDown={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.32, ease: 'easeInOut' }}
+        >
+          <motion.div
+            className={classes}
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+            initial={{ opacity: 0, scale: 0.88, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.88, y: 24 }}
+            transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+          >
         {title ? (
           <div className="modal-header">
             <div>
@@ -120,8 +120,10 @@ export function Modal({
         ) : null}
 
         {children}
-      </motion.div>
-    </motion.div>,
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
     document.body,
   )
 }

@@ -220,10 +220,11 @@ export function AddAdminServiceModal({
 
               <div style={{ display: 'flex', gap: '0.35rem' }}>
                 <button
+                  className="service-modal__mode-button"
                   type="button"
                   onClick={() => setDeptMode('custom')}
                   style={{
-                    padding: '0.25rem 0.6rem',
+                    padding: '0.5rem 1.25rem',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     borderRadius: '6px',
@@ -240,10 +241,11 @@ export function AddAdminServiceModal({
                   + New Department Type
                 </button>
                 <button
+                  className="service-modal__mode-button"
                   type="button"
                   onClick={() => setDeptMode('existing')}
                   style={{
-                    padding: '0.25rem 0.6rem',
+                    padding: '0.5rem 1.25rem',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     borderRadius: '6px',
@@ -381,6 +383,7 @@ export function AddAdminServiceModal({
 
           <div className="modal-actions">
             <Button
+              className="service-modal__action-button"
               type="button"
               variant="secondary"
               onClick={onClose}
@@ -389,6 +392,7 @@ export function AddAdminServiceModal({
               Cancel
             </Button>
             <Button
+              className="service-modal__action-button"
               type="submit"
               disabled={
                 isSubmitting ||
@@ -431,6 +435,7 @@ export function AddAdminServiceModal({
     <Modal
       open={open}
       onClose={onClose}
+      className="service-modal"
       size="md"
       title={isEdit ? 'Edit Service' : 'Step 1: Add New Service'}
       description={
