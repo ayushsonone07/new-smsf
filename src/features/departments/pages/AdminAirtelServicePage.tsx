@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useDebounce } from '../../../hooks/useDebounce'
 import {
   Phone,
   PhoneCall,
@@ -210,22 +212,13 @@ export function AdminAirtelServicePage() {
 
   // Filters
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 350)
   const [status, setStatus] = useState('ALL')
   const [callType, setCallType] = useState('ALL')
   const [startDate, setStartDate] = useState<Date | undefined>()
   const [endDate, setEndDate] = useState<Date | undefined>()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT)
-
-  // Data
-  const [calls, setCalls] = useState<AirtelCallSummary[]>([])
-  const [analytics, setAnalytics] = useState<AirtelAnalytics | null>(null)
-  const [pagination, setPagination] = useState<AirtelPagination | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  // Bumped by the refresh button to re-run the calls + analytics load below.
-  const [reloadKey, setReloadKey] = useState(0)
 
   // Detail modal
   const [detailOpen, setDetailOpen] = useState(false)
@@ -236,88 +229,83 @@ export function AdminAirtelServicePage() {
   const isAllCalls = selectedScope === ALL_CALLS
   const selectedDepartmentInfo = selectedScope && !isAllCalls ? getDepartmentInfo(selectedScope) : null
 
-  // Debounce search box
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 500)
-    return () => clearTimeout(t)
-  }, [search])
-
-  useEffect(() => {
-    setPage(0)
+    setPage((p) => (p === 0 ? p : 0))
   }, [debouncedSearch, status, callType, startDate, endDate, selectedScope])
 
-  const buildQuery = useCallback((): AirtelCallsQuery => ({
-    search: debouncedSearch.trim() || undefined,
-    status: status === 'ALL' ? undefined : status,
-    callType: callType === 'ALL' ? undefined : callType,
-    fromDate: toYmd(startDate),
-    toDate: toYmd(endDate),
-    page,
-    size: pageSize,
-    sortBy: 'callTimestamp',
-    sortDir: 'desc',
-  }), [debouncedSearch, status, callType, startDate, endDate, page, pageSize])
+  const callsQuery = useQuery({
+    queryKey: [
+      'admin-airtel-calls',
+      selectedScope,
+      isAllCalls,
+      debouncedSearch,
+      status,
+      callType,
+      toYmd(startDate),
+      toYmd(endDate),
+      page,
+      pageSize,
+    ],
+    queryFn: () => {
+      const q: AirtelCallsQuery = {
+        search: debouncedSearch.trim() || undefined,
+        status: status === 'ALL' ? undefined : status,
+        callType: callType === 'ALL' ? undefined : callType,
+        fromDate: toYmd(startDate),
+        toDate: toYmd(endDate),
+        page,
+        size: pageSize,
+        sortBy: 'callTimestamp',
+        sortDir: 'desc',
+      }
+      return isAllCalls ? getAirtelCalls(q) : getDepartmentAirtelCalls(q, selectedScope!)
+    },
+    enabled: Boolean(selectedScope),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
 
-  const analyticsQuery = useCallback((): AirtelCallsQuery => ({
-    search: debouncedSearch.trim() || undefined,
-    status: status === 'ALL' ? undefined : status,
-    callType: callType === 'ALL' ? undefined : callType,
-    fromDate: toYmd(startDate),
-    toDate: toYmd(endDate),
-  }), [debouncedSearch, status, callType, startDate, endDate])
+  const analyticsQueryData = useQuery({
+    queryKey: [
+      'admin-airtel-analytics',
+      selectedScope,
+      isAllCalls,
+      debouncedSearch,
+      status,
+      callType,
+      toYmd(startDate),
+      toYmd(endDate),
+    ],
+    queryFn: () => {
+      const aq: AirtelCallsQuery = {
+        search: debouncedSearch.trim() || undefined,
+        status: status === 'ALL' ? undefined : status,
+        callType: callType === 'ALL' ? undefined : callType,
+        fromDate: toYmd(startDate),
+        toDate: toYmd(endDate),
+      }
+      return isAllCalls ? getAirtelAnalytics(aq) : getDepartmentAirtelAnalytics(aq, selectedScope!)
+    },
+    enabled: Boolean(selectedScope),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
 
-  // Fetch list + analytics whenever the scope or filters/paging change
-  useEffect(() => {
-    if (!selectedScope) return
-
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    const q = buildQuery()
-    const aq = analyticsQuery()
-
-    const callsPromise = isAllCalls
-      ? getAirtelCalls(q)
-      : getDepartmentAirtelCalls(q, selectedScope)
-
-    const analyticsPromise = isAllCalls
-      ? getAirtelAnalytics(aq)
-      : getDepartmentAirtelAnalytics(aq, selectedScope)
-
-    callsPromise
-      .then((res) => {
-        if (!cancelled) {
-          setCalls(res?.data ?? [])
-          setPagination({
-            pageNumber: res?.pageNumber ?? page,
-            elementSize: res?.elementSize ?? pageSize,
-            totalElements: res?.totalElements ?? 0,
-            totalPage: res?.totalPage ?? 0,
-            first: res?.first ?? true,
-            last: res?.last ?? true,
-          })
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Failed to fetch calls')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    analyticsPromise
-      .then((res) => {
-        if (!cancelled) setAnalytics(res ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setAnalytics(null)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [selectedScope, isAllCalls, buildQuery, analyticsQuery, page, pageSize, reloadKey])
+  const calls = callsQuery.data?.data ?? []
+  const analytics = analyticsQueryData.data ?? null
+  const pagination: AirtelPagination | null = callsQuery.data
+    ? {
+        pageNumber: callsQuery.data.pageNumber ?? page,
+        elementSize: callsQuery.data.elementSize ?? pageSize,
+        totalElements: callsQuery.data.totalElements ?? 0,
+        totalPage: callsQuery.data.totalPage ?? 0,
+        first: callsQuery.data.first ?? true,
+        last: callsQuery.data.last ?? true,
+      }
+    : null
+  const loading = callsQuery.isLoading || analyticsQueryData.isLoading
+  const isFetching = callsQuery.isFetching || analyticsQueryData.isFetching
+  const error = callsQuery.error instanceof Error ? callsQuery.error.message : callsQuery.isError ? 'Failed to fetch calls' : null
 
   const loadDetail = (id: number) => {
     setDetailLoading(true)
@@ -545,8 +533,11 @@ export function AdminAirtelServicePage() {
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
         <RefreshButton
-          onRefresh={() => setReloadKey((key) => key + 1)}
-          isRefreshing={loading}
+          onRefresh={() => {
+            void callsQuery.refetch()
+            void analyticsQueryData.refetch()
+          }}
+          isRefreshing={isFetching}
           label="calls"
           size={16}
           className="rounded-xl p-2.5 shadow-sm"

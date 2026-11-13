@@ -54,6 +54,20 @@ function getInvoiceStatusBadge(status?: string) {
   return { bg: '#fffbeb', text: '#d97706', border: '#fde68a', label: 'Due' }
 }
 
+function getDownloadableBillUrl(value: unknown): string {
+  if (typeof value !== 'string') return ''
+
+  const candidate = value.trim()
+  if (!candidate || ['null', 'undefined', 'n/a'].includes(candidate.toLowerCase())) return ''
+
+  try {
+    const url = new URL(candidate)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
 export function CustomerBillingView() {
   const { session } = useCustomerSession()
   const [details, setDetails] = useState<CustomerBillingDetails | null>(null)
@@ -151,16 +165,19 @@ export function CustomerBillingView() {
     if (typeof details.generatedBillInfo === 'string') {
       try {
         const parsed = JSON.parse(details.generatedBillInfo)
-        billUrl = parsed.generatedBillInfo || parsed.billingLink || parsed.billUrl || details.generatedBillInfo
+        billUrl = getDownloadableBillUrl(
+          parsed.generatedBillInfo || parsed.billingLink || parsed.billUrl,
+        )
       } catch {
-        billUrl = details.generatedBillInfo
+        billUrl = getDownloadableBillUrl(details.generatedBillInfo)
       }
     } else if (typeof details.generatedBillInfo === 'object') {
-      billUrl =
+      billUrl = getDownloadableBillUrl(
         details.generatedBillInfo.generatedBillInfo ||
         details.generatedBillInfo.billingLink ||
         details.generatedBillInfo.billUrl ||
-        ''
+        '',
+      )
     }
   }
 
@@ -442,7 +459,10 @@ export function CustomerBillingView() {
                 <tbody>
                   {invoices.map((inv, idx) => {
                     const badge = getInvoiceStatusBadge(inv.status)
-                    const targetBillUrl = inv.billUrl || (inv as any).billingLink || billUrl
+                    const targetBillUrl = getDownloadableBillUrl(
+                      inv.billUrl || inv.billingLink || billUrl,
+                    )
+                    const billAvailable = Boolean(targetBillUrl)
 
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -469,29 +489,35 @@ export function CustomerBillingView() {
                         </td>
                         <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '8px' }}>
-                            {targetBillUrl ? (
-                              <>
-                                <button
-                                  onClick={() => {
+                            <>
+                              <button
+                                type="button"
+                                disabled={!billAvailable}
+                                title={billAvailable ? 'Preview bill' : 'Bill not available'}
+                                onClick={() => {
+                                  if (billAvailable) {
                                     setPreviewBillUrl(targetBillUrl)
                                     setPreviewOpen(true)
-                                  }}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '5px 10px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#ffffff',
-                                    color: '#334155',
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                  }}
-                                >
-                                  <Eye size={12} /> Preview
-                                </button>
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  border: `1px solid ${billAvailable ? '#cbd5e1' : '#d1d5db'}`,
+                                  background: billAvailable ? '#ffffff' : '#e5e7eb',
+                                  color: billAvailable ? '#334155' : '#9ca3af',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: billAvailable ? 'pointer' : 'not-allowed',
+                                  opacity: billAvailable ? 1 : 0.75,
+                                }}
+                              >
+                                <Eye size={12} /> Preview
+                              </button>
+                              {billAvailable ? (
                                 <a
                                   href={targetBillUrl}
                                   target="_blank"
@@ -513,10 +539,30 @@ export function CustomerBillingView() {
                                 >
                                   <Download size={12} /> Download
                                 </a>
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Generating...</span>
-                            )}
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  title="Bill not available"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d1d5db',
+                                    background: '#d1d5db',
+                                    color: '#9ca3af',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: 'not-allowed',
+                                    opacity: 0.75,
+                                  }}
+                                >
+                                  <Download size={12} /> Download
+                                </button>
+                              )}
+                            </>
                           </div>
                         </td>
                       </tr>

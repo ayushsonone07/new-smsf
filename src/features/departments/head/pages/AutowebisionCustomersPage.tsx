@@ -848,6 +848,7 @@ export function AutowebisionCustomersPage({
         clientName,
         draftLink,
         remark,
+        customerId: selectedCustomerForDraft.customerId,
       })
       setToast({
         type: 'success',
@@ -867,18 +868,26 @@ export function AutowebisionCustomersPage({
     setSelectedCustomerForDraft(customer)
     setDraftHistoryModalOpen(true)
     const clientEmail = customer.email || ''
-    draftHistoryEmailRef.current = clientEmail
-    if (clientEmail) {
+    const customerId = customer.customerId
+    const key = `${customerId}_${clientEmail}`
+    draftHistoryEmailRef.current = key
+    if (customerId || clientEmail) {
       setIsLoadingDraftHistory(true)
-      fetchWebsiteDraftHistory(clientEmail)
+      fetchWebsiteDraftHistory({ clientEmail, customerId })
         .then((data) => {
-          setDraftHistory(data)
+          if (draftHistoryEmailRef.current === key) {
+            setDraftHistory(data)
+          }
         })
         .catch(() => {
-          setDraftHistory([])
+          if (draftHistoryEmailRef.current === key) {
+            setDraftHistory([])
+          }
         })
         .finally(() => {
-          setIsLoadingDraftHistory(false)
+          if (draftHistoryEmailRef.current === key) {
+            setIsLoadingDraftHistory(false)
+          }
         })
     } else {
       setDraftHistory([])
@@ -896,12 +905,14 @@ export function AutowebisionCustomersPage({
   // keeping the current list on screen (dimmed) until the new one arrives.
   const refreshDraftHistory = async () => {
     const clientEmail = selectedCustomerForDraft?.email || ''
-    if (!clientEmail) return
+    const customerId = selectedCustomerForDraft?.customerId
+    if (!customerId && !clientEmail) return
     setIsRefreshingDraftHistory(true)
+    const key = `${customerId}_${clientEmail}`
     try {
-      const data = await fetchWebsiteDraftHistory(clientEmail)
+      const data = await fetchWebsiteDraftHistory({ clientEmail, customerId })
       // Ignore a late response if the modal was closed or switched to another customer.
-      if (draftHistoryEmailRef.current === clientEmail) setDraftHistory(data)
+      if (draftHistoryEmailRef.current === key) setDraftHistory(data)
     } finally {
       setIsRefreshingDraftHistory(false)
     }

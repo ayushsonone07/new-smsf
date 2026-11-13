@@ -44,6 +44,11 @@ interface Props {
   readOnly?: boolean
   onClose: () => void
   onSuccess?: (result: DeliveryConfirmationResult) => void | Promise<void>
+  /**
+   * After a submit that reported failure. The backend saves the details even when
+   * email and WhatsApp both fail, so the list still has to refresh.
+   */
+  onSubmitted?: () => void
 }
 
 export function DeliveryConfirmationModal({
@@ -54,6 +59,7 @@ export function DeliveryConfirmationModal({
   readOnly = false,
   onClose,
   onSuccess,
+  onSubmitted,
 }: Props) {
   const [form, setForm] = useState<DeliveryConfirmationData>(EMPTY_DELIVERY_FORM)
   const [saving, setSaving] = useState(false)
@@ -92,6 +98,7 @@ export function DeliveryConfirmationModal({
           ? submitError.message
           : 'Failed to update delivery confirmation',
       )
+      onSubmitted?.()
     } finally {
       setSaving(false)
     }

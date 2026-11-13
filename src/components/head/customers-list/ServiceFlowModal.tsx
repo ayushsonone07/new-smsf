@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import {
@@ -408,6 +408,32 @@ export function extractPhase1Steps(
   return subServices[0]?.steps ?? []
 }
 
+/** A sub-service's saved status from the customer row, falling back to the flow's own status. */
+function statusFromCustomerInfo(
+  customer: OnboardingCustomer | null,
+  subServiceName: string,
+  fallback?: string,
+): string {
+  const info = Array.isArray(customer?.subServiceInfo) ? customer.subServiceInfo : []
+  const wanted = subServiceName.trim().toLowerCase()
+  const match = info.find((sub: any) => {
+    const name = sub?.name || (sub && typeof sub === 'object' ? Object.keys(sub)[0] : sub)
+    return String(name ?? '').trim().toLowerCase() === wanted
+  })
+  const raw =
+    (match && (match.status || match.subServiceStatus)) ||
+    (match && typeof match === 'object' && !('name' in match) ? Object.values(match)[0] : undefined) ||
+    fallback ||
+    ''
+  return String(raw).toUpperCase().replace(/-/g, '_')
+}
+
+/** Shown next to a sub-service name, so finished steps aren't mistaken for a confirmed service. */
+const ACK_LABELS: Record<string, { label: string; className: string }> = {
+  COMPLETED: { label: 'Customer confirmed', className: 'bg-emerald-50 text-emerald-700' },
+  PENDING_CUSTOMER_ACK: { label: 'Waiting customer acknowledgment', className: 'bg-purple-50 text-purple-700' },
+}
+
 export function ServiceFlowModal({
   customer,
   isOpen,
@@ -419,6 +445,10 @@ export function ServiceFlowModal({
   serviceType,
   initialSubServiceName,
 }: ServiceFlowModalProps) {
+  const customerId = customer?.id
+  const customerRef = useRef(customer)
+  customerRef.current = customer
+
   const [subServices, setSubServices] = useState<SubServiceFlowData[]>([])
   const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(false)
@@ -491,7 +521,7 @@ export function ServiceFlowModal({
 
   // Fetch service flow steps when modal is open
   useEffect(() => {
-    if (!isOpen || !customer) {
+    if (!isOpen || !customerId) {
       setSubServices([])
       setActiveSubServiceIndex(0)
       setError(null)
@@ -519,9 +549,9 @@ export function ServiceFlowModal({
       (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE')
 
     const fetchFlowPromise =
-      isAutowebsion && customer.id
-        ? fetchCustomerServiceFlowDetail(customer.id, targetServiceType)
-        : getCustomerServiceFlow(customer.id)
+      isAutowebsion && customerId
+        ? fetchCustomerServiceFlowDetail(customerId, targetServiceType)
+        : getCustomerServiceFlow(customerId, effectiveDept)
 
     fetchFlowPromise
       .then((res) => {
@@ -529,17 +559,18 @@ export function ServiceFlowModal({
         const { subServices: extracted, overallStatus } = extractDepartmentFlows(res, effectiveDept)
         setSubServices(extracted)
 
-        if (extracted.length > 0) {
+        const currentCust = customerRef.current
+        if (extracted.length > 0 && currentCust) {
           // If initialSubServiceName is provided or customer has subServiceInfo, match active index
           let foundIndex = 0
           const targetName = (
             manualRefresh?.subServiceName ||
             initialSubServiceName ||
-            (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo[0]
-              ? customer.subServiceInfo[0]?.name ||
-                (typeof customer.subServiceInfo[0] === 'object'
-                  ? Object.keys(customer.subServiceInfo[0])[0]
-                  : customer.subServiceInfo[0])
+            (Array.isArray(currentCust.subServiceInfo) && currentCust.subServiceInfo[0]
+              ? currentCust.subServiceInfo[0]?.name ||
+                (typeof currentCust.subServiceInfo[0] === 'object'
+                  ? Object.keys(currentCust.subServiceInfo[0])[0]
+                  : currentCust.subServiceInfo[0])
               : '') ||
             ''
           ).trim().toLowerCase()
@@ -553,13 +584,21 @@ export function ServiceFlowModal({
             )
             if (idx >= 0) foundIndex = idx
           }
+          // Opened without a specific sub-service: start on the first one the customer hasn't
+          // confirmed, so its acknowledgement can be sent (it used to always be the first one).
+          if (!manualRefresh?.subServiceName && !initialSubServiceName) {
+            const firstOpen = extracted.findIndex(
+              (s) => statusFromCustomerInfo(currentCust, s.name, s.overallStatus) !== 'COMPLETED',
+            )
+            if (firstOpen >= 0) foundIndex = firstOpen
+          }
           setActiveSubServiceIndex(foundIndex)
 
           // Initial status resolution
           const activeSub = extracted[foundIndex]
           let initialStatus = activeSub?.overallStatus || overallStatus || 'PENDING'
-          if (!activeSub?.overallStatus && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-            const match = customer.subServiceInfo.find((sub: any) => {
+          if (!activeSub?.overallStatus && Array.isArray(currentCust.subServiceInfo) && currentCust.subServiceInfo.length > 0) {
+            const match = currentCust.subServiceInfo.find((sub: any) => {
               const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
               return name === activeSub?.name
             })
@@ -569,8 +608,8 @@ export function ServiceFlowModal({
                 (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
                 initialStatus
             }
-          } else if (!activeSub?.overallStatus && Array.isArray(customer.services) && customer.services.length > 0) {
-            initialStatus = customer.services[0]?.status || initialStatus
+          } else if (!activeSub?.overallStatus && Array.isArray(currentCust.services) && currentCust.services.length > 0) {
+            initialStatus = currentCust.services[0]?.status || initialStatus
           }
           setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
         }
@@ -590,7 +629,7 @@ export function ServiceFlowModal({
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer, effectiveDept, serviceType, reloadKey])
+  }, [isOpen, customerId, effectiveDept, serviceType, reloadKey])
 
   function handleRefreshFlow() {
     manualRefreshRef.current = { subServiceName: currentSubService?.name ?? null }
@@ -618,6 +657,13 @@ export function ServiceFlowModal({
       }
     }
     setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
+  }
+
+  /** The selected sub-service uses the live status; the others the customer's saved one. */
+  function statusOfSubService(index: number): string {
+    if (index === activeSubServiceIndex) return subServiceStatus
+    const sub = subServices[index]
+    return sub ? statusFromCustomerInfo(customer, sub.name, sub.overallStatus) : ''
   }
 
   // Determine if all steps are completed
@@ -847,17 +893,43 @@ export function ServiceFlowModal({
               </div>
             ) : (
               <div className="space-y-4">
-                {subServices.map((sub) => {
+                {subServices.map((sub, subIndex) => {
+                  const isActive = subServices.length > 1 && subIndex === activeSubServiceIndex
+                  const ack = ACK_LABELS[statusOfSubService(subIndex)]
                   return (
                     <div
                       key={sub.name}
-                      className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden"
+                      className={`rounded-2xl border bg-white shadow-xs overflow-hidden ${
+                        isActive ? 'border-blue-400 ring-1 ring-blue-200' : 'border-slate-200'
+                      }`}
                     >
                       {/* Card Header matching Reference */}
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                        <span className="rounded-md bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold">
-                          {sub.name}
-                        </span>
+                      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {subServices.length > 1 ? (
+                            // Selecting a sub-service points Change Status / Send Acknowledgement at it.
+                            <button
+                              type="button"
+                              onClick={() => handleSelectSubService(subIndex)}
+                              aria-pressed={isActive}
+                              title={isActive ? 'Selected for status and acknowledgement' : 'Select to change status or send acknowledgement'}
+                              className={`rounded-md px-3 py-1 text-xs font-semibold ${
+                                isActive ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                              }`}
+                            >
+                              {sub.name}
+                            </button>
+                          ) : (
+                            <span className="rounded-md bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold">
+                              {sub.name}
+                            </span>
+                          )}
+                          {ack && (
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ack.className}`}>
+                              {ack.label}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-xs text-slate-500 font-medium">
                           {sub.steps.length} {sub.steps.length === 1 ? 'step' : 'steps'}
                         </span>
@@ -964,7 +1036,9 @@ export function ServiceFlowModal({
             {/* Change Status Section (Department User) */}
             {isEditable && (
               <div className="ssd-section">
-                <h4 className="ssd-section-title">Change Status</h4>
+                <h4 className="ssd-section-title">
+                  Change Status{subServices.length > 1 && currentSubService ? ` — ${currentSubService.name}` : ''}
+                </h4>
                 <select
                   className="ssd-select"
                   value={subServiceStatus}
