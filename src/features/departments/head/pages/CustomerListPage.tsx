@@ -1469,10 +1469,14 @@ export function CustomerListPage() {
         open={Boolean(confirmingCustomer)}
         customer={confirmingCustomer}
         onClose={() => setConfirmingCustomer(null)}
-        onSuccess={() => {
+        onSuccess={(confirmationLink) => {
           setConfirmingCustomer(null)
-          setToast({ type: 'success', message: 'Acknowledgement sent successfully' })
-          activeCustomerQuery.refetch()
+          setToast({
+            type: 'success',
+            message: confirmationLink
+              ? 'Acknowledgement link generated & email queued successfully'
+              : 'Acknowledgement sent successfully',
+          })
         }}
       />
 

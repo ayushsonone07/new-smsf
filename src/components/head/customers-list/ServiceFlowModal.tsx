@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Icon } from '../shared/Icon'
 import {
@@ -445,6 +445,10 @@ export function ServiceFlowModal({
   serviceType,
   initialSubServiceName,
 }: ServiceFlowModalProps) {
+  const customerId = customer?.id
+  const customerRef = useRef(customer)
+  customerRef.current = customer
+
   const [subServices, setSubServices] = useState<SubServiceFlowData[]>([])
   const [activeSubServiceIndex, setActiveSubServiceIndex] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(false)
@@ -517,7 +521,7 @@ export function ServiceFlowModal({
 
   // Fetch service flow steps when modal is open
   useEffect(() => {
-    if (!isOpen || !customer) {
+    if (!isOpen || !customerId) {
       setSubServices([])
       setActiveSubServiceIndex(0)
       setError(null)
@@ -545,9 +549,9 @@ export function ServiceFlowModal({
       (effectiveDept.includes('AUTO') ? 'AUTOMATION' : 'WEBSITE')
 
     const fetchFlowPromise =
-      isAutowebsion && customer.id
-        ? fetchCustomerServiceFlowDetail(customer.id, targetServiceType)
-        : getCustomerServiceFlow(customer.id)
+      isAutowebsion && customerId
+        ? fetchCustomerServiceFlowDetail(customerId, targetServiceType)
+        : getCustomerServiceFlow(customerId, effectiveDept)
 
     fetchFlowPromise
       .then((res) => {
@@ -555,17 +559,18 @@ export function ServiceFlowModal({
         const { subServices: extracted, overallStatus } = extractDepartmentFlows(res, effectiveDept)
         setSubServices(extracted)
 
-        if (extracted.length > 0) {
+        const currentCust = customerRef.current
+        if (extracted.length > 0 && currentCust) {
           // If initialSubServiceName is provided or customer has subServiceInfo, match active index
           let foundIndex = 0
           const targetName = (
             manualRefresh?.subServiceName ||
             initialSubServiceName ||
-            (Array.isArray(customer.subServiceInfo) && customer.subServiceInfo[0]
-              ? customer.subServiceInfo[0]?.name ||
-                (typeof customer.subServiceInfo[0] === 'object'
-                  ? Object.keys(customer.subServiceInfo[0])[0]
-                  : customer.subServiceInfo[0])
+            (Array.isArray(currentCust.subServiceInfo) && currentCust.subServiceInfo[0]
+              ? currentCust.subServiceInfo[0]?.name ||
+                (typeof currentCust.subServiceInfo[0] === 'object'
+                  ? Object.keys(currentCust.subServiceInfo[0])[0]
+                  : currentCust.subServiceInfo[0])
               : '') ||
             ''
           ).trim().toLowerCase()
@@ -583,7 +588,7 @@ export function ServiceFlowModal({
           // confirmed, so its acknowledgement can be sent (it used to always be the first one).
           if (!manualRefresh?.subServiceName && !initialSubServiceName) {
             const firstOpen = extracted.findIndex(
-              (s) => statusFromCustomerInfo(customer, s.name, s.overallStatus) !== 'COMPLETED',
+              (s) => statusFromCustomerInfo(currentCust, s.name, s.overallStatus) !== 'COMPLETED',
             )
             if (firstOpen >= 0) foundIndex = firstOpen
           }
@@ -592,8 +597,8 @@ export function ServiceFlowModal({
           // Initial status resolution
           const activeSub = extracted[foundIndex]
           let initialStatus = activeSub?.overallStatus || overallStatus || 'PENDING'
-          if (!activeSub?.overallStatus && Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0) {
-            const match = customer.subServiceInfo.find((sub: any) => {
+          if (!activeSub?.overallStatus && Array.isArray(currentCust.subServiceInfo) && currentCust.subServiceInfo.length > 0) {
+            const match = currentCust.subServiceInfo.find((sub: any) => {
               const name = sub?.name || (typeof sub === 'object' ? Object.keys(sub)[0] : sub)
               return name === activeSub?.name
             })
@@ -603,8 +608,8 @@ export function ServiceFlowModal({
                 (typeof match === 'object' ? Object.values(match)[0] : 'PENDING') ||
                 initialStatus
             }
-          } else if (!activeSub?.overallStatus && Array.isArray(customer.services) && customer.services.length > 0) {
-            initialStatus = customer.services[0]?.status || initialStatus
+          } else if (!activeSub?.overallStatus && Array.isArray(currentCust.services) && currentCust.services.length > 0) {
+            initialStatus = currentCust.services[0]?.status || initialStatus
           }
           setSubServiceStatus(String(initialStatus).toUpperCase().replace(/-/g, '_'))
         }
@@ -624,7 +629,7 @@ export function ServiceFlowModal({
     return () => {
       isCancelled = true
     }
-  }, [isOpen, customer, effectiveDept, serviceType, reloadKey])
+  }, [isOpen, customerId, effectiveDept, serviceType, reloadKey])
 
   function handleRefreshFlow() {
     manualRefreshRef.current = { subServiceName: currentSubService?.name ?? null }

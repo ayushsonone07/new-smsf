@@ -20,7 +20,7 @@ interface OnboardingConfirmationModalProps {
   open: boolean
   customer: OnboardingCustomer | null
   onClose: () => void
-  onSuccess?: () => void
+  onSuccess?: (link?: string) => void
 }
 
 export function OnboardingConfirmationModal({
@@ -68,7 +68,7 @@ export function OnboardingConfirmationModal({
     setIsSubmitting(true)
 
     try {
-      await sendOnboardingConfirmationMail({
+      const res = await sendOnboardingConfirmationMail({
         recipientUsername: email.trim(),
         contact: contact.trim(),
         isDuplicate: Boolean(customer.hasDuplicateCustomer),
@@ -85,7 +85,8 @@ export function OnboardingConfirmationModal({
         detail: `Acknowledgement email sent to ${email.trim()}.`,
       })
 
-      onSuccess?.()
+      const link = typeof res?.data === 'string' && res.data.startsWith('http') ? res.data : undefined
+      onSuccess?.(link)
       onClose()
     } catch (err: unknown) {
       console.error('Failed to send confirmation email:', err)

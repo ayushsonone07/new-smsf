@@ -152,8 +152,8 @@ export function DepartmentFlowModal({ selection, onClose }: DepartmentFlowModalP
   const autowebType = selection ? autowebsionServiceType(selection.department.id) : null
 
   const flowQuery = useQuery({
-    queryKey: ['meeting-customer-service-flow', selection?.meeting.id],
-    queryFn: () => getCustomerServiceFlow(selection!.meeting.id),
+    queryKey: ['meeting-customer-service-flow', selection?.meeting.id, selection?.department.id],
+    queryFn: () => getCustomerServiceFlow(selection!.meeting.id, selection?.department.id),
     enabled: Boolean(selection) && !autowebType,
   })
 
