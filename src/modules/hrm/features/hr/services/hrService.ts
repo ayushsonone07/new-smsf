@@ -472,6 +472,8 @@ export const hrService = {
       resume,
       aadhaarCard,
       panCard,
+      rcDocument,
+      drivingLicence,
       experienceLetter,
       bankPassbook,
       passportPhoto,
@@ -484,6 +486,8 @@ export const hrService = {
     if (resume) form.append("resume", resume);
     if (aadhaarCard) form.append("aadhaarCard", aadhaarCard);
     if (panCard) form.append("panCard", panCard);
+    if (rcDocument) form.append("rcDocument", rcDocument);
+    if (drivingLicence) form.append("drivingLicence", drivingLicence);
     if (experienceLetter) form.append("experienceLetter", experienceLetter);
     if (bankPassbook) form.append("bankPassbook", bankPassbook);
     if (passportPhoto) form.append("passportPhoto", passportPhoto);
@@ -517,6 +521,8 @@ export const hrService = {
       resume,
       aadhaarCard,
       panCard,
+      rcDocument,
+      drivingLicence,
       experienceLetter,
       bankPassbook,
       passportPhoto,
@@ -529,6 +535,8 @@ export const hrService = {
     if (resume) form.append("resume", resume);
     if (aadhaarCard) form.append("aadhaarCard", aadhaarCard);
     if (panCard) form.append("panCard", panCard);
+    if (rcDocument) form.append("rcDocument", rcDocument);
+    if (drivingLicence) form.append("drivingLicence", drivingLicence);
     if (experienceLetter) form.append("experienceLetter", experienceLetter);
     if (bankPassbook) form.append("bankPassbook", bankPassbook);
     if (passportPhoto) form.append("passportPhoto", passportPhoto);

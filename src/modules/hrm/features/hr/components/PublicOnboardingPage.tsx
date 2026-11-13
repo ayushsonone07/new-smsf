@@ -23,6 +23,7 @@ import {
   MAX_ONBOARDING_FILE_SIZE,
   validateOnboardingForm,
   VALID_BLOOD_GROUPS,
+  VALID_GUARDIAN_RELATIONS,
 } from "../utils/onboardingValidation";
 
 import type { ManualOnboardingInput, PublicOnboardingForm } from "../types";
@@ -133,7 +134,7 @@ function OnboardingForm({
   function update<K extends keyof ManualOnboardingInput>(key: K, value: ManualOnboardingInput[K]) {
     let finalValue = value;
     if (typeof value === "string") {
-      if (key === "aadhaarNumber" || key === "guardianAadhaarNumber") {
+      if (key === "aadhaarNumber") {
         finalValue = value.replace(/\D/g, "").slice(0, 12) as ManualOnboardingInput[K];
       } else if (key === "panNumber") {
         finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) as ManualOnboardingInput[K];
@@ -247,6 +248,23 @@ function OnboardingForm({
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-foreground">Personal details</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Select
+            id="workLocation"
+            label="Office location"
+            value={values.workLocation}
+            onChange={(v) => {
+              update("workLocation", v);
+              markTouched("workLocation");
+            }}
+            onBlur={() => markTouched("workLocation")}
+            error={touched.workLocation ? errors.workLocation : undefined}
+            options={[
+              { label: "Noida", value: "NOIDA" },
+              { label: "Jabalpur", value: "JABALPUR" },
+            ]}
+            placeholder="Select office location (Noida / Jabalpur)"
+            required
+          />
           <Field
             id="dateOfBirth"
             label="Date of birth"
@@ -301,14 +319,18 @@ function OnboardingForm({
             placeholder="Father/Mother/Spouse full name"
             required
           />
-          <Field
+          <Select
             id="guardianRelation"
             label="Guardian relation"
             value={values.guardianRelation}
-            onChange={(v) => update("guardianRelation", v)}
+            onChange={(v) => {
+              update("guardianRelation", v);
+              markTouched("guardianRelation");
+            }}
             onBlur={() => markTouched("guardianRelation")}
             error={touched.guardianRelation ? errors.guardianRelation : undefined}
-            placeholder="e.g. Father, Mother, Spouse"
+            options={VALID_GUARDIAN_RELATIONS.map((r) => ({ label: r, value: r }))}
+            placeholder="Select guardian relation"
             required
           />
           <Field
@@ -323,23 +345,14 @@ function OnboardingForm({
             required
           />
           <Field
-            id="guardianAadhaarNumber"
-            label="Guardian Aadhaar number"
-            value={values.guardianAadhaarNumber}
-            onChange={(v) => update("guardianAadhaarNumber", v)}
-            onBlur={() => markTouched("guardianAadhaarNumber")}
-            error={touched.guardianAadhaarNumber ? errors.guardianAadhaarNumber : undefined}
-            placeholder="12-digit Aadhaar number (optional)"
-            maxLength={12}
-          />
-          <Field
             id="vehicleNumber"
             label="Vehicle number"
             value={values.vehicleNumber}
             onChange={(v) => update("vehicleNumber", v)}
             onBlur={() => markTouched("vehicleNumber")}
             error={touched.vehicleNumber ? errors.vehicleNumber : undefined}
-            placeholder="e.g. DL01AB1234 (optional)"
+            placeholder={values.workLocation === "NOIDA" ? "e.g. DL01AB1234" : "e.g. DL01AB1234 (optional)"}
+            required={values.workLocation === "NOIDA"}
           />
           <Field
             id="vehicleBrand"
@@ -348,8 +361,33 @@ function OnboardingForm({
             onChange={(v) => update("vehicleBrand", v)}
             onBlur={() => markTouched("vehicleBrand")}
             error={touched.vehicleBrand ? errors.vehicleBrand : undefined}
-            placeholder="e.g. Honda Activa (optional)"
+            placeholder={values.workLocation === "NOIDA" ? "e.g. Honda Activa" : "e.g. Honda Activa (optional)"}
+            required={values.workLocation === "NOIDA"}
           />
+          {values.workLocation ? (
+            <>
+              <Field
+                id="rcNumber"
+                label="RC number"
+                value={values.rcNumber}
+                onChange={(v) => update("rcNumber", v)}
+                onBlur={() => markTouched("rcNumber")}
+                error={touched.rcNumber ? errors.rcNumber : undefined}
+                placeholder={values.workLocation === "NOIDA" ? "Vehicle RC number" : "Vehicle RC number (optional)"}
+                required={values.workLocation === "NOIDA"}
+              />
+              <Field
+                id="drivingLicenceNumber"
+                label="Licence number"
+                value={values.drivingLicenceNumber}
+                onChange={(v) => update("drivingLicenceNumber", v)}
+                onBlur={() => markTouched("drivingLicenceNumber")}
+                error={touched.drivingLicenceNumber ? errors.drivingLicenceNumber : undefined}
+                placeholder={values.workLocation === "NOIDA" ? "Driving licence number" : "Driving licence number (optional)"}
+                required={values.workLocation === "NOIDA"}
+              />
+            </>
+          ) : null}
           <Textarea
             id="address"
             label="Residential / Permanent address"
@@ -382,8 +420,9 @@ function OnboardingForm({
             onChange={(v) => update("panNumber", v)}
             onBlur={() => markTouched("panNumber")}
             error={touched.panNumber ? errors.panNumber : undefined}
-            placeholder="ABCDE1234F (optional)"
+            placeholder="ABCDE1234F"
             maxLength={10}
+            required
           />
           <Field
             id="aadhaarNumber"
@@ -468,7 +507,34 @@ function OnboardingForm({
               markTouched("panCard");
             }}
             error={touched.panCard ? errors.panCard : undefined}
+            required
           />
+          {values.workLocation ? (
+            <>
+              <FileField
+                id="rcDocument"
+                label="RC document"
+                file={values.rcDocument}
+                onChange={(f) => {
+                  update("rcDocument", f);
+                  markTouched("rcDocument");
+                }}
+                error={touched.rcDocument ? errors.rcDocument : undefined}
+                required={values.workLocation === "NOIDA"}
+              />
+              <FileField
+                id="drivingLicence"
+                label="Driving licence"
+                file={values.drivingLicence}
+                onChange={(f) => {
+                  update("drivingLicence", f);
+                  markTouched("drivingLicence");
+                }}
+                error={touched.drivingLicence ? errors.drivingLicence : undefined}
+                required={values.workLocation === "NOIDA"}
+              />
+            </>
+          ) : null}
           <FileField
             id="bankPassbook"
             label="Bank passbook"
@@ -889,13 +955,17 @@ function CenteredState({
 
 function emptyValues(): ManualOnboardingInput {
   return {
+    workLocation: "",
+    rcNumber: "",
+    drivingLicenceNumber: "",
+    rcDocument: null,
+    drivingLicence: null,
     dateOfBirth: "",
     gender: "",
     bloodGroup: "",
     guardianName: "",
     guardianRelation: "",
     guardianNumber: "",
-    guardianAadhaarNumber: "",
     address: "",
     currentAddress: "",
     vehicleNumber: "",
@@ -930,6 +1000,8 @@ type TextOnboardingFields = Omit<
   | "marksheet10"
   | "marksheet12"
   | "marksheetGraduation"
+  | "rcDocument"
+  | "drivingLicence"
 >;
 
 function loadDraft(token: string): Partial<TextOnboardingFields> {
@@ -947,13 +1019,15 @@ function saveDraft(token: string, values: ManualOnboardingInput) {
   if (!token) return;
   try {
     const textData: TextOnboardingFields = {
+      workLocation: values.workLocation,
+      rcNumber: values.rcNumber,
+      drivingLicenceNumber: values.drivingLicenceNumber,
       dateOfBirth: values.dateOfBirth,
       gender: values.gender,
       bloodGroup: values.bloodGroup,
       guardianName: values.guardianName,
       guardianRelation: values.guardianRelation,
       guardianNumber: values.guardianNumber,
-      guardianAadhaarNumber: values.guardianAadhaarNumber,
       address: values.address,
       currentAddress: values.currentAddress,
       vehicleNumber: values.vehicleNumber,
