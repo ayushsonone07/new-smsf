@@ -54,7 +54,15 @@ function emitScoped(options: EmitOptions): void {
     audience,
     scope,
     channels: ['IN_APP'],
-  }).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+  })
+    // The POST returns the new notification: add it to the bell list directly instead of
+    // reloading all 100. Other users get it from their regular 45-second poll.
+    .then((created) => {
+      // The customer's own copy is for the customer portal, not the staff bell.
+      if (created.audience === 'CUSTOMER') return
+      queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items) =>
+        items ? [created, ...items.filter((item) => item.id !== created.id)] : items)
+    })
     .catch((error) => console.error('Failed to persist notification event', error))
 }
 
