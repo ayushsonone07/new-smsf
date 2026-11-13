@@ -141,9 +141,11 @@ export async function getDepartmentConfig(
 
 export async function getCustomerServiceFlow(
   customerId: string | number,
+  departmentType?: string,
 ): Promise<any> {
+  const query = departmentType ? `?departmentType=${encodeURIComponent(departmentType)}` : ''
   const res = await authedApiRequest<any>(
-    `/api/auth/department/customer/${customerId}/service-flow`,
+    `/api/auth/department/customer/${customerId}/service-flow${query}`,
   )
   return res?.data ?? res
 }
