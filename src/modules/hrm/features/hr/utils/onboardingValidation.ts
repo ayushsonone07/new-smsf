@@ -7,7 +7,9 @@ export interface OnboardingFormErrors {
   guardianName?: string;
   guardianRelation?: string;
   guardianNumber?: string;
+  guardianAadhaarNumber?: string;
   address?: string;
+  currentAddress?: string;
   vehicleNumber?: string;
   vehicleBrand?: string;
   panNumber?: string;
@@ -137,12 +139,36 @@ export function validateGuardianNumber(num: string): string | null {
   return null;
 }
 
+export function validateGuardianAadhaarNumber(aadhaar: string): string | null {
+  if (!aadhaar || !aadhaar.trim()) {
+    return null; // optional
+  }
+  const cleaned = aadhaar.trim().replace(/\s|-/g, "");
+  if (!/^\d+$/.test(cleaned)) {
+    return "Guardian Aadhaar number must contain only digits";
+  }
+  if (cleaned.length !== 12) {
+    return `Guardian Aadhaar number must be exactly 12 digits (currently ${cleaned.length})`;
+  }
+  return null;
+}
+
 export function validateAddress(address: string): string | null {
   if (!address || !address.trim()) {
     return "Address is required";
   }
   if (address.trim().length < 5) {
     return "Address must be at least 5 characters";
+  }
+  return null;
+}
+
+export function validateCurrentAddress(address: string): string | null {
+  if (!address || !address.trim()) {
+    return null; // optional
+  }
+  if (address.trim().length < 5) {
+    return "Current address must be at least 5 characters";
   }
   return null;
 }
@@ -265,6 +291,12 @@ export function validateOnboardingForm(
 
   const addrErr = validateAddress(values.address);
   if (addrErr) errors.address = addrErr;
+
+  const gAadhaarErr = validateGuardianAadhaarNumber(values.guardianAadhaarNumber);
+  if (gAadhaarErr) errors.guardianAadhaarNumber = gAadhaarErr;
+
+  const cAddrErr = validateCurrentAddress(values.currentAddress);
+  if (cAddrErr) errors.currentAddress = cAddrErr;
 
   const aadhaarErr = validateAadhaarNumber(values.aadhaarNumber);
   if (aadhaarErr) errors.aadhaarNumber = aadhaarErr;

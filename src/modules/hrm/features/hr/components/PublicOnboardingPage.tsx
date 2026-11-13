@@ -133,7 +133,7 @@ function OnboardingForm({
   function update<K extends keyof ManualOnboardingInput>(key: K, value: ManualOnboardingInput[K]) {
     let finalValue = value;
     if (typeof value === "string") {
-      if (key === "aadhaarNumber") {
+      if (key === "aadhaarNumber" || key === "guardianAadhaarNumber") {
         finalValue = value.replace(/\D/g, "").slice(0, 12) as ManualOnboardingInput[K];
       } else if (key === "panNumber") {
         finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) as ManualOnboardingInput[K];
@@ -323,6 +323,16 @@ function OnboardingForm({
             required
           />
           <Field
+            id="guardianAadhaarNumber"
+            label="Guardian Aadhaar number"
+            value={values.guardianAadhaarNumber}
+            onChange={(v) => update("guardianAadhaarNumber", v)}
+            onBlur={() => markTouched("guardianAadhaarNumber")}
+            error={touched.guardianAadhaarNumber ? errors.guardianAadhaarNumber : undefined}
+            placeholder="12-digit Aadhaar number (optional)"
+            maxLength={12}
+          />
+          <Field
             id="vehicleNumber"
             label="Vehicle number"
             value={values.vehicleNumber}
@@ -342,13 +352,22 @@ function OnboardingForm({
           />
           <Textarea
             id="address"
-            label="Residential address"
+            label="Residential / Permanent address"
             value={values.address}
             onChange={(v) => update("address", v)}
             onBlur={() => markTouched("address")}
             error={touched.address ? errors.address : undefined}
             placeholder="Complete address with pincode"
             required
+          />
+          <Textarea
+            id="currentAddress"
+            label="Current address"
+            value={values.currentAddress}
+            onChange={(v) => update("currentAddress", v)}
+            onBlur={() => markTouched("currentAddress")}
+            error={touched.currentAddress ? errors.currentAddress : undefined}
+            placeholder="Current address with pincode (optional)"
           />
         </div>
       </section>
@@ -876,7 +895,9 @@ function emptyValues(): ManualOnboardingInput {
     guardianName: "",
     guardianRelation: "",
     guardianNumber: "",
+    guardianAadhaarNumber: "",
     address: "",
+    currentAddress: "",
     vehicleNumber: "",
     vehicleBrand: "",
     panNumber: "",
@@ -932,7 +953,9 @@ function saveDraft(token: string, values: ManualOnboardingInput) {
       guardianName: values.guardianName,
       guardianRelation: values.guardianRelation,
       guardianNumber: values.guardianNumber,
+      guardianAadhaarNumber: values.guardianAadhaarNumber,
       address: values.address,
+      currentAddress: values.currentAddress,
       vehicleNumber: values.vehicleNumber,
       vehicleBrand: values.vehicleBrand,
       panNumber: values.panNumber,

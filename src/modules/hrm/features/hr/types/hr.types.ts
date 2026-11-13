@@ -280,7 +280,9 @@ export interface EmployeeOnboardingView {
   guardianName: string | null;
   guardianRelation: string | null;
   guardianNumber: string | null;
+  guardianAadhaarNumber: string | null;
   address: string | null;
+  currentAddress: string | null;
   vehicleNumber: string | null;
   vehicleBrand: string | null;
   panNumber: string | null;
@@ -306,7 +308,9 @@ export interface ManualOnboardingInput {
   guardianName: string;
   guardianRelation: string;
   guardianNumber: string;
+  guardianAadhaarNumber: string;
   address: string;
+  currentAddress: string;
   vehicleNumber: string;
   vehicleBrand: string;
   panNumber: string;

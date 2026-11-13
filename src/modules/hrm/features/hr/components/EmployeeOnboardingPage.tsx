@@ -403,6 +403,7 @@ function ReviewGrid({ view }: { view: EmployeeOnboardingView }) {
           <Detail label="Guardian name" value={view.guardianName} />
           <Detail label="Guardian relation" value={view.guardianRelation} />
           <Detail label="Guardian number" value={view.guardianNumber} />
+          <Detail label="Guardian Aadhaar number" value={view.guardianAadhaarNumber} optional />
           <Detail label="PAN number" value={view.panNumber} optional />
           <Detail label="Aadhaar number" value={view.aadhaarNumber} />
           <Detail label="Bank account number" value={view.bankAccountNumber} />
@@ -410,7 +411,8 @@ function ReviewGrid({ view }: { view: EmployeeOnboardingView }) {
           <Detail label="Bank name" value={view.bankName} />
           <Detail label="Vehicle number" value={view.vehicleNumber} optional />
           <Detail label="Vehicle brand" value={view.vehicleBrand} optional />
-          <Detail label="Address" value={view.address} wide />
+          <Detail label="Permanent address" value={view.address} wide />
+          <Detail label="Current address" value={view.currentAddress} wide optional />
         </dl>
       </section>
 
@@ -475,7 +477,7 @@ function ManualOnboardingForm({
   function update<K extends keyof ManualOnboardingInput>(key: K, value: ManualOnboardingInput[K]) {
     let finalValue = value;
     if (typeof value === "string") {
-      if (key === "aadhaarNumber") {
+      if (key === "aadhaarNumber" || key === "guardianAadhaarNumber") {
         finalValue = value.replace(/\D/g, "").slice(0, 12) as ManualOnboardingInput[K];
       } else if (key === "panNumber") {
         finalValue = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) as ManualOnboardingInput[K];
@@ -613,6 +615,16 @@ function ManualOnboardingForm({
           required
         />
         <ManualField
+          id="guardianAadhaarNumber"
+          label="Guardian Aadhaar number"
+          value={values.guardianAadhaarNumber}
+          onChange={(v) => update("guardianAadhaarNumber", v)}
+          onBlur={() => markTouched("guardianAadhaarNumber")}
+          error={touched.guardianAadhaarNumber ? errors.guardianAadhaarNumber : undefined}
+          placeholder="12-digit Aadhaar number (optional)"
+          maxLength={12}
+        />
+        <ManualField
           id="panNumber"
           label="PAN number"
           value={values.panNumber}
@@ -685,13 +697,22 @@ function ManualOnboardingForm({
         />
         <ManualTextarea
           id="address"
-          label="Residential address"
+          label="Permanent address"
           value={values.address}
           onChange={(v) => update("address", v)}
           onBlur={() => markTouched("address")}
           error={touched.address ? errors.address : undefined}
           placeholder="Complete address with pincode"
           required
+        />
+        <ManualTextarea
+          id="currentAddress"
+          label="Current address"
+          value={values.currentAddress}
+          onChange={(v) => update("currentAddress", v)}
+          onBlur={() => markTouched("currentAddress")}
+          error={touched.currentAddress ? errors.currentAddress : undefined}
+          placeholder="Current address with pincode (optional)"
         />
       </div>
 
@@ -1439,7 +1460,9 @@ function manualInitialValues(view: EmployeeOnboardingView): ManualOnboardingInpu
     guardianName: view.guardianName ?? "",
     guardianRelation: view.guardianRelation ?? "",
     guardianNumber: view.guardianNumber ?? "",
+    guardianAadhaarNumber: view.guardianAadhaarNumber ?? "",
     address: view.address ?? "",
+    currentAddress: view.currentAddress ?? "",
     vehicleNumber: view.vehicleNumber ?? "",
     vehicleBrand: view.vehicleBrand ?? "",
     panNumber: view.panNumber ?? "",
