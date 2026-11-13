@@ -17,7 +17,10 @@ import {
   Sparkles,
   CheckCircle2,
   Filter,
+  RotateCw,
 } from 'lucide-react'
+import { PageLayout } from '../../../components/layout/PageLayout'
+import './PlanManagementPage.css'
 import { getSession } from '../../../app/auth/session'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { TablePagination } from '../../../components/ui/TablePagination'
@@ -479,7 +482,7 @@ export function PlanManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 p-4 md:p-6 lg:p-8">
+    <PageLayout>
       {/* Toast Alert */}
       {toast && (
         <div
@@ -500,161 +503,126 @@ export function PlanManagementPage() {
         </div>
       )}
 
-      {/* Top Banner & Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
-              <CreditCard className="h-5 w-5" />
-            </span>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Plan Management</h1>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Configure subscription tiers, department access, pricing, and services across your platform.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <RefreshButton onRefresh={loadPlans} isRefreshing={loading} label="plans" />
-          <button
-            type="button"
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 transition-colors focus:ring-2 focus:ring-purple-400"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add New Plan</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Stat Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Total Plans</span>
-            <span className="rounded-lg bg-purple-50 p-1.5 text-purple-600">
-              <Layers className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{totalElements || totalPlansCount}</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Active Plans</span>
-            <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
-              <Check className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-emerald-600">{activePlansCount}</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Deactivated</span>
-            <span className="rounded-lg bg-amber-50 p-1.5 text-amber-600">
-              <Pause className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-amber-600">{inactivePlansCount}</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Departments Covered</span>
-            <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
-              <Building className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-blue-600">{allDepartmentsPresent.length}</div>
-        </div>
-      </div>
-
-      {/* Search & Filters */}
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search plans by name or department..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-purple-500 focus:bg-white focus:outline-hidden"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Status filter */}
-          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50/60 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
-                statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('active')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
-                statusFilter === 'active' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('inactive')}
-              className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
-                statusFilter === 'inactive' ? 'bg-white text-amber-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Inactive
-            </button>
+      {/* MAIN WHITE CARD */}
+      <div className="plan-main-card">
+        {/* Single-Line Sticky Toolbar: Plans Title + Search + Filter Pills + Dept Select + Add New Plan + Refresh */}
+        <div className="plan-toolbar">
+          {/* Left: Title + Search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 320px', minWidth: '260px' }}>
+            <h1 className="plan-page-title">Plans</h1>
+            <div className="plan-search-wrapper">
+              <Search className="plan-search-icon" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search plans by name or department..."
+                className="plan-search-input"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Department filter dropdown */}
-          <div className="relative">
+          {/* Right: Status Pills + Dept Filter + Add Plan + Refresh */}
+          <div className="plan-toolbar-right">
+            {/* Status filter pills */}
+            <div className="plan-status-pills">
+              <button
+                type="button"
+                className={`plan-pill-btn ${statusFilter === 'all' ? 'is-active' : ''}`}
+                onClick={() => setStatusFilter('all')}
+                title="Show all plans"
+              >
+                All <span className="plan-pill-count">{totalElements || totalPlansCount}</span>
+              </button>
+              <button
+                type="button"
+                className={`plan-pill-btn ${statusFilter === 'active' ? 'is-active' : ''}`}
+                onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
+                title="Filter active plans"
+              >
+                Active <span className="plan-pill-count">{activePlansCount}</span>
+              </button>
+              <button
+                type="button"
+                className={`plan-pill-btn ${statusFilter === 'inactive' ? 'is-active' : ''}`}
+                onClick={() => setStatusFilter(statusFilter === 'inactive' ? 'all' : 'inactive')}
+                title="Filter inactive plans"
+              >
+                Inactive <span className="plan-pill-count">{inactivePlansCount}</span>
+              </button>
+            </div>
+
+            {/* Department dropdown */}
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 focus:border-purple-500 focus:outline-hidden"
+              className="plan-dept-select"
+              title="Filter by department"
             >
-              <option value="all">All Departments</option>
+              <option value="all">All Departments ({allDepartmentsPresent.length})</option>
               {allDepartmentsPresent.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept.replace(/_/g, ' ')}
                 </option>
               ))}
             </select>
+
+            {/* + Add New Plan Button */}
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className="plan-add-btn"
+            >
+              <Plus style={{ width: '16px', height: '16px' }} />
+              <span>Add New Plan</span>
+            </button>
+
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={loadPlans}
+              className="plan-refresh-btn"
+              title="Refresh plans"
+              disabled={loading}
+            >
+              <RotateCw
+                style={{ width: '15px', height: '15px', color: '#475569' }}
+                className={loading ? 'animate-spin' : ''}
+              />
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Plans Table Card */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] border-collapse text-left">
+        {/* Table Container */}
+        <div className="plan-table-container">
+          <table className="plan-table">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3 text-center w-12">#</th>
-                <th className="px-4 py-3">Plan Details</th>
-                <th className="px-4 py-3">Department Access</th>
-                <th className="px-4 py-3">Key Features</th>
-                <th className="px-4 py-3 text-center">Subservices</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+              <tr>
+                <th style={{ width: '48px', textAlign: 'center' }}>#</th>
+                <th>Plan Details</th>
+                <th>Department Access</th>
+                <th>Key Features</th>
+                <th style={{ textAlign: 'center' }}>Subservices</th>
+                <th style={{ textAlign: 'center' }}>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -864,7 +832,7 @@ export function PlanManagementPage() {
         </div>
 
         {/* Pagination */}
-        <div className="border-t border-slate-100 px-4 py-3">
+        <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
           <TablePagination
             page={page}
             pageSize={pageSize}
@@ -1564,7 +1532,7 @@ export function PlanManagementPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   )
 }
 

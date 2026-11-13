@@ -141,136 +141,116 @@ export function AdminTimelinesPage() {
   return (
     <PageLayout>
       <div className="sop-page-container">
-        {/* 1. Header Bar */}
-        <header className="sop-page-header">
-          <div className="sop-page-title-wrap">
-            <h1 className="sop-page-title">Services &amp; SOP</h1>
-            <span className="sop-page-subtitle">
-              Services, SOP statuses and turnaround times
-            </span>
-          </div>
-
-          <div className="sop-header-actions">
-            {pendingCount > 0 && (
-              <button
-                type="button"
-                className="sop-header-icon-btn"
-                onClick={() => setIsApprovalsModalOpen(true)}
-                title={`${pendingCount} Pending Timeline Approvals`}
-              >
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span className="sop-pending-badge">{pendingCount}</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className="sop-header-icon-btn"
-              onClick={() => {
-                flowsQuery.refetch()
-                pendingTimelineQuery.refetch()
-              }}
-              title="Refresh services"
-              disabled={isRefreshing}
-            >
-              <RotateCw className={`w-4 h-4 text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button
-              type="button"
-              className="sop-header-icon-btn"
-              onClick={() => navigate({ to: '/admin/notification-history' as any })}
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-        </header>
-
-        {/* 2. Toolbar Row: Tabs, Search & Actions */}
-        <div className="sop-toolbar">
-          <div className="sop-toolbar-left">
-            {/* Service List vs SOP & timeline tabs */}
-            <div className="sop-nav-tabs">
-              <button
-                type="button"
-                className="sop-nav-tab"
-                onClick={() => navigate({ to: '/admin/services' as any })}
-              >
-                Service List
-              </button>
-              <button
-                type="button"
-                className="sop-nav-tab is-active"
-              >
-                SOP &amp; timeline
-              </button>
-            </div>
-
-            {/* Search Input */}
-            <div className="sop-search-wrap">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                value={serviceSearch}
-                onChange={(e) => setServiceSearch(e.target.value)}
-                placeholder="Search services"
-                className="sop-search-input"
-              />
-            </div>
-          </div>
-
-          <div className="sop-toolbar-right">
-            {/* Department Filter Dropdown */}
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="sop-dept-select"
-            >
-              <option value="ALL">All departments</option>
-              {availableDepartmentTypes.map((dt) => (
-                <option key={dt} value={dt}>
-                  {formatDeptName(dt)}
-                </option>
-              ))}
-            </select>
-
-            {/* + Add Service Button */}
-            <button
-              type="button"
-              className="sop-add-service-btn"
-              onClick={() => setIsAddServiceOpen(true)}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Service</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3. Pale Yellow Authority Banner */}
-        <div className="sop-authority-banner">
-          <span>⚡</span>
-          <span>
-            <strong>Super Admin authority:</strong> timelines you set here are approved immediately — no second approval needed.
-          </span>
-        </div>
-
-        {/* Toast Feedback */}
-        {feedback && (
-          <div className={`sop-feedback-alert ${feedback.type === 'ok' ? 'is-ok' : 'is-err'}`}>
-            <span>{feedback.type === 'ok' ? '✓' : '✕'}</span>
-            <span>{feedback.msg}</span>
-          </div>
-        )}
-
-        {/* 4. Main White Card */}
+        {/* Main White Card */}
         <div className="sop-main-card">
-          <div className="sop-card-header">
-            <h2 className="sop-card-title">SOP &amp; turnaround time</h2>
-            <span className="sop-count-pill">
-              {flowsList.length} of {allFlows.length}
+          {/* Top Sticky Toolbar */}
+          <div className="sop-toolbar">
+            <div className="sop-toolbar-left">
+              <h1 className="sop-page-title">Services &amp; SOP</h1>
+
+              {/* Service List vs SOP & timeline tabs */}
+              <div className="sop-nav-tabs">
+                <button
+                  type="button"
+                  className="sop-nav-tab"
+                  onClick={() => navigate({ to: '/admin/services' as any })}
+                >
+                  Service List
+                </button>
+                <button
+                  type="button"
+                  className="sop-nav-tab is-active"
+                >
+                  SOP &amp; timeline
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="sop-search-wrap">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                  placeholder="Search services..."
+                  className="sop-search-input"
+                />
+              </div>
+            </div>
+
+            <div className="sop-toolbar-right">
+              {/* Approvals button if pending count exists */}
+              {pendingCount > 0 && (
+                <button
+                  type="button"
+                  className="sop-approvals-pill-btn"
+                  onClick={() => setIsApprovalsModalOpen(true)}
+                  title={`${pendingCount} Pending Timeline Approvals`}
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Approvals ({pendingCount})</span>
+                </button>
+              )}
+
+              {/* Department Filter Dropdown */}
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="sop-dept-select"
+                title="Filter by department"
+              >
+                <option value="ALL">All departments</option>
+                {availableDepartmentTypes.map((dt) => (
+                  <option key={dt} value={dt}>
+                    {formatDeptName(dt)}
+                  </option>
+                ))}
+              </select>
+
+              {/* + Add Service Button */}
+              <button
+                type="button"
+                className="sop-add-service-btn"
+                onClick={() => setIsAddServiceOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Service</span>
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                type="button"
+                className="sop-refresh-btn"
+                onClick={() => {
+                  flowsQuery.refetch()
+                  pendingTimelineQuery.refetch()
+                }}
+                title="Refresh services"
+                disabled={isRefreshing}
+              >
+                <RotateCw
+                  style={{ width: '15px', height: '15px', color: '#475569' }}
+                  className={isRefreshing ? 'animate-spin' : ''}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Pale Yellow Authority Banner */}
+          <div className="sop-authority-banner">
+            <span>⚡</span>
+            <span>
+              <strong>Super Admin authority:</strong> timelines you set here are approved immediately — no second approval needed.
             </span>
           </div>
+
+          {/* Toast Feedback */}
+          {feedback && (
+            <div className={`sop-feedback-alert ${feedback.type === 'ok' ? 'is-ok' : 'is-err'}`}>
+              <span>{feedback.type === 'ok' ? '✓' : '✕'}</span>
+              <span>{feedback.msg}</span>
+            </div>
+          )}
 
           {flowsQuery.isLoading ? (
             <LoadingState message="Loading department services and SOP timelines..." />

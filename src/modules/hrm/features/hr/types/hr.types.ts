@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Domain types for the HR (Candidates) dashboard.
  *
  * Sources are lowercase strings from the backend; we narrow to a known union
@@ -162,6 +162,9 @@ export interface EmployeeListItem {
   /** When onboarding was verified/completed; null until VERIFIED. */
   onboardedAt: string | null;
   laptopSerialNumber?: string | null;
+  laptopType?: string | null;
+  isCompanySim?: boolean | null;
+  companyPhoneNumber?: string | null;
 }
 
 export interface OnboardingCounts {
@@ -182,6 +185,9 @@ export interface CreateEmployeeInput {
   designationId?: number | null;
   managerId?: number | null;
   laptopSerialNumber?: string;
+  laptopType?: string;
+  isCompanySim?: boolean;
+  companyPhoneNumber?: string;
 }
 
 export interface UpdateEmployeeInput {
@@ -196,6 +202,9 @@ export interface UpdateEmployeeInput {
   designationId: number | null;
   managerId: number | null;
   laptopSerialNumber?: string | null;
+  laptopType?: string | null;
+  isCompanySim?: boolean | null;
+  companyPhoneNumber?: string | null;
 }
 
 export interface UpdateEmployeeStatusInput {

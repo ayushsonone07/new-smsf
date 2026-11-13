@@ -195,6 +195,11 @@ function EmployeeDetails({ employee }: { employee: EmployeeListItem }) {
       <Detail label="Designation" value={employee.designationName} optional />
       <Detail label="Manager" value={employee.managerName} optional />
       <Detail label="Laptop serial number" value={employee.laptopSerialNumber ?? null} optional />
+      <Detail label="Laptop type" value={employee.laptopType ?? null} optional />
+      <Detail label="Company SIM" value={employee.isCompanySim ? "Yes" : "No"} optional />
+      {employee.isCompanySim ? (
+        <Detail label="Company mobile number" value={employee.companyPhoneNumber ?? null} optional />
+      ) : null}
       <Detail label="Employment type" value={formatValue(employee.employmentType)} />
       <Detail label="Joining date" value={formatDate(employee.joiningDate)} />
       <Detail label="Exit date" value={formatDate(employee.exitDate)} optional />
@@ -226,6 +231,9 @@ function EmployeeEditForm({
     designationId: employee.designationId,
     managerId: employee.managerId,
     laptopSerialNumber: employee.laptopSerialNumber ?? "",
+    laptopType: employee.laptopType ?? "",
+    isCompanySim: employee.isCompanySim ?? false,
+    companyPhoneNumber: employee.companyPhoneNumber ?? "",
   }));
 
   const departments = useAppSelector(selectDepartments);
@@ -336,17 +344,66 @@ function EmployeeEditForm({
         />
       </div>
 
-        <div>
-          <label htmlFor="emp-laptop-serial" className="block text-xs font-medium text-muted-foreground">
-            Laptop serial number
-          </label>
-          <input
-            id="emp-laptop-serial"
-            value={values.laptopSerialNumber || ""}
-            onChange={(e) => update("laptopSerialNumber", e.target.value)}
-            placeholder="e.g. LPT-982341 (optional)"
-            className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-          />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="emp-laptop-serial" className="block text-xs font-medium text-muted-foreground">
+              Laptop serial number
+            </label>
+            <input
+              id="emp-laptop-serial"
+              value={values.laptopSerialNumber || ""}
+              onChange={(e) => update("laptopSerialNumber", e.target.value)}
+              placeholder="e.g. LPT-982341 (optional)"
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="emp-laptop-type" className="block text-xs font-medium text-muted-foreground">
+              Laptop type
+            </label>
+            <input
+              id="emp-laptop-type"
+              value={values.laptopType || ""}
+              onChange={(e) => update("laptopType", e.target.value)}
+              placeholder="e.g. Dell / MacBook / Lenovo (optional)"
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="emp-company-sim" className="block text-xs font-medium text-muted-foreground">
+              Company SIM
+            </label>
+            <select
+              id="emp-company-sim"
+              value={values.isCompanySim ? "yes" : "no"}
+              onChange={(e) => {
+                const isYes = e.target.value === "yes";
+                update("isCompanySim", isYes);
+                if (!isYes) {
+                  update("companyPhoneNumber", "");
+                }
+              }}
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          {values.isCompanySim ? (
+            <div>
+              <label htmlFor="emp-company-phone" className="block text-xs font-medium text-muted-foreground">
+                Company mobile number
+              </label>
+              <input
+                id="emp-company-phone"
+                type="tel"
+                value={values.companyPhoneNumber || ""}
+                onChange={(e) => update("companyPhoneNumber", e.target.value)}
+                placeholder="e.g. +91 98765 43210"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+          ) : null}
         </div>
 
       <div className="flex justify-end gap-2 border-t border-border pt-4">
