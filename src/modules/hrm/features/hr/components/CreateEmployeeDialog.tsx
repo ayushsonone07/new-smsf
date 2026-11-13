@@ -82,7 +82,10 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       values.departmentId > 0 ||
       Boolean(values.designationId) ||
       Boolean(values.managerId) ||
-      Boolean(values.laptopSerialNumber),
+      Boolean(values.laptopSerialNumber) ||
+      Boolean(values.laptopType) ||
+      Boolean(values.isCompanySim) ||
+      Boolean(values.companyPhoneNumber),
     [candidate, values],
   );
 
@@ -125,6 +128,10 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       employeeCode: values.employeeCode.trim(),
       designationId: values.designationId || null,
       managerId: values.managerId || null,
+      laptopSerialNumber: values.laptopSerialNumber?.trim() || "",
+      laptopType: values.laptopType?.trim() || "",
+      isCompanySim: Boolean(values.isCompanySim),
+      companyPhoneNumber: values.isCompanySim ? (values.companyPhoneNumber?.trim() || "") : "",
     };
     const nextErrors = validate(trimmed);
     setErrors(nextErrors);
@@ -366,6 +373,61 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                 />
               }
             />
+            <Field
+              id="emp-laptop-type"
+              label="Laptop type"
+              input={
+                <input
+                  id="emp-laptop-type"
+                  value={values.laptopType || ""}
+                  onChange={(e) => update("laptopType", e.target.value)}
+                  placeholder="e.g. Dell / MacBook / Lenovo (optional)"
+                  className={fieldClass()}
+                  disabled={mutation.isPending}
+                />
+              }
+            />
+            <Field
+              id="emp-company-sim"
+              label="Company SIM"
+              input={
+                <Select
+                  id="emp-company-sim"
+                  value={values.isCompanySim ? "yes" : "no"}
+                  onChange={(e) => {
+                    const isYes = e.target.value === "yes";
+                    update("isCompanySim", isYes);
+                    if (!isYes) {
+                      update("companyPhoneNumber", "");
+                    }
+                  }}
+                  className={fieldClass()}
+                  disabled={mutation.isPending}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </Select>
+              }
+            />
+            {values.isCompanySim ? (
+              <Field
+                id="emp-company-phone"
+                label="Company mobile number"
+                required
+                error={errors.companyPhoneNumber}
+                input={
+                  <input
+                    id="emp-company-phone"
+                    type="tel"
+                    value={values.companyPhoneNumber || ""}
+                    onChange={(e) => update("companyPhoneNumber", e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    className={fieldClass(errors.companyPhoneNumber)}
+                    disabled={mutation.isPending}
+                  />
+                }
+              />
+            ) : null}
 
           </div>
 
@@ -434,6 +496,9 @@ function emptyValues(candidate: Candidate | null): CreateEmployeeInput {
     designationId: null,
     managerId: null,
     laptopSerialNumber: "",
+    laptopType: "",
+    isCompanySim: false,
+    companyPhoneNumber: "",
   };
 }
 
@@ -461,6 +526,9 @@ function validate(values: CreateEmployeeInput): Errors {
   if (values.designationId != null && values.designationId < 1)
     errors.designationId = "Use a valid designation.";
   if (values.managerId != null && values.managerId < 1) errors.managerId = "Use a valid manager.";
+  if (values.isCompanySim && !values.companyPhoneNumber?.trim()) {
+    errors.companyPhoneNumber = "Company mobile number is required.";
+  }
   return errors;
 }
 

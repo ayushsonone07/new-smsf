@@ -8,7 +8,9 @@ import {
   Search,
   Play,
   Pause,
+  RotateCw,
 } from 'lucide-react'
+import './AdminServiceListCard.css'
 import {
   addServicesToAdminPlan,
   decideTimelineRequest,
@@ -26,7 +28,6 @@ import {
   useManageAdminService,
 } from '../../features/departments/hooks/useAdminServices'
 import { Button } from '../ui/Button'
-import { Card } from '../ui/Card'
 import { Modal } from '../ui/Modal'
 import { RefreshButton } from '../ui/RefreshButton'
 import { AddAdminServiceModal } from './AddAdminServiceModal'
@@ -544,252 +545,106 @@ export function AdminServiceListCard({
         </div>
       )}
 
-      <Card>
-        <div className="table-toolbar">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <h2>
-                {onlyServiceList
-                  ? 'Service List'
-                  : showPlans
-                    ? 'Plans Management'
-                    : 'Services Management (Service List)'}
-              </h2>
-              {/* Reloads only the list currently shown (plans or services). */}
-              {showPlans && !onlyServiceList ? (
-                <RefreshButton
-                  onRefresh={() => plansQuery.refetch()}
-                  isRefreshing={plansQuery.isFetching}
-                  label="plans"
+      <div className="svc-main-card">
+        <div className="svc-toolbar">
+          {/* Left: Service List title + search input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 320px', minWidth: '260px' }}>
+            <h1 className="svc-page-title">
+              {onlyServiceList
+                ? 'Service List'
+                : showPlans
+                  ? 'Plans Management'
+                  : 'Services Management (Service List)'}
+            </h1>
+
+            {(!showPlans || onlyServiceList) && (
+              <div className="svc-search-wrapper">
+                <Search className="svc-search-icon" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search services..."
+                  className="svc-search-input"
                 />
-              ) : (
-                <RefreshButton
-                  onRefresh={() =>
-                    onlyServiceList
-                      ? servicesQuery.refetch()
-                      : Promise.all([
-                          servicesQuery.refetch(),
-                          pendingTimelineQuery.refetch(),
-                        ])
-                  }
-                  isRefreshing={
-                    servicesQuery.isFetching ||
-                    (!onlyServiceList && pendingTimelineQuery.isFetching)
-                  }
-                  label="services"
-                />
-              )}
-            </div>
-            {onlyServiceList ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+              </div>
+            )}
+          </div>
+
+          {/* Right Toolbar Controls */}
+          <div className="svc-toolbar-right">
+            {onlyServiceList && !showPlans && (
+              <div className="svc-status-pills">
                 <button
                   type="button"
+                  className={`svc-pill-btn ${serviceStatusFilter === 'ALL' ? 'is-active' : ''}`}
                   onClick={() => setServiceStatusFilter('ALL')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '3px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    backgroundColor: serviceStatusFilter === 'ALL' ? '#e2e8f0' : '#f1f5f9',
-                    color: '#334155',
-                    border: `1px solid ${serviceStatusFilter === 'ALL' ? '#94a3b8' : '#e2e8f0'}`,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
                   title="Show all services"
                 >
-                  <span>Total:</span>
-                  <strong
-                    style={{
-                      backgroundColor: '#ffffff',
-                      padding: '1px 6px',
-                      borderRadius: '9999px',
-                      fontSize: '0.72rem',
-                      color: '#0f172a',
-                      border: '1px solid #e2e8f0',
-                    }}
-                  >
-                    {services.length}
-                  </strong>
+                  All <span className="svc-pill-count">{services.length}</span>
                 </button>
-
                 <button
                   type="button"
+                  className={`svc-pill-btn ${serviceStatusFilter === 'ACTIVE' ? 'is-active' : ''}`}
                   onClick={() =>
                     setServiceStatusFilter(
                       serviceStatusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE',
                     )
                   }
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '3px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    backgroundColor:
-                      serviceStatusFilter === 'ACTIVE' ? '#dcfce7' : '#ecfdf5',
-                    color: '#059669',
-                    border: `1px solid ${
-                      serviceStatusFilter === 'ACTIVE' ? '#4ade80' : '#a7f3d0'
-                    }`,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
                   title="Filter active services"
                 >
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor: '#10b981',
-                    }}
-                  />
-                  <span>Active:</span>
-                  <strong
-                    style={{
-                      backgroundColor: '#ffffff',
-                      padding: '1px 6px',
-                      borderRadius: '9999px',
-                      fontSize: '0.72rem',
-                      color: '#059669',
-                      border: '1px solid #a7f3d0',
-                    }}
-                  >
-                    {activeCount}
-                  </strong>
+                  Active <span className="svc-pill-count">{activeCount}</span>
                 </button>
-
                 <button
                   type="button"
+                  className={`svc-pill-btn ${serviceStatusFilter === 'INACTIVE' ? 'is-active' : ''}`}
                   onClick={() =>
                     setServiceStatusFilter(
                       serviceStatusFilter === 'INACTIVE' ? 'ALL' : 'INACTIVE',
                     )
                   }
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '3px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    backgroundColor:
-                      serviceStatusFilter === 'INACTIVE' ? '#fee2e2' : '#fef2f2',
-                    color: '#dc2626',
-                    border: `1px solid ${
-                      serviceStatusFilter === 'INACTIVE' ? '#f87171' : '#fecaca'
-                    }`,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
                   title="Filter inactive services"
                 >
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor: '#ef4444',
-                    }}
-                  />
-                  <span>Inactive:</span>
-                  <strong
-                    style={{
-                      backgroundColor: '#ffffff',
-                      padding: '1px 6px',
-                      borderRadius: '9999px',
-                      fontSize: '0.72rem',
-                      color: '#dc2626',
-                      border: '1px solid #fecaca',
-                    }}
-                  >
-                    {inactiveCount}
-                  </strong>
+                  Inactive <span className="svc-pill-count">{inactiveCount}</span>
                 </button>
               </div>
-            ) : (
-              <p>
-                {showPlans
-                  ? 'View and manage plans, department types, and associated subservices.'
-                  : 'Create a new Service here — once created, "Step 2: Create Department Login" will open automatically.'}
-              </p>
             )}
-          </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {onlyServiceList ? (
               <>
                 <button
                   type="button"
+                  className="svc-add-btn"
                   onClick={() => {
                     setEditingService(null)
                     setShowAddModal(true)
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '0.5rem 1.1rem',
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(79, 70, 229, 0.35)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.25)'
                   }}
                 >
                   <Plus style={{ width: '16px', height: '16px' }} />
                   <span>Add Service</span>
                 </button>
+
                 <button
                   type="button"
+                  className="svc-export-btn"
                   onClick={handleExportCsv}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '0.5rem 1rem',
-                    background: '#ffffff',
-                    color: '#334155',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc'
-                    e.currentTarget.style.borderColor = '#cbd5e1'
-                    e.currentTarget.style.transform = 'translateY(-1px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffffff'
-                    e.currentTarget.style.borderColor = '#e2e8f0'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}
+                  title="Export CSV"
                 >
                   <Download style={{ width: '15px', height: '15px', color: '#64748b' }} />
                   <span>Export</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="svc-refresh-btn"
+                  onClick={() => servicesQuery.refetch()}
+                  title="Refresh services"
+                  disabled={servicesQuery.isFetching}
+                >
+                  <RotateCw
+                    style={{ width: '15px', height: '15px', color: '#475569' }}
+                    className={servicesQuery.isFetching ? 'animate-spin' : ''}
+                  />
                 </button>
               </>
             ) : !showPlans ? (
@@ -865,82 +720,92 @@ export function AdminServiceListCard({
           </div>
         </div>
 
-        <div style={refreshingStyle(showPlans && !onlyServiceList ? plansQuery : servicesQuery)}>
+        <div
+          style={{
+            ...refreshingStyle(showPlans && !onlyServiceList ? plansQuery : servicesQuery),
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
         {!showPlans ? (
           <>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '1rem',
-                marginBottom: '1.25rem',
-                flexWrap: 'wrap',
-              }}
-            >
+            {!onlyServiceList && (
               <div
                 style={{
-                  position: 'relative',
-                  flex: '1 1 280px',
-                  maxWidth: '380px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  marginBottom: '1.25rem',
+                  flexWrap: 'wrap',
                 }}
               >
-                <Search
+                <div
                   style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '16px',
-                    height: '16px',
-                    color: '#94a3b8',
-                    pointerEvents: 'none',
+                    position: 'relative',
+                    flex: '1 1 280px',
+                    maxWidth: '380px',
                   }}
-                />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search services..."
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem 0.85rem 0.55rem 2.25rem',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f8fafc',
-                    fontSize: '0.85rem',
-                    color: '#0f172a',
-                    outline: 'none',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffffff'
-                    e.currentTarget.style.borderColor = '#6366f1'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.12)'
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc'
-                    e.currentTarget.style.borderColor = '#e2e8f0'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                />
-              </div>
+                >
+                  <Search
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '16px',
+                      height: '16px',
+                      color: '#94a3b8',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search services..."
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.85rem 0.55rem 2.25rem',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#f8fafc',
+                      fontSize: '0.85rem',
+                      color: '#0f172a',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffffff'
+                      e.currentTarget.style.borderColor = '#6366f1'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.12)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8fafc'
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
 
-              <span
-                style={{
-                  fontSize: '0.8125rem',
-                  color: '#64748b',
-                  backgroundColor: '#f1f5f9',
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '20px',
-                  fontWeight: 500,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                Showing <strong style={{ color: '#0f172a' }}>{filteredServices.length}</strong> of{' '}
-                <strong style={{ color: '#0f172a' }}>{services.length}</strong> services
-              </span>
-            </div>
+                <span
+                  style={{
+                    fontSize: '0.8125rem',
+                    color: '#64748b',
+                    backgroundColor: '#f1f5f9',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    fontWeight: 500,
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  Showing <strong style={{ color: '#0f172a' }}>{filteredServices.length}</strong> of{' '}
+                  <strong style={{ color: '#0f172a' }}>{services.length}</strong> services
+                </span>
+              </div>
+            )}
 
             {servicesQuery.isLoading ? (
               <div
@@ -965,25 +830,16 @@ export function AdminServiceListCard({
                 Failed to load services: {servicesQuery.error.message}
               </div>
             ) : (
-              <div
-                className="table-wrapper"
-                style={{
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.03)',
-                  overflow: 'hidden',
-                  background: '#ffffff',
-                }}
-              >
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="svc-table-container">
+                <table className="svc-table">
                   <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>#</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>SERVICE TYPE</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>DEPARTMENT TYPE</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>STATUS</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>CREATED AT</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'right', minWidth: '100px' }}>ACTIONS</th>
+                    <tr>
+                      <th style={{ width: '48px', textAlign: 'center' }}>#</th>
+                      <th>SERVICE TYPE</th>
+                      <th>DEPARTMENT TYPE</th>
+                      <th>STATUS</th>
+                      <th>CREATED AT</th>
+                      <th style={{ textAlign: 'right', minWidth: '100px' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1622,7 +1478,7 @@ export function AdminServiceListCard({
           </>
         )}
         </div>
-      </Card>
+      </div>
 
       {/* Add / Edit Service Modal */}
       <AddAdminServiceModal
