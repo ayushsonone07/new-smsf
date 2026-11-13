@@ -273,6 +273,7 @@ export interface EmployeeOnboardingView {
   employeeCode: string;
   employeeName: string;
   email: string;
+  workLocation: string | null;
   onboardingStatus: OnboardingStatus;
   dateOfBirth: string | null;
   gender: string | null;
@@ -281,8 +282,11 @@ export interface EmployeeOnboardingView {
   guardianRelation: string | null;
   guardianNumber: string | null;
   address: string | null;
+  currentAddress: string | null;
   vehicleNumber: string | null;
   vehicleBrand: string | null;
+  rcNumber: string | null;
+  drivingLicenceNumber: string | null;
   panNumber: string | null;
   aadhaarNumber: string | null;
   bankAccountNumber: string | null;
@@ -291,6 +295,8 @@ export interface EmployeeOnboardingView {
   resumeUrl: string | null;
   aadhaarCardUrl: string | null;
   panCardUrl: string | null;
+  rcDocumentUrl: string | null;
+  drivingLicenceUrl: string | null;
   experienceLetterUrl: string | null;
   bankPassbookUrl: string | null;
   passportPhotoUrl: string | null;
@@ -300,6 +306,7 @@ export interface EmployeeOnboardingView {
 }
 
 export interface ManualOnboardingInput {
+  workLocation: string;
   dateOfBirth: string;
   gender: string;
   bloodGroup: string;
@@ -307,8 +314,11 @@ export interface ManualOnboardingInput {
   guardianRelation: string;
   guardianNumber: string;
   address: string;
+  currentAddress: string;
   vehicleNumber: string;
   vehicleBrand: string;
+  rcNumber: string;
+  drivingLicenceNumber: string;
   panNumber: string;
   aadhaarNumber: string;
   bankAccountNumber: string;
@@ -317,6 +327,8 @@ export interface ManualOnboardingInput {
   resume: File | null;
   aadhaarCard: File | null;
   panCard: File | null;
+  rcDocument: File | null;
+  drivingLicence: File | null;
   experienceLetter: File | null;
   bankPassbook: File | null;
   passportPhoto: File | null;

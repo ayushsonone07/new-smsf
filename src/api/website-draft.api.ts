@@ -5,6 +5,8 @@ export interface WebsiteDraftMailRequest {
   clientName: string
   draftLink: string
   remark?: string
+  customerId?: number | string
+  duplicateCustomerId?: string
 }
 
 export interface WebsiteDraftHistoryEntry {
@@ -20,9 +22,15 @@ export interface WebsiteDraftHistoryResponse {
   data: WebsiteDraftHistoryEntry[]
 }
 
+export interface FetchWebsiteDraftHistoryParams {
+  clientEmail?: string
+  customerId?: number | string
+  duplicateCustomerId?: string
+}
+
 /**
  * Send website draft mail:
- * POST /api/smtp/website-draft/mail?clientEmail=...&clientName=...&draftLink=...&remark=...
+ * POST /api/smtp/website-draft/mail?clientEmail=...&clientName=...&draftLink=...&remark=...&customerId=...
  */
 export async function sendWebsiteDraftMail(
   payload: WebsiteDraftMailRequest,
@@ -34,6 +42,13 @@ export async function sendWebsiteDraftMail(
     remark: payload.remark || '',
   })
 
+  if (payload.customerId !== undefined && payload.customerId !== null) {
+    search.append('customerId', String(payload.customerId))
+  }
+  if (payload.duplicateCustomerId) {
+    search.append('duplicateCustomerId', payload.duplicateCustomerId)
+  }
+
   return authedApiRequest<{ success: boolean; message: string }>(
     `/api/smtp/website-draft/mail?${search.toString()}`,
     {
@@ -44,12 +59,24 @@ export async function sendWebsiteDraftMail(
 
 /**
  * Fetch website draft history:
- * GET /api/smtp/website-draft/history?clientEmail=...
+ * GET /api/smtp/website-draft/history?clientEmail=...&customerId=...
  */
 export async function fetchWebsiteDraftHistory(
-  clientEmail: string,
+  params: string | FetchWebsiteDraftHistoryParams,
 ): Promise<WebsiteDraftHistoryEntry[]> {
-  const search = new URLSearchParams({ clientEmail })
+  const search = new URLSearchParams()
+  if (typeof params === 'string') {
+    if (params) search.append('clientEmail', params)
+  } else if (params) {
+    if (params.clientEmail) search.append('clientEmail', params.clientEmail)
+    if (params.customerId !== undefined && params.customerId !== null) {
+      search.append('customerId', String(params.customerId))
+    }
+    if (params.duplicateCustomerId) {
+      search.append('duplicateCustomerId', params.duplicateCustomerId)
+    }
+  }
+
   const response = await authedApiRequest<
     WebsiteDraftHistoryResponse | WebsiteDraftHistoryEntry[]
   >(`/api/smtp/website-draft/history?${search.toString()}`)

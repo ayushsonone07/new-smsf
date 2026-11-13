@@ -26,6 +26,11 @@ function fakeFile(name: string, size = 1024): File {
 
 function validInput(overrides: Partial<ManualOnboardingInput> = {}): ManualOnboardingInput {
   return {
+    workLocation: 'NOIDA',
+    rcNumber: 'DL01AB1234',
+    drivingLicenceNumber: 'DL1420110012345',
+    rcDocument: fakeFile('rc.pdf'),
+    drivingLicence: fakeFile('dl.pdf'),
     dateOfBirth: '1990-05-15',
     gender: 'Male',
     bloodGroup: 'O+',
@@ -33,8 +38,9 @@ function validInput(overrides: Partial<ManualOnboardingInput> = {}): ManualOnboa
     guardianRelation: 'Father',
     guardianNumber: '9876543210',
     address: '123 Main Street',
-    vehicleNumber: '',
-    vehicleBrand: '',
+    currentAddress: '',
+    vehicleNumber: 'DL01AB1234',
+    vehicleBrand: 'Honda Activa',
     panNumber: 'ABCDE1234F',
     aadhaarNumber: '123456789012',
     bankAccountNumber: '123456789012',
@@ -125,8 +131,8 @@ describe('field validators', () => {
     expect(validateAadhaarNumber('1234 5678 9012')).toBeNull()
   })
 
-  it('validates an optional PAN number', () => {
-    expect(validatePanNumber('')).toBeNull()
+  it('validates PAN number', () => {
+    expect(validatePanNumber('')).toBe('PAN number is required')
     expect(validatePanNumber('ABC123')).toContain('Invalid PAN format')
     expect(validatePanNumber('abcde1234f')).toBeNull()
   })
