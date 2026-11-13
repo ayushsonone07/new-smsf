@@ -21,6 +21,7 @@ import { PageLayout } from '../components/layout/PageLayout'
 import { DepartmentManagementPage } from '../features/departments/pages/DepartmentManagementPage'
 import { AdminOverviewPage } from '../features/departments/pages/AdminOverviewPage'
 import { PaymentSuccessPage } from '../features/payment/pages/PaymentSuccessPage'
+import { PaymentFailurePage } from '../features/payment/pages/PaymentFailurePage'
 import { LoginPage } from '../features/auth/pages/LoginPage'
 import { HeadConsoleLayout } from '../features/departments/head/pages/HeadConsoleLayout'
 import {
@@ -246,6 +247,13 @@ const paymentSuccessRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/payment/success',
   component: PaymentSuccessPage,
+})
+
+/** Public: CashFree / PayU failure redirect from SMSB (payment already marked FAILED). */
+const paymentFailureRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/payment/failure',
+  component: PaymentFailurePage,
 })
 
 const loginRoute = createRoute({
@@ -860,6 +868,7 @@ const routeTree = rootRoute.addChildren([
   registerBusinessRoute,
   salesProposalRoute,
   paymentSuccessRoute,
+  paymentFailureRoute,
   loginRoute,
   googleLayoutRoute.addChildren([
     googleHeadIndexRoute,
