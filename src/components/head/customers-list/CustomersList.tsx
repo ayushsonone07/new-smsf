@@ -1283,6 +1283,7 @@ function CustomerRow({
                   deliveryCompletionMap?.[customer.id] ??
                   customer.rawCustomer?.completionPercentage ??
                   customer.rawCustomer?.delivery?.completionPercentage ??
+                  customer.rawCustomer?.deliveryStatus?.completionPercentage ??
                   customer.rawCustomer?.deliveryCompletionPct ??
                   customer.rawCustomer?.serviceDeliveryDataCompletenessPct ??
                   null
