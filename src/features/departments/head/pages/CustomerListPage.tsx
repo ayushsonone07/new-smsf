@@ -156,6 +156,22 @@ export function CustomerListPage() {
   const [deliveryStatusMap, setDeliveryStatusMap] = useState<Record<string, boolean>>({})
   const [loadingDeliveryLinksForCustId, setLoadingDeliveryLinksForCustId] = useState<string | null>(null)
 
+  /**
+   * After a delivery save, re-reads only this customer's delivery state (one light
+   * call) instead of reloading the whole customer list.
+   */
+  async function refreshDeliveryFor(custId: string) {
+    try {
+      const hist = await getServiceDeliveryHistory(custId)
+      const pct = typeof hist?.completionPercentage === 'number' ? hist.completionPercentage : null
+      const sent = Boolean(hist?.isSent?.email || hist?.isSent?.whatsapp)
+      setDeliveryCompletionMap((prev) => ({ ...prev, [custId]: pct }))
+      setDeliveryStatusMap((prev) => ({ ...prev, [custId]: sent }))
+    } catch {
+      // The row keeps what it showed; the next list load corrects it.
+    }
+  }
+
   async function handleOpenDeliveryConfirmation(customer: OnboardingCustomer) {
     const custId = customer.id
     setLoadingDeliveryLinksForCustId(custId)
@@ -360,7 +376,7 @@ export function CustomerListPage() {
       endDate: dateTo || undefined,
       allTime: !dateFrom && !dateTo,
     },
-    { enabled: isOnboardingDept },
+    { enabled: false }, // Disabled per user request: no /onboarding/summary call on tab click or refresh
   )
 
   // 3a. Onboarding customers live API: /api/auth/onboarding/customers?page=0&size=10
@@ -667,36 +683,38 @@ export function CustomerListPage() {
       }
     }
 
-    const authData = authSummaryQuery.data
     const apiSummary = onboardingApiQuery.data?.summary
+    const authData = authSummaryQuery.data
 
     const all =
+      apiSummary?.total ??
       authData?.totalCustomers ??
       authData?.total ??
       authData?.summary?.total ??
-      apiSummary?.total
+      onboardingApiQuery.data?.totalElements ??
+      onboardingCustomers.length
 
     const pending =
+      apiSummary?.pending ??
       authData?.totalPendingOnboarding ??
       authData?.pendingCustomers ??
       authData?.pending ??
-      authData?.summary?.pending ??
-      apiSummary?.pending
+      authData?.summary?.pending
 
     const inProgress =
+      apiSummary?.inProgress ??
       authData?.totalInProgressOnboarding ??
       authData?.inProgressCustomers ??
       authData?.inProgress ??
-      authData?.summary?.inProgress ??
-      apiSummary?.inProgress
+      authData?.summary?.inProgress
 
     const completed =
+      apiSummary?.completed ??
       authData?.totalCompletedOnboarding ??
       authData?.totalOnboardedCustomers ??
       authData?.onboardedCustomers ??
       authData?.completed ??
-      authData?.summary?.completed ??
-      apiSummary?.completed
+      authData?.summary?.completed
 
     // The customer-list endpoint is already filtered by the selected status.
     // Its total is authoritative for the active tab; the summary endpoint can
@@ -801,7 +819,7 @@ export function CustomerListPage() {
   async function handleRefreshList() {
     const [listResult] = await Promise.all([
       activeCustomerQuery.refetch(),
-      ...(isOnboardingDept ? [authSummaryQuery.refetch(), customersQuery.refetch()] : []),
+      ...(isOnboardingDept ? [customersQuery.refetch()] : []),
     ])
     // Drop optimistic overrides so the freshly fetched status / assignee values are shown.
     if (listResult.isSuccess) {
@@ -811,8 +829,7 @@ export function CustomerListPage() {
     }
   }
 
-  const isListRefreshing =
-    activeCustomerQuery.isFetching || (isOnboardingDept && authSummaryQuery.isFetching)
+  const isListRefreshing = activeCustomerQuery.isFetching
 
   async function handleCallCustomer(customer: OnboardingCustomer) {
     setCallingCustomerId(customer.id)
@@ -997,8 +1014,54 @@ export function CustomerListPage() {
         await updateOnboardingStatus(customerId, status)
       }
 
-      await activeCustomerQuery.refetch()
-      if (isOnboardingDept) await authSummaryQuery.refetch()
+      // Silently patch the customer's status in React Query cache (0ms instant update, no heavy customers list or summary refetch).
+      const updateStatusInCache = (oldData: any) => {
+        if (!oldData) return oldData
+        const listKey = Array.isArray(oldData.customers)
+          ? 'customers'
+          : Array.isArray(oldData.data)
+            ? 'data'
+            : Array.isArray(oldData.content)
+              ? 'content'
+              : Array.isArray(oldData)
+                ? 'SELF'
+                : null
+        if (!listKey) return oldData
+
+        const updateList = (list: any[]) =>
+          list.map((c: any) => {
+            const id = String(c.id ?? c.customerId ?? '')
+            if (id === String(customerId)) {
+              return {
+                ...c,
+                status,
+                serviceStatus: status,
+                onboardingStatus: status,
+              }
+            }
+            return c
+          })
+
+        if (listKey === 'SELF') {
+          return updateList(oldData)
+        }
+        return {
+          ...oldData,
+          [listKey]: updateList(oldData[listKey]),
+        }
+      }
+
+      queryClient.setQueriesData({ queryKey: ['customer-list'] }, updateStatusInCache)
+      queryClient.setQueriesData({ queryKey: ['department-customer-rows'] }, updateStatusInCache)
+      queryClient.setQueriesData({ queryKey: ['onboarding-customers-list'] }, updateStatusInCache)
+      queryClient.setQueriesData({ queryKey: ['departmentCustomers'] }, updateStatusInCache)
+
+      setSelectedCustomer((prev) =>
+        prev && String(prev.id) === String(customerId)
+          ? ({ ...prev, status, onboardingStatus: status } as any)
+          : prev
+      )
+
       if (status === 'completed') {
         const customer = onboardingCustomers.find((item) => item.id === customerId)
         notifyServiceCompleted(customer ?? { id: customerId }, sType, currentDepartment)
@@ -1345,12 +1408,16 @@ export function CustomerListPage() {
           initialData={deliveryModalCustomer.initialData}
           readOnly={isHead}
           onClose={() => setDeliveryModalCustomer(null)}
+          onSubmitted={() => {
+            // Saved even though neither message went out: show this customer's new percentage.
+            void refreshDeliveryFor(deliveryModalCustomer.customer.id)
+          }}
           onSuccess={async (result) => {
             setDeliveryStatusMap((prev) => ({
               ...prev,
               [deliveryModalCustomer.customer.id]: true,
             }))
-            await activeCustomerQuery.refetch()
+            await refreshDeliveryFor(deliveryModalCustomer.customer.id)
             setToast({
               type: 'success',
               title: 'Delivery Confirmation',
@@ -1406,7 +1473,6 @@ export function CustomerListPage() {
           setConfirmingCustomer(null)
           setToast({ type: 'success', message: 'Acknowledgement sent successfully' })
           activeCustomerQuery.refetch()
-          authSummaryQuery.refetch()
         }}
       />
 
