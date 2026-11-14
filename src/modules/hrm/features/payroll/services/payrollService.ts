@@ -17,6 +17,7 @@ import type {
   BulkActionResult,
   BulkApproveInput,
   BulkPaymentInput,
+  BulkSalaryStructureImportResult,
 } from "../types";
 
 function queryString(params: PayrollListParams): string {
@@ -51,6 +52,27 @@ export const payrollService = {
     } catch {
       return null;
     }
+  },
+
+  async downloadSalaryStructureTemplate(): Promise<Blob> {
+    const { data } = await http.get<Blob>(PAYROLL_ENDPOINTS.salaryStructuresTemplate, {
+      responseType: "blob",
+    });
+    return data;
+  },
+
+  async bulkImportSalaryStructures(file: File): Promise<BulkSalaryStructureImportResult> {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await http.post<{ success: boolean; data: BulkSalaryStructureImportResult }>(
+      PAYROLL_ENDPOINTS.salaryStructuresBulkImport,
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000,
+      },
+    );
+    return data.data;
   },
 
   /* ------------------------------ payrolls ----------------------------- */

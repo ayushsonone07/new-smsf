@@ -18,6 +18,7 @@ import type {
   DepartmentManager,
   Designation,
   DesignationInput,
+  EmployeeLookupItem,
   EmployeeListItem,
   EmployeeOnboardingView,
   EmployeeStatus,
@@ -632,4 +633,13 @@ export const hrService = {
     );
     return data.message;
   },
+
+  async lookupEmployees(params?: { employmentType?: string; q?: string }): Promise<EmployeeLookupItem[]> {
+    const { data } = await http.get<{ data: EmployeeLookupItem[] }>(
+      HR_ENDPOINTS.employeesLookup,
+      { params },
+    );
+    return data?.data || [];
+  },
+
 };

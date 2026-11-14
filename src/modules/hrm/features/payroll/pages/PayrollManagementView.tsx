@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { CalendarRange, CheckCircle2, Loader2, Plus, RefreshCw, Search, SlidersHorizontal, Wallet } from "lucide-react";
+import { CalendarRange, CheckCircle2, FileSpreadsheet, Loader2, Plus, RefreshCw, Search, SlidersHorizontal, Wallet } from "lucide-react";
 
 import { useRole } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
@@ -8,6 +8,7 @@ import { AnimatedFilterSelect, ErrorDisplay, PageHeader } from "@shared/componen
 import { getApiErrorMessage } from "@shared/lib";
 
 import { BulkPaymentDialog } from "../components/BulkPaymentDialog";
+import { BulkSalaryStructureDialog } from "../components/BulkSalaryStructureDialog";
 import { GeneratePayrollDialog } from "../components/GeneratePayrollDialog";
 import { MarkPaidDialog } from "../components/MarkPaidDialog";
 import { PayrollDetailsDialog } from "../components/PayrollDetailsDialog";
@@ -59,6 +60,7 @@ export function PayrollManagementView() {
   const [q, setQ] = useState("");
   const [showGenerate, setShowGenerate] = useState(false);
   const [showStructure, setShowStructure] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [details, setDetails] = useState<Payroll | null>(null);
   const [paying, setPaying] = useState<Payroll | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -173,6 +175,14 @@ export function PayrollManagementView() {
                 >
                   <SlidersHorizontal size={18} />
                   Salary Structures
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImport(true)}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                >
+                  <FileSpreadsheet size={18} className="text-emerald-600 dark:text-emerald-400" />
+                  Bulk Import
                 </button>
                 <button
                   type="button"
@@ -312,7 +322,12 @@ export function PayrollManagementView() {
       </div>
 
       <GeneratePayrollDialog open={showGenerate} onClose={() => setShowGenerate(false)} />
-      <SalaryStructureDialog open={showStructure} onClose={() => setShowStructure(false)} />
+      <SalaryStructureDialog
+        open={showStructure}
+        onClose={() => setShowStructure(false)}
+        onOpenBulkImport={() => setShowBulkImport(true)}
+      />
+      <BulkSalaryStructureDialog open={showBulkImport} onClose={() => setShowBulkImport(false)} />
       <PayrollDetailsDialog open={details !== null} payroll={details} onClose={() => setDetails(null)} />
       <MarkPaidDialog open={paying !== null} payroll={paying} onClose={() => setPaying(null)} />
 

@@ -20,6 +20,7 @@ export type EarningType =
   | "SPECIAL_ALLOWANCE"
   | "OTHER"
   | "INCENTIVE"
+  | "STIPEND"
   | "BONUS"
   | "OVERTIME";
 
@@ -31,6 +32,7 @@ export interface SalaryStructure {
   employeeName?: string | null;
   employeeCode?: string | null;
   fixedSalary?: string | null;
+  stipend?: string | null;
   basicSalary: string;
   hra: string;
   specialAllowance: string;
@@ -47,6 +49,7 @@ export interface SalaryStructure {
 export interface SalaryStructureInput {
   employeeId: number;
   fixedSalary?: string;
+  stipend?: string;
   basicSalary: string;
   hra: string;
   specialAllowance: string;
@@ -229,6 +232,7 @@ export const EARNING_LABELS: Record<EarningType, string> = {
   SPECIAL_ALLOWANCE: "Special Allowance",
   OTHER: "Other Allowance",
   INCENTIVE: "Incentive",
+  STIPEND: "Stipend",
   BONUS: "Bonus",
   OVERTIME: "Overtime",
 };
@@ -257,5 +261,14 @@ export interface BulkActionResult {
   totalRequested: number;
   successfulCount: number;
   skippedCount: number;
+  message: string;
+}
+
+
+export interface BulkSalaryStructureImportResult {
+  totalRows: number;
+  successCount: number;
+  failedCount: number;
+  errors: string[];
   message: string;
 }

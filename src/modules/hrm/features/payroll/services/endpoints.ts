@@ -1,5 +1,7 @@
 export const PAYROLL_ENDPOINTS = {
   salaryStructures: "/api/v1/payroll/salary-structures",
+  salaryStructuresTemplate: "/api/v1/payroll/salary-structures/template",
+  salaryStructuresBulkImport: "/api/v1/payroll/salary-structures/bulk-import",
   generate: "/api/v1/payroll/generate",
   payrolls: "/api/v1/payroll",
   summary: "/api/v1/payroll/summary",

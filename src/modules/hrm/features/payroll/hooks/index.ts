@@ -2,6 +2,7 @@ export {
   payrollKeys,
   useApprovePayroll,
   useBulkApprovePayroll,
+  useBulkImportSalaryStructures,
   useBulkPayPayroll,
   useCancelPayroll,
   useEmployeePayrolls,
