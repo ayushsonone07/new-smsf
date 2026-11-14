@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-import { Loader2 } from "lucide-react";
+import { FileSpreadsheet, Loader2 } from "lucide-react";
 
 import { useToast } from "@shared/components/feedback";
 import { Dialog } from "@shared/components/ui";
@@ -19,6 +19,7 @@ interface SalaryStructureDialogProps {
   open: boolean;
   onClose: () => void;
   initialEmployeeId?: number | "";
+  onOpenBulkImport?: () => void;
 }
 
 interface ComponentField {
@@ -45,6 +46,7 @@ export function SalaryStructureDialog({
   open,
   onClose,
   initialEmployeeId = "",
+  onOpenBulkImport,
 }: SalaryStructureDialogProps) {
   const [employmentType, setEmploymentType] = useState<"full_time" | "intern">("full_time");
   const [employeeId, setEmployeeId] = useState<number | "">(initialEmployeeId);
@@ -236,6 +238,25 @@ export function SalaryStructureDialog({
         className={`space-y-5 p-6 transition-opacity ${structureRefreshing ? "pointer-events-none opacity-60" : ""}`}
         aria-busy={structureRefreshing}
       >
+        {onOpenBulkImport ? (
+          <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-foreground">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span>Need to set salaries for 1000+ employees?</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenBulkImport();
+              }}
+              className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400 shrink-0 ml-2 cursor-pointer"
+            >
+              Bulk Excel Import →
+            </button>
+          </div>
+        ) : null}
+
         {/* Employment Type - Single Start Line */}
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">

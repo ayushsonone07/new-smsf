@@ -263,3 +263,12 @@ export interface BulkActionResult {
   skippedCount: number;
   message: string;
 }
+
+
+export interface BulkSalaryStructureImportResult {
+  totalRows: number;
+  successCount: number;
+  failedCount: number;
+  errors: string[];
+  message: string;
+}

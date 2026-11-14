@@ -13,6 +13,7 @@ import type {
   BulkActionResult,
   BulkApproveInput,
   BulkPaymentInput,
+  BulkSalaryStructureImportResult,
 } from "../types";
 
 export const payrollKeys = {
@@ -144,5 +145,17 @@ export function useCancelPayroll() {
   return useMutation<Payroll, Error, number>({
     mutationFn: (id) => payrollService.cancel(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: payrollKeys.all }),
+  });
+}
+
+
+export function useBulkImportSalaryStructures() {
+  const qc = useQueryClient();
+  return useMutation<BulkSalaryStructureImportResult, Error, File>({
+    mutationFn: (file) => payrollService.bulkImportSalaryStructures(file),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: payrollKeys.structures });
+      void qc.invalidateQueries({ queryKey: payrollKeys.all });
+    },
   });
 }
