@@ -165,20 +165,8 @@ export function CustomerDetailsPage() {
     const search = new URLSearchParams(window.location.search)
     const decrypted = decryptUrlParams(search)
 
-    if (
-      decrypted.validation &&
-      decrypted.validation !== 'customer' &&
-      decrypted.validation.toLowerCase() !== 'billing'
-    ) {
-      sessionStorage.setItem('token', decrypted.validation)
-      try {
-        const stored = JSON.parse(sessionStorage.getItem('smsf.auth.session') || '{}')
-        stored.token = decrypted.validation
-        sessionStorage.setItem('smsf.auth.session', JSON.stringify(stored))
-      } catch {
-        // ignore
-      }
-    }
+    // Older copied links carry the sending staff member's login token in `validation`. Never store it:
+    // it is not the customer's, and a token-only session with no user breaks the login page.
 
     const contact = (decrypted.contact || search.get('contact') || search.get('phone') || '').trim()
     const rawCustId = (decrypted.customerId || search.get('customerId') || '').trim()
@@ -1423,7 +1411,7 @@ export function CustomerDetailsPage() {
 
               {/* Registered Contact box */}
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', color: '#475569' }}>
-                Registered contact details &mdash; <strong>Phone: 9827337896</strong> &nbsp;|&nbsp; <strong>Email: {email}</strong>
+                Registered contact details &mdash; <strong>Phone: {phone || '—'}</strong> &nbsp;|&nbsp; <strong>Email: {email || '—'}</strong>
               </div>
 
               {/* Action buttons */}
@@ -1431,8 +1419,14 @@ export function CustomerDetailsPage() {
                 <button type="button" className="cdb-btn-secondary" onClick={() => setActiveStep(1)}>
                   Fill the form again
                 </button>
-                <button type="button" className="cdb-btn-primary" onClick={() => navigate({ to: '/customers' })}>
-                  Go to dashboard
+                {/* Opened from an emailed link the customer is usually not logged in: send them to sign in
+                    (login lands customers on /customers) instead of a dashboard that cannot load. */}
+                <button
+                  type="button"
+                  className="cdb-btn-primary"
+                  onClick={() => navigate({ to: session ? '/customers' : '/login' })}
+                >
+                  {session ? 'Go to dashboard' : 'Sign in to your dashboard'}
                 </button>
               </div>
             </div>

@@ -250,10 +250,21 @@ export async function updateCustomerServiceStatus(
 // 2. BILLING & INVOICES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function fetchCustomerBillingDetails(contact: string): Promise<CustomerBillingDetails> {
+/**
+ * Billing details by phone/email, or by business id (a billing email link names the business:
+ * a linked business shares the owner's phone and email, which alone find the main one).
+ * The endpoint is public, so a customer opening the emailed link does not need to be logged in.
+ */
+export async function fetchCustomerBillingDetails(
+  contact: string,
+  customerId?: number,
+): Promise<CustomerBillingDetails> {
   const headers = getAuthHeaders()
+  const search = new URLSearchParams()
+  if (contact) search.set('contact', contact)
+  if (customerId) search.set('customerId', String(customerId))
   const res = await apiRequest<{ success?: boolean; data?: CustomerBillingDetails }>(
-    `/api/common/customerDetails?contact=${encodeURIComponent(contact)}`,
+    `/api/common/customerDetails?${search.toString()}`,
     { headers }
   )
   return res?.data || {}

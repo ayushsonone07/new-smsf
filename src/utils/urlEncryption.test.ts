@@ -63,7 +63,7 @@ describe('getCustomerFormUrl', () => {
     expect(getCustomerFormUrl('-')).toBe('')
   })
 
-  it('encrypts the contact and the JWT validation token', () => {
+  it('encrypts the contact and never puts the staff login token in the link', () => {
     const token = 'header.payload.signature'
     setSession({
       token,
@@ -76,7 +76,8 @@ describe('getCustomerFormUrl', () => {
 
     const params = decryptUrlParams(new URLSearchParams(url.split('?')[1]))
     expect(params.contact).toBe('9876543210')
-    expect(params.validation).toBe(token)
+    expect(params.validation).toBe('customer')
+    expect(Object.values(params)).not.toContain(token)
     expect(params.isDuplicate).toBeUndefined()
   })
 

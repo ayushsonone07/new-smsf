@@ -408,6 +408,14 @@ export function extractPhase1Steps(
   return subServices[0]?.steps ?? []
 }
 
+export const formatSubServiceName = (name: string): string => {
+  const trimmed = (name || '').trim()
+  if (/^google[\s_]*services?$/i.test(trimmed)) {
+    return 'GOOGLE'
+  }
+  return trimmed.replace(/_/g, ' ')
+}
+
 /** A sub-service's saved status from the customer row, falling back to the flow's own status. */
 function statusFromCustomerInfo(
   customer: OnboardingCustomer | null,
@@ -917,11 +925,11 @@ export function ServiceFlowModal({
                                 isActive ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                               }`}
                             >
-                              {sub.name}
+                              {formatSubServiceName(sub.name)}
                             </button>
                           ) : (
                             <span className="rounded-md bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold">
-                              {sub.name}
+                              {formatSubServiceName(sub.name)}
                             </span>
                           )}
                           {ack && (

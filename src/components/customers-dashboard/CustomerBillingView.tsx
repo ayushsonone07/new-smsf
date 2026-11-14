@@ -6,6 +6,7 @@ import {
   type CustomerBillingDetails,
 } from './api/customer-features.api'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
+import { readBillingLink } from './billingLink'
 import {
   FileText,
   Download,
@@ -70,9 +71,14 @@ function getDownloadableBillUrl(value: unknown): string {
 
 export function CustomerBillingView() {
   const { session } = useCustomerSession()
+  // Opened from the billing email: the link names the business, and the customer may not be logged in.
+  const [billingLink] = useState(() =>
+    typeof window === 'undefined' ? null : readBillingLink(window.location.search),
+  )
   const [details, setDetails] = useState<CustomerBillingDetails | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'invoices' | 'details'>('invoices')
+  // The email asks for GST details, so open that tab straight away.
+  const [activeTab, setActiveTab] = useState<'invoices' | 'details'>(billingLink ? 'details' : 'invoices')
 
   // Form State
   const [billingAddress, setBillingAddress] = useState('')
@@ -93,14 +99,15 @@ export function CustomerBillingView() {
   }
 
   const loadData = async () => {
-    if (!session?.email && !session?.customerId) {
+    if (!billingLink && !session?.email && !session?.customerId) {
       setLoading(false)
       return
     }
     setLoading(true)
     try {
-      const contact = session?.email || session?.username || ''
-      const res = await fetchCustomerBillingDetails(contact)
+      const res = billingLink
+        ? await fetchCustomerBillingDetails(billingLink.contact || '', billingLink.customerId)
+        : await fetchCustomerBillingDetails(session?.email || session?.username || '')
       setDetails(res)
       setBillingAddress(res.billingAddress || '')
       const gst = res.gstNumber && res.gstNumber !== 'null' ? res.gstNumber : ''
@@ -125,11 +132,14 @@ export function CustomerBillingView() {
     try {
       const payload = {
         ...details,
+        // Save onto the business the link names; the backend finds it by id before phone.
+        ...(billingLink?.customerId ? { customerId: billingLink.customerId } : {}),
         billingAddress,
         gstNumber: hasGst === 'yes' ? gstNumber.trim().toUpperCase() : '',
         paymentLinkSS: paymentScreenshotUrl,
-        email: session?.email || details?.email,
-        phone: details?.phone || '',
+        // From a link, keep that business's own email: the logged-in email belongs to the main business.
+        email: billingLink ? details?.email : session?.email || details?.email,
+        phone: details?.phone || billingLink?.contact || '',
       }
       await saveCustomerBillingDetails(payload)
       showToast('Billing details saved successfully!')
