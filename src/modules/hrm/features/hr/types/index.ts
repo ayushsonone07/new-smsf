@@ -21,6 +21,7 @@ export type {
   Designation,
   DesignationInput,
   EmployeeOnboardingView,
+  EmployeeLookupItem,
   EmployeeListItem,
   EmployeeAttendanceMonthlyResponse,
   EmployeeStatus,

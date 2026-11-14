@@ -135,6 +135,14 @@ export interface Candidate {
   updatedAt: string | null; // null when never updated
 }
 
+export interface EmployeeLookupItem {
+  id: number;
+  name: string;
+  employeeCode: string;
+  departmentName: string | null;
+  employmentType: EmploymentType;
+}
+
 export interface EmployeeListItem {
   id: number;
   employeeCode: string;

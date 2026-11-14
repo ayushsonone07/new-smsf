@@ -1,4 +1,5 @@
 export { BulkPaymentDialog } from "./BulkPaymentDialog";
+export { BulkSalaryStructureDialog } from "./BulkSalaryStructureDialog";
 export { EmployeeSelect } from "./EmployeeSelect";
 export { GeneratePayrollDialog } from "./GeneratePayrollDialog";
 export { MarkPaidDialog } from "./MarkPaidDialog";

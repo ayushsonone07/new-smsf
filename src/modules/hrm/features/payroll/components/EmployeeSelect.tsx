@@ -4,16 +4,17 @@ import { Check, ChevronDown, Loader2, Search } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { hrService } from "@features/hr";
-import type { EmployeeListItem } from "@features/hr";
+import type { EmployeeLookupItem, EmploymentType } from "@features/hr";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { cn } from "@hrm/lib/utils";
 
 interface EmployeeSelectProps {
   value: number | "";
-  onChange: (employeeId: number) => void;
+  onChange: (employeeId: number, employee?: EmployeeLookupItem) => void;
   disabled?: boolean;
   placeholder?: string;
+  employmentType?: EmploymentType | "all";
 }
 
 export function EmployeeSelect({
@@ -21,10 +22,11 @@ export function EmployeeSelect({
   onChange,
   disabled = false,
   placeholder = "Select employee",
+  employmentType,
 }: EmployeeSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [options, setOptions] = useState<EmployeeListItem[]>([]);
+  const [options, setOptions] = useState<EmployeeLookupItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -40,12 +42,15 @@ export function EmployeeSelect({
 
   useEffect(() => {
     let active = true;
-    if (!open) return;
+    if (!open && !value) return;
     setLoading(true);
     setError(null);
     hrService
-      .listEmployees({ page: 0, size: 100, q: query.trim() || undefined, sort: "createdAt,desc" })
-      .then(({ items }) => {
+      .lookupEmployees({
+        employmentType: employmentType && employmentType !== "all" ? employmentType : undefined,
+        q: query.trim() || undefined,
+      })
+      .then((items) => {
         if (active) setOptions(items);
       })
       .catch((err) => {
@@ -57,7 +62,7 @@ export function EmployeeSelect({
     return () => {
       active = false;
     };
-  }, [open, query]);
+  }, [open, query, employmentType, value]);
 
   useEffect(() => {
     if (open) {
@@ -119,8 +124,8 @@ export function EmployeeSelect({
     activeOptionRef.current?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
-  function selectEmployee(employee: EmployeeListItem) {
-    onChange(employee.id);
+  function selectEmployee(employee: EmployeeLookupItem) {
+    onChange(employee.id, employee);
     setOpen(false);
   }
 
