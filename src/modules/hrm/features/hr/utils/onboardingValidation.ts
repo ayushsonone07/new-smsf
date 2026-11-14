@@ -131,8 +131,12 @@ export function validateGuardianRelation(rel: string): string | null {
   if (!rel || !rel.trim()) {
     return "Guardian relation is required";
   }
+  const cleaned = rel.trim();
+  if (cleaned.length < 2) {
+    return "Guardian relation must be at least 2 characters";
+  }
   const valid = (VALID_GUARDIAN_RELATIONS as readonly string[]).map((r) => r.toLowerCase());
-  if (!valid.includes(rel.trim().toLowerCase())) {
+  if (!valid.includes(cleaned.toLowerCase())) {
     return "Please select a valid guardian relation";
   }
   return null;

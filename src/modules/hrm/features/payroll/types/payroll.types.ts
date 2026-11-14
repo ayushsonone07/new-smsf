@@ -12,7 +12,16 @@ export type PaymentMethod = "BANK_TRANSFER" | "CASH" | "CHEQUE" | "UPI" | "WALLE
 
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED";
 
-export type EarningType = "BASIC" | "HRA" | "CONVEYANCE" | "MEDICAL" | "SPECIAL_ALLOWANCE";
+export type EarningType =
+  | "BASIC"
+  | "HRA"
+  | "CONVEYANCE"
+  | "MEDICAL"
+  | "SPECIAL_ALLOWANCE"
+  | "OTHER"
+  | "INCENTIVE"
+  | "BONUS"
+  | "OVERTIME";
 
 export type DeductionType = "PF" | "ESI" | "TDS" | "PROFESSIONAL_TAX" | "UNPAID_LEAVE" | "HALF_DAY";
 
@@ -21,16 +30,15 @@ export interface SalaryStructure {
   employeeId: number;
   employeeName?: string | null;
   employeeCode?: string | null;
+  fixedSalary?: string | null;
   basicSalary: string;
   hra: string;
-  conveyanceAllowance: string;
-  medicalAllowance: string;
   specialAllowance: string;
+  otherAllowance: string;
+  incentive?: string | null;
   grossSalary?: string | null;
   pfEnabled: boolean;
   esiEnabled: boolean;
-  tdsEnabled: boolean;
-  professionalTaxEnabled: boolean;
   effectiveFrom: string;
   effectiveTo?: string | null;
   status: SalaryStructureStatus;
@@ -38,15 +46,14 @@ export interface SalaryStructure {
 
 export interface SalaryStructureInput {
   employeeId: number;
+  fixedSalary?: string;
   basicSalary: string;
   hra: string;
-  conveyanceAllowance: string;
-  medicalAllowance: string;
   specialAllowance: string;
+  otherAllowance: string;
+  incentive?: string;
   pfEnabled: boolean;
   esiEnabled: boolean;
-  tdsEnabled: boolean;
-  professionalTaxEnabled: boolean;
   effectiveFrom: string;
 }
 
@@ -220,6 +227,10 @@ export const EARNING_LABELS: Record<EarningType, string> = {
   CONVEYANCE: "Conveyance",
   MEDICAL: "Medical",
   SPECIAL_ALLOWANCE: "Special Allowance",
+  OTHER: "Other Allowance",
+  INCENTIVE: "Incentive",
+  BONUS: "Bonus",
+  OVERTIME: "Overtime",
 };
 
 export const DEDUCTION_LABELS: Record<DeductionType, string> = {

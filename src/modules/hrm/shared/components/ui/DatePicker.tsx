@@ -1,9 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@hrm/lib/utils";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 interface DatePickerProps {
   value: string;
@@ -19,7 +34,7 @@ interface DatePickerProps {
   buttonClassName?: string;
 }
 
-/** A consistent, portal-based date picker that stays visible inside dialogs and tables. */
+/** A consistent, portal-based date picker with Month/Year selectors and manual date entry. */
 export function DatePicker({
   value,
   onChange,
@@ -37,6 +52,9 @@ export function DatePicker({
   const [visibleMonth, setVisibleMonth] = useState(() =>
     startOfMonth(value ? parseDateInput(value) : new Date()),
   );
+  const [manualText, setManualText] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
+
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -44,9 +62,30 @@ export function DatePicker({
   const selectedDate = value ? parseDateInput(value) : null;
   const calendarDays = getCalendarDays(visibleMonth);
 
+  const currentYear = new Date().getFullYear();
+  const minYear = min ? Number(min.slice(0, 4)) : 1930;
+  const maxYear = max ? Number(max.slice(0, 4)) : currentYear + 15;
+
+  const years = useMemo(() => {
+    const startYear = Math.max(maxYear, visibleMonth.getFullYear());
+    const endYear = Math.min(minYear, visibleMonth.getFullYear());
+    const list: number[] = [];
+    for (let y = startYear; y >= endYear; y--) {
+      list.push(y);
+    }
+    return list;
+  }, [minYear, maxYear, visibleMonth]);
+
   useEffect(() => {
     if (value) setVisibleMonth(startOfMonth(parseDateInput(value)));
   }, [value]);
+
+  useEffect(() => {
+    if (open) {
+      setManualText(value || "");
+      setManualError(null);
+    }
+  }, [open, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -77,7 +116,7 @@ export function DatePicker({
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
       const menuWidth = 320;
-      const menuHeight = 410;
+      const menuHeight = 460;
       const opensAbove = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight;
       setPopoverPosition({
         left: Math.max(12, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12)),
@@ -96,7 +135,35 @@ export function DatePicker({
   }, [open]);
 
   function selectDate(nextDate: Date) {
-    onChange(toDateInput(nextDate));
+    const formatted = toDateInput(nextDate);
+    onChange(formatted);
+    setOpen(false);
+  }
+
+  function handleApplyManual() {
+    const raw = manualText.trim();
+    if (!raw) {
+      onChange("");
+      setOpen(false);
+      return;
+    }
+    const parsed = parseManualDateString(raw);
+    if (!parsed) {
+      setManualError("Enter a valid date (e.g. 15/08/2005 or 2005-08-15)");
+      return;
+    }
+    const formatted = toDateInput(parsed);
+    if (min && formatted < min) {
+      setManualError(`Date cannot be earlier than ${min}`);
+      return;
+    }
+    if (max && formatted > max) {
+      setManualError(`Date cannot be later than ${max}`);
+      return;
+    }
+    onChange(formatted);
+    setVisibleMonth(startOfMonth(parsed));
+    setManualError(null);
     setOpen(false);
   }
 
@@ -148,7 +215,8 @@ export function DatePicker({
               }}
               className="mbg-popover-in fixed z-[80] w-80 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.18)]"
             >
-              <div className="mb-4 flex items-center justify-between">
+              {/* Header with Quick Month & Year Dropdowns + Nav Buttons */}
+              <div className="mb-3 flex items-center justify-between gap-1">
                 <button
                   type="button"
                   onClick={() =>
@@ -156,12 +224,46 @@ export function DatePicker({
                       (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1),
                     )
                   }
-                  className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200"
                   aria-label="Previous month"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <p className="text-sm font-bold text-slate-800">{formatMonthYear(visibleMonth)}</p>
+
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={visibleMonth.getMonth()}
+                    onChange={(e) => {
+                      const newMonth = Number(e.target.value);
+                      setVisibleMonth(new Date(visibleMonth.getFullYear(), newMonth, 1));
+                    }}
+                    aria-label="Select month"
+                    className="h-8 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  >
+                    {MONTH_NAMES.map((name, index) => (
+                      <option key={name} value={index}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={visibleMonth.getFullYear()}
+                    onChange={(e) => {
+                      const newYear = Number(e.target.value);
+                      setVisibleMonth(new Date(newYear, visibleMonth.getMonth(), 1));
+                    }}
+                    aria-label="Select year"
+                    className="h-8 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  >
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -169,13 +271,14 @@ export function DatePicker({
                       (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1),
                     )
                   }
-                  className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-200"
                   aria-label="Next month"
                 >
                   <ChevronRight size={18} />
                 </button>
               </div>
 
+              {/* Day of Week Headers */}
               <div className="grid grid-cols-7 gap-y-1 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
                   <span key={`${day}-${index}`} className="py-1">
@@ -183,6 +286,8 @@ export function DatePicker({
                   </span>
                 ))}
               </div>
+
+              {/* Calendar Days Grid */}
               <div className="mt-1 grid grid-cols-7 gap-y-1">
                 {calendarDays.map((day) => {
                   const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
@@ -213,21 +318,65 @@ export function DatePicker({
                   );
                 })}
               </div>
-              <div className="mt-3 flex justify-between border-t border-slate-100 pt-3">
+
+              {/* Manual Date Input Option */}
+              <div className="mt-3 border-t border-slate-100 pt-2.5">
+                <label className="mb-1 block text-[11px] font-medium text-slate-500">
+                  Or enter date manually:
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={manualText}
+                    onChange={(e) => {
+                      setManualText(e.target.value);
+                      if (manualError) setManualError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleApplyManual();
+                      }
+                    }}
+                    placeholder="e.g. 15/08/2005 or 2005-08-15"
+                    className={cn(
+                      "flex-1 rounded-lg border px-2.5 py-1 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2",
+                      manualError
+                        ? "border-red-400 bg-red-50/30 text-red-700 focus:ring-red-200"
+                        : "border-slate-200 bg-slate-50/50 focus:border-sky-400 focus:bg-white focus:ring-sky-100",
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyManual}
+                    className="shrink-0 rounded-lg bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  >
+                    Set
+                  </button>
+                </div>
+                {manualError ? (
+                  <p className="mt-1 text-[11px] font-medium text-red-500">{manualError}</p>
+                ) : null}
+              </div>
+
+              {/* Clear and Today Actions */}
+              <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     onChange("");
+                    setManualText("");
+                    setManualError(null);
                     setOpen(false);
                   }}
-                  className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                  className="rounded-lg px-2.5 py-1 text-xs font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                 >
                   Clear
                 </button>
                 <button
                   type="button"
                   onClick={() => selectDate(new Date())}
-                  className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-sky-700 transition hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  className="rounded-lg px-2.5 py-1 text-xs font-bold text-sky-700 transition hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200"
                 >
                   Today
                 </button>
@@ -238,6 +387,49 @@ export function DatePicker({
         : null}
     </div>
   );
+}
+
+function parseManualDateString(raw: string): Date | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // 1. YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    if (isValidDateParts(year, month, day)) {
+      return new Date(year, month - 1, day);
+    }
+  }
+
+  // 2. DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const day = Number(dmyMatch[1]);
+    const month = Number(dmyMatch[2]);
+    const year = Number(dmyMatch[3]);
+    if (isValidDateParts(year, month, day)) {
+      return new Date(year, month - 1, day);
+    }
+  }
+
+  // 3. String date parse e.g. "15 Aug 2005"
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return null;
+}
+
+function isValidDateParts(year: number, month: number, day: number): boolean {
+  if (year < 1900 || year > 2100) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  const d = new Date(year, month - 1, day);
+  return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
 }
 
 function parseDateInput(date: string) {
@@ -276,10 +468,6 @@ function formatPickerDate(date: string) {
     month: "short",
     year: "numeric",
   }).format(parseDateInput(date));
-}
-
-function formatMonthYear(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
 }
 
 function formatFullDate(date: Date) {
