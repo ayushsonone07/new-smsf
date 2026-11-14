@@ -8,7 +8,7 @@ import { RefreshButton } from "@/components/ui/RefreshButton";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { cn } from "@hrm/lib/utils";
-import type { EmploymentType, EmployeeListItem } from "@features/hr";
+import type { EmploymentType, EmployeeLookupItem } from "@features/hr";
 
 import { useSalaryStructure, useSaveSalaryStructure } from "../hooks";
 import { formatMoney } from "../lib/payrollFormat";
@@ -105,7 +105,7 @@ export function SalaryStructureDialog({
     setErrors({});
   }
 
-  function handleEmployeeChange(id: number, emp?: EmployeeListItem) {
+  function handleEmployeeChange(id: number, emp?: EmployeeLookupItem) {
     setEmployeeId(id);
     if (emp?.employmentType === "intern") {
       setEmploymentType("intern");

@@ -232,6 +232,7 @@ export const EARNING_LABELS: Record<EarningType, string> = {
   SPECIAL_ALLOWANCE: "Special Allowance",
   OTHER: "Other Allowance",
   INCENTIVE: "Incentive",
+  STIPEND: "Stipend",
   BONUS: "Bonus",
   OVERTIME: "Overtime",
 };

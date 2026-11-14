@@ -11,6 +11,7 @@ export const HR_ENDPOINTS = {
   candidates: "/api/v1/hr/candidates",
   candidatesSearch: "/api/v1/hr/candidates/search",
   employees: "/api/v1/hr/employees",
+  employeesLookup: "/api/v1/hr/employees/lookup",
   addCandidate: "/api/v1/hr/add/candidate",
   importCandidates: "/api/v1/hr/import/candidates",
   updateRemark: "/api/v1/hr/candidates/update-remark",
