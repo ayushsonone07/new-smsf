@@ -1,4 +1,3 @@
-import { getSession } from '../app/auth/session'
 
 const SECRET_KEY = 'mbg_customer_details_2025'
 
@@ -91,17 +90,12 @@ export function getCustomerFormUrl(
   const contact = (phone && phone !== '-' ? phone : '').trim()
   if (!contact && !customerId) return ''
 
-  const session = getSession()
-  const rawToken =
-    session?.token ||
-    (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('token') : '') ||
-    ''
-
-  const validation = rawToken && rawToken.split('.').length === 3 ? rawToken : 'customer'
-
+  // Never put the staff member's own login token in a link meant for a customer: anyone holding
+  // the link could use it as that staff account until it expires. The details form loads and
+  // saves through public endpoints, so the customer needs no token.
   const params: Record<string, string> = {
     contact,
-    validation,
+    validation: 'customer',
     ...(isDuplicate ? { isDuplicate: 'true' } : {}),
   }
   if (customerId != null) {

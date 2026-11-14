@@ -201,7 +201,7 @@ function mapNotification(
 export async function fetchCustomerDashboardData(): Promise<CustomerDashboardData> {
   const session = getCustomerSession()
   if (!session) {
-    throw new Error('Your customer session has expired. Please sign in again.')
+    throw new Error('Please sign in to see your dashboard.')
   }
   if (!session.customerId || !session.email || !session.username) {
     throw new Error('Customer ID, email, and login username are required to load dashboard data.')

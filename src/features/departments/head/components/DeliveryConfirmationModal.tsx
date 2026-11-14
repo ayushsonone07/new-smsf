@@ -5,6 +5,7 @@ import {
   type DeliveryConfirmationData,
   type DeliveryConfirmationResult,
 } from '../../../../api/department-users.api'
+import { fetchWebsiteDraftHistory } from '../../../../api/website-draft.api'
 import {
   Package,
   FileText,
@@ -73,6 +74,30 @@ export function DeliveryConfirmationModal({
     })
     setError(null)
   }, [open, initialData])
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    if (!initialData?.website && customerId) {
+      fetchWebsiteDraftHistory({ customerId })
+        .then((drafts) => {
+          if (!active) return
+          if (drafts && drafts.length > 0) {
+            const latest = drafts[drafts.length - 1]
+            if (latest?.draftLink) {
+              setForm((prev) => {
+                if (prev.website && prev.website.trim() !== '') return prev
+                return { ...prev, website: latest.draftLink }
+              })
+            }
+          }
+        })
+        .catch(() => {})
+    }
+    return () => {
+      active = false
+    }
+  }, [open, customerId, initialData?.website])
 
   function handleChange(field: keyof DeliveryConfirmationData, value: string) {
     if (readOnly) return

@@ -28,7 +28,13 @@ export function getSession(): AuthSession | null {
       return null
     }
 
-    return JSON.parse(raw) as AuthSession
+    const parsed = JSON.parse(raw) as Partial<AuthSession> | null
+    // Old customer-details links stored a token-only session with no user; treat it as signed out
+    // so route guards reading session.user do not crash.
+    if (!parsed || typeof parsed.token !== 'string' || !parsed.user) {
+      return null
+    }
+    return parsed as AuthSession
   } catch {
     return null
   }

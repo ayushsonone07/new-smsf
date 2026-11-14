@@ -814,6 +814,14 @@ interface CustomerRowProps {
   }) => void
 }
 
+const formatServiceName = (name: string): string => {
+  const trimmed = (name || '').trim()
+  if (/^google[\s_]*services?$/i.test(trimmed)) {
+    return 'GOOGLE'
+  }
+  return trimmed.replace(/_/g, ' ')
+}
+
 function CustomerRow({
   customer,
   assignees,
@@ -1008,7 +1016,7 @@ function CustomerRow({
         const rawStatus = String(service.status || 'PENDING').trim().toUpperCase()
         const serviceCompleted = rawStatus === 'COMPLETED' || rawStatus === 'COMPLETE'
         list.push({
-          name: name.replace(/_/g, ' '),
+          name: formatServiceName(name),
           status:
             serviceCompleted && (!hasSubServices || allSubServicesCompleted)
               ? 'COMPLETED'
@@ -1045,7 +1053,7 @@ function CustomerRow({
         name = name.trim()
         if (name && !seen.has(name.toLowerCase())) {
           seen.add(name.toLowerCase())
-          list.push({ name, status })
+          list.push({ name: formatServiceName(name), status })
         }
       }
       if (list.length > 0) return list
@@ -1083,7 +1091,7 @@ function CustomerRow({
     if (customer.serviceType) {
       return [
         {
-          name: customer.serviceType.replace(/_/g, ' '),
+          name: formatServiceName(customer.serviceType),
           status:
             customer.status === 'completed'
               ? 'COMPLETED'
@@ -1483,7 +1491,7 @@ function CustomerRow({
                   }}
                 >
                   <Icon name={badgeColors.icon} size={11} strokeWidth={2.4} />
-                  <span>{sub.name}</span>
+                  <span>{formatServiceName(sub.name)}</span>
                 </button>
               )
             })}
@@ -1555,89 +1563,92 @@ function CustomerRow({
                   const parsedSubList: SubServiceStatusItem[] = []
 
                   if (opt === 'completed') {
-                    const subServices =
-                      Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0
-                        ? customer.subServiceInfo
-                        : Array.isArray((customer as any).rawCustomer?.subServiceInfo) &&
-                            (customer as any).rawCustomer.subServiceInfo.length > 0
-                          ? (customer as any).rawCustomer.subServiceInfo
+                    // Support department has no dependency on sub-services and does not wait for acknowledgment
+                    if (!isSupport) {
+                      const subServices =
+                        Array.isArray(customer.subServiceInfo) && customer.subServiceInfo.length > 0
+                          ? customer.subServiceInfo
+                          : Array.isArray((customer as any).rawCustomer?.subServiceInfo) &&
+                              (customer as any).rawCustomer.subServiceInfo.length > 0
+                            ? (customer as any).rawCustomer.subServiceInfo
+                            : null
+
+                      const flowSteps =
+                        Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0
+                          ? customer.flowSteps
                           : null
 
-                    const flowSteps =
-                      Array.isArray(customer.flowSteps) && customer.flowSteps.length > 0
-                        ? customer.flowSteps
-                        : null
+                      const services =
+                        Array.isArray(customer.services) && customer.services.length > 0
+                          ? customer.services
+                          : Array.isArray((customer as any).rawCustomer?.services) &&
+                              (customer as any).rawCustomer.services.length > 0
+                            ? (customer as any).rawCustomer.services
+                            : null
 
-                    const services =
-                      Array.isArray(customer.services) && customer.services.length > 0
-                        ? customer.services
-                        : Array.isArray((customer as any).rawCustomer?.services) &&
-                            (customer as any).rawCustomer.services.length > 0
-                          ? (customer as any).rawCustomer.services
-                          : null
+                      if (subServices || flowSteps || services) {
+                        const allStatuses: string[] = []
 
-                    if (subServices || flowSteps || services) {
-                      const allStatuses: string[] = []
-
-                      if (subServices) {
-                        for (const sub of subServices) {
-                          const name =
-                            sub?.name ||
-                            sub?.subServiceName ||
-                            (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : 'Sub-service')
-                          const st =
-                            sub?.status ||
-                            sub?.subServiceStatus ||
-                            (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
-                          if (st) {
-                            allStatuses.push(String(st).trim().toUpperCase())
-                            parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
-                          }
-                        }
-                      } else if (flowSteps) {
-                        for (const s of flowSteps) {
-                          if (s?.status) {
-                            allStatuses.push(String(s.status).trim().toUpperCase())
-                            parsedSubList.push({ name: s.name || 'Step', status: String(s.status).trim().toUpperCase() })
-                          }
-                        }
-                      } else if (services) {
-                        for (const s of services) {
-                          if (Array.isArray(s?.subServices) && s.subServices.length > 0) {
-                            for (const sub of s.subServices) {
-                              const name = sub?.name || sub?.subServiceName || 'Sub-service'
-                              const st =
-                                sub?.status ||
-                                sub?.subServiceStatus ||
-                                (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
-                              if (st) {
-                                allStatuses.push(String(st).trim().toUpperCase())
-                                parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
-                              }
+                        if (subServices) {
+                          for (const sub of subServices) {
+                            const name =
+                              sub?.name ||
+                              sub?.subServiceName ||
+                              (typeof sub === 'object' && sub !== null ? Object.keys(sub)[0] : 'Sub-service')
+                            const st =
+                              sub?.status ||
+                              sub?.subServiceStatus ||
+                              (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+                            if (st) {
+                              allStatuses.push(String(st).trim().toUpperCase())
+                              parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
                             }
-                          } else if (s?.status) {
-                            allStatuses.push(String(s.status).trim().toUpperCase())
-                            parsedSubList.push({ name: s.serviceType || 'Service', status: String(s.status).trim().toUpperCase() })
+                          }
+                        } else if (flowSteps) {
+                          for (const s of flowSteps) {
+                            if (s?.status) {
+                              allStatuses.push(String(s.status).trim().toUpperCase())
+                              parsedSubList.push({ name: s.name || 'Step', status: String(s.status).trim().toUpperCase() })
+                            }
+                          }
+                        } else if (services) {
+                          for (const s of services) {
+                            if (Array.isArray(s?.subServices) && s.subServices.length > 0) {
+                              for (const sub of s.subServices) {
+                                const name = sub?.name || sub?.subServiceName || 'Sub-service'
+                                const st =
+                                  sub?.status ||
+                                  sub?.subServiceStatus ||
+                                  (typeof sub === 'object' && sub !== null ? Object.values(sub)[0] : '')
+                                if (st) {
+                                  allStatuses.push(String(st).trim().toUpperCase())
+                                  parsedSubList.push({ name: String(name), status: String(st).trim().toUpperCase() })
+                                }
+                              }
+                            } else if (s?.status) {
+                              allStatuses.push(String(s.status).trim().toUpperCase())
+                              parsedSubList.push({ name: s.serviceType || 'Service', status: String(s.status).trim().toUpperCase() })
+                            }
                           }
                         }
-                      }
 
-                      if (allStatuses.length > 0) {
-                        const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
-                        const isAck = (st: string) =>
-                          st.includes('ACK') ||
-                          st === 'PENDING_CUSTOMER_ACK' ||
-                          st === 'ACKNOWLEDGEMENT_PENDING' ||
-                          st === 'PENDING_ACK'
+                        if (allStatuses.length > 0) {
+                          const isDone = (st: string) => st === 'COMPLETED' || st === 'COMPLETE'
+                          const isAck = (st: string) =>
+                            st.includes('ACK') ||
+                            st === 'PENDING_CUSTOMER_ACK' ||
+                            st === 'ACKNOWLEDGEMENT_PENDING' ||
+                            st === 'PENDING_ACK'
 
-                        const allCompleted = allStatuses.every(isDone)
-                        if (!allCompleted && customer.status !== 'completed') {
-                          isOptDisabled = true
-                          const hasUnfinished = allStatuses.some((st) => !isDone(st) && !isAck(st))
-                          if (!hasUnfinished && allStatuses.some(isAck)) {
-                            blockMessage = 'Complete your acknowledgment'
-                          } else {
-                            blockMessage = 'Please complete subservice'
+                          const allCompleted = allStatuses.every(isDone)
+                          if (!allCompleted && customer.status !== 'completed') {
+                            isOptDisabled = true
+                            const hasUnfinished = allStatuses.some((st) => !isDone(st) && !isAck(st))
+                            if (!hasUnfinished && allStatuses.some(isAck)) {
+                              blockMessage = 'Complete your acknowledgment'
+                            } else {
+                              blockMessage = 'Please complete subservice'
+                            }
                           }
                         }
                       }

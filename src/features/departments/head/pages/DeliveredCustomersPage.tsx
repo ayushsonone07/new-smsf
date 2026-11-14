@@ -4,6 +4,7 @@ import { Icon } from '../../../../components/head/shared/Icon'
 import { PermissionToggle } from '../../../../components/permissions/PermissionToggle'
 import { CustomersListModal } from '../../../../components/head/customers-list/CustomersListModal'
 import { DeliveryConfirmationModal } from '../components/DeliveryConfirmationModal'
+import { fetchWebsiteDraftHistory } from '../../../../api/website-draft.api'
 import type {
   OnboardingAssignee,
   OnboardingCustomer,
@@ -425,9 +426,28 @@ export function DeliveredCustomersPage({ feature }: DeliveredCustomersPageProps)
     setLoadingDeliveryId(id)
     setActionError(null)
     try {
-      const initialData = customerUsername
+      let initialData = customerUsername
         ? await getCustomerDeliveryLinks(id, customerUsername)
         : null
+      if (!initialData?.website || initialData.website.trim() === '') {
+        try {
+          const drafts = await fetchWebsiteDraftHistory({
+            customerId: id,
+            clientEmail: customerUsername || undefined,
+          })
+          if (drafts && drafts.length > 0) {
+            const latest = drafts[drafts.length - 1]
+            if (latest?.draftLink) {
+              initialData = {
+                ...(initialData || {}),
+                website: latest.draftLink,
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
       setDeliveryModal({ row, initialData })
     } catch (error) {
       setActionError(

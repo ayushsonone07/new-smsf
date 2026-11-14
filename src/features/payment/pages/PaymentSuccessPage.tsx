@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, AlertTriangle, Loader2, XCircle } from 'lucide-react'
 import { apiRequest } from '../../../api/client'
 import { isPaid, readRazorpayCallback } from '../razorpayCallback'
+import { readGatewayRedirect } from '../gatewayRedirect'
+import { GatewayDetails } from '../components/GatewayDetails'
 
 /**
  * Public page Razorpay redirects to after a payment-link payment
@@ -10,6 +12,9 @@ import { isPaid, readRazorpayCallback } from '../razorpayCallback'
  * razorpay_payment_link_reference_id, razorpay_payment_link_status and razorpay_signature.
  * This page sends them to POST /api/payment/updatePaymentInfo, which saves payment_id and
  * the status on the payment_info row (found by lead_id + reference id).
+ *
+ * SMSB also redirects here after a CashFree or PayU payment (cashfree_verified / payu_verified).
+ * SMSB has already verified and recorded those, so the page only shows the result.
  */
 
 type RecordState =
@@ -37,10 +42,14 @@ export function PaymentSuccessPage() {
     return !isPaid(callback) ? { kind: 'not-paid' } : { kind: 'recording' }
   })
   const started = useRef(false)
+  const [gatewayRedirect] = useState(() =>
+    typeof window === 'undefined' || callback ? null : readGatewayRedirect(window.location.search),
+  )
 
   useEffect(() => {
     // Remove the Razorpay values from the URL so a refresh does not record the payment again.
-    if (callback && window.history.replaceState) {
+    // A CashFree / PayU redirect carries the customer's name, email and phone: keep them out of history.
+    if ((callback || gatewayRedirect) && window.history.replaceState) {
       window.history.replaceState({}, document.title, window.location.pathname)
     }
     if (!callback || !canRecord || started.current) return
@@ -73,7 +82,27 @@ export function PaymentSuccessPage() {
           message: error instanceof Error ? error.message : 'The payment could not be recorded.',
         })
       })
-  }, [callback, canRecord])
+  }, [callback, canRecord, gatewayRedirect])
+
+  if (gatewayRedirect?.gateway) {
+    return (
+      <main className="min-h-screen bg-[#f4f6fb] flex items-center justify-center p-4 font-['Jost']">
+        <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm text-center space-y-5">
+          <img src="/mbg-card-logo.svg" alt="MBG Card" className="h-10 mx-auto" />
+          <CheckCircle2 className="w-14 h-14 mx-auto text-emerald-500" aria-hidden="true" />
+          <h1 className="text-xl font-bold text-slate-900">Payment successful</h1>
+          <p className="text-sm text-slate-500">
+            Thank you{gatewayRedirect.customerName ? `, ${gatewayRedirect.customerName}` : ''}! Your payment to MBG
+            Card was received and recorded.
+          </p>
+          <GatewayDetails redirect={gatewayRedirect} />
+          <p className="text-sm font-semibold text-emerald-700" role="status">
+            You can close this page.
+          </p>
+        </section>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f6fb] flex items-center justify-center p-4 font-['Jost']">
