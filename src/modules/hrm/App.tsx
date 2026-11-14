@@ -25,6 +25,7 @@ import {
   DepartmentsPage,
   DesignationsPage,
   EmployeesPage,
+  EmployeeAssetsPage,
   EmployeeProfilePage,
   EmployeeAttendanceHistoryPage,
   EmployeeOnboardingPage,
@@ -93,6 +94,14 @@ function App() {
                 element={
                   <RequirePermission permission="employee:directory">
                     <EmployeesPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path={rel(ROUTES.assets)}
+                element={
+                  <RequirePermission permission="employee:directory">
+                    <EmployeeAssetsPage />
                   </RequirePermission>
                 }
               />
