@@ -20,6 +20,7 @@ export type EarningType =
   | "SPECIAL_ALLOWANCE"
   | "OTHER"
   | "INCENTIVE"
+  | "STIPEND"
   | "BONUS"
   | "OVERTIME";
 
@@ -31,6 +32,7 @@ export interface SalaryStructure {
   employeeName?: string | null;
   employeeCode?: string | null;
   fixedSalary?: string | null;
+  stipend?: string | null;
   basicSalary: string;
   hra: string;
   specialAllowance: string;
@@ -47,6 +49,7 @@ export interface SalaryStructure {
 export interface SalaryStructureInput {
   employeeId: number;
   fixedSalary?: string;
+  stipend?: string;
   basicSalary: string;
   hra: string;
   specialAllowance: string;

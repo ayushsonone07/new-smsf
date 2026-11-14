@@ -4,16 +4,17 @@ import { Check, ChevronDown, Loader2, Search } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { hrService } from "@features/hr";
-import type { EmployeeListItem } from "@features/hr";
+import type { EmployeeListItem, EmploymentType } from "@features/hr";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { cn } from "@hrm/lib/utils";
 
 interface EmployeeSelectProps {
   value: number | "";
-  onChange: (employeeId: number) => void;
+  onChange: (employeeId: number, employee?: EmployeeListItem) => void;
   disabled?: boolean;
   placeholder?: string;
+  employmentType?: EmploymentType | "all";
 }
 
 export function EmployeeSelect({
@@ -21,6 +22,7 @@ export function EmployeeSelect({
   onChange,
   disabled = false,
   placeholder = "Select employee",
+  employmentType,
 }: EmployeeSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -40,13 +42,21 @@ export function EmployeeSelect({
 
   useEffect(() => {
     let active = true;
-    if (!open) return;
+    if (!open && !value) return;
     setLoading(true);
     setError(null);
     hrService
       .listEmployees({ page: 0, size: 100, q: query.trim() || undefined, sort: "createdAt,desc" })
       .then(({ items }) => {
-        if (active) setOptions(items);
+        if (active) {
+          const filtered =
+            employmentType === "intern"
+              ? items.filter((item) => item.employmentType === "intern")
+              : employmentType === "full_time"
+                ? items.filter((item) => item.employmentType !== "intern")
+                : items;
+          setOptions(filtered);
+        }
       })
       .catch((err) => {
         if (active) setError(getApiErrorMessage(err, "Could not load employees."));
@@ -57,7 +67,7 @@ export function EmployeeSelect({
     return () => {
       active = false;
     };
-  }, [open, query]);
+  }, [open, query, employmentType, value]);
 
   useEffect(() => {
     if (open) {
@@ -120,7 +130,7 @@ export function EmployeeSelect({
   }, [activeIndex]);
 
   function selectEmployee(employee: EmployeeListItem) {
-    onChange(employee.id);
+    onChange(employee.id, employee);
     setOpen(false);
   }
 
