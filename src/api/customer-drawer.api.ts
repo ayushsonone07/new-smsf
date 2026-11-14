@@ -262,12 +262,9 @@ export async function saveCustomerProfileDetails(
   isDuplicate = false,
   isSendEmail = false,
 ): Promise<boolean> {
+  // The save endpoint is public. Send the login only when someone is really signed in; never a
+  // stray `token` left in sessionStorage by an old copied link (it was a staff member's token).
   const session = getSession()
-  const rawToken =
-    session?.token ||
-    (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('token') : '') ||
-    ''
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -276,8 +273,6 @@ export async function saveCustomerProfileDetails(
     if (session.user?.email || session.user?.username) {
       headers.username = session.user.email || session.user.username || ''
     }
-  } else if (rawToken && rawToken.split('.').length === 3) {
-    headers.Authorization = `Bearer ${rawToken}`
   }
 
   const query = new URLSearchParams()
@@ -307,13 +302,25 @@ export async function getCustomerProfileDetails(
   if (customerId !== undefined && customerId !== null && String(customerId).trim() !== '') {
     search.set('customerId', String(customerId))
   }
-  const response = await authedApiRequest<
+  // Public endpoint: a customer opening the emailed or copied details link is usually not logged in,
+  // and the form must still fill in. Send the login when there is one; never bounce to /login.
+  const session = getSession()
+  const response = await apiRequest<
     ApiEnvelope<CustomerProfileDetails> & {
       customerDetails?: CustomerProfileDetails
       customer?: CustomerProfileDetails
     }
   >(
     `/api/common/customerDetails?${search.toString()}`,
+    session?.token
+      ? {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+            username: session.user.email || session.user.username || '',
+          },
+        }
+      : {},
+    true,
   )
   const profile = response.data ?? response.customerDetails ?? response.customer
   if (profile) return profile

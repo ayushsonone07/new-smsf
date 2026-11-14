@@ -154,7 +154,7 @@ export function SubServiceValidationModal({
                         className="flex items-center justify-between p-2 rounded-lg bg-slate-50/80 border border-slate-100"
                       >
                         <span className="font-medium text-slate-700 truncate max-w-[200px]">
-                          {sub.name}
+                          {sub.name.replace(/^google[\s_]*services?$/i, 'GOOGLE')}
                         </span>
                         {isDone ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">

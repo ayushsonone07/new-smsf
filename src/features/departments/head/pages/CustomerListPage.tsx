@@ -21,6 +21,7 @@ import { GoogleInfoModal } from '../../../../components/head/customers-list/Goog
 import { ServiceTagsModal } from '../../../../components/head/customers-list/ServiceTagsModal'
 import { DeliveryConfirmationModal } from '../components/DeliveryConfirmationModal'
 import { ServiceDeliveryHistoryModal } from '../components/ServiceDeliveryHistoryModal'
+import { fetchWebsiteDraftHistory } from '../../../../api/website-draft.api'
 import {
   getCustomerDeliveryLinks,
   getServiceDeliveryHistory,
@@ -215,6 +216,25 @@ export function CustomerListPage() {
       } catch {
         // ignore
       }
+      if (!initialData?.website || initialData.website.trim() === '') {
+        try {
+          const drafts = await fetchWebsiteDraftHistory({
+            customerId: custId,
+            clientEmail: customer.email,
+          })
+          if (drafts && drafts.length > 0) {
+            const latest = drafts[drafts.length - 1]
+            if (latest?.draftLink) {
+              initialData = {
+                ...(initialData || {}),
+                website: latest.draftLink,
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
       setDeliveryModalCustomer({ customer, initialData })
     } finally {
       setLoadingDeliveryLinksForCustId(null)
@@ -233,6 +253,7 @@ export function CustomerListPage() {
   // fetched on demand (and cached) only when a status is set to Completed.
   const queryClient = useQueryClient()
   const fetchHasSubServiceFlow = async () => {
+    if (isSupport) return false
     const flows = await queryClient.fetchQuery({
       queryKey: ['serviceFlows', currentDepartment],
       queryFn: () =>
@@ -431,7 +452,7 @@ export function CustomerListPage() {
   const onboardingCustomers = useMemo<OnboardingCustomer[]>(() => {
     if (useRowsEndpoint) {
       const rows = departmentRowsQuery.data?.customers ?? []
-      const serviceFallback = `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+      const serviceFallback = currentDepartment === 'GOOGLE_DEPARTMENT' ? 'GOOGLE' : `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
       return rows.map((c, index) => {
         const id = String(c.id ?? c.customerId ?? `c-${index}`)
         const bName =
@@ -447,12 +468,13 @@ export function CustomerListPage() {
           'Customer'
         const email = c.email || c.customerDetails?.email || ''
         const phone = c.phoneNumber || c.customerDetails?.phoneNumber || ''
-        // `status` on a department customer row is the service status.  Keep it
-        // out of the customer Status column, which must use onboarding status.
+        // Department customer rows provide service status in `c.status` or `c.serviceStatus`
         const s = String(
+          c.status ||
+          c.serviceStatus ||
           c.onboardingStatus ||
-          (c.customerDetails as any)?.onboardingStatus ||
           (c.customerDetails as any)?.status ||
+          (c.customerDetails as any)?.onboardingStatus ||
           'pending',
         ).toLowerCase()
         const status = s.includes('complete')
@@ -500,7 +522,7 @@ export function CustomerListPage() {
             '',
           serviceType: c.serviceType || serviceFallback,
           callStatus: 'connected',
-          status,
+          status: localStatusMap[id] !== undefined ? localStatusMap[id] : status,
           assigneeId: assigned,
           remark:
             c.latestInternalRemark ||
@@ -888,7 +910,8 @@ export function CustomerListPage() {
     }
 
     // When sub-service flows exist, all sub-services must be completed before marking Completed
-    if (status === 'completed' && useRowsEndpoint && (await fetchHasSubServiceFlow().catch(() => false))) {
+    // (Support department has no sub-service dependency and does not wait for acknowledgment)
+    if (!isSupport && status === 'completed' && useRowsEndpoint && (await fetchHasSubServiceFlow().catch(() => false))) {
       const target =
         filteredCustomers.find((c) => c.id === customerId) ||
         onboardingCustomers.find((c) => c.id === customerId)
@@ -997,7 +1020,7 @@ export function CustomerListPage() {
     const targetCustomer =
       filteredCustomers.find((c) => c.id === customerId) ||
       onboardingCustomers.find((c) => c.id === customerId)
-    const sType = targetCustomer?.serviceType || `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`
+    const sType = targetCustomer?.serviceType || (currentDepartment === 'GOOGLE_DEPARTMENT' ? 'GOOGLE' : `${currentDepartment.replace(/_DEPARTMENT$/, '').replace(/_/g, ' ')} SERVICE`)
 
     try {
       if (useRowsEndpoint) {

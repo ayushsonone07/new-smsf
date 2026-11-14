@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import { CustomerWelcomeBanner } from './CustomerWelcomeBanner'
 import { UpcomingMeetingBanner } from './UpcomingMeetingBanner'
 import { CustomerServicesSection } from './CustomerServicesSection'
@@ -112,6 +113,18 @@ export function CustomerDashboardView() {
     return (
       <div className="cdb-body" style={{ opacity: 0.7, padding: '40px 0', textAlign: 'center' }}>
         Loading dashboard...
+      </div>
+    )
+  }
+
+  // Not logged in (e.g. arrived from an emailed form link): nothing has expired, they just need to sign in.
+  if (!getCustomerSession()) {
+    return (
+      <div className="cdb-body" role="alert" style={{ padding: '40px 0', textAlign: 'center' }}>
+        <p style={{ marginBottom: '12px' }}>Please sign in to see your dashboard.</p>
+        <a href="/login" className="cdb-btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+          Sign in
+        </a>
       </div>
     )
   }
