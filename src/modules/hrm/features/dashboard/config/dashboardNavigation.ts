@@ -9,6 +9,7 @@ import {
   FileText,
   Handshake,
   HelpCircle,
+  Laptop,
   LayoutDashboard,
   Medal,
   PiggyBank,
@@ -57,6 +58,13 @@ export const ROLE_NAVIGATION = {
           label: "Employees",
           icon: UsersRound,
           to: "/hrm/employees",
+          permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Assets",
+          icon: Laptop,
+          to: "/hrm/assets",
           permission: "employee:directory",
         },
         {
@@ -215,6 +223,13 @@ export const ROLE_NAVIGATION = {
           label: "Employees",
           icon: UsersRound,
           to: "/hrm/employees",
+          permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Assets",
+          icon: Laptop,
+          to: "/hrm/assets",
           permission: "employee:directory",
         },
         {
@@ -398,6 +413,13 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
+          label: "Assets",
+          icon: Laptop,
+          to: "/hrm/assets",
+          permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
           label: "Departments",
           icon: Building2,
           to: "/hrm/departments",
@@ -545,6 +567,13 @@ export const ROLE_NAVIGATION = {
           label: "Employee",
           icon: UsersRound,
           to: "/hrm/employees",
+          permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Assets",
+          icon: Laptop,
+          to: "/hrm/assets",
           permission: "employee:directory",
         },
         {

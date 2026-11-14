@@ -10,6 +10,7 @@ export const ROUTES = {
   dashboard: "/hrm/dashboard",
   myTasks: "/hrm/my-tasks",
   employees: "/hrm/employees",
+  assets: "/hrm/assets",
   employeeProfile: "/hrm/employees/:employeeId",
   employeeAttendanceHistory: "/hrm/employees/:employeeId/attendance-history",
   candidates: "/hrm/candidates",
