@@ -3,6 +3,7 @@
 
 export { AllCandidatesPage } from "./components/AllCandidatesPage";
 export { EmployeesPage } from "./components/EmployeesPage";
+export { EmployeeAssetsPage } from "./components/EmployeeAssetsPage";
 export { EmployeeProfilePage } from "./components/EmployeeProfilePage";
 export { EmployeeAttendanceHistoryPage } from "./components/EmployeeAttendanceHistoryPage";
 export { DepartmentsPage } from "./components/DepartmentsPage";
