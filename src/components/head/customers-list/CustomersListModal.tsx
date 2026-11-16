@@ -403,6 +403,24 @@ export function CustomersListModal({
     departmentType,
     requestUsername,
   })
+
+  const isCreatedIn2025 = useMemo(() => {
+    const rawCreated =
+      (current as any)?.createdAt ||
+      (apiDetails.profile as any)?.createdAt ||
+      apiDetails.serviceRows[0]?.createdAt
+    if (rawCreated) {
+      const d = new Date(rawCreated)
+      if (!isNaN(d.getTime()) && d.getFullYear() <= 2025) return true
+      if (String(rawCreated).includes('2025')) return true
+    }
+    const remark = apiDetails.serviceRows[0]?.internalRemark || ''
+    if (remark.includes('created at 2025') || remark.includes('created in 2025')) return true
+    const status = apiDetails.serviceRows[0]?.status || ''
+    if (status.includes('2025')) return true
+    if (apiDetails.errors.some((e) => e.includes('2025'))) return true
+    return false
+  }, [current, apiDetails.profile, apiDetails.serviceRows, apiDetails.errors])
   const [localActivities, setLocalActivities] = useState<CustomerActivityEvent[]>([])
   const recurringCustomerId = Number(current?.id)
 
@@ -1343,6 +1361,20 @@ export function CustomersListModal({
 
         {/* Body */}
         <div className="cl-drawer__body">
+          {isCreatedIn2025 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3.5 mb-3 text-amber-900 text-xs shadow-sm flex items-start gap-2.5">
+              <span className="text-base leading-none mt-0.5">🗓️</span>
+              <div>
+                <strong className="block text-xs font-bold text-amber-950 uppercase tracking-wide">
+                  Historical Account (Created in 2025)
+                </strong>
+                <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                  This customer was created in 2025, so no department services were live at that time. Account details and records are preserved.
+                </p>
+              </div>
+            </div>
+          )}
+
           {(apiDetails.isLoading || apiDetails.errors.length > 0) && (
             <div
               className="cl-drawer__card"
@@ -1353,9 +1385,20 @@ export function CustomersListModal({
                 <div>
                   <strong>Some customer details could not be loaded:</strong>
                   <ul>
-                    {apiDetails.errors.map((error, index) => (
-                      <li key={`${error}-${index}`}>{error}</li>
-                    ))}
+                    {apiDetails.errors.map((error, index) => {
+                      let displayMsg = error
+                      if (
+                        isCreatedIn2025 ||
+                        error.includes('2025') ||
+                        error.includes('Customer Service not found') ||
+                        error.includes('not found in your department')
+                      ) {
+                        displayMsg = isCreatedIn2025 || error.includes('2025')
+                          ? 'This customer was created in 2025, so no services were live at that time.'
+                          : 'Customer has no active service in this department.'
+                      }
+                      return <li key={`${error}-${index}`}>{displayMsg}</li>
+                    })}
                   </ul>
                 </div>
               )}

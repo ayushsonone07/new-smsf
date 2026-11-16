@@ -123,7 +123,25 @@ export function useCustomerDrawerDetails(
       rowsQuery.error,
     ]
       .filter((error): error is Error => error instanceof Error)
-      .map((error) => error.message)
+      .map((error) => {
+        const msg = error.message || ''
+        const createdRaw = (customer as any)?.createdAt
+        const is2025 =
+          (createdRaw &&
+            (new Date(createdRaw).getFullYear() <= 2025 ||
+              String(createdRaw).includes('2025'))) ||
+          msg.includes('2025')
+        if (
+          msg.includes('Customer Service not found') ||
+          msg.includes('not found in your department') ||
+          msg.includes('2025')
+        ) {
+          return is2025
+            ? 'This customer was created in 2025, so no services were live at that time.'
+            : 'Customer has no active service in this department.'
+        }
+        return msg
+      })
       .concat(
         isOpen && !contact
           ? ['Customer contact number is unavailable; contact-based details were not requested.']
