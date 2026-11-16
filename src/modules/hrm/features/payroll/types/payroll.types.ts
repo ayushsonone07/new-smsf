@@ -168,6 +168,14 @@ export interface PayslipDetails {
   employeeCode: string;
   departmentName?: string | null;
   designationTitle?: string | null;
+  location?: string | null;
+  panNumber?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  joiningDate?: string | null;
+  payDays?: number | null;
+  netPayInWords?: string | null;
+  payslipDate?: string | null;
   payrollMonth: number;
   payrollYear: number;
   workingDays: number;

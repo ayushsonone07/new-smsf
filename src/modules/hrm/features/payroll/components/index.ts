@@ -7,4 +7,5 @@ export { PayrollDetailsDialog } from "./PayrollDetailsDialog";
 export { payrollActionButtons, PayrollTable, PayslipDownloadButton } from "./PayrollTable";
 export { PayrollStagePills, PayrollSummaryCards } from "./PayrollSummaryCards";
 export { PayrollStatusBadge } from "./PayrollStatusBadge";
+export { PayslipModal } from "./PayslipModal";
 export { SalaryStructureDialog } from "./SalaryStructureDialog";
