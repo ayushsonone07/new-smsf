@@ -16,9 +16,6 @@ import type { LeaveEntitlement, LeaveTypeValue, LeavePolicyItem } from "../types
 
 const LEAVE_TYPE_OPTIONS: { value: LeaveTypeValue; label: string }[] = [
   { value: "CASUAL", label: "Casual Leave" },
-  { value: "SICK", label: "Sick Leave" },
-  { value: "PAID", label: "Paid Leave" },
-  { value: "UNPAID", label: "Unpaid Leave" },
 ];
 
 export function EntitlementManagement() {
@@ -36,9 +33,6 @@ export function EntitlementManagement() {
   // Company default policy state
   const [policies, setPolicies] = useState<{ [key in LeaveTypeValue]?: number }>({
     CASUAL: 12,
-    SICK: 12,
-    PAID: 15,
-    UNPAID: 0,
   });
   const [isSavingPolicy, setIsSavingPolicy] = useState(false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);

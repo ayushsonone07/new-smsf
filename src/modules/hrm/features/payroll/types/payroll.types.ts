@@ -24,7 +24,16 @@ export type EarningType =
   | "BONUS"
   | "OVERTIME";
 
-export type DeductionType = "PF" | "ESI" | "TDS" | "PROFESSIONAL_TAX" | "UNPAID_LEAVE" | "HALF_DAY";
+export type DeductionType =
+  | "PF"
+  | "ESI"
+  | "TDS"
+  | "PROFESSIONAL_TAX"
+  | "UNPAID_LEAVE"
+  | "HALF_DAY"
+  | "ABSENT"
+  | "INSURANCE"
+  | "OTHER";
 
 export interface SalaryStructure {
   id: number;
@@ -80,6 +89,7 @@ export interface GeneratePayrollInput {
   month: number;
   year: number;
   employeeId?: number | null;
+  force?: boolean;
 }
 
 export interface PayrollSummary {
@@ -168,6 +178,14 @@ export interface PayslipDetails {
   employeeCode: string;
   departmentName?: string | null;
   designationTitle?: string | null;
+  location?: string | null;
+  panNumber?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  joiningDate?: string | null;
+  payDays?: number | null;
+  netPayInWords?: string | null;
+  payslipDate?: string | null;
   payrollMonth: number;
   payrollYear: number;
   workingDays: number;
@@ -244,6 +262,9 @@ export const DEDUCTION_LABELS: Record<DeductionType, string> = {
   PROFESSIONAL_TAX: "Professional Tax",
   UNPAID_LEAVE: "Unpaid Leave",
   HALF_DAY: "Half-Day Attendance",
+  ABSENT: "Absent",
+  INSURANCE: "Insurance",
+  OTHER: "Other",
 };
 
 export interface BulkApproveInput {

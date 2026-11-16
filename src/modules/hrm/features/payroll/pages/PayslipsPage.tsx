@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Building2, Download, FileText } from "lucide-react";
+import { Building2, Download, Eye, FileText } from "lucide-react";
 
 import { useMyProfile } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
@@ -10,6 +10,7 @@ import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import { PayrollStatusBadge } from "../components/PayrollStatusBadge";
 import { PayslipDownloadButton } from "../components/PayrollTable";
+import { PayslipModal } from "../components/PayslipModal";
 import { useEmployeePayslips } from "../hooks";
 import { formatMoney, formatDate, periodLabel, triggerBlobDownload } from "../lib/payrollFormat";
 import { payrollService } from "../services";
@@ -25,6 +26,7 @@ export function PayslipsPage() {
   const payslipsRefreshing = payslipsQuery.isFetching && !isLoading;
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [viewingSlip, setViewingSlip] = useState<PayslipDetails | null>(null);
   const toast = useToast();
 
   async function handleDownload(payslip: PayslipDetails) {
@@ -136,15 +138,33 @@ export function PayslipsPage() {
                     : "Generated on demand"}
                   {payslip.paymentDate ? ` · ${formatDate(payslip.paymentDate)}` : ""}
                 </p>
-                <PayslipDownloadButton
-                  onDownload={() => void handleDownload(payslip)}
-                  downloading={downloadingId === payslip.payrollId}
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewingSlip(payslip)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </button>
+                  <PayslipDownloadButton
+                    onDownload={() => void handleDownload(payslip)}
+                    downloading={downloadingId === payslip.payrollId}
+                  />
+                </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <PayslipModal
+        open={!!viewingSlip}
+        payslip={viewingSlip}
+        onClose={() => setViewingSlip(null)}
+        onDownload={viewingSlip ? () => void handleDownload(viewingSlip) : undefined}
+        isDownloading={viewingSlip ? downloadingId === viewingSlip.payrollId : false}
+      />
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Download className="h-3.5 w-3.5" />
