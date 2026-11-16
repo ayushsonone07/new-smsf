@@ -40,8 +40,12 @@ export function LeaveApprovalDialog({ open, onClose, request }: LeaveApprovalDia
       approveLeave.mutate(
         { id: request.id, action: "APPROVE", note },
         {
-          onSuccess: () => {
-            toast.success("Leave request approved.");
+          onSuccess: (data) => {
+            if (data?.payrollNotice) {
+              toast.warning(data.payrollNotice);
+            } else {
+              toast.success("Leave request approved.");
+            }
             reset();
             onClose();
           },
