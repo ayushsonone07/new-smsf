@@ -39,7 +39,8 @@ describe('notification events', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('adds the staff notification to the bell without reloading the list', async () => {
-    queryClient.setQueryData(['notifications'], [notification('old')])
+    queryClient.setQueryData(['notifications', 'latest'], [notification('old')])
+    queryClient.setQueryData(['notifications', 'unread-count'], 1)
     serverReturnsStaffThenCustomerCopy()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
 
@@ -47,9 +48,10 @@ describe('notification events', () => {
 
     await vi.waitFor(() => expect(createNotificationEvent).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => {
-      const items = queryClient.getQueryData<SuperAdminNotification[]>(['notifications'])
+      const items = queryClient.getQueryData<SuperAdminNotification[]>(['notifications', 'latest'])
       expect(items?.map((item) => item.id)).toEqual(['staff', 'old'])
     })
+    expect(queryClient.getQueryData(['notifications', 'unread-count'])).toBe(2)
     expect(invalidate).not.toHaveBeenCalled()
   })
 
@@ -60,6 +62,7 @@ describe('notification events', () => {
 
     await vi.waitFor(() => expect(createNotificationEvent).toHaveBeenCalledTimes(2))
     await Promise.resolve()
-    expect(queryClient.getQueryData(['notifications'])).toBeUndefined()
+    expect(queryClient.getQueryData(['notifications', 'latest'])).toBeUndefined()
+    expect(queryClient.getQueryData(['notifications', 'unread-count'])).toBe(1)
   })
 })

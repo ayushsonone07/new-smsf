@@ -55,13 +55,13 @@ function emitScoped(options: EmitOptions): void {
     scope,
     channels: ['IN_APP'],
   })
-    // The POST returns the new notification: add it to the bell list directly instead of
-    // reloading all 100. Other users get it from their regular 45-second poll.
+    // Add the event to an already-loaded drawer and update the lightweight badge cache.
     .then((created) => {
       // The customer's own copy is for the customer portal, not the staff bell.
       if (created.audience === 'CUSTOMER') return
-      queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items) =>
+      queryClient.setQueryData<SuperAdminNotification[]>(['notifications', 'latest'], (items) =>
         items ? [created, ...items.filter((item) => item.id !== created.id)] : items)
+      queryClient.setQueryData<number>(['notifications', 'unread-count'], (count = 0) => count + 1)
     })
     .catch((error) => console.error('Failed to persist notification event', error))
 }

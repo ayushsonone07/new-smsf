@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HeadNotification } from '../../features/departments/head/types/head.types'
 import type { SuperAdminNotification } from '../../api/superadmin-notifications.api'
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notifications.api'
+import { fetchNotifications, fetchUnreadNotificationCount, markAllNotificationsRead, markNotificationRead } from '../../api/notifications.api'
 
 function toHeadNotification(item: SuperAdminNotification): HeadNotification {
   return {
@@ -27,26 +27,40 @@ function formatTime(iso: string): string {
  */
 export function useNotifications() {
   const queryClient = useQueryClient()
-  const { data: raw = [] } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: fetchNotifications,
+  const latestQuery = useQuery({
+    queryKey: ['notifications', 'latest'],
+    queryFn: () => fetchNotifications(10),
+    enabled: false,
+    staleTime: 45_000,
+  })
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: fetchUnreadNotificationCount,
     refetchInterval: 45_000,
-    refetchOnWindowFocus: true,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
   })
 
-  const items = useMemo(() => raw.map(toHeadNotification), [raw])
+  const items = useMemo(
+    () => (latestQuery.data ?? []).map(toHeadNotification),
+    [latestQuery.data],
+  )
 
   function markAllRead() {
-    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+    queryClient.setQueryData<number>(['notifications', 'unread-count'], 0)
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications', 'latest'], (items = []) =>
       items.map((item) => ({ ...item, read: true })))
-    void markAllNotificationsRead().then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+    void markAllNotificationsRead().catch(() =>
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] }))
   }
 
   function markRead(id: string) {
-    queryClient.setQueryData<SuperAdminNotification[]>(['notifications'], (items = []) =>
+    queryClient.setQueryData<SuperAdminNotification[]>(['notifications', 'latest'], (items = []) =>
       items.map((item) => item.id === id ? { ...item, read: true } : item))
-    void markNotificationRead(id).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] }))
+    queryClient.setQueryData<number>(['notifications', 'unread-count'], (count = 0) => Math.max(0, count - 1))
+    void markNotificationRead(id).catch(() =>
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] }))
   }
 
-  return { items, markAllRead, markRead }
+  return { items, unreadCount, loadLatest: latestQuery.refetch, markAllRead, markRead }
 }

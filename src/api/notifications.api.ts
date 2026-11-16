@@ -9,6 +9,13 @@ export interface NotificationPage {
   isLast?: boolean
 }
 
+export interface NotificationPageResult {
+  items: SuperAdminNotification[]
+  pageNumber: number
+  totalElements: number
+  totalPage: number
+}
+
 interface ApiEnvelope<T> { data?: T }
 
 export interface BackendNotification {
@@ -51,13 +58,30 @@ function mapNotification(item: BackendNotification): SuperAdminNotification {
   }
 }
 
-export async function fetchNotifications(): Promise<SuperAdminNotification[]> {
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  const response = await authedApiRequest<ApiEnvelope<number>>('/api/notifications/unread-count')
+  return Number(response?.data ?? 0)
+}
+
+export async function fetchNotifications(size = 10): Promise<SuperAdminNotification[]> {
   try {
-    const response = await authedApiRequest<NotificationPage>('/api/notifications?page=0&size=100&sortDir=desc')
+    const response = await authedApiRequest<NotificationPage>(`/api/notifications?page=0&size=${size}&sortDir=desc`)
     return (response?.data ?? []).map(mapNotification)
   } catch (err) {
     console.warn('Backend notification feed unavailable, returning empty list:', err)
     return []
+  }
+}
+
+export async function fetchNotificationPage(page: number, size = 20): Promise<NotificationPageResult> {
+  const response = await authedApiRequest<NotificationPage>(
+    `/api/notifications?page=${page}&size=${size}&sortDir=desc`,
+  )
+  return {
+    items: (response?.data ?? []).map(mapNotification),
+    pageNumber: response?.pageNumber ?? page,
+    totalElements: response?.totalElements ?? 0,
+    totalPage: response?.totalPage ?? 0,
   }
 }
 
