@@ -387,7 +387,7 @@ a {
 }
 
 .app-shell.sidebar-open {
-  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
 }
 
 .main-content {
@@ -2936,6 +2936,28 @@ button.profile-chip--clickable:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  max-height: 190px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.profile-menu__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.profile-menu__list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.profile-menu--dark .profile-menu__list {
+  scrollbar-color: #334155 transparent;
+}
+
+.profile-menu--dark .profile-menu__list::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 
 .profile-menu__item {
