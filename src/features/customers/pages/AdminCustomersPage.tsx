@@ -20,6 +20,41 @@ import type {
 } from '../../../components/head/customers-list/CustomersList'
 import '../../../components/head/customers-list/CustomersList.css'
 import './AdminCustomersPage.css'
+import { businessFamilyRole } from '../businessFamily'
+
+/**
+ * Main / linked badge under the customer's name. Clicking it searches the owner's email: linked
+ * businesses share it, so the main business and all its duplicates are listed together.
+ */
+function FamilyBadge({ customer, onShowFamily }: { customer: AdminCustomer; onShowFamily: (query: string) => void }) {
+  const role = businessFamilyRole(customer)
+  if (role.kind === 'single') return null
+
+  const familyQuery = customer.email || customer.phoneNumber || customer.phone || ''
+  const label = role.kind === 'linked'
+    ? `Linked → ${role.parentName}`
+    : `Main · ${role.duplicateCount} linked`
+  const title = role.kind === 'linked'
+    ? `Duplicate business linked to ${role.parentName}. Click to show the whole family.`
+    : [
+        `Main business with ${role.duplicateCount} duplicate${role.duplicateCount === 1 ? '' : 's'}.`,
+        role.oldDuplicateNames.length ? `Old-style duplicates: ${role.oldDuplicateNames.join(', ')}.` : '',
+        'Click to show the whole family.',
+      ].filter(Boolean).join(' ')
+
+  return (
+    <button
+      type="button"
+      className={`admin-customer-family admin-customer-family--${role.kind}`}
+      title={title}
+      aria-label={title}
+      disabled={!familyQuery}
+      onClick={() => familyQuery && onShowFamily(familyQuery)}
+    >
+      {label}
+    </button>
+  )
+}
 
 function displayName(customer: AdminCustomer): string {
   const personalName = [customer.firstName, customer.lastName]
@@ -91,7 +126,8 @@ function toOnboardingCustomer(customer: AdminCustomer): OnboardingCustomer {
         }))
       : undefined,
     duplicateCount: Number(customer.duplicateCount || 0),
-    hasDuplicateCustomer: Boolean(customer.hasDuplicateCustomer),
+    // The backend sends hasDuplicateCustomers (plural).
+    hasDuplicateCustomer: Boolean(customer.hasDuplicateCustomers ?? customer.hasDuplicateCustomer),
     duplicateCustomers: Array.isArray(customer.duplicateCustomers)
       ? customer.duplicateCustomers
       : [],
@@ -99,7 +135,7 @@ function toOnboardingCustomer(customer: AdminCustomer): OnboardingCustomer {
   }
 }
 
-const baseColumns: DataTableColumn<AdminCustomer>[] = [
+const buildBaseColumns = (onShowFamily: (query: string) => void): DataTableColumn<AdminCustomer>[] => [
   {
     key: 'customer',
     title: 'CUSTOMER',
@@ -111,6 +147,7 @@ const baseColumns: DataTableColumn<AdminCustomer>[] = [
         <div>
           <strong>{displayName(customer)}</strong>
           <span>{customer.username || 'Customer account'}</span>
+          <FamilyBadge customer={customer} onShowFamily={onShowFamily} />
         </div>
       </div>
     ),
@@ -176,7 +213,8 @@ export function AdminCustomersPage() {
   const start = (result?.totalElements ?? 0) === 0 ? 0 : page * size + 1
   const end = Math.min((page + 1) * size, result?.totalElements ?? 0)
   const columns: DataTableColumn<AdminCustomer>[] = [
-    ...baseColumns,
+    // Typing into the search box already resets to page 0 after the debounce.
+    ...buildBaseColumns(setSearch),
     {
       key: 'actions',
       title: 'ACTIONS',

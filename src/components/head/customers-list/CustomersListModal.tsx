@@ -560,15 +560,7 @@ export function CustomersListModal({
   const duplicatesQuery = useQuery({
     queryKey: ['duplicate-customer-summaries', customer?.id ?? 0, departmentType],
     queryFn: () => getDuplicateCustomerSummaries(customer?.id ?? 0, departmentType),
-    enabled: Boolean(
-      customer &&
-        (customer.hasDuplicateCustomer ||
-          (customer.duplicateCount && customer.duplicateCount > 0) ||
-          customer.isLinkedBusiness ||
-          customer.parentCustomerId ||
-          apiDetails.profile?.parentCustomerId ||
-          apiDetails.profile?.isLinkedBusiness),
-    ),
+    enabled: Boolean(customer?.id),
     staleTime: 60_000,
   })
 
@@ -1755,6 +1747,140 @@ export function CustomersListModal({
                   />
                 </div>
               </div>
+
+              {allBusinesses.length > 1 && (
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #bfdbfe',
+                    backgroundColor: '#f8faff',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Icon name="link" size={15} />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e3a8a' }}>
+                        Founder's Businesses ({allBusinesses.length})
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                      Same owner / phone
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {allBusinesses.map((b) => {
+                      const isCurrent = String(b.id) === String(current?.id)
+                      return (
+                        <div
+                          key={b.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: isCurrent ? '#eff6ff' : '#ffffff',
+                            border: isCurrent ? '1.5px solid #60a5fa' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                color: '#0f172a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              {b.businessName}
+                              {b.isMainBusiness && (
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#dbeafe',
+                                    color: '#1e40af',
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  MAIN
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#dcfce7',
+                                    color: '#166534',
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  VIEWING
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '11.5px',
+                                color: '#64748b',
+                                marginTop: '2px',
+                              }}
+                            >
+                              {b.contactName} · {b.phone || 'No phone'} · Status:{' '}
+                              <span
+                                style={{
+                                  textTransform: 'capitalize',
+                                  fontWeight: 600,
+                                  color: b.status === 'completed' ? '#16a34a' : '#d97706',
+                                }}
+                              >
+                                {b.status || 'pending'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {!isCurrent ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveCustomer(b as any)}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                backgroundColor: '#2563eb',
+                                color: '#ffffff',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Switch ↗
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: '#2563eb', fontWeight: 600 }}>
+                              Active
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
