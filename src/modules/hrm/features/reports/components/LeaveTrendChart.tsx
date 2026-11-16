@@ -55,10 +55,7 @@ export function LeaveTrendChart({ data, isLoading, error }: Props) {
             }}
           />
           <Legend />
-          <Bar dataKey="casual" fill="hsl(var(--primary))" stackId="a" name="Casual" />
-          <Bar dataKey="sick" fill="hsl(var(--danger))" stackId="a" name="Sick" />
-          <Bar dataKey="earned" fill="hsl(var(--success))" stackId="a" name="Earned" />
-          <Bar dataKey="unpaid" fill={cc.axis} stackId="a" name="Unpaid" />
+          <Bar dataKey="casual" fill="hsl(var(--primary))" name="Casual Leave" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </Card>

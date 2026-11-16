@@ -41,23 +41,17 @@ interface LeaveBalanceCardsProps {
 export function LeaveBalanceCards({ balances, isLoading, error }: LeaveBalanceCardsProps) {
   const sorted = useMemo(() => {
     const source = balances ?? [];
-    const order: LeaveTypeValue[] = [
-      "CASUAL",
-      "SICK",
-      "PAID",
-      "UNPAID",
-    ];
-    return [...source].sort((a, b) => order.indexOf(a.leaveType) - order.indexOf(b.leaveType));
+    return source.filter((b) => b.leaveType === "CASUAL");
   }, [balances]);
 
-  if (isLoading) return <CardSkeleton count={3} />;
+  if (isLoading) return <CardSkeleton count={1} />;
   if (error) return <ErrorDisplay message="Leave balances could not be loaded. Please try again." />;
   if (sorted.length === 0) {
     return <Card padding="md"><p className="text-sm text-muted-foreground">No leave entitlements are configured for your profile.</p></Card>;
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {sorted.map((balance) => {
         const meta = LEAVE_TYPE_META[balance.leaveType];
         const Icon = meta?.icon ?? Briefcase;
@@ -73,14 +67,22 @@ export function LeaveBalanceCards({ balances, isLoading, error }: LeaveBalanceCa
                 <Icon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-card-foreground">
-                  {meta?.label ?? balance.label}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-card-foreground">
+                    {meta?.label ?? balance.label}
+                  </p>
+                  <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    1 Free / Month
+                  </span>
+                </div>
                 <p className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">
                   <AnimatedNumber value={balance.remaining} />
                   <span className="ml-1 text-sm font-medium text-muted-foreground">
-                    / <AnimatedNumber value={balance.total} />
+                    / <AnimatedNumber value={balance.total} /> days
                   </span>
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Allowed 1 paid leave/mo (12/yr). Additional leaves in month deducted in payroll.
                 </p>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
