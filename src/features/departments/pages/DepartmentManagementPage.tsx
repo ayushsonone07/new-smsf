@@ -6,7 +6,6 @@ import {
   Search,
   Plus,
 } from 'lucide-react'
-import { useDepartments } from '../hooks/useDepartments'
 import { useUpdateDepartment } from '../hooks/useUpdateDepartment'
 import { useUpdateDepartmentStatus } from '../hooks/useUpdateDepartmentStatus'
 import { useDeleteDepartment } from '../hooks/useDeleteDepartment'
@@ -22,7 +21,8 @@ import {
   toLocalDateTimeParam,
   type AdminDepartmentSummary,
 } from '../../../api/admin-summary.api'
-import { getAdminDepartments } from '../../../api/admin-departments.api'
+import { getAdminDepartments, getAdminDepartmentUserCounts } from '../../../api/admin-departments.api'
+import { getDepartmentServiceStatuses } from '../../../api/departments.api'
 import type {
   Department,
   UpdateDepartmentRequest,
@@ -76,46 +76,67 @@ export function DepartmentManagementPage() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
   const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null)
 
-  const departmentsQuery = useDepartments()
   const updateMutation = useUpdateDepartment()
   const updateStatusMutation = useUpdateDepartmentStatus()
   const deleteMutation = useDeleteDepartment()
   const loginAsMutation = useLoginAsDepartment()
 
-  // 1. Fetch User Counts across departments
-  const adminUsersQuery = useQuery({
+  const departmentHeadsQuery = useQuery({
+    queryKey: ['admin-department-heads'],
+    queryFn: () => getAdminDepartments({ isHead: true, size: 100 }),
+    staleTime: 120_000,
+  })
+
+  const userCountsQuery = useQuery({
     queryKey: ['admin-departments-users-count'],
-    queryFn: () => getAdminDepartments({ size: 500 }),
+    queryFn: getAdminDepartmentUserCounts,
+    staleTime: 120_000,
+  })
+
+  const serviceStatusesQuery = useQuery({
+    queryKey: ['department-service-statuses'],
+    queryFn: getDepartmentServiceStatuses,
     staleTime: 120_000,
   })
 
   // Map departmentType -> user count
   const userCountByDept = useMemo(() => {
     const map = new Map<string, number>()
-    const users = adminUsersQuery.data?.data ?? []
-    for (const u of users) {
-      const type = u.departmentType
-      if (type) {
-        map.set(type, (map.get(type) || 0) + 1)
-      }
+    for (const item of userCountsQuery.data ?? []) {
+      if (item.departmentType) map.set(item.departmentType, item.userCount)
     }
     return map
-  }, [adminUsersQuery.data])
+  }, [userCountsQuery.data])
 
-  const allDepartments = useMemo(
-    () => departmentsQuery.data ?? [],
-    [departmentsQuery.data],
+  const statusByDepartment = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const item of serviceStatusesQuery.data ?? []) {
+      const key = item.departmentType.toUpperCase()
+      map.set(key, (map.get(key) ?? true) && item.isActive)
+    }
+    return map
+  }, [serviceStatusesQuery.data])
+
+  const allDepartments = useMemo<Department[]>(
+    () => (departmentHeadsQuery.data?.data ?? []).map((user) => {
+      const type = user.departmentType || ''
+      return {
+        id: String(user.departmentId ?? user.email),
+        name: user.username || user.email,
+        type,
+        username: user.username,
+        email: user.email,
+        contact: user.contact,
+        status: statusByDepartment.get(type.toUpperCase()) === false ? 'INACTIVE' : 'ACTIVE',
+        createdAt: user.createdAt || '',
+        role: user.role || (user.isHead ? 'DEPARTMENT_HEAD' : 'DEPARTMENT_USER'),
+      }
+    }),
+    [departmentHeadsQuery.data, statusByDepartment],
   )
 
   // Deduplicate: only show department heads, grouped by department type
   const uniqueHeads = useMemo(() => uniqueDepartmentHeads(allDepartments), [allDepartments])
-
-  // Extract department types
-  const departmentTypes = useMemo(() => {
-    return uniqueHeads
-      .map((d) => d.type)
-      .filter((t): t is string => Boolean(t) && t !== 'unknown')
-  }, [uniqueHeads])
 
   // 2. Fetch 30-day summaries for each department
   const range = useMemo(() => {
@@ -150,12 +171,8 @@ export function DepartmentManagementPage() {
       const summary = summaryByDept.get(type.toUpperCase())
 
       const label = departmentLabel(type)
-      const headFromUsers = adminUsersQuery.data?.data?.find(
-        (u) => u.departmentType === type && u.isHead,
-      )
-
-      const headName = dept.name || dept.username || headFromUsers?.username || `${label} Head`
-      const headEmail = dept.email || headFromUsers?.email || ''
+      const headName = dept.name || dept.username || `${label} Head`
+      const headEmail = dept.email || ''
       const userCount = userCountByDept.get(type) || 1
 
       const customers = summary?.totalCustomers ?? 0
@@ -187,7 +204,7 @@ export function DepartmentManagementPage() {
         visual: getDepartmentVisual(label),
       }
     })
-  }, [uniqueHeads, summaryByDept, adminUsersQuery.data, userCountByDept])
+  }, [uniqueHeads, summaryByDept, userCountByDept])
 
   // Filtered by Search & Status
   const filteredDepartments = useMemo(() => {
@@ -300,15 +317,17 @@ export function DepartmentManagementPage() {
   }
 
   const isRefreshing =
-    departmentsQuery.isFetching || adminUsersQuery.isFetching || summaryAllQuery.isFetching
+    departmentHeadsQuery.isFetching || userCountsQuery.isFetching ||
+    serviceStatusesQuery.isFetching || summaryAllQuery.isFetching
 
   const handleRefreshAll = () => {
-    departmentsQuery.refetch()
-    adminUsersQuery.refetch()
+    departmentHeadsQuery.refetch()
+    userCountsQuery.refetch()
+    serviceStatusesQuery.refetch()
     summaryAllQuery.refetch()
   }
 
-  if (departmentsQuery.isPending) {
+  if (departmentHeadsQuery.isPending || userCountsQuery.isPending || serviceStatusesQuery.isPending) {
     return (
       <PageLayout>
         <LoadingState message="Loading departments..." />
@@ -316,12 +335,12 @@ export function DepartmentManagementPage() {
     )
   }
 
-  if (departmentsQuery.isError) {
+  if (departmentHeadsQuery.isError || userCountsQuery.isError || serviceStatusesQuery.isError) {
     return (
       <PageLayout>
         <ErrorState
           title="Unable to load departments"
-          message={departmentsQuery.error.message}
+          message={(departmentHeadsQuery.error || userCountsQuery.error || serviceStatusesQuery.error)?.message || 'Unknown error'}
           onRetry={handleRefreshAll}
         />
       </PageLayout>

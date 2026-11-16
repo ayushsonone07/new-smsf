@@ -16,9 +16,11 @@ export function useUpdateDepartment() {
       updateDepartment(id, data),
 
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: departmentsQueryKey,
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: departmentsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['admin-department-heads'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-departments-users-count'] }),
+      ])
     },
   })
 }
