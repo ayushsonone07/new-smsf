@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Bell, CheckCircle2, Circle, RefreshCw, Search } from 'lucide-react'
-import { fetchAllNotifications } from '../../../api/notifications.api'
+import { fetchNotificationPage } from '../../../api/notifications.api'
 import { PageHeader } from '../../../components/layout/PageHeader'
 import { PageLayout } from '../../../components/layout/PageLayout'
 import { Card } from '../../../components/ui/Card'
@@ -9,15 +9,16 @@ import './NotificationHistoryPage.css'
 
 export function NotificationHistoryPage() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
   const notificationsQuery = useQuery({
-    queryKey: ['notification-history'],
-    queryFn: fetchAllNotifications,
+    queryKey: ['notification-history', page],
+    queryFn: () => fetchNotificationPage(page, 20),
     refetchOnWindowFocus: true,
   })
 
   const notifications = useMemo(() => {
     const value = search.trim().toLowerCase()
-    const items = notificationsQuery.data ?? []
+    const items = notificationsQuery.data?.items ?? []
     if (!value) return items
     return items.filter((item) =>
       [item.title, item.message, item.kind, item.audience, item.departmentType]
@@ -51,7 +52,7 @@ export function NotificationHistoryPage() {
         <div className="notification-history__heading">
           <div>
             <h2>All Notifications</h2>
-            <p>{notificationsQuery.data?.length ?? 0} notification(s) from the backend</p>
+            <p>{notificationsQuery.data?.totalElements ?? 0} notification(s) from the backend</p>
           </div>
           <label className="notification-history__search">
             <Search size={16} />
@@ -103,6 +104,21 @@ export function NotificationHistoryPage() {
             ))}
           </div>
         )}
+        {(notificationsQuery.data?.totalPage ?? 0) > 1 ? (
+          <div className="notification-history__pagination">
+            <button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>
+              Previous
+            </button>
+            <span>Page {page + 1} of {notificationsQuery.data?.totalPage}</span>
+            <button
+              type="button"
+              disabled={page + 1 >= (notificationsQuery.data?.totalPage ?? 0)}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
       </Card>
     </PageLayout>
   )

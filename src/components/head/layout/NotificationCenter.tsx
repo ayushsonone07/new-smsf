@@ -23,12 +23,17 @@ interface NotificationCenterProps {
   items: HeadNotification[]
   roleLabel?: string
   onMarkAllRead?: () => void
+  onOpen?: () => void
+  unreadCount?: number
 }
 
 export function NotificationCenter({
   children,
   items,
   roleLabel = 'Account',
+  onMarkAllRead,
+  onOpen,
+  unreadCount: unreadCountOverride,
 }: NotificationCenterProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -44,7 +49,7 @@ export function NotificationCenter({
       `${item.text} ${item.timeLabel}`.toLowerCase().includes(value),
     )
   }, [search, visibleItems])
-  const unreadCount = visibleItems.filter((item) => item.unread).length
+  const unreadCount = unreadCountOverride ?? visibleItems.filter((item) => item.unread).length
   const close = useCallback(() => setOpen(false), [])
 
   const dismissAll = useCallback(() => {
@@ -54,7 +59,13 @@ export function NotificationCenter({
       return next
     })
     setSearch('')
-  }, [items])
+    onMarkAllRead?.()
+  }, [items, onMarkAllRead])
+
+  const openDrawer = useCallback(() => {
+    setOpen(true)
+    onOpen?.()
+  }, [onOpen])
 
   useEffect(() => {
     if (!open) return
@@ -66,8 +77,8 @@ export function NotificationCenter({
   }, [close, open])
 
   const value = useMemo(
-    () => ({ open: () => setOpen(true), isOpen: open, unreadCount }),
-    [open, unreadCount],
+    () => ({ open: openDrawer, isOpen: open, unreadCount }),
+    [open, openDrawer, unreadCount],
   )
 
   return (

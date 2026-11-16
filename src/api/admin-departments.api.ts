@@ -33,6 +33,15 @@ export interface AdminDepartmentsPage {
   elementSize: number
 }
 
+export interface DepartmentUserCount {
+  departmentType: string
+  userCount: number
+}
+
+interface DepartmentUserCountsResponse {
+  data?: DepartmentUserCount[]
+}
+
 interface AdminDepartmentsRaw {
   data?: AdminDepartmentUser[]
   totalElements?: number
@@ -82,4 +91,11 @@ export async function getAdminDepartments(
     pageNumber: res?.pageNumber ?? 0,
     elementSize: res?.elementSize ?? 10,
   }
+}
+
+export async function getAdminDepartmentUserCounts(): Promise<DepartmentUserCount[]> {
+  const res = await authedApiRequest<DepartmentUserCountsResponse>(
+    '/api/auth/admin/departments/counts',
+  )
+  return Array.isArray(res?.data) ? res.data : []
 }
