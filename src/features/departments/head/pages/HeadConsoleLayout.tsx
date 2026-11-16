@@ -67,6 +67,8 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
 
   const {
     items: notifications,
+    unreadCount,
+    loadLatest,
     markAllRead: markAllNotificationsRead,
   } = useNotifications()
 
@@ -149,6 +151,8 @@ export function HeadConsoleLayout({ portalRole, children }: HeadConsoleLayoutPro
       }
       notifications={notifications}
       onMarkAllRead={markAllNotificationsRead}
+      onNotificationsOpen={() => void loadLatest()}
+      unreadNotificationCount={unreadCount}
       dashboardHeaderMode={feature?.screen === 'dashboard'}
     >
       {children ?? <Outlet />}
