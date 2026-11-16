@@ -264,7 +264,7 @@ export function AdminSidebar({
             >
               <NavIcon
                 className="nav-item-icon"
-                size={19}
+                size={16}
                 strokeWidth={1.9}
                 aria-hidden="true"
               />
