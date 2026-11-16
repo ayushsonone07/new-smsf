@@ -11,6 +11,7 @@ export function useUpdateDepartmentStatus() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: departmentsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['admin-departments-users-count'] }),
         queryClient.invalidateQueries({ queryKey: ['department-service-statuses'] }),
       ])
     },
