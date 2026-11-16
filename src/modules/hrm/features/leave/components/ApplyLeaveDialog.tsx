@@ -71,7 +71,7 @@ function countChargeableDays(
 }
 
 export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
-  const [leaveType, setLeaveType] = useState<LeaveTypeValue | "">("");
+  const [leaveType, setLeaveType] = useState<LeaveTypeValue | "">("CASUAL");
   const [startDate, setStartDate] = useState(todayString);
   const [endDate, setEndDate] = useState(todayString);
   const [halfDay, setHalfDay] = useState(false);
@@ -107,12 +107,6 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
     }
     if (!reason.trim()) errs.reason = "Reason is required.";
     if (reason.trim().length > 500) errs.reason = "Reason must be under 500 characters.";
-    if (leaveType && balances) {
-      const balance = balances.find((b) => b.leaveType === leaveType);
-      if (balance && numberOfDays > balance.remaining) {
-        errs.balance = `Insufficient balance. You have ${balance.remaining} day(s) remaining for ${balance.label}.`;
-      }
-    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -155,6 +149,16 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-6">
+        <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-3.5 text-xs text-sky-900 dark:border-sky-800/40 dark:bg-sky-950/30 dark:text-sky-200">
+          <p className="font-semibold flex items-center gap-1.5 text-sky-950 dark:text-sky-100">
+            <span>📌</span> Leave & Salary Deduction Policy:
+          </p>
+          <p className="mt-1 leading-relaxed text-sky-900/90 dark:text-sky-200/90">
+            Employees are entitled to <strong>1 paid Casual Leave per month</strong> without salary deduction (12 days/year).
+            Any extra leaves taken in the same month will be treated as Loss of Pay and deducted from your monthly salary in payroll.
+          </p>
+        </div>
+
         <div>
           <label
             htmlFor="leave-type"
@@ -174,12 +178,17 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
             aria-invalid={!!errors.leaveType}
             aria-describedby={errors.leaveType ? "leave-type-error" : undefined}
           >
-            <option value="">Select leave type</option>
-            {balances?.map((b) => (
-              <option key={b.leaveType} value={b.leaveType}>
-                {`${b.label} (${b.remaining}/${b.total})`}
-              </option>
-            ))}
+            {balances && balances.length > 0 ? (
+              balances
+                .filter((b) => b.leaveType === "CASUAL")
+                .map((b) => (
+                  <option key={b.leaveType} value={b.leaveType}>
+                    {`${b.label} (${b.remaining}/${b.total} days remaining)`}
+                  </option>
+                ))
+            ) : (
+              <option value="CASUAL">Casual Leave (1 paid/month - 12 days/year)</option>
+            )}
           </Select>
           {errors.leaveType ? (
             <p id="leave-type-error" className="mt-1 text-xs text-danger" role="alert">

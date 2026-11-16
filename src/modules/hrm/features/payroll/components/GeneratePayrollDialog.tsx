@@ -34,6 +34,7 @@ export function GeneratePayrollDialog({ open, onClose }: GeneratePayrollDialogPr
   const [employeeId, setEmployeeId] = useState<number | "">("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [summaryResult, setSummaryResult] = useState<GeneratePayrollBatchResult | null>(null);
+  const [pendingWarning, setPendingWarning] = useState<string | null>(null);
 
   const generate = useGeneratePayroll();
   const toast = useToast();
@@ -41,6 +42,7 @@ export function GeneratePayrollDialog({ open, onClose }: GeneratePayrollDialogPr
 
   function handleClose() {
     setSummaryResult(null);
+    setPendingWarning(null);
     onClose();
   }
 
@@ -52,13 +54,12 @@ export function GeneratePayrollDialog({ open, onClose }: GeneratePayrollDialogPr
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
+  function doGenerate(force = false) {
     generate.mutate(
-      { month, year, employeeId: employeeId === "" ? null : employeeId },
+      { month, year, employeeId: employeeId === "" ? null : employeeId, force },
       {
         onSuccess: (result) => {
+          setPendingWarning(null);
           if (result.skippedCount > 0) {
             setSummaryResult(result);
             toast.success(
@@ -72,10 +73,21 @@ export function GeneratePayrollDialog({ open, onClose }: GeneratePayrollDialogPr
           }
         },
         onError: (err) => {
-          toast.error(getApiErrorMessage(err, "Failed to generate payroll."));
+          const msg = getApiErrorMessage(err, "Failed to generate payroll.");
+          if (msg.includes("PENDING leave request")) {
+            setPendingWarning(msg);
+          } else {
+            toast.error(msg);
+          }
         },
       },
     );
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+    doGenerate(false);
   }
 
   return (
@@ -232,6 +244,38 @@ export function GeneratePayrollDialog({ open, onClose }: GeneratePayrollDialogPr
               Leave empty to generate for every active employee with a salary structure.
             </p>
           </div>
+
+          {pendingWarning && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="space-y-2">
+                  <p className="font-semibold text-amber-950 dark:text-amber-100">
+                    Pending Leaves Detected
+                  </p>
+                  <p className="leading-relaxed">{pendingWarning}</p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <a
+                      href="/hrm/leave-management"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-amber-200/80 px-2.5 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-300 dark:bg-amber-900/60 dark:text-amber-200"
+                    >
+                      Review in Leave Management →
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => doGenerate(true)}
+                      disabled={disabled}
+                      className="inline-flex items-center rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      Proceed Anyway (Count as Absent)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-1">
             <button

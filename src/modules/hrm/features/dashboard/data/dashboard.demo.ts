@@ -100,10 +100,7 @@ export const EMPLOYEE_DEMO_DATA: EmployeeDashboardResponse = {
   },
   todayAttendance: { status: "PRESENT", checkIn: "09:12", workingMinutes: 300 },
   leaveBalances: [
-    { leaveType: "Casual leave", total: 12, used: 6, remaining: 6 },
-    { leaveType: "Sick leave", total: 10, used: 2, remaining: 8 },
-    { leaveType: "Earned leave", total: 18, used: 7, remaining: 11 },
-    { leaveType: "Comp-offs", total: 4, used: 2, remaining: 2 },
+    { leaveType: "Casual leave", total: 12, used: 2, remaining: 10 },
   ],
   attendanceTrend: [
     { date: "2026-07-27", status: "PRESENT", workingMinutes: 544 },

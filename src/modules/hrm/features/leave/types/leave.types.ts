@@ -39,6 +39,7 @@ export interface LeaveRequest {
   approvedDate?: string;
   rejectionReason?: string;
   reviewerNote?: string;
+  payrollNotice?: string;
 }
 
 export interface LeaveRequestInput {
