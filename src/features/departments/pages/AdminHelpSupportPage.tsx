@@ -39,6 +39,7 @@ import { Card } from '../../../components/ui/Card'
 import { LoadingState } from '../../../components/ui/LoadingState'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { TablePagination } from '../../../components/ui/TablePagination'
+import { HelpCartSection } from '../components/HelpCartSection'
 
 /**
  * SuperAdmin Help & Support view:
@@ -46,7 +47,7 @@ import { TablePagination } from '../../../components/ui/TablePagination'
  * and status timeline for administration.
  */
 
-type Tab = 'overview' | 'tickets'
+type Tab = 'overview' | 'tickets' | 'help-cart'
 
 interface Counts {
   total: number
@@ -1379,6 +1380,22 @@ export function AdminHelpSupportPage() {
             <span className="absolute bottom-[-1px] left-3 right-3 h-[3px] bg-[#315fe8] rounded-t-full" />
           )}
         </button>
+        <button
+          onClick={() => {
+            setTab('help-cart')
+            setSelectedDeptId(null)
+          }}
+          className={`py-3 px-4 text-xs font-bold relative transition-colors ${
+            tab === 'help-cart'
+              ? 'text-[#315fe8]'
+              : 'text-[#687a96] hover:text-[#17243c]'
+          }`}
+        >
+          Help Cart
+          {tab === 'help-cart' && (
+            <span className="absolute bottom-[-1px] left-3 right-3 h-[3px] bg-[#315fe8] rounded-t-full" />
+          )}
+        </button>
       </div>
 
       {tab === 'overview' &&
@@ -1454,6 +1471,8 @@ export function AdminHelpSupportPage() {
       {tab === 'tickets' && (
         <TicketsListSection departments={departments} onViewTicket={setSelectedTicket} />
       )}
+
+      {tab === 'help-cart' && <HelpCartSection />}
 
       {/* Modern Ticket Details & Status History Modal from preview (3).html */}
       <TicketDetailsModal
