@@ -173,6 +173,10 @@ export interface EmployeeListItem {
   laptopType?: string | null;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  isIdCard?: boolean | null;
+  idCardNumber?: string | null;
+  isVisitingCard?: boolean | null;
+  visitingCardNumber?: string | null;
 }
 
 export interface OnboardingCounts {
@@ -196,6 +200,10 @@ export interface CreateEmployeeInput {
   laptopType?: string;
   isCompanySim?: boolean;
   companyPhoneNumber?: string;
+  isIdCard?: boolean;
+  idCardNumber?: string;
+  isVisitingCard?: boolean;
+  visitingCardNumber?: string;
 }
 
 export interface UpdateEmployeeInput {
@@ -213,6 +221,10 @@ export interface UpdateEmployeeInput {
   laptopType?: string | null;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  isIdCard?: boolean | null;
+  idCardNumber?: string | null;
+  isVisitingCard?: boolean | null;
+  visitingCardNumber?: string | null;
 }
 
 export interface UpdateEmployeeStatusInput {

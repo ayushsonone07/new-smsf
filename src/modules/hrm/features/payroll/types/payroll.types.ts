@@ -20,6 +20,7 @@ export type EarningType =
   | "SPECIAL_ALLOWANCE"
   | "OTHER"
   | "INCENTIVE"
+  | "CRA"
   | "STIPEND"
   | "BONUS"
   | "OVERTIME";
@@ -47,6 +48,7 @@ export interface SalaryStructure {
   specialAllowance: string;
   otherAllowance: string;
   incentive?: string | null;
+  cra?: string | null;
   grossSalary?: string | null;
   pfEnabled: boolean;
   esiEnabled: boolean;
@@ -64,6 +66,7 @@ export interface SalaryStructureInput {
   specialAllowance: string;
   otherAllowance: string;
   incentive?: string;
+  cra?: string;
   pfEnabled: boolean;
   esiEnabled: boolean;
   effectiveFrom: string;
@@ -250,6 +253,7 @@ export const EARNING_LABELS: Record<EarningType, string> = {
   SPECIAL_ALLOWANCE: "Special Allowance",
   OTHER: "Other Allowance",
   INCENTIVE: "Incentive",
+  CRA: "CRA",
   STIPEND: "Stipend",
   BONUS: "Bonus",
   OVERTIME: "Overtime",

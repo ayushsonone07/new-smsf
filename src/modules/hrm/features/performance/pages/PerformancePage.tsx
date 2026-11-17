@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { Edit3, Loader2, Plus, Search, Star, Target } from "lucide-react";
+import { CalendarDays, Edit3, Loader2, Plus, Search, Star, Target } from "lucide-react";
 
 import { useAuth } from "@features/auth";
 import type { EmployeeListItem } from "@features/hr";
@@ -30,7 +30,82 @@ import {
 } from "../hooks";
 import { performanceService } from "../services";
 
-import type { PerformanceReview, PerformanceReviewInput, PerformanceReviewStatus } from "../types";
+import type { PerformanceReview, PerformanceReviewInput, PerformanceReviewStatus, ReviewType } from "../types";
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [CURRENT_YEAR - 2, CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1, CURRENT_YEAR + 2];
+
+const MONTH_OPTIONS = [
+  { value: 1, name: "January" },
+  { value: 2, name: "February" },
+  { value: 3, name: "March" },
+  { value: 4, name: "April" },
+  { value: 5, name: "May" },
+  { value: 6, name: "June" },
+  { value: 7, name: "July" },
+  { value: 8, name: "August" },
+  { value: 9, name: "September" },
+  { value: 10, name: "October" },
+  { value: 11, name: "November" },
+  { value: 12, name: "December" },
+];
+
+const QUARTER_OPTIONS = [
+  { value: "Q1", label: "Q1 (Jan 01 – Mar 31)", startM: 1, startD: 1, endM: 3, endD: 31 },
+  { value: "Q2", label: "Q2 (Apr 01 – Jun 30)", startM: 4, startD: 1, endM: 6, endD: 30 },
+  { value: "Q3", label: "Q3 (Jul 01 – Sep 30)", startM: 7, startD: 1, endM: 9, endD: 30 },
+  { value: "Q4", label: "Q4 (Oct 01 – Dec 31)", startM: 10, startD: 1, endM: 12, endD: 31 },
+];
+
+function computeCycleData(type: ReviewType, year: number, month: number, quarter: string) {
+  if (type === "MONTHLY") {
+    const monthObj = MONTH_OPTIONS.find((m) => m.value === month) ?? MONTH_OPTIONS[0]!;
+    const lastDay = new Date(year, month, 0).getDate();
+    const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const cycle = `${monthObj.name} ${year}`;
+    return { cycle, periodStart, periodEnd };
+  }
+  if (type === "YEARLY") {
+    const periodStart = `${year}-01-01`;
+    const periodEnd = `${year}-12-31`;
+    const cycle = `Annual ${year}`;
+    return { cycle, periodStart, periodEnd };
+  }
+  if (type === "QUARTERLY") {
+    const qObj = QUARTER_OPTIONS.find((q) => q.value === quarter) ?? QUARTER_OPTIONS[0]!;
+    const periodStart = `${year}-${String(qObj.startM).padStart(2, "0")}-01`;
+    const periodEnd = `${year}-${String(qObj.endM).padStart(2, "0")}-${String(qObj.endD).padStart(2, "0")}`;
+    const cycle = `${quarter} ${year}`;
+    return { cycle, periodStart, periodEnd };
+  }
+  return null;
+}
+
+function ReviewTypeBadge({ type }: { type?: ReviewType | null }) {
+  const t = type ?? "QUARTERLY";
+  const label =
+    t === "MONTHLY"
+      ? "Monthly"
+      : t === "YEARLY"
+        ? "Yearly"
+        : t === "CUSTOM"
+          ? "Custom"
+          : "Quarterly";
+  const tone =
+    t === "MONTHLY"
+      ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20"
+      : t === "YEARLY"
+        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+        : t === "CUSTOM"
+          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+          : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20";
+  return (
+    <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+      {label}
+    </span>
+  );
+}
 
 const STATUS_OPTIONS: Array<{ value: PerformanceReviewStatus; label: string; tone: string }> = [
   { value: "PENDING", label: "Pending", tone: "border-warning bg-warning-soft text-warning" },
@@ -53,6 +128,7 @@ export function PerformancePage() {
   const toast = useToast();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<PerformanceReviewStatus | "">("");
+  const [reviewType, setReviewType] = useState<ReviewType | "">("");
   const [cycle, setCycle] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -70,6 +146,7 @@ const summary = usePerformanceSummary(!isEmployee);
       page,
       size: 10,
       status,
+      reviewType,
       cycle,
       employeeSearch,
       sort: "createdAt,desc",
@@ -131,8 +208,11 @@ const summary = usePerformanceSummary(!isEmployee);
                 <tbody className="divide-y divide-border">
                   {myRecords.map((review) => (
                     <tr key={review.id} className="hover:bg-surface-hover/70">
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">
-                        {review.cycle}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="font-semibold text-foreground">{review.cycle}</div>
+                        <div className="mt-0.5">
+                          <ReviewTypeBadge type={review.reviewType} />
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                         {formatDate(review.periodStart)} - {formatDate(review.periodEnd)}
@@ -224,7 +304,7 @@ const summary = usePerformanceSummary(!isEmployee);
               className={`${inputClass} pl-9`}
             />
           </label>
-          <div className="grid w-full grid-cols-2 gap-3 lg:w-[360px] lg:shrink-0">
+          <div className="grid w-full grid-cols-3 gap-3 lg:w-[520px] lg:shrink-0">
             <AnimatedFilterSelect
               value={status}
               onValueChange={(nextStatus) => {
@@ -239,6 +319,21 @@ const summary = usePerformanceSummary(!isEmployee);
                 })),
               ]}
               ariaLabel="Filter performance reviews by status"
+            />
+            <AnimatedFilterSelect
+              value={reviewType}
+              onValueChange={(nextType) => {
+                setReviewType(nextType as ReviewType | "");
+                setPage(1);
+              }}
+              options={[
+                { value: "", label: "Frequency" },
+                { value: "QUARTERLY", label: "Quarterly" },
+                { value: "MONTHLY", label: "Monthly" },
+                { value: "YEARLY", label: "Yearly" },
+                { value: "CUSTOM", label: "Custom" },
+              ]}
+              ariaLabel="Filter performance reviews by frequency"
             />
             <input
               value={cycle}
@@ -388,8 +483,11 @@ function PerformanceTable({
                 </p>
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-foreground">{review.reviewerName}</td>
-              <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">
-                {review.cycle}
+              <td className="whitespace-nowrap px-4 py-3">
+                <div className="font-semibold text-foreground">{review.cycle}</div>
+                <div className="mt-0.5">
+                  <ReviewTypeBadge type={review.reviewType} />
+                </div>
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                 {formatDate(review.periodStart)} - {formatDate(review.periodEnd)}
@@ -488,13 +586,75 @@ function PerformanceDialog({
     return true;
   });
 
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedQuarter, setSelectedQuarter] = useState(() => {
+    const qNum = Math.floor(new Date().getMonth() / 3) + 1;
+    return `Q${qNum}`;
+  });
+
   useEffect(() => {
     if (open) {
-      setForm(review ? toInput(review) : emptyInput());
+      if (review) {
+        setForm(toInput(review));
+        const yr = new Date(review.periodStart).getFullYear();
+        if (yr && !isNaN(yr)) setSelectedYear(yr);
+      } else {
+        const initial = emptyInput();
+        setForm(initial);
+        setSelectedYear(currentYear);
+        const qNum = Math.floor(new Date().getMonth() / 3) + 1;
+        setSelectedQuarter(`Q${qNum}`);
+        setSelectedMonth(new Date().getMonth() + 1);
+      }
       setDepartmentId(0);
       setDesignationId(0);
     }
   }, [open, review]);
+
+  function handleTypeChange(nextType: ReviewType) {
+    if (nextType === "CUSTOM") {
+      update("reviewType", "CUSTOM");
+    } else {
+      const computed = computeCycleData(nextType, selectedYear, selectedMonth, selectedQuarter);
+      setForm((prev) => ({
+        ...prev,
+        reviewType: nextType,
+        ...(computed ? computed : {}),
+      }));
+    }
+  }
+
+  function handleYearChange(year: number) {
+    setSelectedYear(year);
+    if (form.reviewType && form.reviewType !== "CUSTOM") {
+      const computed = computeCycleData(form.reviewType, year, selectedMonth, selectedQuarter);
+      if (computed) {
+        setForm((prev) => ({ ...prev, ...computed }));
+      }
+    }
+  }
+
+  function handleQuarterChange(quarter: string) {
+    setSelectedQuarter(quarter);
+    if (form.reviewType === "QUARTERLY") {
+      const computed = computeCycleData("QUARTERLY", selectedYear, selectedMonth, quarter);
+      if (computed) {
+        setForm((prev) => ({ ...prev, ...computed }));
+      }
+    }
+  }
+
+  function handleMonthChange(month: number) {
+    setSelectedMonth(month);
+    if (form.reviewType === "MONTHLY") {
+      const computed = computeCycleData("MONTHLY", selectedYear, month, selectedQuarter);
+      if (computed) {
+        setForm((prev) => ({ ...prev, ...computed }));
+      }
+    }
+  }
 
   useEffect(() => {
     if (!open || !review) return;
@@ -618,15 +778,107 @@ function PerformanceDialog({
             className={inputClass}
             onChange={(id) => update("reviewerId", id)}
           />
-          <Field label="Cycle" required>
+          <Field label="Review Frequency" required>
+            <Select
+              value={form.reviewType ?? "QUARTERLY"}
+              onChange={(e) => handleTypeChange(e.target.value as ReviewType)}
+              className={inputClass}
+            >
+              <option value="QUARTERLY">📊 Quarterly Review (Q1, Q2, Q3, Q4)</option>
+              <option value="MONTHLY">📅 Monthly Review (Month-wise)</option>
+              <option value="YEARLY">🗓️ Yearly / Annual Review</option>
+              <option value="CUSTOM">⚙️ Custom Range (Manual Dates)</option>
+            </Select>
+          </Field>
+
+          {form.reviewType === "QUARTERLY" && (
+            <>
+              <Field label="Year" required>
+                <Select
+                  value={selectedYear}
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
+                  className={inputClass}
+                >
+                  {YEAR_OPTIONS.map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Quarter" required>
+                <Select
+                  value={selectedQuarter}
+                  onChange={(e) => handleQuarterChange(e.target.value)}
+                  className={inputClass}
+                >
+                  {QUARTER_OPTIONS.map((q) => (
+                    <option key={q.value} value={q.value}>
+                      {q.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
+          )}
+
+          {form.reviewType === "MONTHLY" && (
+            <>
+              <Field label="Year" required>
+                <Select
+                  value={selectedYear}
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
+                  className={inputClass}
+                >
+                  {YEAR_OPTIONS.map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Month" required>
+                <Select
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthChange(Number(e.target.value))}
+                  className={inputClass}
+                >
+                  {MONTH_OPTIONS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
+          )}
+
+          {form.reviewType === "YEARLY" && (
+            <Field label="Year" required>
+              <Select
+                value={selectedYear}
+                onChange={(e) => handleYearChange(Number(e.target.value))}
+                className={inputClass}
+              >
+                {YEAR_OPTIONS.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          <Field label="Cycle Title" required>
             <input
               value={form.cycle}
               onChange={(event) => update("cycle", event.target.value)}
               required
-              placeholder="Q1 2026"
+              placeholder="e.g. Q4 2026"
               className={inputClass}
             />
           </Field>
+
           <Field label="Status">
             <Select
               value={form.status ?? "PENDING"}
@@ -640,24 +892,40 @@ function PerformanceDialog({
               ))}
             </Select>
           </Field>
-          <Field label="Period start" required>
-            <DatePicker
-              value={form.periodStart}
-              onChange={(value) => update("periodStart", value)}
-              required
-              ariaLabel="Choose review period start"
-              buttonClassName={inputClass}
-            />
-          </Field>
-          <Field label="Period end" required>
-            <DatePicker
-              value={form.periodEnd}
-              onChange={(value) => update("periodEnd", value)}
-              required
-              ariaLabel="Choose review period end"
-              buttonClassName={inputClass}
-            />
-          </Field>
+
+          {form.reviewType === "CUSTOM" ? (
+            <>
+              <Field label="Period start" required>
+                <DatePicker
+                  value={form.periodStart}
+                  onChange={(value) => update("periodStart", value)}
+                  required
+                  ariaLabel="Choose review period start"
+                  buttonClassName={inputClass}
+                />
+              </Field>
+              <Field label="Period end" required>
+                <DatePicker
+                  value={form.periodEnd}
+                  onChange={(value) => update("periodEnd", value)}
+                  required
+                  ariaLabel="Choose review period end"
+                  buttonClassName={inputClass}
+                />
+              </Field>
+            </>
+          ) : (
+            <div className="sm:col-span-2 rounded-xl border border-border bg-surface-muted/30 p-3.5 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-foreground font-semibold">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                <span>Computed Review Period:</span>
+                <span className="font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                  {form.periodStart} to {form.periodEnd}
+                </span>
+              </div>
+              <span className="text-muted-foreground italic">Auto-calculated from {form.reviewType?.toLowerCase() || "cycle"}</span>
+            </div>
+          )}
         </div>
         <Field label="Goals / KRA" required>
           <textarea
@@ -791,12 +1059,17 @@ function Field({
 
 function emptyInput(): PerformanceReviewInput {
   const today = new Date();
-  const start = new Date(today.getFullYear(), 0, 1).toISOString().slice(0, 10);
-  const end = new Date(today.getFullYear(), 11, 31).toISOString().slice(0, 10);
+  const year = today.getFullYear();
+  const qNum = Math.floor(today.getMonth() / 3) + 1;
+  const qQuarter = `Q${qNum}`;
+  const qObj = QUARTER_OPTIONS.find((q) => q.value === qQuarter) ?? QUARTER_OPTIONS[0]!;
+  const start = `${year}-${String(qObj.startM).padStart(2, "0")}-01`;
+  const end = `${year}-${String(qObj.endM).padStart(2, "0")}-${String(qObj.endD).padStart(2, "0")}`;
   return {
     employeeId: 0,
     reviewerId: 0,
-    cycle: `Annual ${today.getFullYear()}`,
+    cycle: `${qQuarter} ${year}`,
+    reviewType: "QUARTERLY",
     periodStart: start,
     periodEnd: end,
     goals: "",
@@ -813,6 +1086,7 @@ function toInput(review: PerformanceReview): PerformanceReviewInput {
     employeeId: review.employeeId,
     reviewerId: review.reviewerId,
     cycle: review.cycle,
+    reviewType: review.reviewType ?? "QUARTERLY",
     periodStart: review.periodStart,
     periodEnd: review.periodEnd,
     goals: review.goals,
