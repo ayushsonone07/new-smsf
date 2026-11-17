@@ -36,6 +36,7 @@ import { LeavePage } from "@features/leave";
 import { PayrollPage, PayslipsPage } from "@features/payroll";
 import { PerformancePage } from "@features/performance";
 import { TargetsPage } from "@features/targets";
+import { CompanyPolicyPage } from "@features/policy";
 import { ReportsPage } from "@features/reports";
 import { RoleBasedAccessPage, SettingsPage, UpdateProfilePage } from "@features/settings";
 import { MyTasksPage } from "@features/tasks";
@@ -252,6 +253,11 @@ function App() {
                     <TargetsPage />
                   </RequirePermission>
                 }
+              />
+
+              <Route
+                path={rel(ROUTES.companyPolicy)}
+                element={<CompanyPolicyPage />}
               />
 
               <Route
