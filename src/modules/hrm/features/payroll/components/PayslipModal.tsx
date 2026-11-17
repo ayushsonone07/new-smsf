@@ -35,6 +35,8 @@ export function PayslipModal({
     payslip.earnings?.find((e) => e.earningType === "OTHER")?.amount ?? "0";
   const incentive =
     payslip.earnings?.find((e) => e.earningType === "INCENTIVE")?.amount ?? "0";
+  const cra =
+    payslip.earnings?.find((e) => e.earningType === "CRA")?.amount ?? "0";
   const stipend =
     payslip.earnings?.find((e) => e.earningType === "STIPEND")?.amount ?? "0";
 
@@ -253,6 +255,18 @@ export function PayslipModal({
                   <div className="border-r border-slate-900 px-3 py-1.5"></div>
                   <div className="px-3 py-1.5 text-right font-medium"></div>
                 </div>
+                {parseFloat(cra) > 0 && (
+                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] border-b border-slate-900">
+                    <div className="border-r border-slate-900 px-3 py-1.5 font-bold">
+                      CRA
+                    </div>
+                    <div className="border-r border-slate-900 px-3 py-1.5 text-right font-medium">
+                      ₹ {formatMoney(cra)}
+                    </div>
+                    <div className="border-r border-slate-900 px-3 py-1.5"></div>
+                    <div className="px-3 py-1.5 text-right font-medium"></div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -318,6 +332,18 @@ export function PayslipModal({
                   <div className="border-r border-slate-900 px-3 py-1.5"></div>
                   <div className="px-3 py-1.5 text-right font-medium"></div>
                 </div>
+                {parseFloat(cra) > 0 && (
+                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] border-b border-slate-900">
+                    <div className="border-r border-slate-900 px-3 py-1.5 font-bold">
+                      CRA
+                    </div>
+                    <div className="border-r border-slate-900 px-3 py-1.5 text-right font-medium">
+                      ₹ {formatMoney(cra)}
+                    </div>
+                    <div className="border-r border-slate-900 px-3 py-1.5"></div>
+                    <div className="px-3 py-1.5 text-right font-medium"></div>
+                  </div>
+                )}
               </>
             )}
 

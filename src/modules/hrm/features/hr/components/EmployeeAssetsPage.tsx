@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Contact,
+  CreditCard,
   Edit3,
   HardDrive,
   Laptop,
@@ -47,7 +49,7 @@ export function EmployeeAssetsPage() {
   const toast = useToast();
 
   const [search, setSearch] = useState("");
-  const [filterMode, setFilterMode] = useState<"all" | "has_laptop" | "no_laptop" | "has_sim" | "no_sim">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "has_laptop" | "no_laptop" | "has_sim" | "no_sim" | "has_id_card" | "has_visiting_card">("all");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +60,10 @@ export function EmployeeAssetsPage() {
   const [laptopSerialNumber, setLaptopSerialNumber] = useState("");
   const [isCompanySim, setIsCompanySim] = useState(false);
   const [companyPhoneNumber, setCompanyPhoneNumber] = useState("");
+  const [isIdCard, setIsIdCard] = useState(false);
+  const [idCardNumber, setIdCardNumber] = useState("");
+  const [isVisitingCard, setIsVisitingCard] = useState(false);
+  const [visitingCardNumber, setVisitingCardNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 350);
@@ -107,6 +113,10 @@ export function EmployeeAssetsPage() {
     setLaptopSerialNumber(emp.laptopSerialNumber ?? "");
     setIsCompanySim(Boolean(emp.isCompanySim));
     setCompanyPhoneNumber(emp.companyPhoneNumber ?? "");
+    setIsIdCard(Boolean(emp.isIdCard));
+    setIdCardNumber(emp.idCardNumber ?? "");
+    setIsVisitingCard(Boolean(emp.isVisitingCard));
+    setVisitingCardNumber(emp.visitingCardNumber ?? "");
   }
 
   function closeEditModal() {
@@ -116,6 +126,15 @@ export function EmployeeAssetsPage() {
   async function handleSaveAssets(e: FormEvent) {
     e.preventDefault();
     if (!editingEmployee) return;
+
+    if (isIdCard && !idCardNumber.trim()) {
+      toast.error("Validation error", "ID card number is required when ID card is issued.");
+      return;
+    }
+    if (isVisitingCard && !visitingCardNumber.trim()) {
+      toast.error("Validation error", "Visiting card number is required when Visiting card is issued.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -127,6 +146,10 @@ export function EmployeeAssetsPage() {
             laptopSerialNumber: laptopSerialNumber.trim() || null,
             isCompanySim,
             companyPhoneNumber: isCompanySim ? companyPhoneNumber.trim() || null : null,
+            isIdCard,
+            idCardNumber: isIdCard ? idCardNumber.trim() || null : null,
+            isVisitingCard,
+            visitingCardNumber: isVisitingCard ? visitingCardNumber.trim() || null : null,
           },
         }),
       ).unwrap();
@@ -148,11 +171,15 @@ export function EmployeeAssetsPage() {
     return items.filter((emp) => {
       const hasLaptop = Boolean(emp.laptopSerialNumber || emp.laptopType);
       const hasSim = Boolean(emp.isCompanySim || emp.companyPhoneNumber);
+      const hasIdCard = Boolean(emp.isIdCard || emp.idCardNumber);
+      const hasVisitingCard = Boolean(emp.isVisitingCard || emp.visitingCardNumber);
 
       if (filterMode === "has_laptop" && !hasLaptop) return false;
       if (filterMode === "no_laptop" && hasLaptop) return false;
       if (filterMode === "has_sim" && !hasSim) return false;
       if (filterMode === "no_sim" && hasSim) return false;
+      if (filterMode === "has_id_card" && !hasIdCard) return false;
+      if (filterMode === "has_visiting_card" && !hasVisitingCard) return false;
 
       return true;
     });
@@ -163,9 +190,11 @@ export function EmployeeAssetsPage() {
     const total = meta?.totalElements ?? items.length;
     const laptopsAssigned = items.filter((e) => e.laptopSerialNumber || e.laptopType).length;
     const simsAssigned = items.filter((e) => e.isCompanySim || e.companyPhoneNumber).length;
+    const idCardsAssigned = items.filter((e) => e.isIdCard || e.idCardNumber).length;
+    const visitingCardsAssigned = items.filter((e) => e.isVisitingCard || e.visitingCardNumber).length;
     const bothAssigned = items.filter((e) => (e.laptopSerialNumber || e.laptopType) && (e.isCompanySim || e.companyPhoneNumber)).length;
 
-    return { total, laptopsAssigned, simsAssigned, bothAssigned };
+    return { total, laptopsAssigned, simsAssigned, idCardsAssigned, visitingCardsAssigned, bothAssigned };
   }, [items, meta]);
 
   const totalPages = meta?.totalPages ?? 1;
@@ -277,6 +306,8 @@ export function EmployeeAssetsPage() {
             <option value="no_laptop">Laptop Missing</option>
             <option value="has_sim">Company SIM Assigned</option>
             <option value="no_sim">No Company SIM</option>
+            <option value="has_id_card">ID Card Issued</option>
+            <option value="has_visiting_card">Visiting Card Issued</option>
           </select>
         </div>
       </div>
@@ -296,19 +327,21 @@ export function EmployeeAssetsPage() {
                 <th className="px-4 py-3.5">Laptop Brand / Model</th>
                 <th className="px-4 py-3.5">Laptop Serial Number</th>
                 <th className="px-4 py-3.5">Company SIM Number</th>
+                <th className="px-4 py-3.5">ID Card</th>
+                <th className="px-4 py-3.5">Visiting Card</th>
                 <th className="py-3.5 pl-4 pr-6 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-sm">
               {loading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6">
+                  <td colSpan={8} className="p-6">
                     <TableSkeleton rows={5} />
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12">
+                  <td colSpan={8} className="py-12">
                     <EmptyState
                       title="No asset records found"
                       description="No employees match your search or asset filter criteria."
@@ -372,6 +405,30 @@ export function EmployeeAssetsPage() {
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                             <Smartphone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>{emp.companyPhoneNumber || "Active SIM"}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">None</span>
+                        )}
+                      </td>
+
+                      {/* ID Card */}
+                      <td className="px-4 py-4">
+                        {emp.isIdCard || emp.idCardNumber ? (
+                          <div className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
+                            <CreditCard className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                            <span>{emp.idCardNumber || "Issued"}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground">None</span>
+                        )}
+                      </td>
+
+                      {/* Visiting Card */}
+                      <td className="px-4 py-4">
+                        {emp.isVisitingCard || emp.visitingCardNumber ? (
+                          <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            <Contact className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>{emp.visitingCardNumber || "Issued"}</span>
                           </div>
                         ) : (
                           <span className="text-xs italic text-muted-foreground">None</span>
@@ -495,6 +552,70 @@ export function EmployeeAssetsPage() {
                     value={companyPhoneNumber}
                     onChange={(e) => setCompanyPhoneNumber(e.target.value)}
                     placeholder="e.g. +91 9876543210"
+                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ID Card Toggle & Number */}
+            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isIdCard}
+                  onChange={(e) => {
+                    setIsIdCard(e.target.checked);
+                    if (!e.target.checked) setIdCardNumber("");
+                  }}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+                />
+                <span className="text-sm font-semibold text-foreground">ID Card Issued</span>
+              </label>
+
+              {isIdCard && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    ID Card Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={idCardNumber}
+                    onChange={(e) => setIdCardNumber(e.target.value)}
+                    placeholder="e.g. IDC-1049"
+                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Visiting Card Toggle & Number */}
+            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isVisitingCard}
+                  onChange={(e) => {
+                    setIsVisitingCard(e.target.checked);
+                    if (!e.target.checked) setVisitingCardNumber("");
+                  }}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+                />
+                <span className="text-sm font-semibold text-foreground">Visiting Card Issued</span>
+              </label>
+
+              {isVisitingCard && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Visiting Card Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={visitingCardNumber}
+                    onChange={(e) => setVisitingCardNumber(e.target.value)}
+                    placeholder="e.g. VC-882"
                     className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                   />
                 </div>

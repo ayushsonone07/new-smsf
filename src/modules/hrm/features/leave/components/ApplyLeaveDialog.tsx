@@ -92,6 +92,10 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
     ? 0.5
     : countChargeableDays(startDate, endDate, workingDays, holidays);
 
+  const isMultiMonth =
+    !halfDay &&
+    Boolean(startDate && endDate && startDate.slice(0, 7) !== endDate.slice(0, 7) && startDate <= endDate);
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!leaveType) errs.leaveType = "Leave type is required.";
@@ -256,6 +260,12 @@ export function ApplyLeaveDialog({ open, onClose }: ApplyLeaveDialogProps) {
             </p>
           ) : null}
         </div>
+
+        {isMultiMonth ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
+            <span className="font-semibold">⚡ Month Crossing Auto-Split:</span> Your leave spans across different months. It will be automatically split into monthly requests so your monthly free casual leave and payroll deductions calculate accurately.
+          </div>
+        ) : null}
 
         <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-elevated px-4 py-3">
           <span className="text-sm font-medium text-foreground">Half-day leave</span>
