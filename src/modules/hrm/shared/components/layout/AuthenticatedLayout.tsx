@@ -5,6 +5,7 @@ import { PageTransition } from "@shared/components/ui";
 import { ROUTES } from "@shared/constants";
 
 import { AppShell } from "./AppShell";
+import { PolicyAgreementModal } from "@features/policy";
 
 export function AuthenticatedLayout() {
   const { user, logout } = useAuth();
@@ -22,6 +23,7 @@ export function AuthenticatedLayout() {
       <PageTransition>
         <Outlet />
       </PageTransition>
+      <PolicyAgreementModal />
     </AppShell>
   );
 }
@@ -65,6 +67,7 @@ const ROUTE_TITLES: { path: string; title: string; subtitle: string }[] = [
 
   { path: ROUTES.performance, title: "Performance", subtitle: "Reviews and employee growth" },
   { path: ROUTES.targets, title: "Sales Targets", subtitle: "Sales goals and revenue progress" },
+  { path: ROUTES.companyPolicy, title: "Company Policies", subtitle: "Official employee policies and code of conduct" },
   { path: ROUTES.reports, title: "Reports", subtitle: "Organisation reports and insights" },
   { path: ROUTES.settings, title: "Settings", subtitle: "Workspace preferences and access" },
   {
