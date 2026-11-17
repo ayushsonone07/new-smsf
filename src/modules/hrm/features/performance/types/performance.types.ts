@@ -1,5 +1,7 @@
 export type PerformanceReviewStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
+export type ReviewType = "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";
+
 export interface PerformanceReview {
   id: number;
   employeeId: number;
@@ -9,6 +11,7 @@ export interface PerformanceReview {
   reviewerId: number;
   reviewerName: string;
   cycle: string;
+  reviewType?: ReviewType | null;
   periodStart: string;
   periodEnd: string;
   goals: string;
@@ -26,6 +29,7 @@ export interface PerformanceReviewInput {
   employeeId: number;
   reviewerId: number;
   cycle: string;
+  reviewType?: ReviewType | null;
   periodStart: string;
   periodEnd: string;
   goals: string;
@@ -46,6 +50,7 @@ export interface PerformanceSummary {
 
 export interface PerformanceListParams {
   status?: PerformanceReviewStatus | "";
+  reviewType?: ReviewType | "";
   cycle?: string;
   employeeSearch?: string;
   page?: number;

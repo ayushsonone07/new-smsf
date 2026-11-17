@@ -4,4 +4,5 @@ export type {
   PerformanceReviewInput,
   PerformanceReviewStatus,
   PerformanceSummary,
+  ReviewType,
 } from "./performance.types";
