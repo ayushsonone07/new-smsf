@@ -21,7 +21,7 @@ export function AdminLayout({
       typeof window !== 'undefined' &&
       window.innerWidth > 900,
   )
-  const { items, markAllRead } = useSuperAdminNotifications()
+  const { items, unreadCount, loadLatest, markAllRead } = useSuperAdminNotifications()
 
   // Only close on Escape key or explicit user action (button click / backdrop)
   useEffect(() => {
@@ -38,6 +38,8 @@ export function AdminLayout({
       items={items}
       roleLabel="Super Admin"
       onMarkAllRead={markAllRead}
+      onOpen={() => void loadLatest()}
+      unreadCount={unreadCount}
     >
       <div
         className={`app-shell${

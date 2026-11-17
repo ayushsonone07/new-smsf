@@ -24,6 +24,15 @@ export interface AdminCustomer {
   status?: string
   role?: string
   createdAt?: string
+  /** Shared business model: a linked (duplicate) business points at its main business. */
+  isLinkedBusiness?: boolean
+  parentCustomerId?: number | null
+  parentBusinessName?: string | null
+  /** Main business: linked businesses + old-style duplicates. */
+  duplicateCount?: number
+  hasDuplicateCustomers?: boolean
+  /** Old-style duplicates (separate table, no customer id of their own). */
+  duplicateCustomers?: Array<{ customerId?: string; businessName?: string; contact?: string; email?: string }>
   [key: string]: unknown
 }
 

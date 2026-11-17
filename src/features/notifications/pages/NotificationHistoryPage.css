@@ -24,6 +24,9 @@
 .notification-history__meta span { padding: 3px 7px; border-radius: 6px; background: #f4f6fa; }
 .notification-history__state { display: flex; min-height: 280px; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: #8291a8; }
 .notification-history__state.is-error { color: #c2415d; }
+.notification-history__pagination { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 14px 20px; border-top: 1px solid #edf1f7; color: #64748b; font-size: 13px; }
+.notification-history__pagination button { padding: 7px 12px; border: 1px solid #dbe2ef; border-radius: 8px; background: #fff; color: #334155; cursor: pointer; }
+.notification-history__pagination button:disabled { opacity: .5; cursor: not-allowed; }
 .notification-history .is-spinning { animation: notification-spin .8s linear infinite; }
 @keyframes notification-spin { to { transform: rotate(360deg); } }
 @media (max-width: 720px) { .notification-history__heading { align-items: stretch; flex-direction: column; } .notification-history__search { width: 100%; } .notification-history__list { max-height: none; } }

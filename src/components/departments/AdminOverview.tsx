@@ -21,7 +21,7 @@ import {
   toLocalDateTimeParam,
   type AdminDepartmentSummary,
 } from '../../api/admin-summary.api'
-import { getAdminDepartments } from '../../api/admin-departments.api'
+import { getAdminDepartmentUserCounts } from '../../api/admin-departments.api'
 import {
   getAdminBackup,
   restoreAdminSession,
@@ -150,24 +150,20 @@ export function AdminOverview({
   })
 
   // 2. Fetch User Counts across departments for head ranking
-  const adminUsersQuery = useQuery({
+  const userCountsQuery = useQuery({
     queryKey: ['admin-departments-users-count'],
-    queryFn: () => getAdminDepartments({ size: 500 }),
+    queryFn: getAdminDepartmentUserCounts,
     staleTime: 120_000,
   })
 
   // Map departmentType -> user count
   const userCountByDept = useMemo(() => {
     const map = new Map<string, number>()
-    const users = adminUsersQuery.data?.data ?? []
-    for (const u of users) {
-      const type = u.departmentType
-      if (type) {
-        map.set(type, (map.get(type) || 0) + 1)
-      }
+    for (const item of userCountsQuery.data ?? []) {
+      if (item.departmentType) map.set(item.departmentType, item.userCount)
     }
     return map
-  }, [adminUsersQuery.data])
+  }, [userCountsQuery.data])
 
   // Map departmentType -> head object
   const headByDept = useMemo(() => {
@@ -197,13 +193,10 @@ export function AdminOverview({
     return departmentTypes.map((departmentType) => {
       const summary = summaryByDept.get(departmentType.toUpperCase())
       const head = headByDept.get(departmentType)
-      const headFromUsers = adminUsersQuery.data?.data?.find(
-        (u) => u.departmentType === departmentType && u.isHead,
-      )
 
       const label = departmentLabel(departmentType)
-      const headName = head?.name || head?.username || headFromUsers?.username || `${label} Head`
-      const headEmail = head?.email || headFromUsers?.email || ''
+      const headName = head?.name || head?.username || `${label} Head`
+      const headEmail = head?.email || ''
       const userCount = userCountByDept.get(departmentType) || 1
 
       const totalCustomers = summary?.totalCustomers ?? 0
@@ -241,7 +234,7 @@ export function AdminOverview({
         isPending: totalsQuery.isPending,
       }
     })
-  }, [departmentTypes, summaryByDept, headByDept, adminUsersQuery.data, userCountByDept, totalsQuery.isPending])
+  }, [departmentTypes, summaryByDept, headByDept, userCountByDept, totalsQuery.isPending])
 
   // Sorted departments for Department Health
   const sortedDepartments = useMemo(() => {
@@ -283,13 +276,13 @@ export function AdminOverview({
 
   const isRefreshing =
     (totalsQuery.isFetching && !totalsQuery.isPending) ||
-    (adminUsersQuery.isFetching && !adminUsersQuery.isPending)
+    (userCountsQuery.isFetching && !userCountsQuery.isPending)
 
   const handleRefresh = async () => {
     onRefreshAll?.()
     await Promise.all([
       totalsQuery.refetch(),
-      adminUsersQuery.refetch(),
+      userCountsQuery.refetch(),
     ])
   }
 

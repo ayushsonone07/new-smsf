@@ -12,6 +12,7 @@ import {
   Clock3,
   ChartColumnIncreasing,
   CircleHelp,
+  ChevronDown,
   Menu,
   X,
   LogOut,
@@ -106,6 +107,7 @@ export function HeadSidebar({
   onLogout,
 }: HeadSidebarProps) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const [helpSubtabsOpen, setHelpSubtabsOpen] = useState(true)
   const helpTab = useHelpCenterTab()
   const helpTabs = HELP_CENTER_TABS.filter((t) => !t.headOnly || canSeeHelpCenterMembers())
   const accountRef = useRef<HTMLDivElement>(null)
@@ -137,7 +139,16 @@ export function HeadSidebar({
     }
   }, [panelOpen])
 
-  function handleSelect(item: HeadNavItem) {
+  function handleSelect(item: HeadNavItem, isSubItemClick = false) {
+    if (isHelpSupportNavItem(item)) {
+      if (!isSubItemClick) {
+        if (item.key === activeKey) {
+          setHelpSubtabsOpen((prev) => !prev)
+          return
+        }
+        setHelpSubtabsOpen(true)
+      }
+    }
     setPanelOpen(false)
     onSelect(item)
   }
@@ -145,6 +156,7 @@ export function HeadSidebar({
   function renderItem(item: HeadNavItem) {
     const active = item.key === activeKey
     const NavIcon = getMenuIcon(item)
+    const isHelp = isHelpSupportNavItem(item)
 
     const button = (
       <button
@@ -157,7 +169,7 @@ export function HeadSidebar({
       >
         <NavIcon
           className="hnav__icon"
-          size={19}
+          size={16}
           strokeWidth={1.9}
           aria-hidden="true"
         />
@@ -165,11 +177,19 @@ export function HeadSidebar({
         <span className="hnav__label" aria-hidden={!open}>
           {item.label}
         </span>
+
+        {isHelp && open && (
+          <ChevronDown
+            size={13}
+            className={`hnav__chevron${active && helpSubtabsOpen ? ' is-expanded' : ''}`}
+            aria-hidden="true"
+          />
+        )}
       </button>
     )
 
-    // Sub-tabs appear only while  is the open screen.
-    if (!active || !isHelpSupportNavItem(item)) return button
+    // Sub-tabs appear only while Help & Support is the open screen and not collapsed.
+    if (!active || !isHelp || !helpSubtabsOpen) return button
 
     return (
       <Fragment key={item.key}>
@@ -187,10 +207,10 @@ export function HeadSidebar({
                 title={tab.label}
                 onClick={() => {
                   setHelpCenterTab(tab.key)
-                  handleSelect(item)
+                  handleSelect(item, true)
                 }}
               >
-                <SubIcon className="hnav__subicon" size={16} strokeWidth={1.9} aria-hidden="true" />
+                <SubIcon className="hnav__subicon" size={14} strokeWidth={1.9} aria-hidden="true" />
                 <span className="hnav__label" aria-hidden={!open}>
                   {tab.label}
                 </span>
@@ -234,7 +254,7 @@ export function HeadSidebar({
             onToggle()
           }}
         >
-          {open ? <X size={19} /> : <Menu size={19} />}
+          {open ? <X size={16} /> : <Menu size={16} />}
         </button>
       </div>
 
@@ -372,7 +392,7 @@ export function HeadSidebar({
             className="haccount__logout"
             onClick={onLogout}
           >
-            <LogOut size={16} strokeWidth={1.9} />
+            <LogOut size={14} strokeWidth={1.9} />
             <span>Log out</span>
           </button>
       </div>

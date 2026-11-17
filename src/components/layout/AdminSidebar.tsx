@@ -24,6 +24,9 @@ import {
   CalendarCheck,
   LifeBuoy,
   Mail,
+  ChevronDown,
+  CircleDot,
+  Flag,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -41,6 +44,8 @@ type NavPath =
   | '/admin/notification-history'
   | '/admin/bulk-email'
   | '/admin/help-support'
+  | '/admin/help-support/status'
+  | '/admin/help-support/priority'
   | '/manage-leads'
   | '/manage-customers-payment'
   | '/head'
@@ -53,6 +58,7 @@ interface NavItem {
   roles: UserRole[]
   isActive: (pathname: string) => boolean
   badge?: number
+  children?: Array<{ to: NavPath; label: string; icon: LucideIcon }>
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -128,12 +134,16 @@ const NAV_ITEMS: NavItem[] = [
       pathname.startsWith('/admin/payments'),
   },
   {
-    to: '/admin/help-support',
+    to: '/admin/help-support/status',
     label: 'Help & Support',
     icon: LifeBuoy,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/help-support'),
+    children: [
+      { to: '/admin/help-support/status', label: 'Status', icon: CircleDot },
+      { to: '/admin/help-support/priority', label: 'Priority', icon: Flag },
+    ],
   },
   {
     to: '/admin/notification-history',
@@ -165,6 +175,9 @@ export function AdminSidebar({
   const navigate = useNavigate()
 
   const [panelOpen, setPanelOpen] = useState(false)
+  const [helpSupportOpen, setHelpSupportOpen] = useState(
+    location.pathname.startsWith('/admin/help-support'),
+  )
   const footerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -251,6 +264,47 @@ export function AdminSidebar({
           const NavIcon = item.icon
           const active = item.isActive(location.pathname)
 
+          if (item.children) {
+            const expanded = helpSupportOpen || active
+            return (
+              <div className="nav-group" key={item.label}>
+                <button
+                  type="button"
+                  className={`nav-item nav-item--parent ${active ? 'active' : ''}`}
+                  aria-expanded={expanded}
+                  onClick={() => setHelpSupportOpen((value) => !value)}
+                >
+                  <NavIcon className="nav-item-icon" size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <span className="nav-item-label">{item.label}</span>
+                  <ChevronDown className={`nav-item-chevron ${expanded ? 'is-open' : ''}`} size={14} aria-hidden="true" />
+                </button>
+                {expanded && (
+                  <div className="nav-submenu">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon
+                      const childActive = location.pathname === child.to
+                      return (
+                        <a
+                          key={child.to}
+                          href={child.to}
+                          className={`nav-subitem ${childActive ? 'active' : ''}`}
+                          aria-current={childActive ? 'page' : undefined}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            handleNavigation(child.to)
+                          }}
+                        >
+                          <ChildIcon size={13} strokeWidth={2} aria-hidden="true" />
+                          <span>{child.label}</span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return (
             <a
               key={item.to}
@@ -264,7 +318,7 @@ export function AdminSidebar({
             >
               <NavIcon
                 className="nav-item-icon"
-                size={19}
+                size={16}
                 strokeWidth={1.9}
                 aria-hidden="true"
               />

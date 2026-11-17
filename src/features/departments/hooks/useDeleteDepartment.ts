@@ -11,6 +11,7 @@ export function useDeleteDepartment() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: departmentsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['admin-department-heads'] }),
         queryClient.invalidateQueries({ queryKey: ['admin-departments-users-count'] }),
         queryClient.invalidateQueries({ queryKey: ['admin-department-summary'] }),
       ])

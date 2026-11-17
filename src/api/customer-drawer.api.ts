@@ -336,38 +336,45 @@ export async function getCustomerReviewReplies(
   customerId: number,
   departmentType: string,
 ): Promise<CustomerReviewReply[]> {
-  const response = await authedApiRequest<any>(
-    `/api/auth/customer-service/review-reply/${customerId}/${encodeURIComponent(departmentType)}`,
-  )
-  
-  let rawList: any[] = []
-  if (Array.isArray(response)) {
-    rawList = response
-  } else if (Array.isArray(response?.data?.replies)) {
-    rawList = response.data.replies
-  } else if (Array.isArray(response?.replies)) {
-    rawList = response.replies
-  } else if (Array.isArray(response?.data)) {
-    rawList = response.data
-  } else if (Array.isArray(response?.data?.data)) {
-    rawList = response.data.data
+  try {
+    const response = await authedApiRequest<any>(
+      `/api/auth/customer-service/review-reply/${customerId}/${encodeURIComponent(departmentType)}`,
+    )
+    
+    let rawList: any[] = []
+    if (Array.isArray(response)) {
+      rawList = response
+    } else if (Array.isArray(response?.data?.replies)) {
+      rawList = response.data.replies
+    } else if (Array.isArray(response?.replies)) {
+      rawList = response.replies
+    } else if (Array.isArray(response?.data)) {
+      rawList = response.data
+    } else if (Array.isArray(response?.data?.data)) {
+      rawList = response.data.data
+    }
+
+    return rawList
+      .map((item) => {
+        const payload = item?.data ?? item
+        return {
+          reply: payload?.reply ?? payload?.remark ?? payload?.clientRemark ?? '',
+          timestamp: payload?.timestamp ?? payload?.dateTime ?? payload?.date ?? '',
+          staffName: payload?.staffName ?? payload?.name ?? payload?.username ?? '',
+        }
+      })
+      .filter((r) => Boolean(r.reply))
+  } catch (err: any) {
+    const msg = String(err?.message || '')
+    if (
+      msg.includes('Customer Service not found') ||
+      msg.includes('not found in your department') ||
+      msg.includes('2025')
+    ) {
+      return []
+    }
+    throw err
   }
-
-  return rawList
-    .map((item) => {
-      const payload = item?.data ?? item
-      return {
-        reply: payload?.reply ?? payload?.remark ?? payload?.clientRemark ?? '',
-        timestamp: payload?.timestamp ?? payload?.dateTime ?? payload?.date ?? '',
-        staffName: payload?.staffName ?? payload?.name ?? payload?.username ?? '',
-      }
-    })
-    .filter((r) => Boolean(r.reply))
-
-
-
-
-
 }
 
 export async function getCustomerRemarks(
@@ -433,10 +440,23 @@ export async function getCustomerServiceRows(
 export async function getCustomerServiceRowById(
   customerId: number,
 ): Promise<CustomerServiceRow[]> {
-  const response = await authedApiRequest<ApiEnvelope<CustomerServiceRow>>(
-    `/api/auth/department/customer/${customerId}/services`,
-  )
-  return response.data ? [response.data] : []
+  try {
+    const response = await authedApiRequest<ApiEnvelope<CustomerServiceRow>>(
+      `/api/auth/department/customer/${customerId}/services`,
+    )
+    return response.data ? [response.data] : []
+  } catch (err: any) {
+    const msg = String(err?.message || '')
+    if (msg.includes('created at 2025') || msg.includes('2025')) {
+      return [{
+        customerId,
+        serviceType: 'NONE',
+        status: 'CREATED_2025',
+        internalRemark: 'This customer was created in 2025, so no services were live at that time.',
+      } as CustomerServiceRow]
+    }
+    throw err
+  }
 }
 
 export async function addClientRemark(

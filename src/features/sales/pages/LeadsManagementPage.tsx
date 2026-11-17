@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Check,
   Trash2,
-  Copy,
   ExternalLink,
   Loader2,
   TrendingUp,
@@ -42,6 +41,7 @@ import { GeneratePaymentModal } from '../components/GeneratePaymentModal'
 import { TransferLeadModal } from '../components/TransferLeadModal'
 import { DeleteLeadsModal } from '../components/DeleteLeadsModal'
 import { SalesSummaryView } from '../components/SalesSummaryView'
+import { LeadCustomerCell } from '../components/LeadCustomerCell'
 import { CustomerPaymentView } from '../../payment/components/CustomerPaymentView'
 import { ScrollableSelect } from '../../../components/ui/ScrollableSelect'
 import '../../customers/pages/AdminCustomersPage.css'
@@ -64,41 +64,19 @@ const TELECALLER_STATUS_OPTIONS = [
 
 const LEAD_TYPE_OPTIONS = ['Webinar 999', 'Direct', 'Inbound', 'Referral', 'Campaign']
 
-function isNa(val?: string | null): boolean {
-  if (!val) return true
-  const v = val.trim().toLowerCase()
-  return v === '' || v === 'na' || v === 'n/a' || v === 'null' || v === 'undefined'
-}
-
 function getCustomerDisplay(lead: LeadInfo): { name: string; initial: string } {
-  if (!isNa(lead.ownerName)) {
-    const trimmed = lead.ownerName!.trim()
-    return { name: trimmed, initial: trimmed.charAt(0).toUpperCase() }
+  const name = lead.ownerName?.trim() || lead.businessName?.trim()
+  if (name) return { name, initial: name.charAt(0).toUpperCase() }
+
+  if (lead.businessEmail?.includes('@')) {
+    const emailName = lead.businessEmail.split('@')[0].replace(/[._0-9]/g, ' ').trim()
+    if (emailName) return { name: emailName, initial: emailName.charAt(0).toUpperCase() }
   }
 
-  if (!isNa(lead.businessName)) {
-    const trimmed = lead.businessName!.trim()
-    return { name: trimmed, initial: trimmed.charAt(0).toUpperCase() }
-  }
-
-  if (lead.businessEmail && lead.businessEmail.includes('@')) {
-    const emailPrefix = lead.businessEmail.split('@')[0].replace(/[._0-9]/g, ' ').trim()
-    if (emailPrefix) {
-      const formatted = emailPrefix
-        .split(/\s+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ')
-      return { name: formatted, initial: formatted.charAt(0).toUpperCase() }
-    }
-  }
-
-  if (lead.contact) {
-    return { name: `Lead ${lead.contact}`, initial: 'L' }
-  }
-
-  return { name: `Lead #${lead.leadId?.slice(-4) || '—'}`, initial: 'L' }
+  return lead.contact
+    ? { name: `Lead ${lead.contact}`, initial: 'L' }
+    : { name: `Lead #${lead.leadId?.slice(-4) || '—'}`, initial: 'L' }
 }
-
 
 function formatRepLabel(name?: string, email?: string): string {
   const n = (name || '').trim()
@@ -1617,7 +1595,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
 
           {/* Table matching AdminCustomersPage / DataTable layout */}
           <div className="table-wrapper border-0 rounded-none overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-slate-200/80">
                   <th className="py-3 px-4 w-10">
@@ -1628,10 +1606,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                       className="rounded w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-4 min-w-[200px]">CUSTOMER</th>
-                  <th className="py-3 px-4 min-w-[190px]">EMAIL</th>
-                  <th className="py-3 px-4 min-w-[130px]">PHONE</th>
-                  <th className="py-3 px-4 min-w-[160px]">BUSINESS</th>
+                  <th className="py-3 px-4 min-w-[340px]">CUSTOMER</th>
                   <th className="py-3 px-4 min-w-[120px]">FUNNEL TYPE</th>
                   <th className="py-3 px-4 min-w-[120px]">STATUS</th>
                   <th className="py-3 px-4 min-w-[140px]">ASSIGNED REP</th>
@@ -1642,14 +1617,14 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
               <tbody>
                 {loading && !refreshing ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center text-slate-400">
+                    <td colSpan={7} className="py-16 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                       <span>Loading leads data...</span>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center">
+                    <td colSpan={7} className="py-12 text-center">
                       <div className="max-w-md mx-auto p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
                         <p className="font-semibold text-xs mb-1">Failed to fetch leads</p>
                         <p className="text-xs text-rose-600 mb-2">{error}</p>
@@ -1665,7 +1640,7 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
+                    <td colSpan={7} className="py-16 text-center">
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <FileSpreadsheet className="w-6 h-6" />
                       </div>
@@ -1705,36 +1680,9 @@ export function LeadsManagementPage({ initialTab }: LeadsManagementPageProps = {
                           />
                         </td>
 
-                        {/* Customer Identity matching AdminCustomersPage */}
-                        <td className="py-3 px-4">
-                          <div className="admin-customer-identity">
-                            <span className="admin-customer-avatar">
-                              {customerInfo.initial}
-                            </span>
-                            <div>
-                              <strong>{customerInfo.name}</strong>
-                              <span>Customer account</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Email */}
-                        <td className="py-3 px-4 font-semibold text-slate-800">
-                          <span className="truncate block max-w-[180px]" title={lead.businessEmail || ''}>
-                            {lead.businessEmail || '—'}
-                          </span>
-                        </td>
-
-                        {/* Phone */}
-                        <td className="py-3 px-4 font-bold text-slate-800 font-mono tracking-tight">
-                          {lead.contact || '—'}
-                        </td>
-
-                        {/* Business */}
-                        <td className="py-3 px-4 font-semibold text-slate-800">
-                          <span className="truncate block max-w-[160px]" title={lead.businessName || ''}>
-                            {!isNa(lead.businessName) ? lead.businessName : '—'}
-                          </span>
+                        {/* Combined lead identity, contact details, and business */}
+                        <td className="py-4 px-4">
+                          <LeadCustomerCell lead={lead} />
                         </td>
 
                         {/* Funnel Type */}

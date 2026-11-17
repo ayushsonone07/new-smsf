@@ -49,6 +49,9 @@ const AdminApprovalsPage = lazy(() =>
 const AdminHelpSupportPage = lazy(() =>
   import('../features/departments/pages/AdminHelpSupportPage').then((module) => ({ default: module.AdminHelpSupportPage })),
 )
+const HelpSupportConfigPage = lazy(() =>
+  import('../features/help-support/pages/HelpSupportConfigPage').then((module) => ({ default: module.HelpSupportConfigPage })),
+)
 const AdminAirtelServicePage = lazy(() =>
   import('../features/departments/pages/AdminAirtelServicePage').then((module) => ({ default: module.AdminAirtelServicePage })),
 )
@@ -400,6 +403,20 @@ const adminHelpSupportRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/help-support',
   component: AdminHelpSupportPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminHelpSupportStatusRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/help-support/status',
+  component: () => <HelpSupportConfigPage type="status" />,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminHelpSupportPriorityRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/help-support/priority',
+  component: () => <HelpSupportConfigPage type="priority" />,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -910,6 +927,8 @@ const routeTree = rootRoute.addChildren([
     adminServiceFlowRoute,
     adminApprovalsRoute,
     adminHelpSupportRoute,
+    adminHelpSupportStatusRoute,
+    adminHelpSupportPriorityRoute,
     adminAirtelServiceRoute,
     airtelServiceAliasRoute,
     adminSalaryManagementRoute,

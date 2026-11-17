@@ -32,6 +32,8 @@ interface HeadShellProps {
   topbarActions?: ReactNode
   notifications?: HeadNotification[]
   onMarkAllRead?: () => void
+  onNotificationsOpen?: () => void
+  unreadNotificationCount?: number
   /* impersonation */
   impersonating?: { name: string; onExit: () => void } | null
   /* page */
@@ -64,6 +66,8 @@ export function HeadShell({
   topbarActions,
   notifications,
   onMarkAllRead,
+  onNotificationsOpen,
+  unreadNotificationCount,
   children,
   defaultSidebarOpen = true,
   dashboardHeaderMode = false,
@@ -89,6 +93,8 @@ export function HeadShell({
       items={notifications ?? []}
       roleLabel={roleLabel}
       onMarkAllRead={onMarkAllRead}
+      onOpen={onNotificationsOpen}
+      unreadCount={unreadNotificationCount}
     >
     <HeadShellContext.Provider value={shellContext}>
     <div className="hshell">

@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomerDashboardSidebar } from './CustomerDashboardSidebar'
 import { CustomerDashboardTopbar } from './CustomerDashboardTopbar'
 import { NotificationCenter } from '../head/layout/NotificationCenter'
@@ -12,6 +13,24 @@ interface CustomerDashboardLayoutProps {
   children?: ReactNode
 }
 
+interface CustomerNotificationPayload {
+  id?: string | number
+  title?: string
+  message?: string
+  createdAt?: unknown
+  timestamp?: unknown
+  read?: boolean
+  link?: string
+}
+
+interface CustomerNotificationPage {
+  data?: CustomerNotificationPayload[]
+}
+
+interface UnreadCountResponse {
+  data?: number
+}
+
 export function CustomerDashboardLayout({
   activeKey = 'dashboard',
   children,
@@ -22,45 +41,51 @@ export function CustomerDashboardLayout({
 
   const customerSession = getCustomerSession()
   const isCustomerAuthenticated = Boolean(customerSession)
-  const [backendNotifications, setBackendNotifications] = useState<HeadNotification[]>([])
+  const queryClient = useQueryClient()
+  const customerNotificationKey = ['customer-notifications', customerSession?.customerId] as const
 
-  useEffect(() => {
-    if (!customerSession?.customerId) return
-    let active = true
-    const headers = {
-      username: customerSession.username || customerSession.email,
-      ...(customerSession.accessToken ? { Authorization: `Bearer ${customerSession.accessToken}` } : {}),
-    }
-    const loadNotifications = () => apiRequest<any>('/api/notifications?page=0&size=100&sortDir=desc', { headers })
-      .then((response) => {
-        const items = Array.isArray(response?.data)
-          ? response.data
-          : []
-        if (!active) return
-        setBackendNotifications(items.map((item: any, index: number) => ({
-          id: String(item.id ?? `customer-notification-${index}`),
-          text: item.title || item.message || 'Your account has been updated.',
-          timeLabel: formatNotificationTime(item.createdAt ?? item.timestamp),
-          unread: item.read !== true,
-          link: typeof item.link === 'string' ? item.link : undefined,
-        })))
-      })
-      .catch(() => { if (active) setBackendNotifications([]) })
-    loadNotifications()
-    const refreshTimer = window.setInterval(loadNotifications, 45_000)
-    const refreshOnFocus = () => { if (document.visibilityState === 'visible') loadNotifications() }
-    document.addEventListener('visibilitychange', refreshOnFocus)
-    return () => {
-      active = false
-      window.clearInterval(refreshTimer)
-      document.removeEventListener('visibilitychange', refreshOnFocus)
-    }
-  }, [customerSession?.customerId, customerSession?.email, customerSession?.username, customerSession?.accessToken])
+  const notificationHeaders = useMemo(() => ({
+    username: customerSession?.username || customerSession?.email || '',
+    ...(customerSession?.accessToken ? { Authorization: `Bearer ${customerSession.accessToken}` } : {}),
+  }), [customerSession?.accessToken, customerSession?.email, customerSession?.username])
 
-  const notifications: HeadNotification[] = backendNotifications
+  const latestQuery = useQuery({
+    queryKey: [...customerNotificationKey, 'latest'],
+    queryFn: () => apiRequest<CustomerNotificationPage>('/api/notifications/latest?limit=10', {
+      headers: notificationHeaders,
+    }),
+    enabled: false,
+    staleTime: 45_000,
+  })
+
+  const unreadQuery = useQuery({
+    queryKey: [...customerNotificationKey, 'unread-count'],
+    queryFn: () => apiRequest<UnreadCountResponse>('/api/notifications/unread-count', {
+      headers: notificationHeaders,
+    }).then((response) => Number(response?.data ?? 0)),
+    enabled: Boolean(customerSession?.customerId),
+    refetchInterval: 45_000,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+  })
+
+  const notifications = useMemo<HeadNotification[]>(
+    () => (latestQuery.data?.data ?? []).map((item, index) => ({
+        id: String(item.id ?? `customer-notification-${index}`),
+        text: item.title || item.message || 'Your account has been updated.',
+        timeLabel: formatNotificationTime(item.createdAt ?? item.timestamp),
+        unread: item.read !== true,
+        link: typeof item.link === 'string' ? item.link : undefined,
+      })),
+    [latestQuery.data],
+  )
 
   function markAllRead() {
-    setBackendNotifications((items) => items.map((item) => ({ ...item, unread: false })))
+    queryClient.setQueryData<number>([...customerNotificationKey, 'unread-count'], 0)
+    queryClient.setQueryData<CustomerNotificationPage>([...customerNotificationKey, 'latest'], (page) => ({
+      ...page,
+      data: (page?.data ?? []).map((item) => ({ ...item, read: true })),
+    }))
     if (!customerSession) return
     const headers = {
       username: customerSession.username || customerSession.email,
@@ -86,7 +111,13 @@ export function CustomerDashboardLayout({
     </div>
   )
   return isCustomerAuthenticated ? (
-    <NotificationCenter items={notifications} roleLabel="Customer" onMarkAllRead={markAllRead}>{dashboard}</NotificationCenter>
+    <NotificationCenter
+      items={notifications}
+      roleLabel="Customer"
+      onMarkAllRead={markAllRead}
+      onOpen={() => void latestQuery.refetch()}
+      unreadCount={unreadQuery.data ?? 0}
+    >{dashboard}</NotificationCenter>
   ) : dashboard
 }
 

@@ -1013,7 +1013,7 @@ export async function getDuplicateCustomerSummaries(
   const search = new URLSearchParams()
   search.set('page', '0')
   search.set('size', '20')
-  search.set('departmentType', departmentType)
+  search.set('departmentType', departmentType || 'ONBOARDING_DEPARTMENT')
 
   try {
     const res = await authedApiRequest<any>(
