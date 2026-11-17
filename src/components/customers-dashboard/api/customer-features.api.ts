@@ -668,6 +668,15 @@ export interface CustomerTicketItem {
   updatedAt?: string
   resolvedAt?: string
   latestRemark?: string
+  businessName?: string
+  attachments?: Array<{
+    id?: number | string
+    fileName?: string
+    fileUrl?: string
+    fileType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string
+    fileSize?: number
+    createdAt?: string
+  }>
   messages?: Array<{
     id?: string | number
     sender: string
@@ -923,7 +932,156 @@ export async function createCustomerTicket(payload: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer ticket form: business lookup + ticket with attachments
+//
+// These call Help Center DIRECTLY (not through SMSB) so that attachments keep
+// working when SMSB is down, and because SMSB's ticket proxy only forwards JSON.
+//   dev  → /help-center/... (Vite proxy → help-center /api/v1)
+//   prod → VITE_HELP_CENTER_DIRECT_URL (default https://help.techmbgcard.com) + /api/v1
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HELP_CENTER_DIRECT_BASE: string = import.meta.env.DEV
+  ? '/help-center'
+  : `${String(import.meta.env.VITE_HELP_CENTER_DIRECT_URL || 'https://help.techmbgcard.com').trim().replace(/\/$/, '')}/api/v1`
+
+export const TICKET_ATTACHMENT_LIMITS = {
+  maxFiles: 5,
+  maxImageOrDocBytes: 10 * 1024 * 1024,
+  maxVideoBytes: 50 * 1024 * 1024,
+  accept: 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,.pdf,.doc,.docx,.xls,.xlsx',
+}
+
+export const TICKET_TERMS_VERSION = 'v1'
+
+export interface BusinessLookupResult {
+  customerId: number | null
+  businessName: string
+}
+
+/** Returns [] when nothing is found or the lookup is unavailable — the form then asks for the name manually. */
+export async function lookupBusinessName(params: { phone?: string; email?: string }): Promise<BusinessLookupResult[]> {
+  const qs = new URLSearchParams()
+  if (params.phone) qs.set('phone', params.phone)
+  if (params.email) qs.set('email', params.email)
+  if (!qs.toString()) return []
+  try {
+    const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/tickets/lookup-business?${qs.toString()}`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (!res.ok) return []
+    const json = (await res.json()) as { data?: Array<{ customerId?: number | null; businessName?: unknown }> }
+    const list = Array.isArray(json?.data) ? json.data : []
+    return list
+      .filter((b): b is { customerId?: number | null; businessName: string } =>
+        !!b && typeof b.businessName === 'string' && b.businessName.trim() !== '')
+      .map((b) => ({ customerId: b.customerId ?? null, businessName: b.businessName.trim() }))
+  } catch {
+    return []
+  }
+}
+
+export interface CreateTicketWithAttachmentsResult {
+  ticketNumber: string
+  attachmentsSaved: number
+  failedFiles: string[]
+  message: string
+}
+
+export async function createCustomerTicketWithAttachments(payload: {
+  email?: string
+  phoneNumber?: string
+  subject: string
+  description: string
+  departmentId: string | number
+  priority?: string
+  businessName?: string
+  smsbCustomerId?: number | null
+  termsAccepted: boolean
+  files?: File[]
+}): Promise<CreateTicketWithAttachmentsResult> {
+  if (payload.departmentId === '' || payload.departmentId == null) {
+    throw new Error('Please select a department.')
+  }
+  const ticket: Record<string, string | number | boolean> = {
+    subject: payload.subject,
+    description: payload.description,
+    departmentId: String(payload.departmentId),
+    priority: (payload.priority || 'MEDIUM').toUpperCase(),
+    termsAccepted: payload.termsAccepted === true,
+    termsVersion: TICKET_TERMS_VERSION,
+  }
+  if (payload.email?.trim()) ticket.email = payload.email.trim()
+  if (payload.phoneNumber?.trim()) ticket.phoneNumber = payload.phoneNumber.trim()
+  if (payload.businessName?.trim()) ticket.businessName = payload.businessName.trim()
+  if (payload.smsbCustomerId != null) ticket.smsbCustomerId = payload.smsbCustomerId
+
+  const fd = new FormData()
+  // The 'ticket' part must be sent as application/json for Spring's @RequestPart
+  fd.append('ticket', new Blob([JSON.stringify(ticket)], { type: 'application/json' }))
+  ;(payload.files || []).forEach((f) => fd.append('files', f, f.name))
+
+  // No Content-Type header: the browser sets multipart/form-data with the boundary
+  const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/tickets/create_ticket`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    body: fd,
+  })
+
+  type CreateResponse = {
+    message?: string
+    data?: {
+      ticketNumber?: string
+      ticket?: { ticketNumber?: string }
+      attachments?: unknown[]
+      failedFiles?: string[]
+    } | null
+  }
+  let json: CreateResponse | null = null
+  try {
+    json = (await res.json()) as CreateResponse
+  } catch {
+    // non-JSON (e.g. nginx 413 page)
+  }
+
+  if (!res.ok) {
+    const msg =
+      res.status === 413
+        ? 'Attachments are too large. Please upload smaller files.'
+        : json?.message || `Failed to create ticket (status ${res.status})`
+    const err = new Error(msg) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+
+  const data = json?.data || {}
+  return {
+    ticketNumber: data.ticketNumber || data.ticket?.ticketNumber || '',
+    attachmentsSaved: Array.isArray(data.attachments) ? data.attachments.length : 0,
+    failedFiles: Array.isArray(data.failedFiles) ? data.failedFiles : [],
+    message: json?.message || 'Ticket created successfully',
+  }
+}
+
 export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepartment[]> {
+  // 1. Help Center directly (public endpoint) — real IDs, works even when SMSB is down
+  try {
+    const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/departments/show_all`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (res.ok) {
+      const json = (await res.json()) as { data?: Array<{ id?: number | string; name?: string; isActive?: boolean }> }
+      if (Array.isArray(json?.data)) {
+        return json.data
+          .filter((d) => d && d.id != null && d.isActive !== false)
+          .map((d) => ({ id: d.id as number | string, name: d.name || String(d.id) }))
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch Help Center departments directly:', err)
+  }
+
+  // 2. Fallback: through SMSB
   try {
     const res = await requestCustomerTicketProxy<{ success?: boolean; data?: any[] }>(`/departments`)
     const list = res?.data || (res as any)
@@ -937,14 +1095,9 @@ export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepart
     console.warn('Failed to fetch Help Center departments through SMSB:', err)
   }
 
-  return [
-    { id: '1', name: 'Google Department' },
-    { id: '2', name: 'Advertisement & Social' },
-    { id: '3', name: 'Automation Department' },
-    { id: '4', name: 'Website Development' },
-    { id: '5', name: 'Billing & Invoices' },
-    { id: '6', name: 'General Support' },
-  ]
+  // No fake fallback list: made-up IDs ("1", "2"…) don't exist in Help Center and
+  // produce "Department not found". The form shows a message instead.
+  return []
 }
 
 export async function fetchCustomerTicketHistory(
