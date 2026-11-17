@@ -9,6 +9,11 @@ export interface NotificationPage {
   isLast?: boolean
 }
 
+interface LatestNotificationsResponse {
+  data?: BackendNotification[]
+  hasMore?: boolean
+}
+
 export interface NotificationPageResult {
   items: SuperAdminNotification[]
   pageNumber: number
@@ -65,7 +70,9 @@ export async function fetchUnreadNotificationCount(): Promise<number> {
 
 export async function fetchNotifications(size = 10): Promise<SuperAdminNotification[]> {
   try {
-    const response = await authedApiRequest<NotificationPage>(`/api/notifications?page=0&size=${size}&sortDir=desc`)
+    const response = await authedApiRequest<LatestNotificationsResponse>(
+      `/api/notifications/latest?limit=${size}`,
+    )
     return (response?.data ?? []).map(mapNotification)
   } catch (err) {
     console.warn('Backend notification feed unavailable, returning empty list:', err)
