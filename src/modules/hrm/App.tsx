@@ -35,6 +35,7 @@ import {
 import { LeavePage } from "@features/leave";
 import { PayrollPage, PayslipsPage } from "@features/payroll";
 import { PerformancePage } from "@features/performance";
+import { TargetsPage } from "@features/targets";
 import { ReportsPage } from "@features/reports";
 import { RoleBasedAccessPage, SettingsPage, UpdateProfilePage } from "@features/settings";
 import { MyTasksPage } from "@features/tasks";
@@ -240,6 +241,15 @@ function App() {
                 element={
                   <RequirePermission permission="performance:view">
                     <PerformancePage />
+                  </RequirePermission>
+                }
+              />
+
+              <Route
+                path={rel(ROUTES.targets)}
+                element={
+                  <RequirePermission permission="performance:view">
+                    <TargetsPage />
                   </RequirePermission>
                 }
               />

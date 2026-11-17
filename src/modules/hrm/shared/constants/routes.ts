@@ -31,6 +31,7 @@ export const ROUTES = {
   performance: "/hrm/performance",
   performanceGoals: "/hrm/performance/goals",
   performanceReviews: "/hrm/performance/reviews",
+  targets: "/hrm/targets",
   reports: "/hrm/reports",
   announcements: "/hrm/announcements",
   notifications: "/hrm/notifications",
