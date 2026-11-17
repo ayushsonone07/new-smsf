@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useMemo, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { CustomerDashboardLayout } from './CustomerDashboardLayout'
 import { Icon } from '../head/shared/Icon'
@@ -20,6 +20,24 @@ export interface OfferItem {
   discountValue: string
   description: string
 }
+
+const COMMON_SERVICE_SUGGESTIONS = [
+  'Website Development',
+  'E-commerce Development',
+  'Mobile App Development',
+  'Digital Marketing',
+  'Search Engine Optimization',
+  'Google Business Profile Management',
+  'Social Media Marketing',
+  'Graphic Design',
+  'Branding',
+  'Content Writing',
+  'Lead Generation',
+  'Online Advertising',
+  'Business Consulting',
+  'Home Delivery',
+  'Customer Support',
+]
 
 function parseFriendlyError(rawMsg: string): { title: string; message: string; field?: string } {
   if (!rawMsg) {
@@ -133,6 +151,7 @@ export function CustomerDetailsPage() {
   const [email, setEmail] = useState(session?.email ?? 'hemantdubey.mic@gmail.com')
   const [servicesInput, setServicesInput] = useState('')
   const [mainServices, setMainServices] = useState<string[]>([])
+  const [serviceSuggestionsOpen, setServiceSuggestionsOpen] = useState(false)
 
   // Step 4: Google Step Specific Form State
   const [gmbProfileLink, setGmbProfileLink] = useState('')
@@ -231,6 +250,18 @@ export function CustomerDetailsPage() {
   const progressPercent =
     activeStep === 1 ? 20 : activeStep === 2 ? 20 : activeStep === 3 ? 40 : activeStep === 4 ? 60 : activeStep === 5 ? 80 : 100
 
+  const serviceSuggestions = useMemo(() => {
+    const entered = servicesInput.trim()
+    const input = entered.toLowerCase()
+    if (!input) return []
+    const selected = new Set(mainServices.map((service) => service.toLowerCase()))
+    const matches = COMMON_SERVICE_SUGGESTIONS
+      .filter((service) => service.toLowerCase().includes(input) && !selected.has(service.toLowerCase()))
+    const canAddEntered = !selected.has(input)
+      && !matches.some((service) => service.toLowerCase() === input)
+    return (canAddEntered ? [entered, ...matches] : matches).slice(0, 6)
+  }, [mainServices, servicesInput])
+
   async function handleNextStep(e?: FormEvent) {
     if (e) e.preventDefault()
     if (isSaving) return
@@ -258,6 +289,20 @@ export function CustomerDetailsPage() {
       return
     }
 
+    const pendingService = servicesInput.trim()
+    const servicesForSave = [...mainServices]
+    if (
+      activeStep === 1
+      && pendingService
+      && servicesForSave.length < 15
+      && !servicesForSave.some((service) => service.toLowerCase() === pendingService.toLowerCase())
+    ) {
+      servicesForSave.push(pendingService)
+      setMainServices(servicesForSave)
+      setServicesInput('')
+      setServiceSuggestionsOpen(false)
+    }
+
     const rawPayload: Record<string, any> = {
       phone: effectivePhone,
       customerId: customerId ? Number(customerId) : undefined,
@@ -272,7 +317,7 @@ export function CustomerDetailsPage() {
       businessCategory: businessCategory.trim() || undefined,
       bookingLink: bookingLink.trim() || undefined,
       paymentLink: paymentLink.trim() || undefined,
-      topProducts: mainServices.length ? mainServices.join(', ') : undefined,
+      topProducts: servicesForSave.length ? servicesForSave.join(', ') : undefined,
       gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || undefined,
       brandName: brandName.trim() || undefined,
       googleReviewLink: googleReviewLink.trim() || undefined,
@@ -337,11 +382,25 @@ export function CustomerDetailsPage() {
     }
   }
 
-  function handleAddService() {
-    if (servicesInput.trim() && mainServices.length < 15) {
-      setMainServices([...mainServices, servicesInput.trim()])
+  function addMainService(value: string) {
+    const service = value.trim()
+    if (!service || mainServices.length >= 15) return
+    if (mainServices.some((item) => item.toLowerCase() === service.toLowerCase())) {
       setServicesInput('')
+      setServiceSuggestionsOpen(false)
+      return
     }
+    setMainServices((items) => [...items, service])
+    setServicesInput('')
+    setServiceSuggestionsOpen(false)
+  }
+
+  function handleAddService() {
+    addMainService(servicesInput)
+  }
+
+  function removeMainService(index: number) {
+    setMainServices((items) => items.filter((_, itemIndex) => itemIndex !== index))
   }
 
   function handleAddAutoService() {
@@ -715,14 +774,45 @@ export function CustomerDetailsPage() {
                 <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
                   Main Services / Products
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    className="cdb-input"
-                    placeholder="List one at a time and click +"
-                    value={servicesInput}
-                    onChange={(e) => setServicesInput(e.target.value)}
-                  />
+                <div className="cdb-service-entry">
+                  <div className="cdb-service-input-wrap">
+                    <input
+                      type="text"
+                      className="cdb-input"
+                      placeholder="Type a service or product"
+                      value={servicesInput}
+                      maxLength={100}
+                      autoComplete="off"
+                      onFocus={() => setServiceSuggestionsOpen(true)}
+                      onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)}
+                      onChange={(e) => {
+                        setServicesInput(e.target.value)
+                        setServiceSuggestionsOpen(true)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleAddService()
+                        }
+                      }}
+                    />
+                    {serviceSuggestionsOpen && serviceSuggestions.length > 0 && (
+                      <div className="cdb-service-suggestions" role="listbox" aria-label="Service suggestions">
+                        {serviceSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            role="option"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => addMainService(suggestion)}
+                          >
+                            <span>{suggestion}</span>
+                            <span aria-hidden="true">+</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className="cdb-btn-primary"
@@ -732,6 +822,25 @@ export function CustomerDetailsPage() {
                     +
                   </button>
                 </div>
+                {mainServices.length > 0 && (
+                  <div className="cdb-service-stack" aria-label="Added services and products">
+                    {mainServices.map((service, index) => (
+                      <span className="cdb-service-chip" key={`${service}-${index}`}>
+                        {service}
+                        <button
+                          type="button"
+                          onClick={() => removeMainService(index)}
+                          aria-label={`Remove ${service}`}
+                        >
+                          <CloseIcon size={12} strokeWidth={2.5} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <span className="cdb-service-help">
+                  {mainServices.length}/15 added. Press Enter or click + to add a custom service.
+                </span>
               </div>
 
               {/* Contact Details Section */}
