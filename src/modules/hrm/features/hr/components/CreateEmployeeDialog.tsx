@@ -85,7 +85,11 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       Boolean(values.laptopSerialNumber) ||
       Boolean(values.laptopType) ||
       Boolean(values.isCompanySim) ||
-      Boolean(values.companyPhoneNumber),
+      Boolean(values.companyPhoneNumber) ||
+      Boolean(values.isIdCard) ||
+      Boolean(values.idCardNumber) ||
+      Boolean(values.isVisitingCard) ||
+      Boolean(values.visitingCardNumber),
     [candidate, values],
   );
 
@@ -132,6 +136,10 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
       laptopType: values.laptopType?.trim() || "",
       isCompanySim: Boolean(values.isCompanySim),
       companyPhoneNumber: values.isCompanySim ? (values.companyPhoneNumber?.trim() || "") : "",
+      isIdCard: Boolean(values.isIdCard),
+      idCardNumber: values.isIdCard ? (values.idCardNumber?.trim() || "") : "",
+      isVisitingCard: Boolean(values.isVisitingCard),
+      visitingCardNumber: values.isVisitingCard ? (values.visitingCardNumber?.trim() || "") : "",
     };
     const nextErrors = validate(trimmed);
     setErrors(nextErrors);
@@ -429,6 +437,90 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
               />
             ) : null}
 
+            <Field
+              id="emp-id-card"
+              label="ID Card"
+              input={
+                <Select
+                  id="emp-id-card"
+                  value={values.isIdCard ? "yes" : "no"}
+                  onChange={(e) => {
+                    const isYes = e.target.value === "yes";
+                    update("isIdCard", isYes);
+                    if (!isYes) {
+                      update("idCardNumber", "");
+                    }
+                  }}
+                  className={fieldClass()}
+                  disabled={mutation.isPending}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </Select>
+              }
+            />
+            {values.isIdCard ? (
+              <Field
+                id="emp-id-card-number"
+                label="ID Card Number"
+                required
+                error={errors.idCardNumber}
+                input={
+                  <input
+                    id="emp-id-card-number"
+                    type="text"
+                    value={values.idCardNumber || ""}
+                    onChange={(e) => update("idCardNumber", e.target.value)}
+                    placeholder="e.g. IDC-1049"
+                    className={fieldClass(errors.idCardNumber)}
+                    disabled={mutation.isPending}
+                  />
+                }
+              />
+            ) : null}
+
+            <Field
+              id="emp-visiting-card"
+              label="Visiting Card"
+              input={
+                <Select
+                  id="emp-visiting-card"
+                  value={values.isVisitingCard ? "yes" : "no"}
+                  onChange={(e) => {
+                    const isYes = e.target.value === "yes";
+                    update("isVisitingCard", isYes);
+                    if (!isYes) {
+                      update("visitingCardNumber", "");
+                    }
+                  }}
+                  className={fieldClass()}
+                  disabled={mutation.isPending}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </Select>
+              }
+            />
+            {values.isVisitingCard ? (
+              <Field
+                id="emp-visiting-card-number"
+                label="Visiting Card Number"
+                required
+                error={errors.visitingCardNumber}
+                input={
+                  <input
+                    id="emp-visiting-card-number"
+                    type="text"
+                    value={values.visitingCardNumber || ""}
+                    onChange={(e) => update("visitingCardNumber", e.target.value)}
+                    placeholder="e.g. VC-882"
+                    className={fieldClass(errors.visitingCardNumber)}
+                    disabled={mutation.isPending}
+                  />
+                }
+              />
+            ) : null}
+
           </div>
 
           {mutation.error ? (
@@ -499,6 +591,10 @@ function emptyValues(candidate: Candidate | null): CreateEmployeeInput {
     laptopType: "",
     isCompanySim: false,
     companyPhoneNumber: "",
+    isIdCard: false,
+    idCardNumber: "",
+    isVisitingCard: false,
+    visitingCardNumber: "",
   };
 }
 
@@ -528,6 +624,12 @@ function validate(values: CreateEmployeeInput): Errors {
   if (values.managerId != null && values.managerId < 1) errors.managerId = "Use a valid manager.";
   if (values.isCompanySim && !values.companyPhoneNumber?.trim()) {
     errors.companyPhoneNumber = "Company mobile number is required.";
+  }
+  if (values.isIdCard && !values.idCardNumber?.trim()) {
+    errors.idCardNumber = "ID card number is required.";
+  }
+  if (values.isVisitingCard && !values.visitingCardNumber?.trim()) {
+    errors.visitingCardNumber = "Visiting card number is required.";
   }
   return errors;
 }

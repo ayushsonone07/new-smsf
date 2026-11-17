@@ -23,7 +23,7 @@ interface SalaryStructureDialogProps {
 }
 
 interface ComponentField {
-  key: "basicSalary" | "hra" | "specialAllowance" | "otherAllowance" | "incentive";
+  key: "basicSalary" | "hra" | "specialAllowance" | "otherAllowance" | "incentive" | "cra";
   label: string;
   hint?: string;
   optional?: boolean;
@@ -40,6 +40,7 @@ const FIELDS: ComponentField[] = [
   { key: "specialAllowance", label: "Special Allowance", hint: "10% of Fixed Salary" },
   { key: "otherAllowance", label: "Other Allowance", hint: "6% of Fixed Salary" },
   { key: "incentive", label: "Incentive", optional: true, hint: "Optional performance incentive" },
+  { key: "cra", label: "CRA", optional: true, hint: "Optional CRA allowance" },
 ];
 
 export function SalaryStructureDialog({
@@ -89,6 +90,7 @@ export function SalaryStructureDialog({
         specialAllowance: String(structure.specialAllowance ?? 0),
         otherAllowance: String(structure.otherAllowance ?? 0),
         incentive: structure.incentive != null && Number(structure.incentive) > 0 ? String(structure.incentive) : "",
+        cra: structure.cra != null && Number(structure.cra) > 0 ? String(structure.cra) : "",
       });
       setPfEnabled(structure.pfEnabled);
       setEsiEnabled(structure.esiEnabled);
@@ -132,7 +134,7 @@ export function SalaryStructureDialog({
 
   const gross = isFullTime
     ? FIELDS.reduce((sum, field) => sum + (Number(values[field.key]) || 0), 0)
-    : (Number(values.stipend) || 0) + (Number(values.incentive) || 0);
+    : (Number(values.stipend) || 0) + (Number(values.incentive) || 0) + (Number(values.cra) || 0);
 
   const disabled = save.isPending || isLoading;
 
@@ -161,6 +163,12 @@ export function SalaryStructureDialog({
           errs.incentive = "Enter a valid incentive amount.";
         }
       }
+      if (values.cra && values.cra.trim() !== "") {
+        const craNum = Number(values.cra);
+        if (Number.isNaN(craNum) || craNum < 0) {
+          errs.cra = "Enter a valid CRA amount.";
+        }
+      }
     }
 
     if (!effectiveFrom) errs.effectiveFrom = "Effective date is required.";
@@ -182,6 +190,7 @@ export function SalaryStructureDialog({
           specialAllowance: values.specialAllowance ?? "0",
           otherAllowance: values.otherAllowance ?? "0",
           incentive: values.incentive && values.incentive.trim() !== "" ? values.incentive : "0",
+          cra: values.cra && values.cra.trim() !== "" ? values.cra : "0",
           pfEnabled,
           esiEnabled,
           effectiveFrom,
@@ -195,6 +204,7 @@ export function SalaryStructureDialog({
           specialAllowance: "0",
           otherAllowance: "0",
           incentive: values.incentive && values.incentive.trim() !== "" ? values.incentive : "0",
+          cra: values.cra && values.cra.trim() !== "" ? values.cra : "0",
           pfEnabled: false,
           esiEnabled: false,
           effectiveFrom,
@@ -438,6 +448,31 @@ export function SalaryStructureDialog({
                 Optional performance or milestone incentive
               </p>
               {errors.incentive ? <p className="mt-1 text-xs text-danger">{errors.incentive}</p> : null}
+            </div>
+
+            <div>
+              <label htmlFor="payroll-cra-simple" className="mb-1.5 block text-sm font-semibold text-foreground">
+                CRA <span className="text-xs font-normal text-muted-foreground ml-1">(Optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">₹</span>
+                <input
+                  id="payroll-cra-simple"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={values.cra ?? ""}
+                  onChange={(e) => setValues((prev) => ({ ...prev, cra: e.target.value }))}
+                  disabled={disabled}
+                  placeholder="0.00"
+                  className="block w-full rounded-xl border border-border bg-surface-elevated pl-8 pr-4 py-2.5 text-sm text-foreground shadow transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Optional CRA allowance
+              </p>
+              {errors.cra ? <p className="mt-1 text-xs text-danger">{errors.cra}</p> : null}
             </div>
           </div>
         )}
