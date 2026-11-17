@@ -202,6 +202,7 @@ export function TopBar({ onMenuClick, title, subtitle, user }: TopBarProps) {
 
       { label: "Performance", path: "/hrm/performance" },
       { label: "Sales Targets", path: "/hrm/targets" },
+      { label: "Company Policies", path: "/hrm/company-policies" },
       { label: "Settings", path: "/hrm/settings" },
     ];
     const hrItems = [

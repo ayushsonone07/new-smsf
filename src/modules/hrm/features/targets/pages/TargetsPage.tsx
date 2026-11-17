@@ -769,22 +769,41 @@ function TargetDialog({
   return (
     <Dialog open={open} onClose={onClose} title={isEditing ? "Edit Sales Target" : "Assign Sales Target"}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 py-1">
-        <div>
-          <label className="text-xs font-semibold text-foreground block mb-1">
-            Sales Employee <span className="text-danger">*</span>
-          </label>
-          <Select
-            value={form.employeeId ? String(form.employeeId) : ""}
-            onChange={(e) => update("employeeId", e.target.value ? Number(e.target.value) : "")}
-            disabled={isEditing}
-          >
-            <option value="">Select sales employee...</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name} ({emp.employeeCode}) {emp.departmentName ? `— ${emp.departmentName}` : ""}
-              </option>
-            ))}
-          </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1">
+              Sales Employee <span className="text-danger">*</span>
+            </label>
+            <Select
+              value={form.employeeId ? String(form.employeeId) : ""}
+              onChange={(e) => update("employeeId", e.target.value ? Number(e.target.value) : "")}
+              disabled={isEditing}
+            >
+              <option value="">Select sales employee...</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} ({emp.employeeCode}) {emp.departmentName ? `— ${emp.departmentName}` : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1">
+              Assigned By (Manager / Admin)
+            </label>
+            <Select
+              value={form.assignedById ? String(form.assignedById) : ""}
+              onChange={(e) => update("assignedById", e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">Logged-in User (Admin)</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} ({emp.employeeCode})
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
 
         <div className="rounded-xl border border-border/80 bg-surface-muted/40 p-3.5 space-y-3">
