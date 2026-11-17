@@ -51,7 +51,7 @@ export function CustomerDashboardLayout({
 
   const latestQuery = useQuery({
     queryKey: [...customerNotificationKey, 'latest'],
-    queryFn: () => apiRequest<CustomerNotificationPage>('/api/notifications?page=0&size=10&sortDir=desc', {
+    queryFn: () => apiRequest<CustomerNotificationPage>('/api/notifications/latest?limit=10', {
       headers: notificationHeaders,
     }),
     enabled: false,
