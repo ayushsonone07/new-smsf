@@ -200,8 +200,8 @@ function EmployeeDetails({ employee }: { employee: EmployeeListItem }) {
       {employee.isCompanySim ? (
         <Detail label="Company mobile number" value={employee.companyPhoneNumber ?? null} optional />
       ) : null}
-      <Detail label="ID Card" value={employee.isIdCard ? (employee.idCardNumber ? `Yes (${employee.idCardNumber})` : "Yes") : "No"} optional />
-      <Detail label="Visiting Card" value={employee.isVisitingCard ? (employee.visitingCardNumber ? `Yes (${employee.visitingCardNumber})` : "Yes") : "No"} optional />
+      <Detail label="ID Card" value={employee.isIdCard ? "Yes" : "No"} optional />
+      <Detail label="Visiting Card" value={employee.isVisitingCard ? "Yes" : "No"} optional />
       <Detail label="Employment type" value={formatValue(employee.employmentType)} />
       <Detail label="Joining date" value={formatDate(employee.joiningDate)} />
       <Detail label="Exit date" value={formatDate(employee.exitDate)} optional />
@@ -266,14 +266,6 @@ function EmployeeEditForm({
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (values.isIdCard && !values.idCardNumber?.trim()) {
-      toast.error("Validation error", "ID card number is required when ID card is issued.");
-      return;
-    }
-    if (values.isVisitingCard && !values.visitingCardNumber?.trim()) {
-      toast.error("Validation error", "Visiting card number is required when Visiting card is issued.");
-      return;
-    }
     void dispatch(updateEmployee({ id: employee.id, input: values })).then((result) => {
       if (updateEmployee.fulfilled.match(result)) {
         onDone();
@@ -428,9 +420,7 @@ function EmployeeEditForm({
               onChange={(e) => {
                 const isYes = e.target.value === "yes";
                 update("isIdCard", isYes);
-                if (!isYes) {
-                  update("idCardNumber", "");
-                }
+                update("idCardNumber", "");
               }}
               className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
             >
@@ -438,22 +428,6 @@ function EmployeeEditForm({
               <option value="yes">Yes</option>
             </select>
           </div>
-          {values.isIdCard ? (
-            <div>
-              <label htmlFor="emp-id-card-number" className="block text-xs font-medium text-muted-foreground">
-                ID card number <span className="text-rose-500">*</span>
-              </label>
-              <input
-                id="emp-id-card-number"
-                type="text"
-                required
-                value={values.idCardNumber || ""}
-                onChange={(e) => update("idCardNumber", e.target.value)}
-                placeholder="e.g. IDC-1049"
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-              />
-            </div>
-          ) : null}
           <div>
             <label htmlFor="emp-visiting-card" className="block text-xs font-medium text-muted-foreground">
               Visiting Card
@@ -464,9 +438,7 @@ function EmployeeEditForm({
               onChange={(e) => {
                 const isYes = e.target.value === "yes";
                 update("isVisitingCard", isYes);
-                if (!isYes) {
-                  update("visitingCardNumber", "");
-                }
+                update("visitingCardNumber", "");
               }}
               className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
             >
@@ -474,22 +446,6 @@ function EmployeeEditForm({
               <option value="yes">Yes</option>
             </select>
           </div>
-          {values.isVisitingCard ? (
-            <div>
-              <label htmlFor="emp-visiting-card-number" className="block text-xs font-medium text-muted-foreground">
-                Visiting card number <span className="text-rose-500">*</span>
-              </label>
-              <input
-                id="emp-visiting-card-number"
-                type="text"
-                required
-                value={values.visitingCardNumber || ""}
-                onChange={(e) => update("visitingCardNumber", e.target.value)}
-                placeholder="e.g. VC-882"
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-              />
-            </div>
-          ) : null}
         </div>
 
       <div className="flex justify-end gap-2 border-t border-border pt-4">
