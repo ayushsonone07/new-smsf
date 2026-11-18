@@ -61,9 +61,7 @@ export function EmployeeAssetsPage() {
   const [isCompanySim, setIsCompanySim] = useState(false);
   const [companyPhoneNumber, setCompanyPhoneNumber] = useState("");
   const [isIdCard, setIsIdCard] = useState(false);
-  const [idCardNumber, setIdCardNumber] = useState("");
   const [isVisitingCard, setIsVisitingCard] = useState(false);
-  const [visitingCardNumber, setVisitingCardNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 350);
@@ -114,9 +112,7 @@ export function EmployeeAssetsPage() {
     setIsCompanySim(Boolean(emp.isCompanySim));
     setCompanyPhoneNumber(emp.companyPhoneNumber ?? "");
     setIsIdCard(Boolean(emp.isIdCard));
-    setIdCardNumber(emp.idCardNumber ?? "");
     setIsVisitingCard(Boolean(emp.isVisitingCard));
-    setVisitingCardNumber(emp.visitingCardNumber ?? "");
   }
 
   function closeEditModal() {
@@ -127,29 +123,30 @@ export function EmployeeAssetsPage() {
     e.preventDefault();
     if (!editingEmployee) return;
 
-    if (isIdCard && !idCardNumber.trim()) {
-      toast.error("Validation error", "ID card number is required when ID card is issued.");
-      return;
-    }
-    if (isVisitingCard && !visitingCardNumber.trim()) {
-      toast.error("Validation error", "Visiting card number is required when Visiting card is issued.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       await dispatch(
         updateEmployee({
           id: editingEmployee.id,
           input: {
+            email: editingEmployee.email,
+            name: editingEmployee.name,
+            phone: editingEmployee.phone,
+            role: editingEmployee.role,
+            employeeCode: editingEmployee.employeeCode,
+            joiningDate: editingEmployee.joiningDate,
+            employmentType: editingEmployee.employmentType,
+            departmentId: editingEmployee.departmentId ?? 0,
+            designationId: editingEmployee.designationId ?? null,
+            managerId: editingEmployee.managerId ?? null,
             laptopType: laptopType.trim() || null,
             laptopSerialNumber: laptopSerialNumber.trim() || null,
             isCompanySim,
             companyPhoneNumber: isCompanySim ? companyPhoneNumber.trim() || null : null,
             isIdCard,
-            idCardNumber: isIdCard ? idCardNumber.trim() || null : null,
+            idCardNumber: null,
             isVisitingCard,
-            visitingCardNumber: isVisitingCard ? visitingCardNumber.trim() || null : null,
+            visitingCardNumber: null,
           },
         }),
       ).unwrap();
@@ -171,8 +168,8 @@ export function EmployeeAssetsPage() {
     return items.filter((emp) => {
       const hasLaptop = Boolean(emp.laptopSerialNumber || emp.laptopType);
       const hasSim = Boolean(emp.isCompanySim || emp.companyPhoneNumber);
-      const hasIdCard = Boolean(emp.isIdCard || emp.idCardNumber);
-      const hasVisitingCard = Boolean(emp.isVisitingCard || emp.visitingCardNumber);
+      const hasIdCard = Boolean(emp.isIdCard);
+      const hasVisitingCard = Boolean(emp.isVisitingCard);
 
       if (filterMode === "has_laptop" && !hasLaptop) return false;
       if (filterMode === "no_laptop" && hasLaptop) return false;
@@ -190,8 +187,8 @@ export function EmployeeAssetsPage() {
     const total = meta?.totalElements ?? items.length;
     const laptopsAssigned = items.filter((e) => e.laptopSerialNumber || e.laptopType).length;
     const simsAssigned = items.filter((e) => e.isCompanySim || e.companyPhoneNumber).length;
-    const idCardsAssigned = items.filter((e) => e.isIdCard || e.idCardNumber).length;
-    const visitingCardsAssigned = items.filter((e) => e.isVisitingCard || e.visitingCardNumber).length;
+    const idCardsAssigned = items.filter((e) => e.isIdCard).length;
+    const visitingCardsAssigned = items.filter((e) => e.isVisitingCard).length;
     const bothAssigned = items.filter((e) => (e.laptopSerialNumber || e.laptopType) && (e.isCompanySim || e.companyPhoneNumber)).length;
 
     return { total, laptopsAssigned, simsAssigned, idCardsAssigned, visitingCardsAssigned, bothAssigned };
@@ -413,25 +410,25 @@ export function EmployeeAssetsPage() {
 
                       {/* ID Card */}
                       <td className="px-4 py-4">
-                        {emp.isIdCard || emp.idCardNumber ? (
+                        {emp.isIdCard ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
                             <CreditCard className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                            <span>{emp.idCardNumber || "Issued"}</span>
+                            <span>Yes</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">None</span>
+                          <span className="text-xs italic text-muted-foreground">No</span>
                         )}
                       </td>
 
                       {/* Visiting Card */}
                       <td className="px-4 py-4">
-                        {emp.isVisitingCard || emp.visitingCardNumber ? (
+                        {emp.isVisitingCard ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
                             <Contact className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                            <span>{emp.visitingCardNumber || "Issued"}</span>
+                            <span>Yes</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">None</span>
+                          <span className="text-xs italic text-muted-foreground">No</span>
                         )}
                       </td>
 
@@ -558,68 +555,30 @@ export function EmployeeAssetsPage() {
               )}
             </div>
 
-            {/* ID Card Toggle & Number */}
-            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4 space-y-3">
+            {/* ID Card Toggle */}
+            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isIdCard}
-                  onChange={(e) => {
-                    setIsIdCard(e.target.checked);
-                    if (!e.target.checked) setIdCardNumber("");
-                  }}
+                  onChange={(e) => setIsIdCard(e.target.checked)}
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
                 />
-                <span className="text-sm font-semibold text-foreground">ID Card Issued</span>
+                <span className="text-sm font-semibold text-foreground">ID Card Issued (Yes / No)</span>
               </label>
-
-              {isIdCard && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    ID Card Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={idCardNumber}
-                    onChange={(e) => setIdCardNumber(e.target.value)}
-                    placeholder="e.g. IDC-1049"
-                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                  />
-                </div>
-              )}
             </div>
 
-            {/* Visiting Card Toggle & Number */}
-            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4 space-y-3">
+            {/* Visiting Card Toggle */}
+            <div className="rounded-2xl border border-border bg-surface-muted/20 p-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isVisitingCard}
-                  onChange={(e) => {
-                    setIsVisitingCard(e.target.checked);
-                    if (!e.target.checked) setVisitingCardNumber("");
-                  }}
+                  onChange={(e) => setIsVisitingCard(e.target.checked)}
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
                 />
-                <span className="text-sm font-semibold text-foreground">Visiting Card Issued</span>
+                <span className="text-sm font-semibold text-foreground">Visiting Card Issued (Yes / No)</span>
               </label>
-
-              {isVisitingCard && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    Visiting Card Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={visitingCardNumber}
-                    onChange={(e) => setVisitingCardNumber(e.target.value)}
-                    placeholder="e.g. VC-882"
-                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                  />
-                </div>
-              )}
             </div>
 
             {/* Actions */}
