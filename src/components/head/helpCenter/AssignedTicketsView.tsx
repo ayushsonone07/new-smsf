@@ -139,8 +139,12 @@ export function AssignedTicketsView({
     }
   }, [isReassignModalOpen])
 
-  // Fetch assignable users for re-assignment / round robin
+  // Fetch assignable users for re-assignment / round robin (only for Heads/Admins who can reassign)
   useEffect(() => {
+    if (!canReassignTickets) {
+      return
+    }
+
     let cancelled = false
     async function loadUsers() {
       setIsLoadingUsers(true)
@@ -162,7 +166,7 @@ export function AssignedTicketsView({
     return () => {
       cancelled = true
     }
-  }, [departmentType, usersReloadKey])
+  }, [canReassignTickets, departmentType, usersReloadKey])
 
   // Compute status counts
   const computedStatusCounts = useMemo(() => {

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Download, ExternalLink, FileSpreadsheet, FileText, Paperclip, PlayCircle, X } from 'lucide-react'
+import React from 'react'
+import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Paperclip, Video as VideoIcon } from 'lucide-react'
 
 export interface TicketAttachment {
   id?: number | string
@@ -10,13 +10,14 @@ export interface TicketAttachment {
   createdAt?: string
 }
 
-type Kind = 'image' | 'video' | 'pdf' | 'doc'
+type Kind = 'image' | 'video' | 'pdf' | 'spreadsheet' | 'doc'
 
 function kindOf(a: TicketAttachment): Kind {
   const name = (a.fileName || a.fileUrl || '').toLowerCase()
-  if (a.fileType === 'IMAGE') return 'image'
-  if (a.fileType === 'VIDEO') return 'video'
+  if (a.fileType === 'IMAGE' || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name)) return 'image'
+  if (a.fileType === 'VIDEO' || /\.(mp4|webm|ogg|mov|mkv|avi)$/i.test(name)) return 'video'
   if (name.endsWith('.pdf')) return 'pdf'
+  if (/\.(xls|xlsx|csv)$/i.test(name)) return 'spreadsheet'
   return 'doc'
 }
 
@@ -26,38 +27,43 @@ function formatSize(bytes?: number) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-const tile: React.CSSProperties = {
-  position: 'relative',
-  width: '120px',
-  height: '90px',
-  borderRadius: '8px',
-  border: '1px solid #cbd5e1',
-  background: '#ffffff',
-  overflow: 'hidden',
-  cursor: 'pointer',
-  padding: 0,
-  flexShrink: 0,
+async function handleDownload(fileUrl?: string, fileName?: string) {
+  if (!fileUrl) return
+  const name = fileName || 'attachment'
+  try {
+    const res = await fetch(fileUrl)
+    const blob = await res.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(blobUrl)
+  } catch {
+    // Fallback if cross-origin restricts fetch
+    const link = document.createElement('a')
+    link.href = fileUrl
+    link.download = name
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
 }
 
 /**
- * Shows a ticket's attachments: image thumbnails, video tiles and document cards.
- * Images, videos and PDFs open in a full-screen preview; Word/Excel files download.
+ * Shows a ticket's attachments: image, video, PDF and document cards
+ * with a direct Download button.
  */
 export function TicketAttachmentsView({ attachments }: { attachments?: TicketAttachment[] }) {
-  const [preview, setPreview] = useState<TicketAttachment | null>(null)
-
-  useEffect(() => {
-    if (!preview) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPreview(null)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [preview])
-
   const list = (attachments || []).filter((a) => a && a.fileUrl)
   if (list.length === 0) return null
 
   return (
-    <div>
+    <div style={{ marginTop: '4px', marginBottom: '8px' }}>
       <span
         style={{
           fontSize: '10px',
@@ -68,7 +74,7 @@ export function TicketAttachmentsView({ attachments }: { attachments?: TicketAtt
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          marginBottom: '6px',
+          marginBottom: '8px',
         }}
       >
         <Paperclip size={11} /> ATTACHMENTS ({list.length})
@@ -79,153 +85,88 @@ export function TicketAttachmentsView({ attachments }: { attachments?: TicketAtt
           const kind = kindOf(a)
           const key = `${a.id ?? i}-${a.fileName}`
 
+          let IconComponent = FileText
+          let iconColor = '#2563eb'
+
           if (kind === 'image') {
-            return (
-              <button key={key} type="button" style={tile} onClick={() => setPreview(a)} title={a.fileName}>
-                <img
-                  src={a.fileUrl}
-                  alt={a.fileName || 'attachment'}
-                  loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
-              </button>
-            )
+            IconComponent = ImageIcon
+            iconColor = '#059669'
+          } else if (kind === 'video') {
+            IconComponent = VideoIcon
+            iconColor = '#7c3aed'
+          } else if (kind === 'pdf') {
+            IconComponent = FileText
+            iconColor = '#dc2626'
+          } else if (kind === 'spreadsheet') {
+            IconComponent = FileSpreadsheet
+            iconColor = '#16a34a'
           }
 
-          if (kind === 'video') {
-            return (
-              <button key={key} type="button" style={{ ...tile, background: '#0f172a' }} onClick={() => setPreview(a)} title={a.fileName}>
-                <video
-                  src={`${a.fileUrl}#t=0.5`}
-                  preload="metadata"
-                  muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.85 }}
-                />
-                <PlayCircle
-                  size={30}
-                  color="#ffffff"
-                  style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-                />
-              </button>
-            )
-          }
-
-          // PDF / Word / Excel card
-          const isPdf = kind === 'pdf'
-          const DocIcon = /\.(xls|xlsx)$/i.test(a.fileName || '') ? FileSpreadsheet : FileText
           return (
             <div
               key={key}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
+                gap: '12px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
                 background: '#ffffff',
-                minWidth: '220px',
-                maxWidth: '320px',
+                minWidth: '240px',
+                maxWidth: '340px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
               }}
             >
-              <DocIcon size={26} color={isPdf ? '#dc2626' : '#2563eb'} style={{ flexShrink: 0 }} />
+              <IconComponent size={26} color={iconColor} style={{ flexShrink: 0 }} />
+
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
-                  style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  title={a.fileName}
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={a.fileName || 'Attachment'}
                 >
-                  {a.fileName || 'Document'}
+                  {a.fileName || 'Attachment'}
                 </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>{formatSize(a.fileSize)}</div>
+                {a.fileSize ? (
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    {formatSize(a.fileSize)}
+                  </div>
+                ) : null}
               </div>
-              {isPdf ? (
-                <button
-                  type="button"
-                  onClick={() => setPreview(a)}
-                  style={{ border: 'none', background: '#eff6ff', color: '#2563eb', borderRadius: '6px', padding: '5px 8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  View
-                </button>
-              ) : (
-                <a
-                  href={a.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                  title="Download"
-                  style={{ color: '#2563eb', display: 'flex', padding: '4px' }}
-                >
-                  <Download size={16} />
-                </a>
-              )}
+
+              <button
+                type="button"
+                onClick={() => handleDownload(a.fileUrl, a.fileName)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+                title={`Download ${a.fileName || 'file'}`}
+              >
+                <Download size={13} />
+                Download
+              </button>
             </div>
           )
         })}
       </div>
-
-      {/* Full-screen preview */}
-      {preview && (
-        <div
-          onClick={() => setPreview(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10050,
-            background: 'rgba(15, 23, 42, 0.85)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: '1000px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', color: '#ffffff' }}
-          >
-            <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {preview.fileName}
-            </span>
-            <a
-              href={preview.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open in new tab"
-              style={{ color: '#ffffff', display: 'flex', padding: '4px' }}
-            >
-              <ExternalLink size={18} />
-            </a>
-            <button
-              type="button"
-              onClick={() => setPreview(null)}
-              aria-label="Close preview"
-              style={{ border: 'none', background: 'transparent', color: '#ffffff', cursor: 'pointer', display: 'flex', padding: '4px' }}
-            >
-              <X size={22} />
-            </button>
-          </div>
-
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '1000px', display: 'flex', justifyContent: 'center' }}>
-            {kindOf(preview) === 'image' && (
-              <img
-                src={preview.fileUrl}
-                alt={preview.fileName || 'attachment'}
-                style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '8px' }}
-              />
-            )}
-            {kindOf(preview) === 'video' && (
-              <video src={preview.fileUrl} controls autoPlay style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', background: '#000' }} />
-            )}
-            {kindOf(preview) === 'pdf' && (
-              <iframe
-                src={preview.fileUrl}
-                title={preview.fileName || 'PDF preview'}
-                style={{ width: '100%', height: '80vh', border: 'none', borderRadius: '8px', background: '#ffffff' }}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

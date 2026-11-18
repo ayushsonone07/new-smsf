@@ -26,6 +26,7 @@ import {
   fetchTicketDetails,
   fetchTicketHistory,
 } from '../../../api/help-center.api'
+import { TimeRangeFilter, TimeRangeFilterValue } from '../../../components/head/helpCenter/TimeRangeFilter'
 import { getSession } from '../../../app/auth/session'
 import type {
   HelpCenterDashboardUserAnalytics,
@@ -1290,10 +1291,18 @@ export function AdminHelpSupportPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null)
+  const [timeFilter, setTimeFilter] = useState<TimeRangeFilterValue>({ preset: 'all' })
 
   const analyticsQuery = useQuery({
-    queryKey: ['admin-help-analytics', email],
-    queryFn: () => fetchHelpCenterAnalytics(email, 'SUPERADMIN'),
+    queryKey: ['admin-help-analytics', email, timeFilter],
+    queryFn: () =>
+      fetchHelpCenterAnalytics(email, 'SUPERADMIN', {
+        days: timeFilter.days,
+        months: timeFilter.months,
+        period: timeFilter.period,
+        startDate: timeFilter.startDate,
+        endDate: timeFilter.endDate,
+      }),
   })
 
   const departments = useMemo(
@@ -1343,6 +1352,14 @@ export function AdminHelpSupportPage() {
             label="overview"
           />
         }
+      />
+
+      {/* Time Range Filter Bar */}
+      <TimeRangeFilter
+        value={timeFilter}
+        onChange={setTimeFilter}
+        disabled={analyticsQuery.isFetching}
+        className="mb-4"
       />
 
       {/* Navigation Tabs corresponding to preview (1).html & preview (2).html */}
