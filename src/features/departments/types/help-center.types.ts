@@ -8,6 +8,15 @@ export type TicketStatus =
   | 'RESOLVED'
   | 'CLOSED'
 
+export interface TicketAttachment {
+  id?: number | string
+  fileName?: string
+  fileUrl?: string
+  fileType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string
+  fileSize?: number
+  createdAt?: string
+}
+
 export interface EmployeeTicketWithCreator {
   ticketId: number
   ticketNumber: string
@@ -26,6 +35,10 @@ export interface EmployeeTicketWithCreator {
   creatorPhone?: string | null
   creatorStatus?: 'ACTIVE' | 'INACTIVE' | string | null
   creatorRegisteredAt?: string | null
+  businessName?: string | null
+  smsbCustomerId?: number | string | null
+  attachmentCount?: number
+  attachments?: TicketAttachment[]
 }
 
 export interface EmployeeTicketPageResponse {

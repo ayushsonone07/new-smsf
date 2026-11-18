@@ -27,6 +27,7 @@ import {
 } from '../../../api/help-center.api'
 import { TicketStatusHistoryModal } from './TicketStatusHistoryModal'
 import { RefreshButton } from '../../ui/RefreshButton'
+import { TicketAttachmentsView } from '../../customers-dashboard/TicketAttachmentsView'
 
 interface AssignedTicketsViewProps {
   tickets: EmployeeTicketWithCreator[]
@@ -723,6 +724,15 @@ export function AssignedTicketsView({
                     )}
                   </div>
 
+                  {selectedTicket.businessName && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-500">Business name</p>
+                      <p className="mt-0.5 text-sm font-semibold text-slate-900 break-words">
+                        {selectedTicket.businessName}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Status + actions */}
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                     <div>
@@ -815,6 +825,7 @@ export function AssignedTicketsView({
                     {selectedTicket.creatorName || selectedTicket.creatorEmail || 'Customer'} ·{' '}
                     {formatFullDate(selectedTicket.ticketCreatedAt)}
                   </p>
+                  <TicketAttachmentsView attachments={selectedTicket.attachments} />
                 </div>
               </div>
             ) : (
