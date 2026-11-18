@@ -32,6 +32,7 @@ export const ROUTES = {
   performanceGoals: "/hrm/performance/goals",
   performanceReviews: "/hrm/performance/reviews",
   targets: "/hrm/targets",
+  companyPolicy: "/hrm/company-policies",
   reports: "/hrm/reports",
   announcements: "/hrm/announcements",
   notifications: "/hrm/notifications",
