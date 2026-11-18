@@ -3,7 +3,10 @@ import {
   connectCustomerHelpCenter,
   fetchCustomerTicketsPage,
   fetchCustomerTicketDetails,
-  createCustomerTicket,
+  createCustomerTicketWithAttachments,
+  lookupBusinessName,
+  TICKET_ATTACHMENT_LIMITS,
+  type BusinessLookupResult,
   fetchHelpCenterDepartmentsList,
   fetchCustomerStatusSummary,
   fetchCustomerTicketHistory,
@@ -13,6 +16,7 @@ import {
   type HelpCenterDepartment,
 } from './api/customer-features.api'
 import { RefreshButton } from '../ui/RefreshButton'
+import { TicketAttachmentsView } from './TicketAttachmentsView'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import {
   Search,
@@ -42,7 +46,34 @@ import {
   Globe,
   FileText,
   CheckCircle,
+  Paperclip,
+  Image as ImageIcon,
+  Video,
 } from 'lucide-react'
+
+// Optional link shown next to the Terms & Conditions checkbox
+const TERMS_URL: string = String(import.meta.env.VITE_TERMS_URL || '').trim()
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+/** Client-side mirror of the backend checks, so the customer gets instant feedback. */
+function checkAttachment(file: File): string | null {
+  const name = file.name.toLowerCase()
+  const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm)$/.test(name)
+  const isImage = file.type.startsWith('image/') && !name.endsWith('.svg')
+  const isDoc = /\.(pdf|doc|docx|xls|xlsx)$/.test(name)
+  if (!isVideo && !isImage && !isDoc) {
+    return `${file.name}: only images, videos (mp4, mov, webm), PDF, Word or Excel files are allowed`
+  }
+  const limit = isVideo ? TICKET_ATTACHMENT_LIMITS.maxVideoBytes : TICKET_ATTACHMENT_LIMITS.maxImageOrDocBytes
+  if (file.size > limit) {
+    return `${file.name} is too large (max ${formatFileSize(limit)})`
+  }
+  return null
+}
 
 // ─── Department Meta & Icon helper ────────────────────────────────────────────
 function getDeptMeta(deptName?: string) {
@@ -309,6 +340,16 @@ export function CustomerHelpSupportView() {
   const [newSubject, setNewSubject] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newPhone, setNewPhone] = useState('')
+  // Business name (auto-fetched by email / phone, editable fallback)
+  const [businessName, setBusinessName] = useState('')
+  const [smsbCustomerId, setSmsbCustomerId] = useState<number | null>(null)
+  const [businessOptions, setBusinessOptions] = useState<BusinessLookupResult[]>([])
+  const [businessLookupState, setBusinessLookupState] = useState<'idle' | 'loading' | 'found' | 'none'>('idle')
+  // Attachments + terms
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createGeneralError, setCreateGeneralError] = useState<string | null>(null)
   const [activeTicketAlertBanner, setActiveTicketAlertBanner] = useState<ActiveTicketError | null>(null)
@@ -486,37 +527,127 @@ export function CustomerHelpSupportView() {
     }
   }
 
+  // ── Business name lookup: by 10-digit phone if typed, otherwise by account email ──
+  useEffect(() => {
+    if (!createOpen) return
+    const digits = newPhone.replace(/\D/g, '')
+    const phone = digits.length >= 10 ? digits.slice(-10) : ''
+    const email = customerEmail && customerEmail.includes('@') ? customerEmail : ''
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      if (!phone && !email) {
+        setBusinessLookupState('none')
+        return
+      }
+      setBusinessLookupState('loading')
+      const list = await lookupBusinessName(phone ? { phone } : { email })
+      if (cancelled) return
+      setBusinessOptions(list)
+      if (list.length > 0) {
+        setBusinessLookupState('found')
+        // keep the current choice if it is still in the list, otherwise pick the first
+        const keep = list.find((b) => b.customerId != null && b.customerId === smsbCustomerId)
+        const pick = keep || list[0]
+        setBusinessName(pick.businessName)
+        setSmsbCustomerId(pick.customerId)
+      } else {
+        setBusinessLookupState('none')
+        setSmsbCustomerId(null)
+        // not found / lookup unavailable → editable field, prefilled from the account if empty
+        setBusinessName((prev) => prev || (session?.company ? String(session.company) : ''))
+      }
+    }, 500)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // smsbCustomerId intentionally omitted: it is an output of this effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createOpen, newPhone, customerEmail])
+
+  const handleFilesPicked = (picked: FileList | null) => {
+    if (!picked || picked.length === 0) return
+    const incoming = Array.from(picked)
+    const errors: string[] = []
+    const next = [...attachments]
+    for (const f of incoming) {
+      const err = checkAttachment(f)
+      if (err) {
+        errors.push(err)
+        continue
+      }
+      if (next.some((x) => x.name === f.name && x.size === f.size)) continue
+      if (next.length >= TICKET_ATTACHMENT_LIMITS.maxFiles) {
+        errors.push(`You can attach up to ${TICKET_ATTACHMENT_LIMITS.maxFiles} files`)
+        break
+      }
+      next.push(f)
+    }
+    setAttachments(next)
+    setAttachmentError(errors.length ? errors.join(' • ') : null)
+    if (fileInputRef.current) fileInputRef.current.value = '' // allow picking the same file again
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+    setAttachmentError(null)
+  }
+
+  const resetCreateForm = () => {
+    setNewSubject('')
+    setNewDescription('')
+    setNewPhone('')
+    setBusinessName('')
+    setSmsbCustomerId(null)
+    setBusinessOptions([])
+    setBusinessLookupState('idle')
+    setAttachments([])
+    setAttachmentError(null)
+    setTermsAccepted(false)
+  }
+
   // Create Ticket Submit
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newSubject.trim() || !newDescription.trim()) return
+    if (!selectedDeptId) {
+      setCreateGeneralError('Please select a department.')
+      return
+    }
+    if (!termsAccepted) {
+      setCreateGeneralError('Please accept the Terms & Conditions to create a ticket.')
+      return
+    }
 
     setIsSubmitting(true)
     setCreateGeneralError(null)
 
     try {
-      const selectedDept = departments.find((d) => String(d.id) === String(selectedDeptId))
-      const deptName = selectedDept?.name || 'General Support'
-
-      const res = await createCustomerTicket({
+      const res = await createCustomerTicketWithAttachments({
         email: customerEmail,
         phoneNumber: newPhone.trim() || undefined,
-        phone: newPhone.trim() || undefined,
         subject: newSubject.trim(),
         description: newDescription.trim(),
         departmentId: selectedDeptId,
-        departmentName: deptName,
         priority: newPriority,
+        businessName: businessName.trim() || undefined,
+        smsbCustomerId,
+        termsAccepted,
+        files: attachments,
       })
 
       setCreateOpen(false)
       setCreateGeneralError(null)
       setActiveTicketAlertBanner(null)
-      setNewSubject('')
-      setNewDescription('')
-      setNewPhone('')
+      resetCreateForm()
       setSuccessTicketId(res.ticketNumber)
-      showToast(`Ticket #${res.ticketNumber} created successfully!`)
+      if (res.failedFiles.length > 0) {
+        showToast(`Ticket #${res.ticketNumber} created, but ${res.failedFiles.length} file(s) could not be uploaded.`, 'error')
+      } else {
+        showToast(`Ticket #${res.ticketNumber} created successfully!`)
+      }
       await loadData(0)
     } catch (err: any) {
       const rawMsg = err?.message || 'Failed to create ticket'
@@ -1443,6 +1574,15 @@ export function CustomerHelpSupportView() {
                         </div>
                       </div>
 
+                      {/* Business name + attachments (customer form, V26) */}
+                      {detail?.businessName && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#334155' }}>
+                          <Building2 size={13} color="#64748b" />
+                          <span style={{ fontWeight: 700 }}>Business:</span> {detail.businessName}
+                        </div>
+                      )}
+                      <TicketAttachmentsView attachments={detail?.attachments} />
+
                       {/* 6-Item Meta Grid */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                         {/* Raised by */}
@@ -1947,6 +2087,78 @@ export function CustomerHelpSupportView() {
                 />
               </div>
 
+              {/* Business Name — auto-fetched from your email / phone */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <Building2 size={14} color="#64748b" />
+                  Business Name
+                  {businessLookupState === 'loading' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', fontWeight: 400 }}>
+                      <Loader2 size={12} className="animate-spin" /> Fetching…
+                    </span>
+                  )}
+                </label>
+
+                {businessLookupState === 'found' && businessOptions.length > 1 ? (
+                  <select
+                    value={smsbCustomerId != null ? String(smsbCustomerId) : ''}
+                    onChange={(e) => {
+                      const picked = businessOptions.find((b) => String(b.customerId) === e.target.value)
+                      if (picked) {
+                        setSmsbCustomerId(picked.customerId)
+                        setBusinessName(picked.businessName)
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      background: '#ffffff',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {businessOptions.map((b) => (
+                      <option key={`${b.customerId}-${b.businessName}`} value={b.customerId != null ? String(b.customerId) : ''}>
+                        {b.businessName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={businessName}
+                    readOnly={businessLookupState === 'found'}
+                    maxLength={255}
+                    onChange={(e) => {
+                      setBusinessName(e.target.value)
+                      setSmsbCustomerId(null)
+                    }}
+                    placeholder={businessLookupState === 'loading' ? 'Fetching your business…' : 'Enter your business name'}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      boxSizing: 'border-box',
+                      background: businessLookupState === 'found' ? '#f8fafc' : '#ffffff',
+                    }}
+                  />
+                )}
+
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
+                  {businessLookupState === 'found'
+                    ? businessOptions.length > 1
+                      ? 'We found multiple businesses on your account — pick the one this ticket is about.'
+                      : 'Fetched automatically from your account.'
+                    : businessLookupState === 'none'
+                      ? "We couldn't fetch your business name — please enter it."
+                      : 'Fetched automatically from your email or phone number.'}
+                </p>
+              </div>
+
               {/* Department & Priority */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
                 <div>
@@ -1966,12 +2178,18 @@ export function CustomerHelpSupportView() {
                       boxSizing: 'border-box',
                     }}
                   >
+                    {departments.length === 0 && <option value="">No departments available</option>}
                     {departments.map((dept) => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name}
                       </option>
                     ))}
                   </select>
+                  {departments.length === 0 && (
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#dc2626' }}>
+                      Couldn't load departments. Please refresh the page and try again.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -2022,6 +2240,125 @@ export function CustomerHelpSupportView() {
                 />
               </div>
 
+              {/* Attachments (optional) */}
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Attachments <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 400 }}>(Optional)</span>
+                </label>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={TICKET_ATTACHMENT_LIMITS.accept}
+                  onChange={(e) => handleFilesPicked(e.target.files)}
+                  style={{ display: 'none' }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attachments.length >= TICKET_ATTACHMENT_LIMITS.maxFiles}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '10px',
+                    border: '1.5px dashed #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: attachments.length >= TICKET_ATTACHMENT_LIMITS.maxFiles ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Paperclip size={14} /> Add images, videos or documents
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: 400, color: '#94a3b8' }}>
+                    Up to {TICKET_ATTACHMENT_LIMITS.maxFiles} files · images & documents max 10 MB · videos max 50 MB
+                  </span>
+                </button>
+
+                {attachmentError && (
+                  <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#dc2626', fontWeight: 600 }}>{attachmentError}</p>
+                )}
+
+                {attachments.length > 0 && (
+                  <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {attachments.map((f, i) => {
+                      const Icon = f.type.startsWith('image/') ? ImageIcon : f.type.startsWith('video/') ? Video : FileText
+                      return (
+                        <li
+                          key={`${f.name}-${f.size}-${i}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '7px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                          }}
+                        >
+                          <Icon size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: '12px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {f.name}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', flexShrink: 0 }}>{formatFileSize(f.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(i)}
+                            aria-label={`Remove ${f.name}`}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px', display: 'flex' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              {/* Terms & Conditions */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  marginBottom: '20px',
+                  fontSize: '12px',
+                  color: '#334155',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked)
+                    if (e.target.checked) setCreateGeneralError(null)
+                  }}
+                  style={{ marginTop: '2px', width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
+                />
+                <span>
+                  I agree to the{' '}
+                  {TERMS_URL ? (
+                    <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 600 }}>
+                      Terms &amp; Conditions
+                    </a>
+                  ) : (
+                    <strong>Terms &amp; Conditions</strong>
+                  )}{' '}
+                  and confirm the details and files shared above are accurate.{' '}
+                  <span style={{ color: '#ef4444' }}>*</span>
+                </span>
+              </label>
+
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
@@ -2042,7 +2379,8 @@ export function CustomerHelpSupportView() {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !termsAccepted}
+                  title={!termsAccepted ? 'Please accept the Terms & Conditions' : undefined}
                   style={{
                     padding: '8px 20px',
                     borderRadius: '8px',
@@ -2051,7 +2389,8 @@ export function CustomerHelpSupportView() {
                     color: '#ffffff',
                     fontSize: '13px',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    opacity: isSubmitting || !termsAccepted ? 0.55 : 1,
+                    cursor: isSubmitting || !termsAccepted ? 'not-allowed' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
