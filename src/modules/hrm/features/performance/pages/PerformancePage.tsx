@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Edit3, Loader2, Plus, Search, Star, Target } from "lucide-react";
 
 import { useAuth } from "@features/auth";
-import type { EmployeeListItem } from "@features/hr";
+import type { EmployeeLookupItem } from "@features/hr";
 import { hrService } from "@features/hr/services";
 import { useToast } from "@shared/components/feedback";
 import {
@@ -565,15 +565,10 @@ function PerformanceDialog({
   const designationItems = designations.data ?? [];
 
   const employees = useQuery({
-    queryKey: ["performance", "employees"],
-    queryFn: () =>
-      hrService
-        .listEmployees({ page: 0, size: 100, status: "active", sort: "employeeCode,asc" })
-        .then((r) => r.items),
+    queryKey: ["performance", "employees", "lookup"],
+    queryFn: () => hrService.lookupEmployees(),
   });
-  const employeeItems = (employees.data ?? []).filter(
-    (employee) => employee.status === "active",
-  );
+  const employeeItems = employees.data ?? [];
   const filteredDesignations = departmentId
     ? designationItems.filter(
         (designation) =>
@@ -771,9 +766,10 @@ function PerformanceDialog({
           <SelectEmployee
             label="Reviewer"
             value={form.reviewerId}
-            employees={(employees.data ?? []).filter((employee) =>
-              ["hr", "admin", "manager", "sub_hr"].includes(employee.role),
-            )}
+            employees={(employees.data ?? []).filter((employee) => {
+              const r = employee.role?.toLowerCase() || "";
+              return ["hr", "admin", "manager", "sub_hr", "hr_head"].includes(r);
+            })}
             disabled={employees.isLoading}
             className={inputClass}
             onChange={(id) => update("reviewerId", id)}
@@ -1012,7 +1008,7 @@ function SelectEmployee({
 }: {
   label: string;
   value: number;
-  employees: EmployeeListItem[];
+  employees: EmployeeLookupItem[];
   disabled: boolean;
   className: string;
   onChange: (id: number) => void;

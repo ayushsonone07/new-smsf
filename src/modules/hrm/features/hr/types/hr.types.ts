@@ -139,8 +139,13 @@ export interface EmployeeLookupItem {
   id: number;
   name: string;
   employeeCode: string;
-  departmentName: string | null;
-  employmentType: EmploymentType;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  designationId?: number | null;
+  designationTitle?: string | null;
+  role?: string | null;
+  status?: string | null;
+  employmentType?: EmploymentType;
 }
 
 export interface EmployeeListItem {
