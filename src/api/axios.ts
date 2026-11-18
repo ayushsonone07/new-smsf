@@ -12,6 +12,7 @@ import { authedApiRequest } from './client'
 interface ApiClientConfig {
   headers?: Record<string, string>
   params?: Record<string, string | number | boolean | undefined>
+  signal?: AbortSignal
 }
 
 function withParams(
@@ -44,6 +45,7 @@ async function request<T>(
     {
       method,
       headers: { ...(config?.headers ?? {}) },
+      signal: config?.signal,
       body:
         body === undefined || body === null
           ? undefined
