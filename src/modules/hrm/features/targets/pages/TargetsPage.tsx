@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@features/auth";
-import type { EmployeeListItem } from "@features/hr";
+import type { EmployeeLookupItem } from "@features/hr";
 import { hrService } from "@features/hr/services";
 import { useToast } from "@shared/components/feedback";
 import {
@@ -638,14 +638,11 @@ function TargetDialog({
   const [calQuarter, setCalQuarter] = useState<string>("Q1");
 
   const employeesQuery = useQuery({
-    queryKey: ["targets", "employees"],
-    queryFn: () =>
-      hrService
-        .listEmployees({ page: 0, size: 200, status: "active", sort: "employeeCode,asc" })
-        .then((r) => r.items),
+    queryKey: ["targets", "employees", "lookup"],
+    queryFn: () => hrService.lookupEmployees(),
   });
 
-  const employees: EmployeeListItem[] = employeesQuery.data ?? [];
+  const employees: EmployeeLookupItem[] = employeesQuery.data ?? [];
 
   useEffect(() => {
     if (!open) return;
