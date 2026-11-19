@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ChevronDown, CircleDot, Flag, Pencil, Plus, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, CircleDot, Flag, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react'
 
 import {
   createTicketStatus,
@@ -111,8 +111,8 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   })
 
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      isStatus ? toggleTicketStatusActive(id, active) : toggleTicketPriorityActive(id, active),
+    // Same API the State dropdown uses — works for both statuses and priorities
+    mutationFn: ({ id, active }: { id: number; active: boolean }) => setTicketConfigActive(type, id, active),
     onMutate: async ({ id, active }) => {
       await queryClient.cancelQueries({ queryKey: ['help-center-config', type] })
       const previous = queryClient.getQueryData<HelpCenterConfigItem[]>(['help-center-config', type])
@@ -127,7 +127,6 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
       }
     },
     onSettled: () => {
-      setTogglingId(null)
       queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
     },
   })
