@@ -17,6 +17,7 @@ import {
   X,
   LogOut,
   Ticket,
+  ListChecks,
   BarChart3,
   Users,
   PhoneCall,
@@ -46,6 +47,7 @@ import './HeadSidebar.css'
 
 const HELP_TAB_ICONS: Record<HelpCenterTab, LucideIcon> = {
   'assigned-tickets': Ticket,
+  'all-tickets': ListChecks,
   analytics: BarChart3,
   'department-members': Users,
   calls: PhoneCall,

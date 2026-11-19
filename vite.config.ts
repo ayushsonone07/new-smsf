@@ -65,6 +65,19 @@ export default defineConfig(({ mode }) => {
             })
           },
         },
+        // These two must go through SMSB: it adds the department/scope from the logged-in
+        // user's token. Sent straight to help-center they have no scope (500 / empty).
+        // Keep them ABOVE '/api/help-center' — the first matching key wins.
+        '/api/help-center/department_users/fetch_department_tickets': {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/help-center/tickets/customer-history': {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
         '/api/help-center': {
           target: helpCenterUrl,
           changeOrigin: true,

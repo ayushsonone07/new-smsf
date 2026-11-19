@@ -94,6 +94,41 @@ export async function fetchAssignedTickets(
 }
 
 /**
+ * Head → "All Tickets": every ticket in the logged-in head's department in ONE call.
+ * SMSB takes the department from the token; rows carry assignedToEmail / assignedToName / unassigned.
+ * Endpoint: GET /api/help-center/department_users/fetch_department_tickets
+ */
+export async function fetchDepartmentTickets(
+  params?: Omit<AssignedTicketsFilterParams, 'sortDirection'>
+): Promise<EmployeeTicketPageResponse> {
+  const size = params?.size ?? 200
+  const res = await apiClient.get<CustomApiResponse<EmployeeTicketPageResponse>>(
+    '/api/help-center/department_users/fetch_department_tickets',
+    {
+      params: {
+        page: params?.page ?? 0,
+        size,
+        status: params?.status || undefined,
+        priority: params?.priority || undefined,
+        days: params?.days ?? undefined,
+        months: params?.months !== undefined ? String(params.months) : undefined,
+        period: params?.period || undefined,
+        startDate: params?.startDate || undefined,
+        endDate: params?.endDate || undefined,
+      },
+      signal: params?.signal,
+    }
+  )
+
+  const data = res.data?.data
+  if (!data) {
+    return { content: [], currentPage: 0, pageSize: size, totalRecords: 0, totalPages: 0 }
+  }
+  if (!Array.isArray(data.content)) data.content = []
+  return data
+}
+
+/**
  * Fetch status summary counts for tickets (e.g. OPEN, IN_PROGRESS, etc.).
  * Endpoint: GET /api/help-center/tickets/status_summary?email=...
  */
@@ -210,9 +245,30 @@ export async function assignTickets(
  * Fetch assignable team members for this department.
  * Endpoint: GET /api/meetings/users/assigning-list?departmentType=...
  */
-export async function fetchAssignableDepartmentUsers(
-  departmentType?: string
+// The member list rarely changes; share one request between screens (and React StrictMode's
+// double effect run in dev). Pass { force: true } from Refresh buttons to bypass it.
+const ASSIGNABLE_USERS_TTL_MS = 60_000
+const assignableUsersCache = new Map<string, { at: number; promise: Promise<AssignableUser[]> }>()
+
+export function fetchAssignableDepartmentUsers(
+  departmentType?: string,
+  options?: { force?: boolean }
 ): Promise<AssignableUser[]> {
+  const key = departmentType || ''
+  const cached = assignableUsersCache.get(key)
+  if (!options?.force && cached && Date.now() - cached.at < ASSIGNABLE_USERS_TTL_MS) {
+    return cached.promise
+  }
+  const promise = loadAssignableDepartmentUsers(departmentType)
+  assignableUsersCache.set(key, { at: Date.now(), promise })
+  // Don't keep an empty/failed result around
+  promise.then((list) => {
+    if (list.length === 0 && assignableUsersCache.get(key)?.promise === promise) assignableUsersCache.delete(key)
+  })
+  return promise
+}
+
+async function loadAssignableDepartmentUsers(departmentType?: string): Promise<AssignableUser[]> {
   try {
     const res = await apiClient.get<CustomApiResponse<AssignableUser[]>>(
       '/api/meetings/users/assigning-list',

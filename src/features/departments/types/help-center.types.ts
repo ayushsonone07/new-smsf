@@ -41,6 +41,11 @@ export interface EmployeeTicketWithCreator {
   attachments?: TicketAttachment[]
   previousTicketCount?: number
   hasMultipleTickets?: boolean
+  /** Filled by the department-wide list (All Tickets) */
+  assignedToEmail?: string | null
+  assignedToName?: string | null
+  /** Nobody has it, or it is still with the department head */
+  unassigned?: boolean
 }
 
 export interface CustomerHistoryTicket {
