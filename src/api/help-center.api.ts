@@ -18,20 +18,39 @@ interface CustomApiResponse<T> {
   data: T
 }
 
+export interface AssignedTicketsFilterParams {
+  page?: number
+  size?: number
+  status?: string
+  priority?: string
+  days?: number
+  months?: string | number
+  period?: string
+  startDate?: string
+  endDate?: string
+  sortDirection?: 'asc' | 'desc'
+  signal?: AbortSignal
+}
+
+export interface AnalyticsFilterParams {
+  email?: string
+  role?: string
+  days?: number
+  months?: string | number
+  period?: string
+  startDate?: string
+  endDate?: string
+  departmentId?: number
+  signal?: AbortSignal
+}
+
 /**
  * Fetch paginated tickets assigned to an employee along with creator information.
  * Endpoint: GET /api/help-center/department_users/fetch_tickets_assigned_to_employee
  */
 export async function fetchAssignedTickets(
   email: string,
-  params?: {
-    page?: number
-    size?: number
-    status?: string
-    priority?: string
-    startDate?: string
-    endDate?: string
-  }
+  params?: AssignedTicketsFilterParams
 ): Promise<EmployeeTicketPageResponse> {
   const res = await apiClient.get<CustomApiResponse<EmployeeTicketPageResponse>>(
     '/api/help-center/department_users/fetch_tickets_assigned_to_employee',
@@ -42,9 +61,14 @@ export async function fetchAssignedTickets(
         size: params?.size ?? 100,
         status: params?.status || undefined,
         priority: params?.priority || undefined,
+        days: params?.days ?? undefined,
+        months: params?.months !== undefined ? String(params.months) : undefined,
+        period: params?.period || undefined,
         startDate: params?.startDate || undefined,
         endDate: params?.endDate || undefined,
+        sortDirection: params?.sortDirection || undefined,
       },
+      signal: params?.signal,
     }
   )
 
@@ -72,29 +96,42 @@ export async function fetchAssignedTickets(
  * Endpoint: GET /api/help-center/tickets/status_summary?email=...
  */
 export async function fetchTicketStatusSummary(
-  email: string
+  email: string,
+  signal?: AbortSignal
 ): Promise<HelpCenterStatusSummary | null> {
   try {
     const res = await apiClient.get<CustomApiResponse<HelpCenterStatusSummary>>(
       '/api/help-center/tickets/status_summary',
       {
         params: { email },
+        signal,
       }
     )
     return res.data?.data ?? null
-  } catch (err) {
-    console.warn('Failed to fetch status summary from API:', err)
+  } catch (err: any) {
+    if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+      console.warn('Failed to fetch status summary from API:', err)
+    }
     return null
   }
 }
 
 /**
- * Fetch Help Center dashboard analytics.
+ * Fetch Help Center dashboard analytics with optional time range filters.
  * Endpoint: GET /api/help-center/dashboard/analytics
  */
 export async function fetchHelpCenterAnalytics(
   email?: string,
-  role?: string
+  role?: string,
+  filterParams?: {
+    days?: number
+    months?: string | number
+    period?: string
+    startDate?: string
+    endDate?: string
+    departmentId?: number
+    signal?: AbortSignal
+  }
 ): Promise<HelpCenterDashboardAnalytics | null> {
   try {
     // The Help Center reads the caller's role from X-User-Role. SMSB sets it
@@ -107,15 +144,24 @@ export async function fetchHelpCenterAnalytics(
         params: {
           email: email || undefined,
           role: role || undefined,
+          days: filterParams?.days ?? undefined,
+          months: filterParams?.months !== undefined ? String(filterParams.months) : undefined,
+          period: filterParams?.period || undefined,
+          startDate: filterParams?.startDate || undefined,
+          endDate: filterParams?.endDate || undefined,
+          departmentId: filterParams?.departmentId ?? undefined,
         },
         headers: isSuperAdmin
           ? { 'X-User-Role': 'SUPER_ADMIN', ...(email ? { 'X-User-Email': email } : {}) }
           : undefined,
+        signal: filterParams?.signal,
       }
     )
     return res.data?.data ?? null
-  } catch (err) {
-    console.warn('Failed to fetch help center analytics from API:', err)
+  } catch (err: any) {
+    if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+      console.warn('Failed to fetch help center analytics from API:', err)
+    }
     return null
   }
 }
@@ -179,19 +225,7 @@ export async function fetchAssignableDepartmentUsers(
       return list
     }
   } catch {
-    // fallback
-  }
-
-  try {
-    const fallback = await apiClient.get<CustomApiResponse<AssignableUser[]>>(
-      '/api/help-center/users'
-    )
-    const list = fallback.data?.data
-    if (Array.isArray(list)) {
-      return list
-    }
-  } catch {
-    // fallback
+    // If user lacks permission (e.g. non-head user) or endpoint fails, return empty list
   }
 
   return []
