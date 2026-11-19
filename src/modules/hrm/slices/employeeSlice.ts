@@ -9,7 +9,14 @@ import { apiClient } from "@hrm/utils/apiClient";
 import { normalizeApiError } from "@hrm/utils/apiError";
 import type { ApiErrorPayload } from "@hrm/utils/asyncThunk";
 
-type EmployeeStatus = "active" | "on_leave" | "notice" | "terminated";
+type EmployeeStatus =
+  | "active"
+  | "notice"
+  | "resignation"
+  | "exit"
+  | "abscond"
+  | "terminated"
+  | "on_leave";
 
 interface EmployeeFilters {
   q: string | undefined;

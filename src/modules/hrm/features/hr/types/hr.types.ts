@@ -48,7 +48,14 @@ export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
 
 export type EmploymentType = "full_time" | "part_time" | "contract" | "intern";
 
-export type EmployeeStatus = "active" | "on_leave" | "notice" | "terminated";
+export type EmployeeStatus =
+  | "active"
+  | "notice"
+  | "resignation"
+  | "exit"
+  | "abscond"
+  | "terminated"
+  | "on_leave";
 
 export type UserRole = "admin" | "hr" | "sub_hr" | "manager" | "employee" | "visitor";
 
