@@ -856,7 +856,13 @@ export function CustomerListPage() {
   async function handleCallCustomer(customer: OnboardingCustomer) {
     setCallingCustomerId(customer.id)
     try {
-      const result = await initiateAirtelClickToCall(customer.phone)
+      // DEPARTMENT context → the recording shows in this customer's department Calls, not in a ticket
+      const result = await initiateAirtelClickToCall(customer.phone, {
+        contextType: 'DEPARTMENT',
+        customerId: customer.id,
+        customerName: customer.businessName,
+        departmentType: currentDepartment,
+      })
       if (result?.success === false) {
         throw new Error(result.message || 'Unable to initiate call')
       }

@@ -8,6 +8,8 @@ import type {
   HelpArticle,
   TicketHistoryPageResponse,
   TicketHistoryEntry,
+  CustomerHistoryPageResponse,
+  CustomerHistoryTicket,
 } from '../features/departments/types/help-center.types'
 
 interface CustomApiResponse<T> {
@@ -400,4 +402,57 @@ export async function getHelpArticles(
   _departmentId: string
 ): Promise<HelpArticle[]> {
   return []
+}
+
+export interface CustomerTicketHistoryParams {
+  excludeTicket?: string
+  status?: string
+  priority?: string
+  page?: number
+  size?: number
+  signal?: AbortSignal
+}
+
+/**
+ * Fetch a customer's previous tickets on demand ("View All").
+ * Endpoint: GET /api/help-center/tickets/customer-history
+ */
+export async function fetchCustomerTicketHistory(
+  creatorId: number,
+  params?: CustomerTicketHistoryParams
+): Promise<CustomerHistoryPageResponse> {
+  const res = await apiClient.get<CustomApiResponse<CustomerHistoryPageResponse>>(
+    '/api/help-center/tickets/customer-history',
+    {
+      params: {
+        creatorId,
+        excludeTicket: params?.excludeTicket || undefined,
+        status: params?.status || undefined,
+        priority: params?.priority || undefined,
+        page: params?.page ?? 0,
+        size: params?.size ?? 10,
+      },
+      signal: params?.signal,
+    }
+  )
+
+  const data = res.data?.data
+  if (!data) {
+    return {
+      creatorId,
+      content: [],
+      currentPage: 0,
+      pageSize: params?.size ?? 10,
+      totalRecords: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    }
+  }
+
+  if (!Array.isArray(data.content)) {
+    data.content = []
+  }
+
+  return data
 }

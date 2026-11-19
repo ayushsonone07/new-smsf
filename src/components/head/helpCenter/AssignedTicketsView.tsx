@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   Phone,
   Repeat,
+  Layers,
+  Building2,
+  PhoneCall,
 } from 'lucide-react'
 import type {
   EmployeeTicketWithCreator,
@@ -26,6 +29,10 @@ import {
   fetchAssignableDepartmentUsers,
 } from '../../../api/help-center.api'
 import { TicketStatusHistoryModal } from './TicketStatusHistoryModal'
+import { CustomerTicketHistoryModal } from './CustomerTicketHistoryModal'
+import { CallsHistoryModal } from './CallsHistoryModal'
+import { useTicketCall } from './useTicketCall'
+import { TicketAttachmentsView } from '../../customers-dashboard/TicketAttachmentsView'
 import { RefreshButton } from '../../ui/RefreshButton'
 
 interface AssignedTicketsViewProps {
@@ -88,6 +95,8 @@ export function AssignedTicketsView({
   const [activeTab, setActiveTab] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTicketNumber, setSelectedTicketNumber] = useState<string | null>(null)
+  // Calls View: null = closed; otherwise the filters it opens with
+  const [callsView, setCallsView] = useState<{ ticketNumber?: string; customer?: string } | null>(null)
 
   // Modals state
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
@@ -105,6 +114,27 @@ export function AssignedTicketsView({
     setHistoryTicketNumber(ticketNumber)
     setHistoryCurrentStatus(status)
     setIsHistoryModalOpen(true)
+  }
+
+  const [isCustomerHistoryModalOpen, setIsCustomerHistoryModalOpen] = useState(false)
+  const [customerHistoryTarget, setCustomerHistoryTarget] = useState<{
+    creatorId: number
+    creatorName?: string | null
+    creatorEmail?: string | null
+    creatorPhone?: string | null
+    currentTicketNumber?: string
+  } | null>(null)
+
+  function handleOpenCustomerHistoryModal(ticket: EmployeeTicketWithCreator) {
+    if (!ticket.creatorId) return
+    setCustomerHistoryTarget({
+      creatorId: ticket.creatorId,
+      creatorName: ticket.creatorName,
+      creatorEmail: ticket.creatorEmail,
+      creatorPhone: ticket.creatorPhone,
+      currentTicketNumber: ticket.ticketNumber,
+    })
+    setIsCustomerHistoryModalOpen(true)
   }
 
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false)
@@ -241,6 +271,15 @@ export function AssignedTicketsView({
     }
     return filteredTickets[0]
   }, [filteredTickets, selectedTicketNumber])
+
+  // Click-to-call from the open ticket → tagged TICKET so the recording lands on this ticket
+  const ticketCall = useTicketCall({
+    ticketNumber: selectedTicket?.ticketNumber ?? '',
+    customerPhone: selectedTicket?.creatorPhone,
+    customerId: selectedTicket?.smsbCustomerId ?? null,
+    customerName: selectedTicket?.businessName || selectedTicket?.creatorName,
+    departmentType,
+  })
 
   // Sync selectedTicketNumber when selectedTicket changes
   useEffect(() => {
@@ -400,21 +439,21 @@ export function AssignedTicketsView({
   }
 
   function formatShortDate(dateStr?: string | null) {
-    if (!dateStr) return '—'
+    if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return '—'
     try {
       const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return dateStr
+      if (isNaN(d.getTime())) return '—'
       return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(d)
     } catch {
-      return dateStr
+      return '—'
     }
   }
 
   function formatFullDate(dateStr?: string | null) {
-    if (!dateStr) return '—'
+    if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return '—'
     try {
       const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return dateStr
+      if (isNaN(d.getTime())) return '—'
       return new Intl.DateTimeFormat('en-GB', {
         day: 'numeric',
         month: 'short',
@@ -426,7 +465,7 @@ export function AssignedTicketsView({
         .format(d)
         .toLowerCase()
     } catch {
-      return dateStr
+      return '—'
     }
   }
 
@@ -527,6 +566,16 @@ export function AssignedTicketsView({
           >
             <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCallsView({})}
+            title="Calls made from tickets, with recordings"
+            className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors flex-shrink-0"
+          >
+            <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Calls View</span>
           </button>
 
           {canReassignTickets && (
@@ -645,20 +694,36 @@ export function AssignedTicketsView({
                       {t.creatorName || t.creatorEmail || 'Customer'}
                       {t.departmentName ? ` · ${t.departmentName}` : ''}
                     </span>
-                    {canViewHistory && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
-                        }}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex-shrink-0"
-                        title="View ticket history"
-                      >
-                        <History className="h-3 w-3" />
-                        <span>History</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {(t.hasMultipleTickets || (t.previousTicketCount ?? 0) > 0) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenCustomerHistoryModal(t)
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+                          title="View all previous tickets from this customer"
+                        >
+                          <Layers className="h-3 w-3 text-blue-600" />
+                          <span>View All{t.previousTicketCount ? ` (${t.previousTicketCount})` : ''}</span>
+                        </button>
+                      )}
+                      {canViewHistory && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                          title="View ticket history"
+                        >
+                          <History className="h-3 w-3 text-slate-500" />
+                          <span>History</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -705,23 +770,62 @@ export function AssignedTicketsView({
                       {(selectedTicket.creatorName || selectedTicket.creatorEmail || 'C').charAt(0).toUpperCase()}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-900 truncate">
-                        {selectedTicket.creatorName || 'Customer'}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {selectedTicket.creatorName || 'Customer'}
+                        </p>
+                        {selectedTicket.businessName && (
+                          <span className="text-[11px] font-medium text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 truncate inline-flex items-center gap-1">
+                            <Building2 className="h-3 w-3 text-slate-400" />
+                            {selectedTicket.businessName}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 truncate">
                         {[selectedTicket.creatorPhone, selectedTicket.creatorEmail].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
-                    {selectedTicket.creatorPhone && (
-                      <a
-                        href={`tel:${selectedTicket.creatorPhone}`}
-                        title={`Call ${selectedTicket.creatorPhone}`}
-                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-emerald-600 hover:bg-emerald-50 transition-colors"
+
+                    {/* View All button if customer has more than 1 ticket */}
+                    {(selectedTicket.hasMultipleTickets || (selectedTicket.previousTicketCount ?? 0) > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCustomerHistoryModal(selectedTicket)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors flex-shrink-0 shadow-2xs"
+                        title="View all previous tickets from this customer"
                       >
-                        <Phone className="h-4 w-4" />
-                      </a>
+                        <Layers className="h-3.5 w-3.5 text-blue-600" />
+                        <span>View All{selectedTicket.previousTicketCount ? ` (${selectedTicket.previousTicketCount})` : ''}</span>
+                      </button>
+                    )}
+
+                    {selectedTicket.creatorPhone && (
+                      <button
+                        type="button"
+                        onClick={ticketCall.call}
+                        disabled={ticketCall.isCalling}
+                        title={`Call ${selectedTicket.creatorPhone} (recording is saved on this ticket)`}
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                      >
+                        {ticketCall.isCalling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+                      </button>
                     )}
                   </div>
+
+                  {ticketCall.message && (
+                    <div
+                      className={`flex items-start justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
+                        ticketCall.message.type === 'success'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-rose-200 bg-rose-50 text-rose-800'
+                      }`}
+                    >
+                      <span>{ticketCall.message.text}</span>
+                      <button type="button" onClick={ticketCall.clearMessage} className="flex-shrink-0 opacity-70 hover:opacity-100">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
 
                   {/* Status + actions */}
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -737,6 +841,28 @@ export function AssignedTicketsView({
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setCallsView({ ticketNumber: selectedTicket.ticketNumber })}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                        title="Calls made from this ticket, with recordings"
+                      >
+                        <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Ticket calls</span>
+                      </button>
+
+                      {selectedTicket.creatorPhone && (
+                        <button
+                          type="button"
+                          onClick={() => setCallsView({ customer: selectedTicket.creatorPhone || '' })}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                          title="All ticket calls with this customer, across their tickets"
+                        >
+                          <PhoneCall className="h-3.5 w-3.5 text-blue-600" />
+                          <span>Customer calls</span>
+                        </button>
+                      )}
+
                       {canViewHistory && (
                         <button
                           type="button"
@@ -811,11 +937,18 @@ export function AssignedTicketsView({
                   <div className="max-w-[90%] rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {selectedTicket.description || 'No description provided.'}
                   </div>
-                  <p className="mt-1.5 text-[11px] text-slate-400">
+                  {/* Attachments with Download button only */}
+                  {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                    <div className="mt-3">
+                      <TicketAttachmentsView attachments={selectedTicket.attachments} />
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] text-slate-400">
                     {selectedTicket.creatorName || selectedTicket.creatorEmail || 'Customer'} ·{' '}
                     {formatFullDate(selectedTicket.ticketCreatedAt)}
                   </p>
                 </div>
+
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
@@ -1189,6 +1322,31 @@ export function AssignedTicketsView({
         ticketNumber={historyTicketNumber}
         currentStatus={historyCurrentStatus}
         onClose={() => setIsHistoryModalOpen(false)}
+      />
+
+      {/* ── Modal: Calls View (Help & Support → ticket calls only, with recordings) ── */}
+      {callsView && (
+        <CallsHistoryModal
+          // new key per filter → the modal opens with these filters applied
+          key={`${callsView.ticketNumber ?? ''}|${callsView.customer ?? ''}`}
+          open
+          onClose={() => setCallsView(null)}
+          title="Calls View"
+          defaultSource="TICKET"
+          lockSource
+          initialTicketNumber={callsView.ticketNumber}
+          initialCustomer={callsView.customer}
+        />
+      )}
+
+      {/* ── Modal: Customer Ticket History (View All) ── */}
+      <CustomerTicketHistoryModal
+        isOpen={isCustomerHistoryModalOpen}
+        customer={customerHistoryTarget}
+        onClose={() => {
+          setIsCustomerHistoryModalOpen(false)
+          setCustomerHistoryTarget(null)
+        }}
       />
     </div>
   )

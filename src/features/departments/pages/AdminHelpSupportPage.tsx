@@ -26,6 +26,8 @@ import {
   fetchTicketDetails,
   fetchTicketHistory,
 } from '../../../api/help-center.api'
+import { CallsHistoryModal } from '../../../components/head/helpCenter/CallsHistoryModal'
+import { PhoneCall } from 'lucide-react'
 import { TimeRangeFilter, TimeRangeFilterValue } from '../../../components/head/helpCenter/TimeRangeFilter'
 import { getSession } from '../../../app/auth/session'
 import type {
@@ -1188,8 +1190,7 @@ function TicketDetailsModal({
                     {details.latestRemark}
                   </div>
                 </div>
-              )}
-            </div>
+              )}            </div>
           ) : (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -1291,6 +1292,7 @@ export function AdminHelpSupportPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null)
+  const [isCallsHistoryOpen, setIsCallsHistoryOpen] = useState(false)
   const [timeFilter, setTimeFilter] = useState<TimeRangeFilterValue>({ preset: 'all' })
 
   const analyticsQuery = useQuery({
@@ -1346,12 +1348,31 @@ export function AdminHelpSupportPage() {
             : 'Monitor ticket activity and department performance in one place.'
         }
         actions={
-          <RefreshButton
-            onRefresh={() => analyticsQuery.refetch()}
-            isRefreshing={analyticsQuery.isFetching}
-            label="overview"
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCallsHistoryOpen(true)}
+              title="Calls made from tickets (all departments), with recordings"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+              Calls View
+            </button>
+            <RefreshButton
+              onRefresh={() => analyticsQuery.refetch()}
+              isRefreshing={analyticsQuery.isFetching}
+              label="overview"
+            />
+          </div>
         }
+      />
+
+      <CallsHistoryModal
+        open={isCallsHistoryOpen}
+        onClose={() => setIsCallsHistoryOpen(false)}
+        title="Calls View"
+        defaultSource="TICKET"
+        lockSource
       />
 
       {/* Time Range Filter Bar */}
