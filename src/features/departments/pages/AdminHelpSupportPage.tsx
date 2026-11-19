@@ -19,13 +19,17 @@ import {
   Loader2,
   ChevronDown,
   Eye,
+  User,
+  Paperclip,
 } from 'lucide-react'
 import {
   fetchAllTickets,
+  fetchAssignedTickets,
   fetchHelpCenterAnalytics,
   fetchTicketDetails,
   fetchTicketHistory,
 } from '../../../api/help-center.api'
+import { TicketAttachmentsView } from '../../../components/customers-dashboard/TicketAttachmentsView'
 import { CallsHistoryModal } from '../../../components/head/helpCenter/CallsHistoryModal'
 import { PhoneCall } from 'lucide-react'
 import { TimeRangeFilter, TimeRangeFilterValue } from '../../../components/head/helpCenter/TimeRangeFilter'
@@ -49,7 +53,7 @@ import { TablePagination } from '../../../components/ui/TablePagination'
  * and status timeline for administration.
  */
 
-type Tab = 'overview' | 'tickets'
+type Tab = 'departments' | 'tickets'
 
 interface Counts {
   total: number
@@ -884,22 +888,49 @@ function TicketsListSection({
 }
 
 /** Team Workload Table for Department View */
-function TeamWorkloadSection({ dept }: { dept: DepartmentSummary }) {
-  const membersSorted = useMemo(() => {
-    return [...dept.members].sort((a, b) => unresolvedOf(b) - unresolvedOf(a))
-  }, [dept.members])
+function TeamWorkloadSection({
+  dept,
+  onViewMember,
+}: {
+  dept: DepartmentSummary
+  onViewMember?: (member: Counts & { email: string; name: string }) => void
+}) {
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const membersFiltered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    const sorted = [...dept.members].sort((a, b) => unresolvedOf(b) - unresolvedOf(a))
+    if (!q) return sorted
+    return sorted.filter(
+      (m) =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q)
+    )
+  }, [dept.members, searchTerm])
 
   return (
     <div className="bg-white border border-[#e7ebf3] rounded-2xl shadow-sm overflow-hidden mb-6">
       <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7ebf3]">
         <div>
-          <h2 className="text-sm font-bold text-[#17243c] tracking-tight">Team Workload</h2>
+          <h2 className="text-sm font-bold text-[#17243c] tracking-tight">Department Users</h2>
           <p className="text-xs text-[#77869e] mt-1">
-            Department members with ticket counts by status
+            Department users with assigned ticket metrics
           </p>
         </div>
-        <div className="text-xs font-semibold text-[#5c6d88]">
-          Tickets assigned to each member of {dept.name}
+        <div className="flex items-center gap-3">
+          <div className="relative min-w-[220px]">
+            <Search className="w-4 h-4 text-[#9aa6b9] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              className="w-full h-9 pl-9 pr-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] placeholder-[#9aa6b9] focus:outline-none focus:border-[#315fe8]"
+              placeholder="Search user by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="text-xs font-semibold text-[#5c6d88] whitespace-nowrap">
+            {dept.members.length} {dept.members.length === 1 ? 'user' : 'users'}
+          </div>
         </div>
       </div>
 
@@ -915,20 +946,25 @@ function TeamWorkloadSection({ dept }: { dept: DepartmentSummary }) {
               <th className="py-3 px-4">ESCALATED</th>
               <th className="py-3 px-4">RESOLVED / CLOSED</th>
               <th className="py-3 px-4">RESOLUTION %</th>
+              <th className="py-3 px-4 text-right">ACTION</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#eff2f7]">
-            {membersSorted.length === 0 ? (
+            {membersFiltered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-xs text-[#77869e]">
+                <td colSpan={9} className="py-8 text-center text-xs text-[#77869e]">
                   No members with assigned tickets found for this department.
                 </td>
               </tr>
             ) : (
-              membersSorted.map((m) => {
+              membersFiltered.map((m) => {
                 const rate = resolutionRate(m)
                 return (
-                  <tr key={m.email} className="hover:bg-[#f9fbff] transition-colors">
+                  <tr
+                    key={m.email}
+                    onClick={() => onViewMember?.(m)}
+                    className="hover:bg-[#f9fbff] transition-colors cursor-pointer"
+                  >
                     <td className="py-3.5 px-4">
                       <strong className="block text-xs font-bold text-[#17243c]">
                         {m.name || m.email}
@@ -962,12 +998,338 @@ function TeamWorkloadSection({ dept }: { dept: DepartmentSummary }) {
                         </div>
                       </div>
                     </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onViewMember?.(m)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-bold text-xs hover:bg-[#315fe8] hover:text-white hover:border-[#315fe8] transition-all shadow-sm"
+                      >
+                        View User <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 )
               })
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+/** Level 3: Department User Details & Assigned Tickets */
+function UserDetailsSection({
+  member,
+  departmentName,
+  onBack,
+  onViewTicket,
+  timeFilter,
+}: {
+  member: Counts & { email: string; name: string }
+  departmentName: string
+  onBack: () => void
+  onViewTicket: (ticketNumber: string) => void
+  timeFilter: TimeRangeFilterValue
+}) {
+  const [statusTab, setStatusTab] = useState<string>('ALL')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 350)
+    return () => clearTimeout(id)
+  }, [searchInput])
+
+  const userTicketsQuery = useQuery({
+    queryKey: [
+      'admin-user-assigned-tickets',
+      member.email,
+      statusTab,
+      page,
+      pageSize,
+      timeFilter,
+    ],
+    queryFn: () =>
+      fetchAssignedTickets(member.email, {
+        page,
+        size: pageSize,
+        status: statusTab === 'ALL' ? undefined : statusTab,
+        days: timeFilter.days,
+        months: timeFilter.months !== undefined ? String(timeFilter.months) : undefined,
+        period: timeFilter.period,
+        startDate: timeFilter.startDate,
+        endDate: timeFilter.endDate,
+      }),
+    placeholderData: keepPreviousData,
+  })
+
+  const rawTickets = userTicketsQuery.data?.content ?? []
+  const filteredTickets = useMemo(() => {
+    if (!search) return rawTickets
+    const q = search.toLowerCase()
+    return rawTickets.filter(
+      (t) =>
+        t.ticketNumber?.toLowerCase().includes(q) ||
+        t.subject?.toLowerCase().includes(q) ||
+        t.creatorName?.toLowerCase().includes(q) ||
+        t.creatorEmail?.toLowerCase().includes(q) ||
+        t.creatorPhone?.toLowerCase().includes(q),
+    )
+  }, [rawTickets, search])
+
+  const totalResults = userTicketsQuery.data?.totalRecords ?? 0
+  const rate = resolutionRate(member)
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb & User Profile Card */}
+      <div className="bg-white border border-[#e7ebf3] rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#e7ebf3] bg-white text-xs font-bold text-[#3f4f6d] hover:bg-[#f8fafe] transition-colors shadow-sm"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Users
+            </button>
+            <div className="h-6 w-[1px] bg-[#e7ebf3]" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 font-extrabold text-sm border border-blue-100">
+                {(member.name || member.email).charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-extrabold text-[#17243c]">
+                    {member.name || member.email}
+                  </h2>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                    {departmentName}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-[#687a96] mt-0.5">{member.email}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-[#e7ebf3] bg-[#f8fafe] px-3.5 py-2 text-right">
+              <span className="block text-[10px] font-bold uppercase text-[#77869e]">Resolution Rate</span>
+              <span className="text-sm font-extrabold text-[#047857]">{rate}%</span>
+            </div>
+            <div className="rounded-xl border border-[#e7ebf3] bg-[#f8fafe] px-3.5 py-2 text-right">
+              <span className="block text-[10px] font-bold uppercase text-[#77869e]">Total Assigned</span>
+              <span className="text-sm font-extrabold text-[#17243c]">{member.total}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Member KPI Stat cards */}
+      <StatKPISection counts={member} />
+
+      {/* Member Assigned Tickets Card */}
+      <div className="bg-white border border-[#e7ebf3] rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-[#e7ebf3] space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#17243c] tracking-tight">Assigned Tickets</h3>
+              <p className="text-xs text-[#77869e] mt-0.5">
+                Tickets assigned to {member.name || member.email}
+              </p>
+            </div>
+            <div className="relative min-w-[260px]">
+              <Search className="w-4 h-4 text-[#9aa6b9] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                className="w-full h-9 pl-9 pr-3 bg-white border border-[#e7ebf3] rounded-lg text-xs text-[#17243c] placeholder-[#9aa6b9] focus:outline-none focus:border-[#315fe8]"
+                placeholder="Search ticket #, subject or customer..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            {[
+              { id: 'ALL', label: 'All', count: member.total },
+              { id: 'OPEN', label: 'Open', count: member.open },
+              { id: 'IN_PROGRESS', label: 'In Progress', count: member.inProgress },
+              { id: 'WAITING_ON_CUSTOMER', label: 'Waiting', count: member.waiting },
+              { id: 'ESCALATED', label: 'Escalated', count: member.escalated },
+              { id: 'RESOLVED', label: 'Resolved', count: member.resolved },
+              { id: 'CLOSED', label: 'Closed', count: member.closed },
+            ].map((tab) => {
+              const active = statusTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setStatusTab(tab.id)
+                    setPage(0)
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                      active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Tickets Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
+            <thead>
+              <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#7b89a1] tracking-wider uppercase">
+                <th className="py-3 px-4">TICKET</th>
+                <th className="py-3 px-4">CUSTOMER</th>
+                <th className="py-3 px-4">PRIORITY</th>
+                <th className="py-3 px-4">STATUS</th>
+                <th className="py-3 px-4">CREATED</th>
+                <th className="py-3 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#eff2f7]">
+              {userTicketsQuery.isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-xs text-[#77869e]">
+                    <LoadingState message="Loading user assigned tickets..." />
+                  </td>
+                </tr>
+              ) : filteredTickets.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-xs text-[#77869e]">
+                    No tickets found for this filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredTickets.map((t) => {
+                  const statusConfig = STATUS_COLORS[t.ticketStatus] || STATUS_COLORS.OPEN
+                  const priorityConfig = PRIORITY_COLORS[t.priority] || PRIORITY_COLORS.LOW
+                  return (
+                    <tr
+                      key={t.ticketNumber}
+                      onClick={() => onViewTicket(t.ticketNumber)}
+                      className="cursor-pointer hover:bg-[#f9fbff] transition-colors"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <strong className="block text-xs font-bold text-[#315fe8] hover:underline">
+                            {t.ticketNumber}
+                          </strong>
+                          {((t.attachments && t.attachments.length > 0) || (t.attachmentCount ?? 0) > 0) && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"
+                              title={`${t.attachments?.length || t.attachmentCount} attachment(s)`}
+                            >
+                              <Paperclip size={10} className="text-slate-500" />
+                              <span>{t.attachments?.length || t.attachmentCount}</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="block text-xs text-[#17243c] font-medium max-w-[320px] truncate mt-0.5">
+                          {t.subject}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <strong className="block text-xs font-bold text-[#17243c]">
+                          {t.creatorName || t.businessName || '—'}
+                        </strong>
+                        <span className="block text-[11px] text-[#77869e] mt-0.5">
+                          {t.creatorPhone || t.creatorEmail || '—'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border"
+                          style={{
+                            backgroundColor: priorityConfig.bg,
+                            color: priorityConfig.fg,
+                            borderColor: priorityConfig.border,
+                          }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: priorityConfig.dot }}
+                          />
+                          {humanize(t.priority)}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border"
+                          style={{
+                            backgroundColor: statusConfig.bg,
+                            color: statusConfig.fg,
+                            borderColor: statusConfig.border,
+                          }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: statusConfig.dot }}
+                          />
+                          {humanize(t.ticketStatus)}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-[#77869e] font-medium">
+                        {formatDate(t.ticketCreatedAt)}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onViewTicket(t.ticketNumber)
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#dbe4f3] bg-white text-[#315fe8] font-bold text-xs hover:bg-[#315fe8] hover:text-white transition shadow-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Details
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {totalResults > 0 && (
+          <div className="p-4 border-t border-[#e7ebf3] bg-[#fafcff]/60">
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalResults={totalResults}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(0)
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1040,6 +1402,12 @@ function TicketDetailsModal({
             <div className="flex items-center gap-2 flex-wrap">
               <StatusBadge status={details?.status || 'OPEN'} />
               <PriorityBadge priority={details?.priority || 'MEDIUM'} />
+              {details?.attachments && details.attachments.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  <Paperclip className="w-3 h-3 text-blue-600" />
+                  {details.attachments.length} {details.attachments.length === 1 ? 'Attachment' : 'Attachments'}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#f2f4f8] text-[#64758d]">
                 <Shield className="w-3 h-3 text-[#64758d]" /> Read Only
               </span>
@@ -1183,6 +1551,19 @@ function TicketDetailsModal({
                 </div>
               )}
 
+              {/* Attachments Section */}
+              {details.attachments && details.attachments.length > 0 && (
+                <div className="mb-5">
+                  <div className="text-xs font-extrabold text-[#17233c] mb-2 flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5 text-[#315fe8]" />
+                    <span>Attachments ({details.attachments.length})</span>
+                  </div>
+                  <div className="p-4 border border-[#e9edf5] rounded-xl bg-[#f8faff]">
+                    <TicketAttachmentsView attachments={details.attachments} />
+                  </div>
+                </div>
+              )}
+
               {details.latestRemark && (
                 <div>
                   <div className="text-xs font-extrabold text-[#17233c] mb-2">Latest Remark</div>
@@ -1286,14 +1667,25 @@ function TicketDetailsModal({
   )
 }
 
-export function AdminHelpSupportPage() {
+interface AdminHelpSupportPageProps {
+  initialTab?: Tab
+}
+
+export function AdminHelpSupportPage({ initialTab = 'departments' }: AdminHelpSupportPageProps = {}) {
   const email = getSession()?.user?.email || ''
 
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null)
+  const [selectedMember, setSelectedMember] = useState<(Counts & { email: string; name: string }) | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null)
   const [isCallsHistoryOpen, setIsCallsHistoryOpen] = useState(false)
   const [timeFilter, setTimeFilter] = useState<TimeRangeFilterValue>({ preset: 'all' })
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab)
+    }
+  }, [initialTab])
 
   const analyticsQuery = useQuery({
     queryKey: ['admin-help-analytics', email, timeFilter],
@@ -1309,7 +1701,7 @@ export function AdminHelpSupportPage() {
 
   const departments = useMemo(
     () => summarizeDepartments(analyticsQuery.data?.users ?? []),
-    [analyticsQuery.data]
+    [analyticsQuery.data],
   )
 
   const overall = useMemo<Counts>(() => {
@@ -1334,26 +1726,44 @@ export function AdminHelpSupportPage() {
   const selectedDept = departments.find((d) => d.id === selectedDeptId) ?? null
   const isRefreshingAnalytics = analyticsQuery.isFetching && !analyticsQuery.isLoading
 
+  const pageTitle = useMemo(() => {
+    if (tab === 'departments') {
+      if (selectedDept && selectedMember) {
+        return `${selectedMember.name || selectedMember.email} — User Performance`
+      }
+      if (selectedDept) {
+        return `${selectedDept.name} — Department Users`
+      }
+      return 'Help & Support — All Departments'
+    }
+    return 'Help & Support — All Tickets'
+  }, [tab, selectedDept, selectedMember])
+
+  const pageDescription = useMemo(() => {
+    if (tab === 'departments') {
+      if (selectedDept && selectedMember) {
+        return `Assigned ticket metrics and customer tickets for ${selectedMember.name || selectedMember.email}.`
+      }
+      if (selectedDept) {
+        return `Team members, ticket workload, and tickets for ${selectedDept.name}.`
+      }
+      return 'All registered departments with team workload and ticket performance.'
+    }
+    return 'Search and inspect customer tickets across all departments.'
+  }, [tab, selectedDept, selectedMember])
+
   return (
     <PageLayout>
       <PageHeader
-        title={
-          selectedDept && tab === 'overview'
-            ? `${selectedDept.name} — Help & Support`
-            : 'Help & Support'
-        }
-        description={
-          selectedDept && tab === 'overview'
-            ? 'View-only: how every department is handling its customer support tickets.'
-            : 'Monitor ticket activity and department performance in one place.'
-        }
+        title={pageTitle}
+        description={pageDescription}
         actions={
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsCallsHistoryOpen(true)}
               title="Calls made from tickets (all departments), with recordings"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
             >
               <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
               Calls View
@@ -1383,21 +1793,20 @@ export function AdminHelpSupportPage() {
         className="mb-4"
       />
 
-      {/* Navigation Tabs corresponding to preview (1).html & preview (2).html */}
+      {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-[#e7ebf3] mb-6">
         <button
           onClick={() => {
-            setTab('overview')
-            setSelectedDeptId(null)
+            setTab('departments')
           }}
           className={`py-3 px-4 text-xs font-bold relative transition-colors ${
-            tab === 'overview' && !selectedDept
+            tab === 'departments'
               ? 'text-[#315fe8]'
               : 'text-[#687a96] hover:text-[#17243c]'
           }`}
         >
-          Overview
-          {tab === 'overview' && !selectedDept && (
+          All Departments
+          {tab === 'departments' && (
             <span className="absolute bottom-[-1px] left-3 right-3 h-[3px] bg-[#315fe8] rounded-t-full" />
           )}
         </button>
@@ -1405,6 +1814,7 @@ export function AdminHelpSupportPage() {
           onClick={() => {
             setTab('tickets')
             setSelectedDeptId(null)
+            setSelectedMember(null)
           }}
           className={`py-3 px-4 text-xs font-bold relative transition-colors ${
             tab === 'tickets'
@@ -1419,81 +1829,109 @@ export function AdminHelpSupportPage() {
         </button>
       </div>
 
-      {tab === 'overview' &&
-        (analyticsQuery.isLoading ? (
-          <div className="py-12">
-            <LoadingState message="Loading Help & Support overview..." />
+      {analyticsQuery.isLoading ? (
+        <div className="py-12">
+          <LoadingState message="Loading Help & Support data..." />
+        </div>
+      ) : analyticsQuery.isError || !analyticsQuery.data ? (
+        <Card>
+          <div className="py-10 text-center text-[#b91c1c]">
+            <p className="text-sm font-semibold mb-3">Could not load the Help Center data.</p>
+            <Button variant="secondary" onClick={() => analyticsQuery.refetch()}>
+              Try again
+            </Button>
           </div>
-        ) : analyticsQuery.isError || !analyticsQuery.data ? (
-          <Card>
-            <div className="py-10 text-center text-[#b91c1c]">
-              <p className="text-sm font-semibold mb-3">Could not load the Help Center overview.</p>
-              <Button variant="secondary" onClick={() => analyticsQuery.refetch()}>
-                Try again
-              </Button>
-            </div>
-          </Card>
-        ) : selectedDept ? (
-          // ── Department Drill-Down View corresponding to preview (2).html ──
-          <div
-            className={`transition-opacity ${isRefreshingAnalytics ? 'opacity-60 pointer-events-none' : ''}`}
-            aria-busy={isRefreshingAnalytics}
-          >
-            <div className="mb-4">
-              <button
-                onClick={() => setSelectedDeptId(null)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#e7ebf3] bg-white text-xs font-bold text-[#3f4f6d] hover:bg-[#f8fafe] transition-colors shadow-sm"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> All departments
-              </button>
-            </div>
-
-            <StatKPISection counts={selectedDept} />
-
-            <TeamWorkloadSection dept={selectedDept} />
-
-            <TicketsListSection
-              departmentId={selectedDept.id}
-              departments={departments}
-              onViewTicket={setSelectedTicket}
-            />
-          </div>
-        ) : (
-          // ── Overall SuperAdmin Overview corresponding to preview (1).html ──
-          <div
-            className={`transition-opacity ${isRefreshingAnalytics ? 'opacity-60 pointer-events-none' : ''}`}
-            aria-busy={isRefreshingAnalytics}
-          >
-            <StatKPISection counts={overall} />
-
-            {departments.length === 0 ? (
-              <div className="bg-white border border-[#e7ebf3] rounded-2xl p-12 text-center shadow-sm">
-                <strong className="block text-base font-bold text-[#1e293b]">
-                  No assigned tickets yet
-                </strong>
-                <span className="text-xs text-[#64748b] mt-1 block">
-                  Department figures appear once tickets are assigned.
-                </span>
-              </div>
-            ) : (
-              <>
-                <PerformanceAndOverview departments={departments} overall={overall} />
-
-                <DepartmentComparisonTable
-                  departments={departments}
-                  attentionId={attentionDeptId}
-                  onViewDepartment={(id) => setSelectedDeptId(id)}
+        </Card>
+      ) : (
+        <>
+          {/* TAB 1: All Departments (3-Level Drilldown) */}
+          {tab === 'departments' && (
+            <div
+              className={`transition-opacity ${isRefreshingAnalytics ? 'opacity-60 pointer-events-none' : ''}`}
+              aria-busy={isRefreshingAnalytics}
+            >
+              {selectedDept && selectedMember ? (
+                // Level 3: Department User Details & Tickets
+                <UserDetailsSection
+                  member={selectedMember}
+                  departmentName={selectedDept.name}
+                  onBack={() => setSelectedMember(null)}
+                  onViewTicket={setSelectedTicket}
+                  timeFilter={timeFilter}
                 />
-              </>
-            )}
-          </div>
-        ))}
+              ) : selectedDept ? (
+                // Level 2: Department Users & Workload
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <button
+                      onClick={() => {
+                        setSelectedDeptId(null)
+                        setSelectedMember(null)
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#e7ebf3] bg-white text-xs font-bold text-[#3f4f6d] hover:bg-[#f8fafe] transition-colors shadow-sm"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> All Departments
+                    </button>
+                    <span className="text-[#9aa6b9] text-xs">/</span>
+                    <span className="text-xs font-bold text-[#17243c]">{selectedDept.name}</span>
+                  </div>
 
-      {tab === 'tickets' && (
-        <TicketsListSection departments={departments} onViewTicket={setSelectedTicket} />
+                  <StatKPISection counts={selectedDept} />
+
+                  <TeamWorkloadSection
+                    dept={selectedDept}
+                    onViewMember={(m) => setSelectedMember(m)}
+                  />
+
+                  <TicketsListSection
+                    departmentId={selectedDept.id}
+                    departments={departments}
+                    onViewTicket={setSelectedTicket}
+                  />
+                </div>
+              ) : (
+                // Level 1: List of all departments
+                <div>
+                  <div className="mb-5">
+                    <StatKPISection counts={overall} />
+                  </div>
+
+                  {departments.length === 0 ? (
+                    <div className="bg-white border border-[#e7ebf3] rounded-2xl p-12 text-center shadow-sm">
+                      <strong className="block text-base font-bold text-[#1e293b]">
+                        No assigned tickets yet
+                      </strong>
+                      <span className="text-xs text-[#64748b] mt-1 block">
+                        Department figures appear once tickets are assigned.
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <PerformanceAndOverview departments={departments} overall={overall} />
+
+                      <DepartmentComparisonTable
+                        departments={departments}
+                        attentionId={attentionDeptId}
+                        onViewDepartment={(id) => {
+                          setSelectedDeptId(id)
+                          setSelectedMember(null)
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: All Tickets */}
+          {tab === 'tickets' && (
+            <TicketsListSection departments={departments} onViewTicket={setSelectedTicket} />
+          )}
+        </>
       )}
 
-      {/* Modern Ticket Details & Status History Modal from preview (3).html */}
+      {/* Modern Ticket Details & Status History Modal */}
       <TicketDetailsModal
         ticketNumber={selectedTicket}
         onClose={() => setSelectedTicket(null)}

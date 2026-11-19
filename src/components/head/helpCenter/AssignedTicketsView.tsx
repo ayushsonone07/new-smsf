@@ -568,16 +568,6 @@ export function AssignedTicketsView({
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setCallsView({})}
-            title="Calls made from tickets, with recordings"
-            className="h-10 px-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors flex-shrink-0"
-          >
-            <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Calls View</span>
-          </button>
-
           {canReassignTickets && (
             <button
               type="button"
@@ -850,18 +840,6 @@ export function AssignedTicketsView({
                         <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
                         <span>Ticket calls</span>
                       </button>
-
-                      {selectedTicket.creatorPhone && (
-                        <button
-                          type="button"
-                          onClick={() => setCallsView({ customer: selectedTicket.creatorPhone || '' })}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
-                          title="All ticket calls with this customer, across their tickets"
-                        >
-                          <PhoneCall className="h-3.5 w-3.5 text-blue-600" />
-                          <span>Customer calls</span>
-                        </button>
-                      )}
 
                       {canViewHistory && (
                         <button
@@ -1324,16 +1302,22 @@ export function AssignedTicketsView({
         onClose={() => setIsHistoryModalOpen(false)}
       />
 
-      {/* ── Modal: Calls View (Help & Support → ticket calls only, with recordings) ── */}
+      {/* ── Modal: Calls View (Department & Ticket calls with recordings) ── */}
       {callsView && (
         <CallsHistoryModal
-          // new key per filter → the modal opens with these filters applied
-          key={`${callsView.ticketNumber ?? ''}|${callsView.customer ?? ''}`}
+          key={`${callsView.ticketNumber ?? ''}|${callsView.customer ?? ''}|${departmentType ?? ''}`}
           open
           onClose={() => setCallsView(null)}
-          title="Calls View"
-          defaultSource="TICKET"
-          lockSource
+          departmentType={departmentType}
+          title={
+            callsView.ticketNumber
+              ? `Calls for ${callsView.ticketNumber}`
+              : callsView.customer
+              ? `Calls for ${callsView.customer}`
+              : 'Calls View'
+          }
+          defaultSource={callsView.ticketNumber ? 'TICKET' : 'ALL'}
+          lockSource={Boolean(callsView.ticketNumber)}
           initialTicketNumber={callsView.ticketNumber}
           initialCustomer={callsView.customer}
         />

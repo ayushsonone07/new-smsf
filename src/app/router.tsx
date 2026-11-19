@@ -402,7 +402,21 @@ const adminApprovalsRoute = createRoute({
 const adminHelpSupportRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/admin/help-support',
-  component: AdminHelpSupportPage,
+  component: () => <AdminHelpSupportPage initialTab="departments" />,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminHelpSupportAnalyticsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/help-support/analytics',
+  component: () => <AdminHelpSupportPage initialTab="departments" />,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminHelpSupportDepartmentsRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/help-support/departments',
+  component: () => <AdminHelpSupportPage initialTab="departments" />,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -927,6 +941,8 @@ const routeTree = rootRoute.addChildren([
     adminServiceFlowRoute,
     adminApprovalsRoute,
     adminHelpSupportRoute,
+    adminHelpSupportAnalyticsRoute,
+    adminHelpSupportDepartmentsRoute,
     adminHelpSupportStatusRoute,
     adminHelpSupportPriorityRoute,
     adminAirtelServiceRoute,

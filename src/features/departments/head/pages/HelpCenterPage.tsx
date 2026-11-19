@@ -13,6 +13,7 @@ import type {
 import { AssignedTicketsView } from '../../../../components/head/helpCenter/AssignedTicketsView'
 import { HelpCenterAnalyticsView } from '../../../../components/head/helpCenter/HelpCenterAnalyticsView'
 import { DepartmentUsersTicketsView } from '../../../../components/head/helpCenter/DepartmentUsersTicketsView'
+import { HelpCenterCallsView } from '../../../../components/head/helpCenter/HelpCenterCallsView'
 import { TimeRangeFilter, TimeRangeFilterValue } from '../../../../components/head/helpCenter/TimeRangeFilter'
 import { useHelpCenterTab } from '../utils/helpCenterTab'
 
@@ -153,15 +154,17 @@ export function HelpCenterPage() {
     setTimeFilter(newFilter)
   }
 
-  // Load tickets on mount or when filter/employee changes (single execution)
+  // Load tickets only when assigned-tickets tab is active
   useEffect(() => {
-    loadTickets(false, timeFilter)
+    if (activeTab === 'assigned-tickets') {
+      loadTickets(false, timeFilter)
+    }
     return () => {
       if (ticketsAbortRef.current) {
         ticketsAbortRef.current.abort()
       }
     }
-  }, [employeeEmail, timeFilter])
+  }, [activeTab, employeeEmail, timeFilter])
 
   // Load analytics only when analytics tab is active and filter changes
   useEffect(() => {
@@ -210,11 +213,17 @@ export function HelpCenterPage() {
             isRefreshing={isLoadingAnalytics}
             error={analyticsError}
             onRefresh={() => loadAnalytics(timeFilter)}
+            isDepartmentHead={isDepartmentHead}
+            currentUserEmail={employeeEmail}
           />
         )}
 
         {activeTab === 'department-members' && isHead && (
           <DepartmentUsersTicketsView departmentType={departmentType} />
+        )}
+
+        {activeTab === 'calls' && (
+          <HelpCenterCallsView departmentType={departmentType} timeFilter={timeFilter} />
         )}
       </div>
     </div>

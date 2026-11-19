@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, ChevronDown, CircleDot, Flag, Plus, Search, ShieldCheck, XCircle } from 'lucide-react'
+import { ChevronDown, CircleDot, Flag, Loader2, Plus, Search } from 'lucide-react'
 
 import {
   createTicketStatus,
   fetchTicketPriorities,
   fetchTicketStatuses,
+  toggleTicketPriorityActive,
+  toggleTicketStatusActive,
   type HelpCenterConfigItem,
 } from '../../../api/help-center-config.api'
 import { PageHeader } from '../../../components/layout/PageHeader'
@@ -42,32 +44,38 @@ function formatDate(value?: string | null) {
       }).format(date)
 }
 
-function StateBadge({ active }: { active: boolean }) {
+function ActiveToggleSwitch({
+  active,
+  disabled,
+  isPending,
+  onChange,
+}: {
+  active: boolean
+  disabled?: boolean
+  isPending?: boolean
+  onChange: (next: boolean) => void
+}) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-      active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-    }`}>
-      {active ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-      {active ? 'Active' : 'Inactive'}
-    </span>
-  )
-}
-
-function TypeBadges({ item }: { item: HelpCenterConfigItem }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {item.isDefault && (
-        <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
-          Default
-        </span>
-      )}
-      {item.isSystem && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">
-          <ShieldCheck size={11} /> System
-        </span>
-      )}
-      {!item.isDefault && !item.isSystem && <span className="text-xs text-slate-400">—</span>}
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      disabled={disabled || isPending}
+      onClick={() => onChange(!active)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${
+        active ? 'bg-emerald-600' : 'bg-slate-300'
+      }`}
+    >
+      <span className="sr-only">{active ? 'Active' : 'Inactive'}</span>
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none inline-flex h-4 w-4 transform items-center justify-center rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+          active ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      >
+        {isPending && <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-500" />}
+      </span>
+    </button>
   )
 }
 
@@ -77,6 +85,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   const [statusFilterOpen, setStatusFilterOpen] = useState(false)
   const [addStatusOpen, setAddStatusOpen] = useState(false)
   const [statusForm, setStatusForm] = useState<StatusFormState>(EMPTY_STATUS_FORM)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
   const statusFilterRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const isStatus = type === 'status'
@@ -86,6 +95,28 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
     queryKey: ['help-center-config', type],
     queryFn: isStatus ? fetchTicketStatuses : fetchTicketPriorities,
     staleTime: 60_000,
+  })
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      isStatus ? toggleTicketStatusActive(id, active) : toggleTicketPriorityActive(id, active),
+    onMutate: async ({ id, active }) => {
+      await queryClient.cancelQueries({ queryKey: ['help-center-config', type] })
+      const previous = queryClient.getQueryData<HelpCenterConfigItem[]>(['help-center-config', type])
+      queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', type], (old) =>
+        old?.map((item) => (item.id === id ? { ...item, isActive: active } : item)),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['help-center-config', type], context.previous)
+      }
+    },
+    onSettled: () => {
+      setTogglingId(null)
+      queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
+    },
   })
 
   const createStatusMutation = useMutation({
@@ -248,16 +279,13 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
           <div className="py-14 text-center text-sm font-semibold text-slate-500">No matching {label.toLowerCase()} records found.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] border-collapse text-left">
+            <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
-                  <th className="px-3 py-3 font-bold">Order</th>
+                  <th className="px-3 py-3 font-bold w-16">Order</th>
                   <th className="px-3 py-3 font-bold">{label}</th>
-                  <th className="px-3 py-3 font-bold">Code</th>
-                  <th className="px-3 py-3 font-bold">Category</th>
-                  <th className="px-3 py-3 font-bold">State</th>
-                  <th className="px-3 py-3 font-bold">Properties</th>
-                  <th className="px-3 py-3 font-bold">Updated</th>
+                  <th className="px-3 py-3 font-bold w-48">State</th>
+                  <th className="px-3 py-3 font-bold w-48">Updated</th>
                 </tr>
               </thead>
               <tbody>
@@ -270,10 +298,25 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                         <span className="font-bold text-slate-900">{item.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3.5"><code className="rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">{item.code}</code></td>
-                    <td className="px-3 py-3.5 text-slate-600">{item.category || '—'}</td>
-                    <td className="px-3 py-3.5"><StateBadge active={item.isActive} /></td>
-                    <td className="px-3 py-3.5"><TypeBadges item={item} /></td>
+                    <td className="px-3 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <ActiveToggleSwitch
+                          active={item.isActive}
+                          isPending={toggleActiveMutation.isPending && togglingId === item.id}
+                          onChange={(next) => {
+                            setTogglingId(item.id)
+                            toggleActiveMutation.mutate({ id: item.id, active: next })
+                          }}
+                        />
+                        <span
+                          className={`text-xs font-bold ${
+                            item.isActive ? 'text-emerald-700' : 'text-slate-400'
+                          }`}
+                        >
+                          {item.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-3 py-3.5 text-slate-500">{formatDate(item.updatedAt || item.createdAt)}</td>
                   </tr>
                 ))}

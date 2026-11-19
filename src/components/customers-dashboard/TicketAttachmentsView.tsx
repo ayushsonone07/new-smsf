@@ -118,22 +118,53 @@ export function TicketAttachmentsView({ attachments }: { attachments?: TicketAtt
                 boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
               }}
             >
-              <IconComponent size={26} color={iconColor} style={{ flexShrink: 0 }} />
+              {kind === 'image' && a.fileUrl ? (
+                <a
+                  href={a.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'block', flexShrink: 0 }}
+                  title="View full image"
+                >
+                  <img
+                    src={a.fileUrl}
+                    alt={a.fileName || 'Attachment'}
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      objectFit: 'cover',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                    }}
+                    onError={(e) => {
+                      ;(e.currentTarget as HTMLElement).style.display = 'none'
+                    }}
+                  />
+                </a>
+              ) : (
+                <IconComponent size={26} color={iconColor} style={{ flexShrink: 0 }} />
+              )}
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div
+                <a
+                  href={a.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     fontSize: '12px',
                     fontWeight: 600,
                     color: '#0f172a',
+                    textDecoration: 'none',
+                    display: 'block',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}
                   title={a.fileName || 'Attachment'}
+                  className="hover:underline hover:text-blue-600"
                 >
                   {a.fileName || 'Attachment'}
-                </div>
+                </a>
                 {a.fileSize ? (
                   <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                     {formatSize(a.fileSize)}

@@ -24,6 +24,8 @@ interface HelpCenterAnalyticsViewProps {
   isRefreshing?: boolean
   error?: string | null
   onRefresh: () => void
+  isDepartmentHead?: boolean
+  currentUserEmail?: string
 }
 
 const statusCardConfig = [
@@ -42,12 +44,93 @@ export function HelpCenterAnalyticsView({
   isRefreshing,
   error,
   onRefresh,
+  isDepartmentHead = false,
+  currentUserEmail,
 }: HelpCenterAnalyticsViewProps) {
   const [selectedUser, setSelectedUser] = useState<HelpCenterDashboardUserAnalytics | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Derive analytics if apiAnalytics is empty or not provided
   const analytics: HelpCenterDashboardAnalytics = useMemo(() => {
+    // ── For Department User: ALWAYS strictly scope to currentUserEmail ──
+    if (!isDepartmentHead) {
+      // 1. Check if apiAnalytics has the user's data
+      const myApiUser =
+        currentUserEmail && apiAnalytics?.users
+          ? apiAnalytics.users.find(
+              (u) => u.userEmail?.toLowerCase() === currentUserEmail.toLowerCase()
+            )
+          : null
+
+      if (myApiUser) {
+        return {
+          users: [myApiUser],
+          overallTotalTickets: myApiUser.totalTickets,
+          overallOpen: myApiUser.open,
+          overallInProgress: myApiUser.inProgress,
+          overallWaitingOnCustomer: myApiUser.waitingOnCustomer,
+          overallResolved: myApiUser.resolved,
+          overallClosed: myApiUser.closed,
+          overallEscalated: myApiUser.escalated,
+          overallSolved: myApiUser.resolved + myApiUser.closed,
+          overallUnsolved:
+            myApiUser.open +
+            myApiUser.inProgress +
+            myApiUser.waitingOnCustomer +
+            myApiUser.escalated,
+        }
+      }
+
+      // 2. Otherwise derive directly from user's assigned tickets (which are filtered by the active date filter!)
+      let open = 0
+      let inProgress = 0
+      let waiting = 0
+      let resolved = 0
+      let closed = 0
+      let escalated = 0
+
+      tickets.forEach((t) => {
+        const status = t.ticketStatus?.toUpperCase()
+        if (status === 'OPEN') open++
+        else if (status === 'IN_PROGRESS') inProgress++
+        else if (status === 'WAITING_ON_CUSTOMER') waiting++
+        else if (status === 'RESOLVED') resolved++
+        else if (status === 'CLOSED') closed++
+        else if (status === 'ESCALATED') escalated++
+      })
+
+      const userEmail = currentUserEmail || 'me@mbgcard.com'
+      const userName = userEmail.split('@')[0] || 'My Performance'
+      const myUser: HelpCenterDashboardUserAnalytics = {
+        userId: 1,
+        userName,
+        userEmail,
+        departmentId: 1,
+        departmentName: 'DEPARTMENT',
+        totalTickets: tickets.length,
+        open,
+        inProgress,
+        waitingOnCustomer: waiting,
+        resolved,
+        closed,
+        escalated,
+      }
+
+      return {
+        users: [myUser],
+        overallTotalTickets: tickets.length,
+        overallOpen: open,
+        overallInProgress: inProgress,
+        overallWaitingOnCustomer: waiting,
+        overallResolved: resolved,
+        overallClosed: closed,
+        overallEscalated: escalated,
+        overallSolved: resolved + closed,
+        overallUnsolved: open + inProgress + waiting + escalated,
+      }
+    }
+
+    // ── For Department Head: Full team view ──
     if (apiAnalytics && (apiAnalytics.overallTotalTickets > 0 || apiAnalytics.users.length > 0)) {
       return apiAnalytics
     }
@@ -113,7 +196,7 @@ export function HelpCenterAnalyticsView({
       overallSolved: resolved + closed,
       overallUnsolved: open + inProgress + waiting + escalated,
     }
-  }, [apiAnalytics, tickets])
+  }, [apiAnalytics, tickets, isDepartmentHead, currentUserEmail])
 
   const overallTotal = useMemo(() => {
     if (selectedUser) return selectedUser.totalTickets
@@ -146,6 +229,11 @@ export function HelpCenterAnalyticsView({
   const userList = useMemo(() => {
     if (selectedUser) return [selectedUser]
     const users = analytics.users || []
+    if (!isDepartmentHead && currentUserEmail) {
+      return users.filter(
+        (u) => u.userEmail?.toLowerCase() === currentUserEmail.toLowerCase()
+      )
+    }
     const q = searchQuery.trim().toLowerCase()
     if (!q) return users
     return users.filter((u) => {
@@ -154,7 +242,7 @@ export function HelpCenterAnalyticsView({
       const dept = u.departmentName?.toLowerCase() || ''
       return name.includes(q) || email.includes(q) || dept.includes(q)
     })
-  }, [analytics, selectedUser, searchQuery])
+  }, [analytics, selectedUser, searchQuery, isDepartmentHead, currentUserEmail])
 
   function getStatusValue(key: string) {
     if (selectedUser) {
@@ -228,7 +316,18 @@ export function HelpCenterAnalyticsView({
 
   const escalatedCount = selectedUser ? selectedUser.escalated : analytics.overallEscalated
   const kpiCards = [
-    { key: 'total', label: 'Total tickets', value: overallTotal, sub: selectedUser ? selectedUser.userEmail : 'Across the department', icon: Ticket, tone: 'bg-blue-50 text-blue-600' },
+    {
+      key: 'total',
+      label: 'Total tickets',
+      value: overallTotal,
+      sub: selectedUser
+        ? selectedUser.userEmail
+        : isDepartmentHead
+        ? 'Across the department'
+        : 'My assigned tickets',
+      icon: Ticket,
+      tone: 'bg-blue-50 text-blue-600',
+    },
     { key: 'solved', label: 'Solved', value: solved, sub: `${solvedPercent.toFixed(1)}% of total`, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-600' },
     { key: 'unsolved', label: 'Not solved', value: notSolved, sub: `${notSolvedPercent.toFixed(1)}% of total`, icon: Clock, tone: 'bg-amber-50 text-amber-600' },
     { key: 'escalated', label: 'Escalated', value: escalatedCount, sub: 'Needs attention', icon: AlertTriangle, tone: 'bg-rose-50 text-rose-600' },
@@ -242,7 +341,11 @@ export function HelpCenterAnalyticsView({
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              {selectedUser ? `${selectedUser.userName}'s analytics` : 'Help Center analytics'}
+              {selectedUser
+                ? `${selectedUser.userName}'s analytics`
+                : isDepartmentHead
+                ? 'Help Center analytics'
+                : 'My Performance Analytics'}
             </h2>
             {selectedUser && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -250,11 +353,18 @@ export function HelpCenterAnalyticsView({
                 Individual view
               </span>
             )}
+            {!isDepartmentHead && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Personal View
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             {selectedUser
               ? `Ticket metrics for ${selectedUser.userEmail}`
-              : 'Ticket metrics and workload across your team'}
+              : isDepartmentHead
+              ? 'Ticket metrics and workload across your team'
+              : 'Your personal ticket metrics and performance'}
           </p>
         </div>
 
@@ -350,9 +460,15 @@ export function HelpCenterAnalyticsView({
         <div className="p-5 rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-900">
-              {selectedUser ? 'Ticket breakdown' : 'Tickets by team member'}
+              {selectedUser
+                ? 'Ticket breakdown'
+                : isDepartmentHead
+                ? 'Tickets by team member'
+                : 'My Ticket Performance'}
             </h3>
-            <span className="text-xs text-slate-400">{userList.length} members</span>
+            <span className="text-xs text-slate-400">
+              {isDepartmentHead ? `${userList.length} members` : 'Personal'}
+            </span>
           </div>
           <div className="space-y-3.5 max-h-60 overflow-y-auto pr-1">
             {userList.length === 0 ? (
@@ -392,14 +508,14 @@ export function HelpCenterAnalyticsView({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              {selectedUser ? 'Member details' : 'Team member analytics'}
+              {selectedUser ? 'Member details' : isDepartmentHead ? 'Team member analytics' : 'My Performance Details'}
             </h3>
-            {!selectedUser && (
+            {!selectedUser && isDepartmentHead && (
               <p className="text-xs text-slate-500 mt-0.5">Click a member to see their individual metrics</p>
             )}
           </div>
 
-          {!selectedUser && (
+          {!selectedUser && isDepartmentHead && (
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               <input

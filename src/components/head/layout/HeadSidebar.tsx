@@ -19,6 +19,7 @@ import {
   Ticket,
   BarChart3,
   Users,
+  PhoneCall,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +48,7 @@ const HELP_TAB_ICONS: Record<HelpCenterTab, LucideIcon> = {
   'assigned-tickets': Ticket,
   analytics: BarChart3,
   'department-members': Users,
+  calls: PhoneCall,
 }
 
 interface HeadSidebarProps {

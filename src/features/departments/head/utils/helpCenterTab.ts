@@ -5,12 +5,13 @@ import { getSession } from '../../../../app/auth/session'
  * Which Help & Support sub-tab is open. Shared between the sidebar (where the
  * sub-tabs live) and HelpCenterPage, without adding search params to the route.
  */
-export type HelpCenterTab = 'assigned-tickets' | 'analytics' | 'department-members'
+export type HelpCenterTab = 'assigned-tickets' | 'analytics' | 'department-members' | 'calls'
 
 export const HELP_CENTER_TABS: { key: HelpCenterTab; label: string; headOnly: boolean }[] = [
   { key: 'assigned-tickets', label: 'Assign Tickets', headOnly: false },
   { key: 'analytics', label: 'Analytics', headOnly: false },
   { key: 'department-members', label: 'Department User', headOnly: true },
+  { key: 'calls', label: 'Calls View', headOnly: false },
 ]
 
 const STORAGE_KEY = 'helpCenterTab'

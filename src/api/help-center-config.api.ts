@@ -58,3 +58,26 @@ export async function createTicketStatus(payload: CreateTicketStatusRequest) {
 
   return response.data
 }
+
+export async function toggleTicketStatusActive(id: number, active: boolean) {
+  const response = await authedApiRequest<HelpCenterConfigResponse>(
+    `/api/help-center/config/statuses/${id}/toggle-active?active=${active}`,
+    {
+      method: 'PATCH',
+    },
+  )
+
+  return response?.data
+}
+
+export async function toggleTicketPriorityActive(id: number, active: boolean) {
+  const response = await authedApiRequest<HelpCenterConfigResponse>(
+    `/api/help-center/config/priorities/${id}/toggle-active?active=${active}`,
+    {
+      method: 'PATCH',
+    },
+  )
+
+  return response?.data
+}
+

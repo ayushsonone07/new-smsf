@@ -366,6 +366,8 @@ export async function fetchAllTickets(params: {
   }
 }
 
+import type { TicketAttachment } from '../components/customers-dashboard/TicketAttachmentsView'
+
 export interface HelpCenterTicketDetails {
   ticketNumber: string
   subject: string
@@ -381,6 +383,9 @@ export interface HelpCenterTicketDetails {
   updatedAt?: string
   resolvedAt?: string
   latestRemark?: string
+  businessName?: string
+  smsbCustomerId?: number
+  attachments?: TicketAttachment[]
 }
 
 /**
