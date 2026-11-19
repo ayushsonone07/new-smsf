@@ -1,5 +1,5 @@
 import React from 'react'
-import { Download, FileSpreadsheet, FileText, Image as ImageIcon, Paperclip, Video as VideoIcon } from 'lucide-react'
+import { Download, ExternalLink, FileSpreadsheet, FileText, Image as ImageIcon, Paperclip, Video as VideoIcon } from 'lucide-react'
 
 export interface TicketAttachment {
   id?: number | string
@@ -22,9 +22,20 @@ function kindOf(a: TicketAttachment): Kind {
 }
 
 function formatSize(bytes?: number) {
-  if (!bytes) return ''
+  if (bytes == null) return 'Size unavailable'
+  if (bytes === 0) return '0 B'
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+function formatCreatedAt(value?: string) {
+  if (!value) return 'Date unavailable'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 async function handleDownload(fileUrl?: string, fileName?: string) {
@@ -172,28 +183,33 @@ export function TicketAttachmentsView({ attachments }: { attachments?: TicketAtt
                 ) : null}
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleDownload(a.fileUrl, a.fileName)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  border: 'none',
-                  background: '#eff6ff',
-                  color: '#2563eb',
-                  borderRadius: '6px',
-                  padding: '6px 10px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-                title={`Download ${a.fileName || 'file'}`}
-              >
-                <Download size={13} />
-                Download
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <a
+                  href={a.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none',
+                    background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0',
+                    borderRadius: '6px', padding: '6px 9px', fontSize: '11px', fontWeight: 700,
+                  }}
+                  title={`View ${a.fileName || 'file'} in a new tab`}
+                >
+                  <ExternalLink size={13} /> View
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(a.fileUrl, a.fileName)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none',
+                    background: '#eff6ff', color: '#2563eb', borderRadius: '6px', padding: '7px 9px',
+                    fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                  }}
+                  title={`Download ${a.fileName || 'file'}`}
+                >
+                  <Download size={13} /> Download
+                </button>
+              </div>
             </div>
           )
         })}

@@ -45,6 +45,7 @@ import { CallsHistoryModal } from './CallsHistoryModal'
 import { useTicketCall } from './useTicketCall'
 import { TicketAttachmentsView } from '../../customers-dashboard/TicketAttachmentsView'
 import { RefreshButton } from '../../ui/RefreshButton'
+import { TicketAttachmentsView } from '../../customers-dashboard/TicketAttachmentsView'
 
 /** A ticket row, optionally tagged with who it is assigned to (All Tickets view). */
 export type TicketWithAssignee = EmployeeTicketWithCreator & {
