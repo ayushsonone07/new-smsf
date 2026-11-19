@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, ChevronDown, CircleDot, Flag, Plus, Search, ShieldCheck, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, CircleDot, Flag, Pencil, Plus, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react'
 
 import {
   createTicketStatus,
+  deleteTicketPriority,
+  deleteTicketStatusConfig,
+  createTicketPriority,
   fetchTicketPriorities,
   fetchTicketStatuses,
+  setTicketConfigActive,
+  updateTicketPriority,
+  updateTicketStatusConfig,
   type HelpCenterConfigItem,
 } from '../../../api/help-center-config.api'
 import { PageHeader } from '../../../components/layout/PageHeader'
@@ -23,12 +29,16 @@ interface StatusFormState {
   name: string
   isActive: boolean
   isDefault: boolean
+  followupHours: string
+  resolveHours: string
 }
 
 const EMPTY_STATUS_FORM: StatusFormState = {
   name: '',
   isActive: true,
   isDefault: false,
+  followupHours: '',
+  resolveHours: '',
 }
 
 function formatDate(value?: string | null) {
@@ -77,6 +87,12 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   const [statusFilterOpen, setStatusFilterOpen] = useState(false)
   const [addStatusOpen, setAddStatusOpen] = useState(false)
   const [statusForm, setStatusForm] = useState<StatusFormState>(EMPTY_STATUS_FORM)
+  const [editingPriority, setEditingPriority] = useState<HelpCenterConfigItem | null>(null)
+  const [deleteCandidate, setDeleteCandidate] = useState<HelpCenterConfigItem | null>(null)
+  const [editingStatus, setEditingStatus] = useState<HelpCenterConfigItem | null>(null)
+  const [statusEditForm, setStatusEditForm] = useState({ name: '', sortOrder: '' })
+  const [deleteStatusCandidate, setDeleteStatusCandidate] = useState<HelpCenterConfigItem | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', followupHours: '', resolveHours: '' })
   const statusFilterRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const isStatus = type === 'status'
@@ -89,11 +105,60 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   })
 
   const createStatusMutation = useMutation({
-    mutationFn: createTicketStatus,
+    mutationFn: async (form: StatusFormState) => isStatus
+      ? createTicketStatus({ name: form.name, isActive: form.isActive, isDefault: form.isDefault })
+      : createTicketPriority({
+          name: form.name,
+          followupHours: Number(form.followupHours),
+          resolveHours: Number(form.resolveHours),
+          color: '#2563EB',
+          sortOrder: Math.max(0, ...(query.data ?? []).map((item) => item.sortOrder)) + 1,
+          isActive: true,
+          isDefault: false,
+        }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
       setAddStatusOpen(false)
       setStatusForm(EMPTY_STATUS_FORM)
+    },
+  })
+
+  const stateMutation = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) => setTicketConfigActive(type, id, active),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
+    },
+  })
+
+  const updatePriorityMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateTicketPriority>[1] }) => updateTicketPriority(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'priority'] })
+      setEditingPriority(null)
+    },
+  })
+
+  const deletePriorityMutation = useMutation({
+    mutationFn: deleteTicketPriority,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'priority'] })
+      setDeleteCandidate(null)
+    },
+  })
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateTicketStatusConfig>[1] }) => updateTicketStatusConfig(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
+      setEditingStatus(null)
+    },
+  })
+
+  const deleteStatusMutation = useMutation({
+    mutationFn: deleteTicketStatusConfig,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
+      setDeleteStatusCandidate(null)
     },
   })
 
@@ -129,10 +194,57 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   function submitStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!statusForm.name.trim()) return
-    createStatusMutation.mutate({
-      name: statusForm.name.trim(),
-      isActive: statusForm.isActive,
-      isDefault: statusForm.isDefault,
+    if (!isStatus && (
+      !statusForm.followupHours || Number(statusForm.followupHours) < 1 ||
+      !statusForm.resolveHours || Number(statusForm.resolveHours) < 1
+    )) return
+    createStatusMutation.mutate({ ...statusForm, name: statusForm.name.trim() })
+  }
+
+  function openEditPriority(item: HelpCenterConfigItem) {
+    updatePriorityMutation.reset()
+    setEditingPriority(item)
+    setEditForm({
+      name: item.name,
+      followupHours: String(item.followupHours ?? ''),
+      resolveHours: String(item.resolveHours ?? ''),
+    })
+  }
+
+  function submitPriorityUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingPriority || !editForm.name.trim() || Number(editForm.followupHours) < 1 || Number(editForm.resolveHours) < 1) return
+    updatePriorityMutation.mutate({
+      id: editingPriority.id,
+      payload: {
+        name: editForm.name.trim(),
+        followupHours: Number(editForm.followupHours),
+        resolveHours: Number(editForm.resolveHours),
+        color: editingPriority.color || '#2563EB',
+        sortOrder: editingPriority.sortOrder,
+        isActive: editingPriority.isActive,
+        isDefault: editingPriority.isDefault,
+      },
+    })
+  }
+
+  function openEditStatus(item: HelpCenterConfigItem) {
+    updateStatusMutation.reset()
+    setEditingStatus(item)
+    setStatusEditForm({ name: item.name, sortOrder: String(item.sortOrder) })
+  }
+
+  function submitStatusUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingStatus || !statusEditForm.name.trim() || Number(statusEditForm.sortOrder) < 1) return
+    updateStatusMutation.mutate({
+      id: editingStatus.id,
+      payload: {
+        name: statusEditForm.name.trim(),
+        sortOrder: Number(statusEditForm.sortOrder),
+        isActive: editingStatus.isActive,
+        isDefault: editingStatus.isDefault,
+      },
     })
   }
 
@@ -174,8 +286,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
             <p className="mt-1 text-xs text-slate-500">Sorted by the configured display order.</p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            {isStatus && (
-              <div ref={statusFilterRef} className="relative sm:w-44">
+            <div ref={statusFilterRef} className="relative sm:w-44">
                 <button
                   type="button"
                   aria-haspopup="listbox"
@@ -185,14 +296,14 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                 >
                   <span className="truncate">
                     {statusFilter === 'all'
-                      ? 'All statuses'
-                      : query.data?.find((item) => String(item.id) === statusFilter)?.name || 'All statuses'}
+                      ? `All ${pluralLabel}`
+                      : query.data?.find((item) => String(item.id) === statusFilter)?.name || `All ${pluralLabel}`}
                   </span>
                   <ChevronDown className={`shrink-0 text-slate-400 transition-transform ${statusFilterOpen ? 'rotate-180' : ''}`} size={14} />
                 </button>
                 {statusFilterOpen && (
                   <div role="listbox" className="absolute left-0 top-[calc(100%+6px)] z-30 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-200/70">
-                    {[{ id: 'all', name: 'All statuses', color: null }, ...(query.data ?? [])].map((item) => {
+                    {[{ id: 'all', name: `All ${pluralLabel}`, color: null }, ...(query.data ?? [])].map((item) => {
                       const value = String(item.id)
                       const selected = statusFilter === value
                       return (
@@ -215,25 +326,22 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                   </div>
                 )}
               </div>
-            )}
             <label className="relative block w-full sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={`Search ${label.toLowerCase()}...`}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </label>
-            {isStatus && (
               <button
                 type="button"
                 onClick={openAddStatus}
-                className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
-                <Plus size={15} /> Add Status
+                <Plus size={15} /> New {label}
               </button>
-            )}
           </div>
         </div>
 
@@ -253,11 +361,9 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                 <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
                   <th className="px-3 py-3 font-bold">Order</th>
                   <th className="px-3 py-3 font-bold">{label}</th>
-                  <th className="px-3 py-3 font-bold">Code</th>
-                  <th className="px-3 py-3 font-bold">Category</th>
                   <th className="px-3 py-3 font-bold">State</th>
-                  <th className="px-3 py-3 font-bold">Properties</th>
                   <th className="px-3 py-3 font-bold">Updated</th>
+                  <th className="px-3 py-3 text-right font-bold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -270,11 +376,42 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                         <span className="font-bold text-slate-900">{item.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3.5"><code className="rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">{item.code}</code></td>
-                    <td className="px-3 py-3.5 text-slate-600">{item.category || '—'}</td>
-                    <td className="px-3 py-3.5"><StateBadge active={item.isActive} /></td>
-                    <td className="px-3 py-3.5"><TypeBadges item={item} /></td>
+                    <td className="px-3 py-3.5">
+                      <div className="relative inline-flex items-center">
+                        <select
+                          aria-label={`Change ${item.name} state`}
+                          value={item.isActive ? 'active' : 'inactive'}
+                          disabled={stateMutation.isPending && stateMutation.variables?.id === item.id}
+                          onChange={(event) => stateMutation.mutate({ id: item.id, active: event.target.value === 'active' })}
+                          className={`h-9 appearance-none rounded-xl border px-3 pr-8 text-[11px] font-bold outline-none transition focus:ring-2 disabled:cursor-wait disabled:opacity-60 ${item.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-600 focus:ring-slate-200'}`}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                        <ChevronDown size={13} className="pointer-events-none absolute right-2.5 text-current opacity-60" />
+                      </div>
+                    </td>
                     <td className="px-3 py-3.5 text-slate-500">{formatDate(item.updatedAt || item.createdAt)}</td>
+                    {!isStatus && (
+                      <td className="px-3 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button type="button" onClick={() => openEditPriority(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 text-[11px] font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                            <Pencil size={13} /> Update
+                          </button>
+                          <button type="button" onClick={() => { deletePriorityMutation.reset(); setDeleteCandidate(item) }} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 text-[11px] font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-100">
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                    {isStatus && (
+                      <td className="px-3 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button type="button" onClick={() => openEditStatus(item)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"><Pencil size={13} /> Update</button>
+                          <button type="button" onClick={() => { deleteStatusMutation.reset(); setDeleteStatusCandidate(item) }} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 text-[11px] font-bold text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-100"><Trash2 size={13} /> Delete</button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -284,30 +421,43 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
       </Card>
 
       <Modal
-        open={isStatus && addStatusOpen}
+        open={addStatusOpen}
         onClose={() => !createStatusMutation.isPending && setAddStatusOpen(false)}
-        title="Add Status"
-        description="Create a new ticket status for Help Center workflows."
+        title={`New ${label}`}
+        description={`Create a new ticket ${label.toLowerCase()} for Help Center workflows.`}
         size="md"
         closeOnEscape={!createStatusMutation.isPending}
       >
         <form onSubmit={submitStatus} className="space-y-4">
           <div>
             <label>
-              <span className="mb-1.5 block text-xs font-bold text-slate-700">Status name</span>
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">{label} name</span>
               <input
                 required
                 autoFocus
                 maxLength={80}
                 value={statusForm.name}
                 onChange={(event) => setStatusForm((form) => ({ ...form, name: event.target.value }))}
-                placeholder="Under Technical Review"
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder={isStatus ? 'Under Technical Review' : 'Urgent'}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-5 rounded-xl bg-slate-50 p-3">
+          {!isStatus && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-slate-700">Follow-up time (hours)</span>
+                <input required type="number" min="1" step="1" value={statusForm.followupHours} onChange={(event) => setStatusForm((form) => ({ ...form, followupHours: event.target.value }))} placeholder="2" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-slate-700">Resolve time (hours)</span>
+                <input required type="number" min="1" step="1" value={statusForm.resolveHours} onChange={(event) => setStatusForm((form) => ({ ...form, resolveHours: event.target.value }))} placeholder="6" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </label>
+            </div>
+          )}
+
+          {isStatus && <div className="flex flex-wrap gap-5 rounded-xl bg-slate-50 p-3">
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
               <input type="checkbox" checked={statusForm.isActive} onChange={(event) => setStatusForm((form) => ({ ...form, isActive: event.target.checked }))} className="peer sr-only" />
               <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-200 after:h-1.5 after:w-1.5 after:rounded-full after:bg-white after:content-['']" />
@@ -316,23 +466,109 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
               <input type="checkbox" checked={statusForm.isDefault} onChange={(event) => setStatusForm((form) => ({ ...form, isDefault: event.target.checked }))} className="peer sr-only" />
               <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-200 after:h-1.5 after:w-1.5 after:rounded-full after:bg-white after:content-['']" />
-              Default status
+              Default {label.toLowerCase()}
             </label>
-          </div>
+          </div>}
 
           {createStatusMutation.isError && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-              {createStatusMutation.error instanceof Error ? createStatusMutation.error.message : 'Could not create status.'}
+              {createStatusMutation.error instanceof Error ? createStatusMutation.error.message : `Could not create ${label.toLowerCase()}.`}
             </p>
           )}
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <button type="button" disabled={createStatusMutation.isPending} onClick={() => setAddStatusOpen(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
             <button type="submit" disabled={createStatusMutation.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
-              {createStatusMutation.isPending ? 'Creating...' : 'Create Status'}
+              {createStatusMutation.isPending ? 'Creating...' : `Create ${label}`}
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={!!editingPriority}
+        onClose={() => !updatePriorityMutation.isPending && setEditingPriority(null)}
+        title="Update Priority"
+        description="Update the priority name and response timing. Existing configuration is preserved."
+        size="md"
+        closeOnEscape={!updatePriorityMutation.isPending}
+      >
+        <form onSubmit={submitPriorityUpdate} className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold text-slate-700">Priority name</span>
+            <input required autoFocus maxLength={80} value={editForm.name} onChange={(event) => setEditForm((form) => ({ ...form, name: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Follow-up time (hours)</span>
+              <input required type="number" min="1" step="1" value={editForm.followupHours} onChange={(event) => setEditForm((form) => ({ ...form, followupHours: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Resolve time (hours)</span>
+              <input required type="number" min="1" step="1" value={editForm.resolveHours} onChange={(event) => setEditForm((form) => ({ ...form, resolveHours: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+          </div>
+          {updatePriorityMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{updatePriorityMutation.error instanceof Error ? updatePriorityMutation.error.message : 'Could not update priority.'}</p>}
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+            <button type="button" disabled={updatePriorityMutation.isPending} onClick={() => setEditingPriority(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={updatePriorityMutation.isPending} className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">{updatePriorityMutation.isPending ? 'Updating...' : 'Update Priority'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!deleteCandidate}
+        onClose={() => !deletePriorityMutation.isPending && setDeleteCandidate(null)}
+        title="Delete Priority"
+        description="This action permanently removes the priority and cannot be undone."
+        size="md"
+        closeOnEscape={!deletePriorityMutation.isPending}
+      >
+        {deleteCandidate && (() => {
+          const canDelete = !deleteCandidate.isActive && !deleteCandidate.isDefault
+          return (
+            <div className="space-y-4">
+              <div className={`flex items-start gap-3 rounded-2xl border p-4 ${canDelete ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${canDelete ? 'text-red-600' : 'text-amber-600'}`} />
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{canDelete ? `Delete “${deleteCandidate.name}”?` : `“${deleteCandidate.name}” cannot be deleted yet.`}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">A priority can only be deleted when all safety conditions below are satisfied.</p>
+                </div>
+              </div>
+              <ul className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-700">
+                <li className={deleteCandidate.isActive ? 'text-red-700' : 'text-emerald-700'}>• Priority toggle must be OFF {deleteCandidate.isActive ? '— currently Active' : '— satisfied'}</li>
+                <li className={deleteCandidate.isDefault ? 'text-red-700' : 'text-emerald-700'}>• Priority must not be the default {deleteCandidate.isDefault ? '— currently Default' : '— satisfied'}</li>
+                <li>• No tickets may currently use this priority — verified by the server when deleting</li>
+              </ul>
+              {deletePriorityMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{deletePriorityMutation.error instanceof Error ? deletePriorityMutation.error.message : 'Could not delete priority.'}</p>}
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button type="button" disabled={deletePriorityMutation.isPending} onClick={() => setDeleteCandidate(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                <button type="button" disabled={!canDelete || deletePriorityMutation.isPending} onClick={() => deletePriorityMutation.mutate(deleteCandidate.id)} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} />{deletePriorityMutation.isPending ? 'Deleting...' : 'Delete Priority'}</button>
+              </div>
+            </div>
+          )
+        })()}
+      </Modal>
+
+      <Modal open={!!editingStatus} onClose={() => !updateStatusMutation.isPending && setEditingStatus(null)} title="Update Status" description="Update the status name and display order." size="md" closeOnEscape={!updateStatusMutation.isPending}>
+        <form onSubmit={submitStatusUpdate} className="space-y-4">
+          <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Status name</span><input required autoFocus maxLength={80} value={statusEditForm.name} onChange={(event) => setStatusEditForm((form) => ({ ...form, name: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Display order</span><input required type="number" min="1" step="1" value={statusEditForm.sortOrder} onChange={(event) => setStatusEditForm((form) => ({ ...form, sortOrder: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+          {updateStatusMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{updateStatusMutation.error instanceof Error ? updateStatusMutation.error.message : 'Could not update status.'}</p>}
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={updateStatusMutation.isPending} onClick={() => setEditingStatus(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button><button type="submit" disabled={updateStatusMutation.isPending} className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60">{updateStatusMutation.isPending ? 'Updating...' : 'Update Status'}</button></div>
+        </form>
+      </Modal>
+
+      <Modal open={!!deleteStatusCandidate} onClose={() => !deleteStatusMutation.isPending && setDeleteStatusCandidate(null)} title="Delete Status" description="This action permanently removes the status and cannot be undone." size="md" closeOnEscape={!deleteStatusMutation.isPending}>
+        {deleteStatusCandidate && (() => {
+          const canDelete = !deleteStatusCandidate.isActive && !deleteStatusCandidate.isDefault
+          return <div className="space-y-4">
+            <div className={`flex items-start gap-3 rounded-2xl border p-4 ${canDelete ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${canDelete ? 'text-red-600' : 'text-amber-600'}`} /><div><p className="text-sm font-bold text-slate-900">{canDelete ? `Delete “${deleteStatusCandidate.name}”?` : `“${deleteStatusCandidate.name}” cannot be deleted yet.`}</p><p className="mt-1 text-xs text-slate-600">All safety conditions must be satisfied before deletion.</p></div></div>
+            <ul className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-700"><li className={deleteStatusCandidate.isActive ? 'text-red-700' : 'text-emerald-700'}>• Status toggle must be OFF {deleteStatusCandidate.isActive ? '— currently Active' : '— satisfied'}</li><li className={deleteStatusCandidate.isDefault ? 'text-red-700' : 'text-emerald-700'}>• Status must not be the default {deleteStatusCandidate.isDefault ? '— currently Default' : '— satisfied'}</li><li>• No tickets may currently use this status — verified by the server when deleting</li></ul>
+            {deleteStatusMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{deleteStatusMutation.error instanceof Error ? deleteStatusMutation.error.message : 'Could not delete status.'}</p>}
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={deleteStatusMutation.isPending} onClick={() => setDeleteStatusCandidate(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button><button type="button" disabled={!canDelete || deleteStatusMutation.isPending} onClick={() => deleteStatusMutation.mutate(deleteStatusCandidate.id)} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14} />{deleteStatusMutation.isPending ? 'Deleting...' : 'Delete Status'}</button></div>
+          </div>
+        })()}
       </Modal>
     </PageLayout>
   )
