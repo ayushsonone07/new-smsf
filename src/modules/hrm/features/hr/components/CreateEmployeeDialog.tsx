@@ -439,7 +439,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
 
             <Field
               id="emp-id-card"
-              label="ID Card"
+              label="ID Card Issued"
               input={
                 <Select
                   id="emp-id-card"
@@ -447,9 +447,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                   onChange={(e) => {
                     const isYes = e.target.value === "yes";
                     update("isIdCard", isYes);
-                    if (!isYes) {
-                      update("idCardNumber", "");
-                    }
+                    update("idCardNumber", "");
                   }}
                   className={fieldClass()}
                   disabled={mutation.isPending}
@@ -459,29 +457,10 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                 </Select>
               }
             />
-            {values.isIdCard ? (
-              <Field
-                id="emp-id-card-number"
-                label="ID Card Number"
-                required
-                error={errors.idCardNumber}
-                input={
-                  <input
-                    id="emp-id-card-number"
-                    type="text"
-                    value={values.idCardNumber || ""}
-                    onChange={(e) => update("idCardNumber", e.target.value)}
-                    placeholder="e.g. IDC-1049"
-                    className={fieldClass(errors.idCardNumber)}
-                    disabled={mutation.isPending}
-                  />
-                }
-              />
-            ) : null}
 
             <Field
               id="emp-visiting-card"
-              label="Visiting Card"
+              label="Visiting Card Issued"
               input={
                 <Select
                   id="emp-visiting-card"
@@ -489,9 +468,7 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                   onChange={(e) => {
                     const isYes = e.target.value === "yes";
                     update("isVisitingCard", isYes);
-                    if (!isYes) {
-                      update("visitingCardNumber", "");
-                    }
+                    update("visitingCardNumber", "");
                   }}
                   className={fieldClass()}
                   disabled={mutation.isPending}
@@ -501,25 +478,6 @@ export function CreateEmployeeDialog({ candidate = null, open, onClose, onCreate
                 </Select>
               }
             />
-            {values.isVisitingCard ? (
-              <Field
-                id="emp-visiting-card-number"
-                label="Visiting Card Number"
-                required
-                error={errors.visitingCardNumber}
-                input={
-                  <input
-                    id="emp-visiting-card-number"
-                    type="text"
-                    value={values.visitingCardNumber || ""}
-                    onChange={(e) => update("visitingCardNumber", e.target.value)}
-                    placeholder="e.g. VC-882"
-                    className={fieldClass(errors.visitingCardNumber)}
-                    disabled={mutation.isPending}
-                  />
-                }
-              />
-            ) : null}
 
           </div>
 
@@ -624,12 +582,6 @@ function validate(values: CreateEmployeeInput): Errors {
   if (values.managerId != null && values.managerId < 1) errors.managerId = "Use a valid manager.";
   if (values.isCompanySim && !values.companyPhoneNumber?.trim()) {
     errors.companyPhoneNumber = "Company mobile number is required.";
-  }
-  if (values.isIdCard && !values.idCardNumber?.trim()) {
-    errors.idCardNumber = "ID card number is required.";
-  }
-  if (values.isVisitingCard && !values.visitingCardNumber?.trim()) {
-    errors.visitingCardNumber = "Visiting card number is required.";
   }
   return errors;
 }
