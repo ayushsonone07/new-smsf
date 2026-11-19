@@ -195,6 +195,8 @@ function TeamAttendance({
 }: {
   date: string;
 }) {
+  const { role } = useAuth();
+  const canCorrectAttendance = role !== "MANAGER";
   const mark = useMarkAttendance();
   const update = useUpdateAttendance();
   const [query, setQuery] = useState("");
@@ -297,7 +299,9 @@ function TeamAttendance({
           <td className="px-4 py-3.5 font-mono">{shortTime(record.checkIn)}</td><td className="px-4 py-3.5 font-mono">{shortTime(record.checkOut)}</td><td className="px-4 py-3.5">{formatMinutes(record.workingMinutes ?? 0)}</td>
           <td className="px-4 py-3.5"><CheckInStatusPill status={record.checkInStatus ?? (record.checkIn ? "ON_TIME_CHECK_IN" : "NOT_CHECKED_IN")} /></td><td className="px-4 py-3.5"><CheckOutStatusPill status={record.checkOutStatus ?? (record.checkOut ? "ON_TIME_CHECK_OUT" : "NOT_CHECKED_OUT")} /></td><td className="px-4 py-3.5 text-right"><div className="flex justify-end gap-2">
             <button type="button" onClick={() => void navigate(`/hrm/employees/${record.employeeId}/attendance-history`)} className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold transition-colors hover:bg-muted">History</button>
-            <button type="button" onClick={() => setTarget(record)} className="inline-flex items-center gap-1 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"><Pencil size={13} /> Correct</button>
+            {canCorrectAttendance ? (
+              <button type="button" onClick={() => setTarget(record)} className="inline-flex items-center gap-1 rounded-lg bg-primary-soft px-3 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/15"><Pencil size={13} /> Correct</button>
+            ) : null}
           </div></td>
         </tr>)}</tbody>
       </table>
