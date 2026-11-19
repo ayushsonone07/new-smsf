@@ -1,9 +1,17 @@
 import { hrApiGet, hrApiPost } from "@shared/services";
-import type { Birthday, BirthdayRequest } from "../types/birthday.types";
+import type { Birthday, BirthdayRequest, MyBirthdayStatus } from "../types/birthday.types";
 
 export const birthdayService = {
   async getTodayBirthdays(): Promise<Birthday[]> {
     return hrApiGet<Birthday[]>("/api/v1/birthdays/today");
+  },
+
+  async getMyBirthdayStatus(): Promise<MyBirthdayStatus> {
+    return hrApiGet<MyBirthdayStatus>("/api/v1/birthdays/my-status");
+  },
+
+  async triggerWishes(): Promise<{ success: boolean; sentCount: number }> {
+    return hrApiPost<{ success: boolean; sentCount: number }>("/api/v1/birthdays/trigger-wishes", {});
   },
 
   async getUpcomingBirthdays(days: number = 30): Promise<Birthday[]> {

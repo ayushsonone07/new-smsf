@@ -129,16 +129,6 @@ export function EmployeeAssetsPage() {
         updateEmployee({
           id: editingEmployee.id,
           input: {
-            email: editingEmployee.email,
-            name: editingEmployee.name,
-            phone: editingEmployee.phone,
-            role: editingEmployee.role,
-            employeeCode: editingEmployee.employeeCode,
-            joiningDate: editingEmployee.joiningDate,
-            employmentType: editingEmployee.employmentType,
-            departmentId: editingEmployee.departmentId ?? 0,
-            designationId: editingEmployee.designationId ?? null,
-            managerId: editingEmployee.managerId ?? null,
             laptopType: laptopType.trim() || null,
             laptopSerialNumber: laptopSerialNumber.trim() || null,
             isCompanySim,
