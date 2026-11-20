@@ -38,7 +38,7 @@ import { StatusMenu } from "./StatusMenu";
 import type { Candidate, CandidateStatus, DateRange } from "../types";
 
 interface CandidatesSectionProps {
-  range: DateRange;
+  range?: DateRange;
   showRecruiter: boolean;
   actions?: React.ReactNode;
 }

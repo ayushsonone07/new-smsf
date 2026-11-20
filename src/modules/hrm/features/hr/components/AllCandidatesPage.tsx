@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChevronDown, Download, Plus, Upload } from "lucide-react";
 
@@ -11,18 +11,11 @@ import { BulkUploadDialog } from "./BulkUploadDialog";
 import { CandidatesSection } from "./CandidatesSection";
 import { hrService } from "../services";
 
-import type { Candidate, DateRange } from "../types";
+import type { Candidate } from "../types";
 
 type Dialog = "none" | "bulkUpload" | "addCandidate";
 
 export function AllCandidatesPage() {
-  const initialRange = useMemo<DateRange>(() => {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - 29);
-    return { from, to };
-  }, []);
-  const [range] = useState<DateRange>(initialRange);
   const [dialog, setDialog] = useState<Dialog>("none");
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -59,7 +52,6 @@ export function AllCandidatesPage() {
 
       while (hasNext) {
         const result = await hrService.listCandidates({
-          range,
           page,
           size: 100,
           sort: "createdAt,desc",
@@ -81,7 +73,6 @@ export function AllCandidatesPage() {
   return (
     <div className="w-full space-y-4">
       <CandidatesSection
-        range={range}
         showRecruiter={user?.role === "HR"}
         actions={
           <>
