@@ -36,9 +36,7 @@ import {
   selectEmployees,
   selectEmployeesError,
   selectEmployeesLoading,
-  selectEmployeeMutating,
   selectEmployeesPagination,
-  updateEmployeeStatus,
 } from "@hrm/slices/employeeSlice";
 import { getApiErrorMessage } from "@hrm/utils/apiError";
 
@@ -49,10 +47,12 @@ import { useBirthdaysToday } from "@features/birthdays";
 import type { EmployeeListItem, EmployeeStatus, OnboardingStatus } from "../types";
 
 const EMPLOYEE_STATUSES: { value: EmployeeStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "on_leave", label: "On leave" },
-  { value: "notice", label: "Notice" },
-  { value: "terminated", label: "Terminated" },
+  { value: "active", label: "Live" },
+  { value: "notice", label: "On notice" },
+  { value: "resignation", label: "Resignation" },
+  { value: "exit", label: "Exit" },
+  { value: "abscond", label: "Abscond" },
+  { value: "terminated", label: "Terminate" },
 ];
 const ONBOARDING_FILTERS: { value: OnboardingStatus; label: string }[] = [
   { value: "PENDING", label: "Pending" },
@@ -109,7 +109,7 @@ export function EmployeesPage() {
     setRefreshing(true);
 
     try {
-      await dispatch(fetchEmployees(employeeRequest)).unwrap();
+      await dispatch(fetchEmployees({ ...employeeRequest, force: true })).unwrap();
 
       toast.success("Employees refreshed", "The latest employee list was loaded.");
     } catch (error) {
@@ -120,21 +120,6 @@ export function EmployeesPage() {
     } finally {
       setRefreshing(false);
     }
-  }
-
-  const isMutating = useAppSelector(selectEmployeeMutating);
-
-  function handleUpdateStatus(employeeId: number, newStatus: EmployeeStatus) {
-    void dispatch(updateEmployeeStatus({ id: employeeId, status: newStatus })).then((result) => {
-      if (updateEmployeeStatus.fulfilled.match(result)) {
-        toast.success("Employee status updated");
-      } else {
-        toast.error(
-          "Couldn't update status",
-          result.payload?.message ?? "Update failed",
-        );
-      }
-    });
   }
 
   return (
@@ -183,30 +168,8 @@ export function EmployeesPage() {
             </div>
           </StaggerItem>
         )}
-        <StaggerItem>
-          <PageHeader
-            title="Employees"
-            actions={
-              <>
-                <button
-                  type="button"
-                  onClick={() => setAddEmployeeOpen(true)}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary-hover"
-                >
-                  <Plus size={16} />
-                  Employee
-                </button>
-                <RefreshIconButton
-                  refreshing={refreshing || isLoading}
-                  onClick={() => void refreshEmployees()}
-                />
-              </>
-            }
-          />
-        </StaggerItem>
-
         <StaggerItem variant="card">
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile
               label="Total employees"
               value={String(total)}
@@ -245,23 +208,40 @@ export function EmployeesPage() {
                 />
               </label>
 
-              <div className="grid w-full grid-cols-2 gap-3 lg:w-[360px] lg:shrink-0">
-                <AnimatedFilterSelect
-                  value={status}
-                  onValueChange={(nextStatus) =>
-                    resetPage(() => setStatus(nextStatus as "" | EmployeeStatus))
-                  }
-                  options={[{ value: "", label: "Status" }, ...EMPLOYEE_STATUSES]}
-                  ariaLabel="Filter employees by status"
-                />
-                <AnimatedFilterSelect
-                  value={onboardingStatus}
-                  onValueChange={(nextStatus) =>
-                    resetPage(() => setOnboardingStatus(nextStatus as "" | OnboardingStatus))
-                  }
-                  options={[{ value: "", label: "Onboarding" }, ...ONBOARDING_FILTERS]}
-                  ariaLabel="Filter employees by onboarding status"
-                />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5 w-full sm:w-[320px]">
+                  <AnimatedFilterSelect
+                    value={status}
+                    onValueChange={(nextStatus) =>
+                      resetPage(() => setStatus(nextStatus as "" | EmployeeStatus))
+                    }
+                    options={[{ value: "", label: "Status" }, ...EMPLOYEE_STATUSES]}
+                    ariaLabel="Filter employees by status"
+                  />
+                  <AnimatedFilterSelect
+                    value={onboardingStatus}
+                    onValueChange={(nextStatus) =>
+                      resetPage(() => setOnboardingStatus(nextStatus as "" | OnboardingStatus))
+                    }
+                    options={[{ value: "", label: "Onboarding" }, ...ONBOARDING_FILTERS]}
+                    ariaLabel="Filter employees by onboarding status"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAddEmployeeOpen(true)}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    Employee
+                  </button>
+                  <RefreshIconButton
+                    refreshing={refreshing || isLoading}
+                    onClick={() => void refreshEmployees()}
+                  />
+                </div>
               </div>
             </div>
 
@@ -284,8 +264,6 @@ export function EmployeesPage() {
             ) : (
               <EmployeeTable
                 employees={items}
-                isMutating={isMutating}
-                onUpdateStatus={handleUpdateStatus}
                 onOpen={(employeeId) => navigate(`/hrm/employees/${employeeId}`)}
               />
             )}
@@ -380,13 +358,9 @@ function StatTile({
 
 function EmployeeTable({
   employees,
-  isMutating,
-  onUpdateStatus,
   onOpen,
 }: {
   employees: EmployeeListItem[];
-  isMutating: boolean;
-  onUpdateStatus: (employeeId: number, status: EmployeeStatus) => void;
   onOpen: (employeeId: number) => void;
 }) {
   return (
@@ -428,21 +402,7 @@ function EmployeeTable({
                 {formatDate(employee.joiningDate)}
               </td>
               <td className="whitespace-nowrap px-4 py-3.5">
-                <Select
-                  value={employee.status}
-                  disabled={isMutating}
-                  onChange={(event) =>
-                    onUpdateStatus(employee.id, event.target.value as EmployeeStatus)
-                  }
-                  aria-label={`Update status for ${employee.name}`}
-                  className="h-8 cursor-pointer rounded-lg border border-border bg-surface-elevated px-2 text-xs font-semibold text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {EMPLOYEE_STATUSES.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
+                <EmployeeStatusPill status={employee.status} />
               </td>
               <td className="whitespace-nowrap px-4 py-3.5">
                 <AttendancePill present={employee.isPresent === true} />
@@ -491,6 +451,35 @@ function EmployeeAvatar({ name, id }: { name: string; id: number }) {
     >
       {initials}
     </span>
+  );
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "Live",
+  notice: "On notice",
+  resignation: "Resignation",
+  exit: "Exit",
+  abscond: "Abscond",
+  terminated: "Terminate",
+  on_leave: "On leave",
+};
+
+function EmployeeStatusPill({ status }: { status: EmployeeStatus }) {
+  const toneMap: Record<EmployeeStatus, "emerald" | "sky" | "amber" | "rose"> = {
+    active: "emerald",
+    notice: "amber",
+    resignation: "sky",
+    exit: "rose",
+    abscond: "rose",
+    terminated: "rose",
+    on_leave: "sky",
+  };
+
+  return (
+    <StatusBadge
+      label={STATUS_LABELS[status] ?? status}
+      tone={toneMap[status] ?? "sky"}
+    />
   );
 }
 

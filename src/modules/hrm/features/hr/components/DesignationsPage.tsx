@@ -24,7 +24,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
   StatusBadge,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
@@ -44,7 +43,7 @@ import {
 import { useDepartments } from "../hooks";
 import { hrService } from "../services";
 
-import type { Department, Designation, DesignationInput, EmployeeListItem } from "../types";
+import type { Department, Designation, DesignationInput } from "../types";
 
 type DialogState = "none" | "create" | "update" | "delete";
 type DesignationLevel = "Entry" | "Mid" | "Senior";
@@ -70,10 +69,6 @@ export function DesignationsPage() {
   const error = useAppSelector(selectDesignationsError);
 
   const departments = useDepartments();
-  const employees = useQuery({
-    queryKey: ["hr", "employees", "designation-metrics"],
-    queryFn: () => hrService.listEmployees({ page: 0, size: 100, sort: "employeeCode,asc" }),
-  });
 
   useEffect(() => {
     void dispatch(fetchDesignations(undefined));
@@ -81,7 +76,6 @@ export function DesignationsPage() {
 
   const items = designations ?? [];
   const departmentItems = departments.data ?? [];
-  const employeeItems = employees.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState>("none");
   const [query, setQuery] = useState("");
@@ -92,7 +86,10 @@ export function DesignationsPage() {
     [items, selectedId],
   );
 
-  const peopleCounts = useMemo(() => countByDesignation(employeeItems), [employeeItems]);
+  const peopleCounts = useMemo(
+    () => new Map(items.map((d) => [d.id, d.employeeCount ?? 0])),
+    [items],
+  );
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
@@ -103,7 +100,10 @@ export function DesignationsPage() {
     );
   }, [items, query]);
 
-  const peopleAssigned = employeeItems.filter((employee) => employee.designationId != null).length;
+  const peopleAssigned = useMemo(
+    () => items.reduce((sum, d) => sum + (d.employeeCount ?? 0), 0),
+    [items],
+  );
   const departmentsCovered = new Set(
     items.map((designation) => designation.departmentId).filter(isNumber),
   ).size;
@@ -117,10 +117,7 @@ export function DesignationsPage() {
   async function refreshDesignations() {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        dispatch(fetchDesignations({ force: true })).unwrap(),
-        employees.refetch(),
-      ]);
+      await dispatch(fetchDesignations({ force: true })).unwrap();
       toast.success("Designations refreshed", "The latest designations were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh designations", getApiErrorMessage(err));
@@ -141,15 +138,8 @@ export function DesignationsPage() {
 
   return (
     <>
-      <div className="space-y-6">
-        <PageHeader
-          eyebrow="Organization"
-          title="Designations"
-          description="Define job titles and roles across departments."
-         
-        />
-
-        <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="space-y-4">
+        <section className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
           <MetricCard
             icon={<Briefcase size={22} />}
             tone="blue"
@@ -169,31 +159,32 @@ export function DesignationsPage() {
             label="Departments covered"
           />
         </section>
-<div className="flex items-center justify-between gap-6">
- <div className="w-full max-w-2xl">
-        <SearchBox value={query} placeholder="Search designations..." onChange={setQuery} />
- </div>
-             <div className="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDialog("create")}
-                className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-7 text-sm font-medium text-white shadow transition-colors hover:bg-primary/90"
-              >
-                <Plus size={17} />
-                Designation
-              </button>
-              <button
-                type="button"
-                onClick={() => void refreshDesignations()}
-                disabled={isRefreshing}
-                aria-label={isRefreshing ? "Refreshing designations" : "Refresh designations"}
-                title="Refresh designations"
-                className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface-elevated text-foreground shadow transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <RefreshCw size={18} className={isRefreshing ? "animate-spin" : undefined} />
-              </button>
-            </div>
-         </div> 
+
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full sm:max-w-md">
+            <SearchBox value={query} placeholder="Search designations..." onChange={setQuery} />
+          </div>
+          <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setDialog("create")}
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover"
+            >
+              <Plus size={15} />
+              Designation
+            </button>
+            <button
+              type="button"
+              onClick={() => void refreshDesignations()}
+              disabled={isRefreshing}
+              aria-label={isRefreshing ? "Refreshing designations" : "Refresh designations"}
+              title="Refresh designations"
+              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-70"
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : undefined} />
+            </button>
+          </div>
+        </div> 
         {error ? (
           <ErrorDisplay
             message={`Failed to load designations: ${error}`}
@@ -713,15 +704,6 @@ function Field({
       {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
     </div>
   );
-}
-
-function countByDesignation(employees: EmployeeListItem[]): Map<number, number> {
-  const counts = new Map<number, number>();
-  for (const employee of employees) {
-    if (employee.designationId == null) continue;
-    counts.set(employee.designationId, (counts.get(employee.designationId) ?? 0) + 1);
-  }
-  return counts;
 }
 
 function inferLevel(title: string): DesignationLevel {

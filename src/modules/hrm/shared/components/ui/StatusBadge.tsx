@@ -57,17 +57,24 @@ const dotColors: Record<BadgeTone, string> = {
   lime: "bg-success",
 };
 
-export function StatusBadge({ label, tone = "slate", className, dot = false }: StatusBadgeProps) {
+export function StatusBadge({ label, tone = "slate", className, dot = true }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition-colors duration-150",
         toneClasses[tone],
         className,
       )}
     >
-      {dot ? <span className={cn("mr-1.5 h-1.5 w-1.5 rounded-full", dotColors[tone])} /> : null}
-      {label}
+      {dot ? (
+        <span
+          className={cn(
+            "h-1.5 w-1.5 rounded-full shadow-xs",
+            dotColors[tone],
+          )}
+        />
+      ) : null}
+      <span className="leading-none">{label}</span>
     </span>
   );
 }
