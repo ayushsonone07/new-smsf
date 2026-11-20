@@ -362,6 +362,11 @@ export interface AllTicketsRow {
   ticketNumber: string
   subject: string
   department: string
+  businessName?: string
+  customerName?: string
+  status?: string
+  priority?: string
+  createdAt?: string
 }
 
 export interface AllTicketsPage {
@@ -389,6 +394,11 @@ export async function fetchAllTickets(params: {
     CustomApiResponse<{
       tickets?: Record<string, string>
       departments?: Record<string, string>
+      businessNames?: Record<string, string>
+      customerNames?: Record<string, string>
+      statuses?: Record<string, string>
+      priorities?: Record<string, string>
+      createdAts?: Record<string, string>
       currentPage?: number
       pageSize?: number
       totalRecords?: number
@@ -408,12 +418,22 @@ export async function fetchAllTickets(params: {
   const data = res.data?.data
   const tickets = data?.tickets ?? {}
   const departments = data?.departments ?? {}
+  const businessNames = data?.businessNames ?? {}
+  const customerNames = data?.customerNames ?? {}
+  const statuses = data?.statuses ?? {}
+  const priorities = data?.priorities ?? {}
+  const createdAts = data?.createdAts ?? {}
 
   return {
     rows: Object.entries(tickets).map(([ticketNumber, subject]) => ({
       ticketNumber,
       subject,
       department: departments[ticketNumber] ?? '',
+      businessName: businessNames[ticketNumber] || undefined,
+      customerName: customerNames[ticketNumber] || undefined,
+      status: statuses[ticketNumber] || undefined,
+      priority: priorities[ticketNumber] || undefined,
+      createdAt: createdAts[ticketNumber] || undefined,
     })),
     currentPage: data?.currentPage ?? 0,
     pageSize: data?.pageSize ?? size,

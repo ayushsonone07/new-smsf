@@ -1122,4 +1122,69 @@ export async function fetchCustomerTicketHistory(
   return []
 }
 
+export interface ActivePriorityItem {
+  id: number
+  name: string
+  code: string
+  isDefault?: boolean
+  sortOrder?: number
+}
+
+export async function fetchActivePriorities(): Promise<ActivePriorityItem[]> {
+  // 1. Try directly via Help Center proxy or direct URL
+  try {
+    const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/config/priorities/active`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      if (list.length > 0) {
+        return list
+          .filter((p: any) => p && p.isActive !== false)
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            code: (p.code || p.name).toUpperCase(),
+            isDefault: Boolean(p.isDefault),
+            sortOrder: p.sortOrder ?? 0,
+          }))
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active priorities directly:', err)
+  }
+
+  // 2. Try through Vite local proxy
+  try {
+    const res = await fetch(`/api/help-center/config/priorities/active`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      if (list.length > 0) {
+        return list
+          .filter((p: any) => p && p.isActive !== false)
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            code: (p.code || p.name).toUpperCase(),
+            isDefault: Boolean(p.isDefault),
+            sortOrder: p.sortOrder ?? 0,
+          }))
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active priorities via proxy:', err)
+  }
+
+  return [
+    { id: 1, name: 'Low', code: 'LOW', isDefault: false },
+    { id: 2, name: 'Medium', code: 'MEDIUM', isDefault: true },
+    { id: 3, name: 'High', code: 'HIGH', isDefault: false },
+    { id: 4, name: 'Critical', code: 'CRITICAL', isDefault: false },
+  ]
+}
+
 

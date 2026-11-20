@@ -1381,15 +1381,7 @@ export function AssignedTicketsView({
               </DrawerSection>
             </div>
 
-            {/* Footer — Call History, History and Re-assign are already on the table row, so they are
-                not repeated here. Heads keep "Customer Calls" (all calls with this customer). */}
-            {canReassignTickets && selectedTicket.creatorPhone && (
-              <div className="flex flex-wrap gap-2 border-t border-[#e6e9f0] px-4 py-3 sm:px-5">
-                <button type="button" onClick={() => setCallsView({ customer: selectedTicket.creatorPhone || '' })} className={BTN}>
-                  <PhoneCall className="h-3.5 w-3.5 text-slate-500" /> Customer Calls
-                </button>
-              </div>
-            )}
+
           </aside>
         </>
       )}

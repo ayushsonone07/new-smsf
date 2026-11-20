@@ -783,6 +783,7 @@ function TicketsListSection({
                 <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#64748b] tracking-wider uppercase">
                   <th className="py-2.5 px-3 w-[155px]">TICKET #</th>
                   <th className="py-2.5 px-3 min-w-[180px] max-w-[260px]">SUBJECT</th>
+                  <th className="py-2.5 px-3 min-w-[140px]">BUSINESS NAME</th>
                   <th className="py-2.5 px-2.5 w-[125px]">DEPARTMENT</th>
                   <th className="py-2.5 px-2 w-[90px]">STATUS</th>
                   <th className="py-2.5 px-2 w-[90px]">PRIORITY</th>
@@ -834,6 +835,16 @@ function TicketsListSection({
                           )}
                         </div>
                       </td>
+                      <td className="py-2.5 px-3 min-w-[140px]">
+                        <strong className="block text-xs font-bold text-[#1e293b]">
+                          {row.businessName || row.customerName || '—'}
+                        </strong>
+                        {row.businessName && row.customerName && row.businessName !== row.customerName && (
+                          <span className="block text-[11px] text-[#64748b] mt-0.5">
+                            {row.customerName}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-2.5 w-[125px]">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${deptStyle.className}`}
@@ -842,10 +853,10 @@ function TicketsListSection({
                         </span>
                       </td>
                       <td className="py-2.5 px-2 w-[90px]">
-                        <StatusBadge status={(row as any).status || status || 'OPEN'} />
+                        <StatusBadge status={row.status || status || 'OPEN'} />
                       </td>
                       <td className="py-2.5 px-2 w-[90px]">
-                        <PriorityBadge priority={(row as any).priority || priority || 'MEDIUM'} />
+                        <PriorityBadge priority={row.priority || priority || 'MEDIUM'} />
                       </td>
                       <td className="py-2.5 px-3 text-right w-[75px]">
                         <button
@@ -1205,6 +1216,7 @@ function UserDetailsSection({
               <tr className="bg-[#f8fafe] border-b border-[#e7ebf3] text-[10px] font-bold text-[#7b89a1] tracking-wider uppercase">
                 <th className="py-3 px-4">TICKET</th>
                 <th className="py-3 px-4">CUSTOMER</th>
+                <th className="py-3 px-4">BUSINESS NAME</th>
                 <th className="py-3 px-4">PRIORITY</th>
                 <th className="py-3 px-4">STATUS</th>
                 <th className="py-3 px-4">CREATED</th>
@@ -1214,13 +1226,13 @@ function UserDetailsSection({
             <tbody className="divide-y divide-[#eff2f7]">
               {userTicketsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-[#77869e]">
+                  <td colSpan={7} className="py-12 text-center text-xs text-[#77869e]">
                     <LoadingState message="Loading user assigned tickets..." />
                   </td>
                 </tr>
               ) : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-[#77869e]">
+                  <td colSpan={7} className="py-12 text-center text-xs text-[#77869e]">
                     No tickets found for this filter.
                   </td>
                 </tr>
@@ -1255,11 +1267,16 @@ function UserDetailsSection({
                       </td>
                       <td className="py-3.5 px-4">
                         <strong className="block text-xs font-bold text-[#17243c]">
-                          {t.creatorName || t.businessName || '—'}
+                          {t.creatorName || '—'}
                         </strong>
                         <span className="block text-[11px] text-[#77869e] mt-0.5">
                           {t.creatorPhone || t.creatorEmail || '—'}
                         </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <strong className="block text-xs font-bold text-[#17243c]">
+                          {t.businessName || '—'}
+                        </strong>
                       </td>
                       <td className="py-3.5 px-4">
                         <span
@@ -1498,6 +1515,15 @@ function TicketDetailsModal({
                   </div>
                   <div className="text-xs font-bold text-[#17233c]">
                     {details.userDto?.name || details.userDto?.email || '—'}
+                  </div>
+                </div>
+
+                <div className="border border-[#e8edf5] rounded-xl p-3.5 bg-white">
+                  <div className="text-[10px] font-bold text-[#8390a6] uppercase tracking-wider mb-1.5">
+                    Business Name
+                  </div>
+                  <div className="text-xs font-bold text-[#17233c]">
+                    {details.businessName || '—'}
                   </div>
                 </div>
 

@@ -69,7 +69,11 @@ function ActiveToggleSwitch({
       role="switch"
       aria-checked={active}
       disabled={disabled || isPending}
-      onClick={() => onChange(!active)}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onChange(!active)
+      }}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${
         active ? 'bg-emerald-600' : 'bg-slate-300'
       }`}
@@ -107,11 +111,11 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   const query = useQuery({
     queryKey: ['help-center-config', type],
     queryFn: isStatus ? fetchTicketStatuses : fetchTicketPriorities,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 
   const toggleActiveMutation = useMutation({
-    // Same API the State dropdown uses — works for both statuses and priorities
     mutationFn: ({ id, active }: { id: number; active: boolean }) => setTicketConfigActive(type, id, active),
     onMutate: async ({ id, active }) => {
       await queryClient.cancelQueries({ queryKey: ['help-center-config', type] })
@@ -126,8 +130,14 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
         queryClient.setQueryData(['help-center-config', type], context.previous)
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
+    onSuccess: (updatedItem, variables) => {
+      queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', type], (old) =>
+        old?.map((item) => {
+          if (item.id !== variables.id) return item
+          const patch = updatedItem && typeof updatedItem === 'object' ? updatedItem : {}
+          return { ...item, ...patch, isActive: variables.active }
+        })
+      )
     },
   })
 
@@ -143,23 +153,28 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
           isActive: true,
           isDefault: false,
         }),
-    onSuccess: async () => {
+    onSuccess: async (createdItem) => {
+      if (createdItem) {
+        queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', type], (old) => {
+          if (!old) return [createdItem]
+          if (old.some((item) => item.id === createdItem.id)) return old
+          return [...old, createdItem]
+        })
+      }
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
       setAddStatusOpen(false)
       setStatusForm(EMPTY_STATUS_FORM)
     },
   })
 
-  const stateMutation = useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) => setTicketConfigActive(type, id, active),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['help-center-config', type] })
-    },
-  })
-
   const updatePriorityMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateTicketPriority>[1] }) => updateTicketPriority(id, payload),
-    onSuccess: async () => {
+    onSuccess: async (updatedItem) => {
+      if (updatedItem) {
+        queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'priority'], (old) =>
+          old?.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item)) ?? [updatedItem]
+        )
+      }
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'priority'] })
       setEditingPriority(null)
     },
@@ -167,7 +182,10 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
 
   const deletePriorityMutation = useMutation({
     mutationFn: deleteTicketPriority,
-    onSuccess: async () => {
+    onSuccess: async (_data, deletedId) => {
+      queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'priority'], (old) =>
+        old?.filter((item) => item.id !== deletedId) ?? []
+      )
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'priority'] })
       setDeleteCandidate(null)
     },
@@ -175,7 +193,12 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof updateTicketStatusConfig>[1] }) => updateTicketStatusConfig(id, payload),
-    onSuccess: async () => {
+    onSuccess: async (updatedItem) => {
+      if (updatedItem) {
+        queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'status'], (old) =>
+          old?.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item)) ?? [updatedItem]
+        )
+      }
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
       setEditingStatus(null)
     },
@@ -183,7 +206,10 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
 
   const deleteStatusMutation = useMutation({
     mutationFn: deleteTicketStatusConfig,
-    onSuccess: async () => {
+    onSuccess: async (_data, deletedId) => {
+      queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'status'], (old) =>
+        old?.filter((item) => item.id !== deletedId) ?? []
+      )
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
       setDeleteStatusCandidate(null)
     },
@@ -388,6 +414,12 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                 <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
                   <th className="px-3 py-3 font-bold w-16">Order</th>
                   <th className="px-3 py-3 font-bold">{label}</th>
+                  {!isStatus && (
+                    <>
+                      <th className="px-3 py-3 font-bold">Follow-up (hours)</th>
+                      <th className="px-3 py-3 font-bold">Resolve time (hours)</th>
+                    </>
+                  )}
                   <th className="px-3 py-3 font-bold">State</th>
                   <th className="px-3 py-3 font-bold">Updated</th>
                   <th className="px-3 py-3 text-right font-bold">Actions</th>
@@ -403,19 +435,31 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                         <span className="font-bold text-slate-900">{item.name}</span>
                       </div>
                     </td>
+                    {!isStatus && (
+                      <>
+                        <td className="px-3 py-3.5">
+                          <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                            {item.followupHours != null ? `${item.followupHours} hrs` : '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                            {item.resolveHours != null ? `${item.resolveHours} hrs` : '—'}
+                          </span>
+                        </td>
+                      </>
+                    )}
                     <td className="px-3 py-3.5">
-                      <div className="relative inline-flex items-center">
-                        <select
-                          aria-label={`Change ${item.name} state`}
-                          value={item.isActive ? 'active' : 'inactive'}
-                          disabled={stateMutation.isPending && stateMutation.variables?.id === item.id}
-                          onChange={(event) => stateMutation.mutate({ id: item.id, active: event.target.value === 'active' })}
-                          className={`h-9 appearance-none rounded-xl border px-3 pr-8 text-[11px] font-bold outline-none transition focus:ring-2 disabled:cursor-wait disabled:opacity-60 ${item.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-600 focus:ring-slate-200'}`}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                        <ChevronDown size={13} className="pointer-events-none absolute right-2.5 text-current opacity-60" />
+                      <div className="flex items-center gap-2">
+                        <ActiveToggleSwitch
+                          active={Boolean(item.isActive)}
+                          disabled={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === item.id}
+                          isPending={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === item.id}
+                          onChange={(nextActive) => toggleActiveMutation.mutate({ id: item.id, active: nextActive })}
+                        />
+                        <span className={`text-[11px] font-bold ${item.isActive ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          {item.isActive ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
                     </td>
                     <td className="px-3 py-3.5 text-slate-500">{formatDate(item.updatedAt || item.createdAt)}</td>
