@@ -71,11 +71,12 @@ export async function createTicketStatus(payload: CreateTicketStatusRequest) {
     body: JSON.stringify(payload),
   })
 
-  if (!response?.success || !response.data) {
+  const data = response?.data ?? (response as unknown as HelpCenterConfigItem)
+  if (!data || response?.success === false) {
     throw new Error(response?.message || 'Could not create ticket status')
   }
 
-  return response.data
+  return data
 }
 
 export async function createTicketPriority(payload: CreateTicketPriorityRequest) {
@@ -87,11 +88,12 @@ export async function createTicketPriority(payload: CreateTicketPriorityRequest)
     body: JSON.stringify(payload),
   })
 
-  if (!response?.success || !response.data) {
+  const data = response?.data ?? (response as unknown as HelpCenterConfigItem)
+  if (!data || response?.success === false) {
     throw new Error(response?.message || 'Could not create ticket priority')
   }
 
-  return response.data
+  return data
 }
 
 export async function updateTicketPriority(id: number, payload: CreateTicketPriorityRequest) {
@@ -103,11 +105,12 @@ export async function updateTicketPriority(id: number, payload: CreateTicketPrio
     body: JSON.stringify(payload),
   })
 
-  if (!response?.success || !response.data) {
+  const data = response?.data ?? (response as unknown as HelpCenterConfigItem)
+  if (!data || response?.success === false) {
     throw new Error(response?.message || 'Could not update ticket priority')
   }
 
-  return response.data
+  return data
 }
 
 export async function deleteTicketPriority(id: number) {
@@ -119,7 +122,7 @@ export async function deleteTicketPriority(id: number) {
     },
   )
 
-  if (!response?.success) {
+  if (response?.success === false) {
     throw new Error(response?.message || 'Could not delete ticket priority')
   }
 }
@@ -132,8 +135,9 @@ export async function updateTicketStatusConfig(id: number, payload: UpdateTicket
     headers: { 'Content-Type': 'application/json', 'X-User-Role': 'SUPER_ADMIN' },
     body: JSON.stringify(payload),
   })
-  if (!response?.success || !response.data) throw new Error(response?.message || 'Could not update ticket status')
-  return response.data
+  const data = response?.data ?? (response as unknown as HelpCenterConfigItem)
+  if (!data || response?.success === false) throw new Error(response?.message || 'Could not update ticket status')
+  return data
 }
 
 export async function deleteTicketStatusConfig(id: number) {
@@ -141,7 +145,7 @@ export async function deleteTicketStatusConfig(id: number) {
     `/api/help-center/config/statuses/${id}`,
     { method: 'DELETE', headers: { 'X-User-Role': 'SUPER_ADMIN' } },
   )
-  if (!response?.success) throw new Error(response?.message || 'Could not delete ticket status')
+  if (response?.success === false) throw new Error(response?.message || 'Could not delete ticket status')
 }
 
 export async function setTicketConfigActive(
@@ -155,9 +159,9 @@ export async function setTicketConfigActive(
     { method: 'PATCH' },
   )
 
-  if (!response?.success) {
+  if (response?.success === false) {
     throw new Error(response?.message || `Could not ${active ? 'activate' : 'deactivate'} ticket ${type}`)
   }
 
-  return response.data
+  return response?.data ?? (response as unknown as HelpCenterConfigItem)
 }

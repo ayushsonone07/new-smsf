@@ -64,11 +64,11 @@ export function DepartmentUsersTicketsView({
   }, [members, memberSearch])
 
   // Load department members
-  async function loadMembers() {
+  async function loadMembers(force = false) {
     setIsLoadingMembers(true)
     setMembersError(null)
     try {
-      const users = await fetchAssignableDepartmentUsers(departmentType)
+      const users = await fetchAssignableDepartmentUsers(departmentType, { force })
       setMembers(users)
     } catch (err) {
       setMembersError(err instanceof Error ? err.message : 'Failed to load department members')
@@ -160,6 +160,7 @@ export function DepartmentUsersTicketsView({
             onTicketUpdated={() => setRefreshMemberTicketsKey((k) => k + 1)}
             canViewHistory={canViewHistory}
             canUpdateStatus={false}
+            canCall={false}
           />
         )}
       </div>
@@ -216,7 +217,7 @@ export function DepartmentUsersTicketsView({
             </div>
             <button
               type="button"
-              onClick={loadMembers}
+              onClick={() => loadMembers(true)}
               disabled={isLoadingMembers}
               className="flex h-[38px] flex-shrink-0 items-center gap-[7px] rounded-[9px] border border-[#e3e8f0] bg-white px-3.5 text-[13px] font-semibold text-[#344461] hover:bg-[#f7f8fd] disabled:opacity-60"
             >
@@ -240,7 +241,7 @@ export function DepartmentUsersTicketsView({
             <p className="mt-1 max-w-sm text-xs text-[#8491a6]">{membersError}</p>
             <button
               type="button"
-              onClick={loadMembers}
+              onClick={() => loadMembers(true)}
               className="mt-3 rounded-lg bg-[#f0efff] px-3.5 py-2 text-xs font-bold text-[#5146ef] hover:bg-[#5146ef] hover:text-white"
             >
               Retry

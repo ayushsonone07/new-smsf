@@ -36,9 +36,48 @@ export interface EmployeeTicketWithCreator {
   creatorStatus?: 'ACTIVE' | 'INACTIVE' | string | null
   creatorRegisteredAt?: string | null
   businessName?: string | null
-  smsbCustomerId?: number | string | null
+  smsbCustomerId?: number | null
   attachmentCount?: number
   attachments?: TicketAttachment[]
+  previousTicketCount?: number
+  hasMultipleTickets?: boolean
+  /** Filled by the department-wide list (All Tickets) */
+  assignedToEmail?: string | null
+  assignedToName?: string | null
+  /** Nobody has it, or it is still with the department head */
+  unassigned?: boolean
+}
+
+export interface CustomerHistoryTicket {
+  ticketId: number
+  ticketNumber: string
+  subject: string
+  description?: string | null
+  status: TicketStatus
+  priority: TicketPriority
+  departmentName: string
+  createdAt: string
+  updatedAt?: string | null
+  resolvedAt?: string | null
+  assignedTo?: string | null
+  assignedToName?: string | null
+  businessName?: string | null
+  attachmentCount?: number
+  attachments?: TicketAttachment[]
+}
+
+export interface CustomerHistoryPageResponse {
+  creatorId: number
+  creatorName?: string
+  creatorEmail?: string
+  scope?: string[]
+  content: CustomerHistoryTicket[]
+  currentPage: number
+  pageSize: number
+  totalRecords: number
+  totalPages: number
+  hasNext: boolean
+  hasPrevious: boolean
 }
 
 export interface EmployeeTicketPageResponse {

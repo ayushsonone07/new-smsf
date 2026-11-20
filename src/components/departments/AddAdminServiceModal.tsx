@@ -35,7 +35,7 @@ export function AddAdminServiceModal({
   const isEdit = Boolean(editingService)
 
   const [serviceType, setServiceType] = useState('')
-  const [deptMode, setDeptMode] = useState<'existing' | 'custom'>('custom')
+  const [deptMode, setDeptMode] = useState<'existing' | 'custom'>('existing')
   const [selectedDeptType, setSelectedDeptType] = useState(
     'WEBSITE_DEPARTMENT',
   )
@@ -57,7 +57,7 @@ export function AddAdminServiceModal({
       } else {
         setServiceType('')
         setCustomDeptType('')
-        setDeptMode('custom')
+        setDeptMode('existing')
         setSelectedDeptType(departmentTypes[0] || 'WEBSITE_DEPARTMENT')
         setIsServiceActive(true)
       }
