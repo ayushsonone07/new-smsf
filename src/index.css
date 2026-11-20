@@ -165,6 +165,64 @@
   --app-font-weight-heading: 700;
 }
 
+.dark,
+:root.dark,
+html.dark {
+  /* HRM Dark Theme Tokens */
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  --card: 222 32% 12%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 30% 13%;
+  --popover-foreground: 210 40% 96%;
+
+  --primary: 24 95% 55%;
+  --primary-hover: 23 92% 48%;
+  --primary-foreground: 0 0% 100%;
+  --primary-soft: 24 40% 16%;
+
+  --secondary: 222 30% 16%;
+  --secondary-foreground: 210 40% 88%;
+  --muted: 222 28% 16%;
+  --muted-foreground: 215 16% 68%;
+  --accent: 222 30% 16%;
+  --accent-foreground: 210 40% 88%;
+  --destructive: 0 84% 62%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 222 20% 22%;
+  --border-strong: 222 18% 32%;
+  --input: 222 22% 24%;
+  --ring: 24 95% 55%;
+
+  --sidebar: 222 36% 8%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-muted: 215 16% 68%;
+  --sidebar-hover: 222 28% 14%;
+  --sidebar-active: 24 95% 55%;
+  --sidebar-border: 222 20% 18%;
+
+  --surface: 222 47% 7%;
+  --surface-elevated: 222 32% 12%;
+  --surface-muted: 222 28% 14%;
+  --surface-hover: 222 28% 18%;
+  --surface-active: 24 40% 20%;
+
+  --danger: 0 84% 62%;
+  --danger-soft: 0 45% 16%;
+  --success: 142 71% 50%;
+  --success-soft: 142 45% 16%;
+  --warning: 38 96% 55%;
+  --warning-soft: 38 45% 16%;
+  --info: 199 89% 52%;
+  --info-soft: 199 45% 16%;
+
+  --ink: 210 40% 96%;
+  --ink-soft: 215 16% 68%;
+  --ink-faint: 222 18% 45%;
+  --line: 222 20% 22%;
+}
+
 html {
   font-size: 12px;
   -webkit-text-size-adjust: 100%;
@@ -183,8 +241,8 @@ body {
   font-weight: var(--app-font-weight-body);
   line-height: 1.45;
   letter-spacing: 0.005em;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

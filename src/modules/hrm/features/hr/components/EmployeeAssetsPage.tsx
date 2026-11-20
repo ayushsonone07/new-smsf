@@ -306,20 +306,20 @@ export function EmployeeAssetsPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="min-w-full divide-y divide-border text-sm">
             <thead>
-              <tr className="border-b border-border bg-surface-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <th className="py-3.5 pl-6 pr-4">Employee</th>
-                <th className="px-4 py-3.5">Contact Details</th>
-                <th className="px-4 py-3.5">Laptop Brand / Model</th>
-                <th className="px-4 py-3.5">Laptop Serial Number</th>
-                <th className="px-4 py-3.5">Company SIM Number</th>
-                <th className="px-4 py-3.5">ID Card</th>
-                <th className="px-4 py-3.5">Visiting Card</th>
-                <th className="py-3.5 pl-4 pr-6 text-right">Action</th>
+              <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="py-3.5 pl-6 pr-4 whitespace-nowrap">Employee</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Contact Details</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Laptop Brand / Model</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Laptop Serial Number</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Company SIM Number</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">ID Card</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Visiting Card</th>
+                <th className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border text-sm">
+            <tbody className="divide-y divide-border bg-surface-elevated text-sm">
               {loading && items.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-6">
@@ -337,48 +337,47 @@ export function EmployeeAssetsPage() {
                 </tr>
               ) : (
                 filteredItems.map((emp) => {
-                  const hasLaptop = Boolean(emp.laptopSerialNumber || emp.laptopType);
-                  const hasSim = Boolean(emp.isCompanySim || emp.companyPhoneNumber);
-
                   return (
-                    <tr key={emp.id} className="transition-colors hover:bg-muted/40">
+                    <tr key={emp.id} className="transition-colors hover:bg-surface-hover/70">
                       {/* Employee Details */}
-                      <td className="py-4 pl-6 pr-4">
+                      <td className="py-4 pl-6 pr-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
                             {emp.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-foreground truncate">{emp.name}</p>
+                            <p className="font-semibold text-foreground">{emp.name}</p>
                             <p className="text-xs text-muted-foreground">{emp.employeeCode}</p>
                           </div>
                         </div>
                       </td>
 
                       {/* Contact Details */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="space-y-0.5 text-xs">
-                          <p className="text-foreground truncate">{emp.email || "—"}</p>
+                          <p className="font-medium text-foreground">{emp.email || "—"}</p>
                           <p className="text-muted-foreground">{emp.phone || "—"}</p>
                         </div>
                       </td>
 
                       {/* Laptop Brand */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         {emp.laptopType ? (
-                          <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-2.5 py-1 text-xs font-semibold text-foreground">
+                          <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-muted/60 px-2.5 py-1 text-xs font-semibold text-foreground">
                             <Laptop className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                             <span>{emp.laptopType}</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">Not assigned</span>
+                          <span className="inline-flex items-center rounded-md border border-border bg-surface-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            Not assigned
+                          </span>
                         )}
                       </td>
 
                       {/* Laptop Serial Number */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         {emp.laptopSerialNumber ? (
-                          <span className="inline-block rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
+                          <span className="inline-block rounded-md border border-border bg-surface-muted/80 px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
                             {emp.laptopSerialNumber}
                           </span>
                         ) : (
@@ -387,47 +386,53 @@ export function EmployeeAssetsPage() {
                       </td>
 
                       {/* Company SIM */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         {emp.isCompanySim || emp.companyPhoneNumber ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                             <Smartphone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>{emp.companyPhoneNumber || "Active SIM"}</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">None</span>
+                          <span className="inline-flex items-center rounded-md border border-border bg-surface-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            None
+                          </span>
                         )}
                       </td>
 
                       {/* ID Card */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         {emp.isIdCard ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
                             <CreditCard className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                             <span>Yes</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">No</span>
+                          <span className="inline-flex items-center rounded-md border border-border bg-surface-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            No
+                          </span>
                         )}
                       </td>
 
                       {/* Visiting Card */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         {emp.isVisitingCard ? (
                           <div className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
                             <Contact className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                             <span>Yes</span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">No</span>
+                          <span className="inline-flex items-center rounded-md border border-border bg-surface-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            No
+                          </span>
                         )}
                       </td>
 
                       {/* Action */}
-                      <td className="py-4 pl-4 pr-6 text-right">
+                      <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => openEditModal(emp)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow transition hover:bg-muted"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:border-primary/40 hover:bg-surface-hover"
                         >
                           <Edit3 className="h-3.5 w-3.5 text-primary" />
                           <span>Assign / Edit</span>
