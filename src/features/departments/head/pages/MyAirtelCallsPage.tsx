@@ -189,6 +189,7 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
       'my-airtel-calls',
       isHead,
       departmentType,
+      'DEPARTMENT',
       debouncedSearch,
       status,
       callType,
@@ -208,6 +209,7 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
         size: pageSize,
         sortBy: 'callTimestamp',
         sortDir: 'desc',
+        contextType: 'DEPARTMENT',
       }
       return isHead && departmentType
         ? getDepartmentAirtelCalls(q, departmentType)
@@ -222,6 +224,7 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
       'my-airtel-analytics',
       isHead,
       departmentType,
+      'DEPARTMENT',
       debouncedSearch,
       status,
       callType,
@@ -235,6 +238,7 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
         callType: callType === 'ALL' ? undefined : callType,
         fromDate: toYmd(startDate),
         toDate: toYmd(endDate),
+        contextType: 'DEPARTMENT',
       }
       return isHead && departmentType
         ? getDepartmentAirtelAnalytics(aq, departmentType)
@@ -349,8 +353,8 @@ export function MyAirtelCallsPage({ feature: _feature }: Props) {
             </h1>
             <p className="text-xs font-medium text-slate-500 mt-0.5">
               {isHead
-                ? `All calls for ${departmentType.replace(/_/g, ' ')} department`
-                : 'Your call history filtered by your phone number'}
+                ? `Direct & department calls for ${departmentType.replace(/_/g, ' ')} department (non-ticket)`
+                : 'Your direct & department call history (non-ticket)'}
             </p>
           </div>
         </div>

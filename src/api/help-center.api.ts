@@ -8,6 +8,8 @@ import type {
   HelpArticle,
   TicketHistoryPageResponse,
   TicketHistoryEntry,
+  CustomerHistoryPageResponse,
+  CustomerHistoryTicket,
 } from '../features/departments/types/help-center.types'
 
 interface CustomApiResponse<T> {
@@ -88,6 +90,41 @@ export async function fetchAssignedTickets(
     data.content = []
   }
 
+  return data
+}
+
+/**
+ * Head → "All Tickets": every ticket in the logged-in head's department in ONE call.
+ * SMSB takes the department from the token; rows carry assignedToEmail / assignedToName / unassigned.
+ * Endpoint: GET /api/help-center/department_users/fetch_department_tickets
+ */
+export async function fetchDepartmentTickets(
+  params?: Omit<AssignedTicketsFilterParams, 'sortDirection'>
+): Promise<EmployeeTicketPageResponse> {
+  const size = params?.size ?? 200
+  const res = await apiClient.get<CustomApiResponse<EmployeeTicketPageResponse>>(
+    '/api/help-center/department_users/fetch_department_tickets',
+    {
+      params: {
+        page: params?.page ?? 0,
+        size,
+        status: params?.status || undefined,
+        priority: params?.priority || undefined,
+        days: params?.days ?? undefined,
+        months: params?.months !== undefined ? String(params.months) : undefined,
+        period: params?.period || undefined,
+        startDate: params?.startDate || undefined,
+        endDate: params?.endDate || undefined,
+      },
+      signal: params?.signal,
+    }
+  )
+
+  const data = res.data?.data
+  if (!data) {
+    return { content: [], currentPage: 0, pageSize: size, totalRecords: 0, totalPages: 0 }
+  }
+  if (!Array.isArray(data.content)) data.content = []
   return data
 }
 
@@ -208,9 +245,30 @@ export async function assignTickets(
  * Fetch assignable team members for this department.
  * Endpoint: GET /api/meetings/users/assigning-list?departmentType=...
  */
-export async function fetchAssignableDepartmentUsers(
-  departmentType?: string
+// The member list rarely changes; share one request between screens (and React StrictMode's
+// double effect run in dev). Pass { force: true } from Refresh buttons to bypass it.
+const ASSIGNABLE_USERS_TTL_MS = 60_000
+const assignableUsersCache = new Map<string, { at: number; promise: Promise<AssignableUser[]> }>()
+
+export function fetchAssignableDepartmentUsers(
+  departmentType?: string,
+  options?: { force?: boolean }
 ): Promise<AssignableUser[]> {
+  const key = departmentType || ''
+  const cached = assignableUsersCache.get(key)
+  if (!options?.force && cached && Date.now() - cached.at < ASSIGNABLE_USERS_TTL_MS) {
+    return cached.promise
+  }
+  const promise = loadAssignableDepartmentUsers(departmentType)
+  assignableUsersCache.set(key, { at: Date.now(), promise })
+  // Don't keep an empty/failed result around
+  promise.then((list) => {
+    if (list.length === 0 && assignableUsersCache.get(key)?.promise === promise) assignableUsersCache.delete(key)
+  })
+  return promise
+}
+
+async function loadAssignableDepartmentUsers(departmentType?: string): Promise<AssignableUser[]> {
   try {
     const res = await apiClient.get<CustomApiResponse<AssignableUser[]>>(
       '/api/meetings/users/assigning-list',
@@ -304,6 +362,11 @@ export interface AllTicketsRow {
   ticketNumber: string
   subject: string
   department: string
+  businessName?: string
+  customerName?: string
+  status?: string
+  priority?: string
+  createdAt?: string
 }
 
 export interface AllTicketsPage {
@@ -331,6 +394,11 @@ export async function fetchAllTickets(params: {
     CustomApiResponse<{
       tickets?: Record<string, string>
       departments?: Record<string, string>
+      businessNames?: Record<string, string>
+      customerNames?: Record<string, string>
+      statuses?: Record<string, string>
+      priorities?: Record<string, string>
+      createdAts?: Record<string, string>
       currentPage?: number
       pageSize?: number
       totalRecords?: number
@@ -350,12 +418,22 @@ export async function fetchAllTickets(params: {
   const data = res.data?.data
   const tickets = data?.tickets ?? {}
   const departments = data?.departments ?? {}
+  const businessNames = data?.businessNames ?? {}
+  const customerNames = data?.customerNames ?? {}
+  const statuses = data?.statuses ?? {}
+  const priorities = data?.priorities ?? {}
+  const createdAts = data?.createdAts ?? {}
 
   return {
     rows: Object.entries(tickets).map(([ticketNumber, subject]) => ({
       ticketNumber,
       subject,
       department: departments[ticketNumber] ?? '',
+      businessName: businessNames[ticketNumber] || undefined,
+      customerName: customerNames[ticketNumber] || undefined,
+      status: statuses[ticketNumber] || undefined,
+      priority: priorities[ticketNumber] || undefined,
+      createdAt: createdAts[ticketNumber] || undefined,
     })),
     currentPage: data?.currentPage ?? 0,
     pageSize: data?.pageSize ?? size,
@@ -363,6 +441,8 @@ export async function fetchAllTickets(params: {
     totalPages: data?.totalPages ?? 0,
   }
 }
+
+import type { TicketAttachment } from '../components/customers-dashboard/TicketAttachmentsView'
 
 export interface HelpCenterTicketDetails {
   ticketNumber: string
@@ -379,6 +459,9 @@ export interface HelpCenterTicketDetails {
   updatedAt?: string
   resolvedAt?: string
   latestRemark?: string
+  businessName?: string
+  smsbCustomerId?: number
+  attachments?: TicketAttachment[]
 }
 
 /**
@@ -400,4 +483,57 @@ export async function getHelpArticles(
   _departmentId: string
 ): Promise<HelpArticle[]> {
   return []
+}
+
+export interface CustomerTicketHistoryParams {
+  excludeTicket?: string
+  status?: string
+  priority?: string
+  page?: number
+  size?: number
+  signal?: AbortSignal
+}
+
+/**
+ * Fetch a customer's previous tickets on demand ("View All").
+ * Endpoint: GET /api/help-center/tickets/customer-history
+ */
+export async function fetchCustomerTicketHistory(
+  creatorId: number,
+  params?: CustomerTicketHistoryParams
+): Promise<CustomerHistoryPageResponse> {
+  const res = await apiClient.get<CustomApiResponse<CustomerHistoryPageResponse>>(
+    '/api/help-center/tickets/customer-history',
+    {
+      params: {
+        creatorId,
+        excludeTicket: params?.excludeTicket || undefined,
+        status: params?.status || undefined,
+        priority: params?.priority || undefined,
+        page: params?.page ?? 0,
+        size: params?.size ?? 10,
+      },
+      signal: params?.signal,
+    }
+  )
+
+  const data = res.data?.data
+  if (!data) {
+    return {
+      creatorId,
+      content: [],
+      currentPage: 0,
+      pageSize: params?.size ?? 10,
+      totalRecords: 0,
+      totalPages: 0,
+      hasNext: false,
+      hasPrevious: false,
+    }
+  }
+
+  if (!Array.isArray(data.content)) {
+    data.content = []
+  }
+
+  return data
 }

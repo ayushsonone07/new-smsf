@@ -24,6 +24,23 @@ export interface AirtelCallsQuery {
   size?: number
   sortBy?: string
   sortDir?: string
+  /** DEPARTMENT or TICKET — where the call was started */
+  contextType?: CallContextType
+  ticketNumber?: string
+  customerId?: number | string
+}
+
+export type CallContextType = 'DEPARTMENT' | 'TICKET'
+
+/** Where the agent is calling from — decides which tab the recording shows up in. */
+export interface CallContext {
+  contextType: CallContextType
+  /** Required for TICKET calls */
+  ticketNumber?: string
+  customerId?: number | string | null
+  customerName?: string
+  departmentType?: string
+  subServiceName?: string
 }
 
 export interface AirtelParticipant {
@@ -43,6 +60,7 @@ export interface AirtelCallSummary {
   callType?: string
   customerName?: string
   callerNumber?: string
+  callerName?: string
   callerCircleName?: string
   airtelCallerId?: string
   destinationNumber?: string
@@ -55,6 +73,12 @@ export interface AirtelCallSummary {
   recordingUrl?: string
   participantCount?: number
   sessionId?: string
+  customerId?: number
+  departmentType?: string
+  subServiceName?: string
+  contextType?: CallContextType
+  ticketNumber?: string
+  createdAt?: string
 }
 
 export interface AirtelCallDetail extends AirtelCallSummary {
@@ -163,7 +187,11 @@ function sanitizePhone(raw?: string | null): string | null {
 
 export async function initiateAirtelClickToCall(
   customerPhone: string,
+  context?: CallContext,
 ): Promise<AirtelClickToCallResponse> {
+  if (context?.contextType === 'TICKET' && !context.ticketNumber) {
+    throw new Error('Ticket number is required for a ticket call')
+  }
   const toNumber = sanitizePhone(customerPhone)
   if (!toNumber) throw new Error('Invalid customer phone number')
 
@@ -182,8 +210,73 @@ export async function initiateAirtelClickToCall(
     throw new Error('Your agent phone number is not on file. Please contact your admin.')
   }
 
+  const body: Record<string, unknown> = {
+    fromNumber,
+    toNumber,
+    contextType: context?.contextType ?? 'DEPARTMENT',
+  }
+  if (context?.ticketNumber) body.ticketNumber = context.ticketNumber
+  const customerId = context?.customerId != null && context.customerId !== '' ? Number(context.customerId) : NaN
+  if (Number.isFinite(customerId)) body.customerId = customerId
+  if (context?.customerName) body.customerName = context.customerName
+  if (context?.departmentType) body.departmentType = context.departmentType
+  if (context?.subServiceName) body.subServiceName = context.subServiceName
+
   return authedApiRequest<AirtelClickToCallResponse>(`${AIRTEL_API_BASE}/click-to-call`, {
     method: 'POST',
-    body: JSON.stringify({ fromNumber, toNumber }),
+    body: JSON.stringify(body),
   })
+}
+
+/** Calls made from one Help Center ticket (scoped like department calls: user = own, head = dept, admin = all). */
+export async function getTicketCalls(ticketNumber: string, page = 0, size = 20): Promise<AirtelCallsPage> {
+  const search = queryString({ ticketNumber, contextType: 'TICKET', page, size, sortDir: 'desc' })
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `${AIRTEL_API_BASE}/department/calls?${search}`,
+  )
+  return 'pageNumber' in response ? response : response.data
+}
+
+/**
+ * Calls History: every call the viewer may see (user = own, head = department, SuperAdmin = all),
+ * optionally only ticket calls or only department calls, with recordings.
+ */
+export async function getCallsHistory(query: AirtelCallsQuery): Promise<AirtelCallsPage> {
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `${AIRTEL_API_BASE}/department/calls?${queryString({ sortDir: 'desc', ...query })}`,
+  )
+  return 'pageNumber' in response ? response : response.data
+}
+
+/** Department-context calls with one customer (customer drawer → Calls). */
+export async function getCustomerDepartmentCalls(
+  customerId: number | string,
+  departmentType?: string,
+  page = 0,
+  size = 20,
+): Promise<AirtelCallsPage> {
+  const search = queryString({
+    customerId,
+    contextType: 'DEPARTMENT',
+    page,
+    size,
+    sortDir: 'desc',
+    ...(departmentType ? { departmentType } : {}),
+  } as AirtelCallsQuery)
+  const response = await authedApiRequest<AirtelCallsPage | { data: AirtelCallsPage }>(
+    `${AIRTEL_API_BASE}/department/calls?${search}`,
+  )
+  return 'pageNumber' in response ? response : response.data
+}
+
+/** Move a call to a ticket, or back to the department. */
+export async function moveCallContext(
+  callId: string | number,
+  target: { contextType: 'TICKET'; ticketNumber: string } | { contextType: 'DEPARTMENT' },
+): Promise<AirtelCallDetail> {
+  const response = await authedApiRequest<AirtelCallDetail | { data: AirtelCallDetail }>(
+    `${AIRTEL_API_BASE}/calls/${encodeURIComponent(String(callId))}/context`,
+    { method: 'PATCH', body: JSON.stringify(target) },
+  )
+  return 'id' in response ? response : response.data
 }

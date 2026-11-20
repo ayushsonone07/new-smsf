@@ -27,6 +27,7 @@ import {
   ChevronDown,
   CircleDot,
   Flag,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,8 @@ type NavPath =
   | '/admin/notification-history'
   | '/admin/bulk-email'
   | '/admin/help-support'
+  | '/admin/help-support/analytics'
+  | '/admin/help-support/departments'
   | '/admin/help-support/status'
   | '/admin/help-support/priority'
   | '/manage-leads'
@@ -134,13 +137,14 @@ const NAV_ITEMS: NavItem[] = [
       pathname.startsWith('/admin/payments'),
   },
   {
-    to: '/admin/help-support/status',
+    to: '/admin/help-support/departments',
     label: 'Help & Support',
     icon: LifeBuoy,
     roles: ['ADMIN'],
     isActive: (pathname) =>
       pathname.startsWith('/admin/help-support'),
     children: [
+      { to: '/admin/help-support/departments', label: 'All Departments', icon: Building2 },
       { to: '/admin/help-support/status', label: 'Status', icon: CircleDot },
       { to: '/admin/help-support/priority', label: 'Priority', icon: Flag },
     ],

@@ -8,6 +8,10 @@ import {
   TICKET_ATTACHMENT_LIMITS,
   type BusinessLookupResult,
   fetchHelpCenterDepartmentsList,
+  fetchActivePriorities,
+  type ActivePriorityItem,
+  fetchActiveStatuses,
+  type ActiveStatusItem,
   fetchCustomerStatusSummary,
   fetchCustomerTicketHistory,
   type CustomerTicketItem,
@@ -336,6 +340,8 @@ export function CustomerHelpSupportView() {
   const [createOpen, setCreateOpen] = useState(false)
   const [departments, setDepartments] = useState<HelpCenterDepartment[]>([])
   const [selectedDeptId, setSelectedDeptId] = useState<string | number>('')
+  const [activePriorities, setActivePriorities] = useState<ActivePriorityItem[]>([])
+  const [activeStatuses, setActiveStatuses] = useState<ActiveStatusItem[]>([])
   const [newPriority, setNewPriority] = useState('MEDIUM')
   const [newSubject, setNewSubject] = useState('')
   const [newDescription, setNewDescription] = useState('')
@@ -394,10 +400,18 @@ export function CustomerHelpSupportView() {
       if (!customerEmail) return
       try {
         await connectCustomerHelpCenter({ email: customerEmail, name: customerName })
-        const depts = await fetchHelpCenterDepartmentsList()
+        const [depts, pris, sts] = await Promise.all([
+          fetchHelpCenterDepartmentsList(),
+          fetchActivePriorities(),
+          fetchActiveStatuses(),
+        ])
         if (active) {
           setDepartments(depts)
           if (depts.length > 0) setSelectedDeptId(depts[0].id)
+          setActivePriorities(pris)
+          setActiveStatuses(sts)
+          const defaultPri = pris.find((p) => p.isDefault) || pris[0]
+          if (defaultPri) setNewPriority(defaultPri.code)
         }
         if (active) {
           await loadData(0)
@@ -1366,12 +1380,22 @@ export function CustomerHelpSupportView() {
               }}
             >
               <option value="">All Statuses</option>
-              <option value="OPEN">Open</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="WAITING_ON_CUSTOMER">Waiting on Customer</option>
-              <option value="RESOLVED">Resolved</option>
-              <option value="CLOSED">Closed</option>
-              <option value="ESCALATED">Escalated</option>
+              {activeStatuses.length === 0 ? (
+                <>
+                  <option value="OPEN">Open</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="WAITING_ON_CUSTOMER">Waiting on Customer</option>
+                  <option value="RESOLVED">Resolved</option>
+                  <option value="CLOSED">Closed</option>
+                  <option value="ESCALATED">Escalated</option>
+                </>
+              ) : (
+                activeStatuses.map((st) => (
+                  <option key={st.code} value={st.code}>
+                    {st.name}
+                  </option>
+                ))
+              )}
             </select>
 
             {/* Priority Dropdown */}
@@ -1391,10 +1415,11 @@ export function CustomerHelpSupportView() {
               }}
             >
               <option value="">All Priorities</option>
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="CRITICAL">Critical</option>
+              {activePriorities.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name}
+                </option>
+              ))}
             </select>
 
             {/* Refresh Button */}
@@ -2209,10 +2234,20 @@ export function CustomerHelpSupportView() {
                       boxSizing: 'border-box',
                     }}
                   >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="CRITICAL">Critical</option>
+                    {activePriorities.length === 0 ? (
+                      <>
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="CRITICAL">Critical</option>
+                      </>
+                    ) : (
+                      activePriorities.map((p) => (
+                        <option key={p.code} value={p.code}>
+                          {p.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>

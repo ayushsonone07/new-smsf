@@ -1007,7 +1007,13 @@ export function AutowebisionCustomersPage({
     }
     setCallingCustomerId(String(customerId))
     try {
-      const result = await initiateAirtelClickToCall(phone)
+      // DEPARTMENT context → the recording shows in this customer's department Calls, not in a ticket
+      const result = await initiateAirtelClickToCall(phone, {
+        contextType: 'DEPARTMENT',
+        customerId,
+        customerName,
+        departmentType: permissionDepartmentType,
+      })
       if (result?.success === false) {
         throw new Error(result.message || 'Unable to initiate call')
       }

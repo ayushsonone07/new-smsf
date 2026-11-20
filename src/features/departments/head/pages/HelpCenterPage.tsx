@@ -13,6 +13,8 @@ import type {
 import { AssignedTicketsView } from '../../../../components/head/helpCenter/AssignedTicketsView'
 import { HelpCenterAnalyticsView } from '../../../../components/head/helpCenter/HelpCenterAnalyticsView'
 import { DepartmentUsersTicketsView } from '../../../../components/head/helpCenter/DepartmentUsersTicketsView'
+import { AllDepartmentTicketsView } from '../../../../components/head/helpCenter/AllDepartmentTicketsView'
+import { HelpCenterCallsView } from '../../../../components/head/helpCenter/HelpCenterCallsView'
 import { TimeRangeFilter, TimeRangeFilterValue } from '../../../../components/head/helpCenter/TimeRangeFilter'
 import { useHelpCenterTab } from '../utils/helpCenterTab'
 
@@ -37,7 +39,8 @@ export function HelpCenterPage() {
 
   // The sub-tab is chosen from the Help & Support entries in the sidebar.
   const selectedTab = useHelpCenterTab()
-  const activeTab = selectedTab === 'department-members' && !isHead ? 'assigned-tickets' : selectedTab
+  const isHeadOnlyTab = selectedTab === 'department-members' || selectedTab === 'all-tickets'
+  const activeTab = isHeadOnlyTab && !isHead ? 'assigned-tickets' : selectedTab
 
   // Time range filter state
   const [timeFilter, setTimeFilter] = useState<TimeRangeFilterValue>({ preset: 'all' })
@@ -153,15 +156,17 @@ export function HelpCenterPage() {
     setTimeFilter(newFilter)
   }
 
-  // Load tickets on mount or when filter/employee changes (single execution)
+  // Load tickets only when assigned-tickets tab is active
   useEffect(() => {
-    loadTickets(false, timeFilter)
+    if (activeTab === 'assigned-tickets') {
+      loadTickets(false, timeFilter)
+    }
     return () => {
       if (ticketsAbortRef.current) {
         ticketsAbortRef.current.abort()
       }
     }
-  }, [employeeEmail, timeFilter])
+  }, [activeTab, employeeEmail, timeFilter])
 
   // Load analytics only when analytics tab is active and filter changes
   useEffect(() => {
@@ -199,6 +204,25 @@ export function HelpCenterPage() {
             canViewHistory={canViewHistory}
             canUpdateStatus={!isDepartmentHead}
             canReassignTickets={canReassignTickets}
+            canCall={!isDepartmentHead}
+            introText={
+              isDepartmentHead
+                ? 'Not assigned tickets — these are still with you and have not been given to a department user yet. Re-assign them or use Round robin; a ticket leaves this list once it is assigned.'
+                : undefined
+            }
+            emptyText={
+              isDepartmentHead
+                ? 'All tickets are assigned to department users. Nothing is waiting for assignment.'
+                : 'No tickets are assigned to you yet.'
+            }
+          />
+        )}
+
+        {activeTab === 'all-tickets' && isHead && (
+          <AllDepartmentTicketsView
+            headEmail={employeeEmail}
+            departmentType={departmentType}
+            timeFilter={timeFilter}
           />
         )}
 
@@ -210,11 +234,21 @@ export function HelpCenterPage() {
             isRefreshing={isLoadingAnalytics}
             error={analyticsError}
             onRefresh={() => loadAnalytics(timeFilter)}
+            isDepartmentHead={isDepartmentHead}
+            currentUserEmail={employeeEmail}
           />
         )}
 
         {activeTab === 'department-members' && isHead && (
           <DepartmentUsersTicketsView departmentType={departmentType} />
+        )}
+
+        {activeTab === 'calls' && (
+          <HelpCenterCallsView
+            departmentType={departmentType}
+            timeFilter={timeFilter}
+            isDepartmentHead={isDepartmentHead}
+          />
         )}
       </div>
     </div>
