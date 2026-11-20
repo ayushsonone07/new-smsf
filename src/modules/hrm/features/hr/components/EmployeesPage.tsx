@@ -168,30 +168,8 @@ export function EmployeesPage() {
             </div>
           </StaggerItem>
         )}
-        <StaggerItem>
-          <PageHeader
-            title="Employees"
-            actions={
-              <>
-                <button
-                  type="button"
-                  onClick={() => setAddEmployeeOpen(true)}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary-hover"
-                >
-                  <Plus size={16} />
-                  Employee
-                </button>
-                <RefreshIconButton
-                  refreshing={refreshing || isLoading}
-                  onClick={() => void refreshEmployees()}
-                />
-              </>
-            }
-          />
-        </StaggerItem>
-
         <StaggerItem variant="card">
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile
               label="Total employees"
               value={String(total)}
@@ -230,23 +208,40 @@ export function EmployeesPage() {
                 />
               </label>
 
-              <div className="grid w-full grid-cols-2 gap-3 lg:w-[360px] lg:shrink-0">
-                <AnimatedFilterSelect
-                  value={status}
-                  onValueChange={(nextStatus) =>
-                    resetPage(() => setStatus(nextStatus as "" | EmployeeStatus))
-                  }
-                  options={[{ value: "", label: "Status" }, ...EMPLOYEE_STATUSES]}
-                  ariaLabel="Filter employees by status"
-                />
-                <AnimatedFilterSelect
-                  value={onboardingStatus}
-                  onValueChange={(nextStatus) =>
-                    resetPage(() => setOnboardingStatus(nextStatus as "" | OnboardingStatus))
-                  }
-                  options={[{ value: "", label: "Onboarding" }, ...ONBOARDING_FILTERS]}
-                  ariaLabel="Filter employees by onboarding status"
-                />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5 w-full sm:w-[320px]">
+                  <AnimatedFilterSelect
+                    value={status}
+                    onValueChange={(nextStatus) =>
+                      resetPage(() => setStatus(nextStatus as "" | EmployeeStatus))
+                    }
+                    options={[{ value: "", label: "Status" }, ...EMPLOYEE_STATUSES]}
+                    ariaLabel="Filter employees by status"
+                  />
+                  <AnimatedFilterSelect
+                    value={onboardingStatus}
+                    onValueChange={(nextStatus) =>
+                      resetPage(() => setOnboardingStatus(nextStatus as "" | OnboardingStatus))
+                    }
+                    options={[{ value: "", label: "Onboarding" }, ...ONBOARDING_FILTERS]}
+                    ariaLabel="Filter employees by onboarding status"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAddEmployeeOpen(true)}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary-hover cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    Employee
+                  </button>
+                  <RefreshIconButton
+                    refreshing={refreshing || isLoading}
+                    onClick={() => void refreshEmployees()}
+                  />
+                </div>
               </div>
             </div>
 
