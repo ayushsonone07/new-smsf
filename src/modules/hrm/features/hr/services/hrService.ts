@@ -9,6 +9,7 @@ import type {
   AttendanceInput,
   AttendanceRecord,
   Candidate,
+  CandidateLookupItem,
   CandidateStatus,
   ChartsData,
   CreateEmployeeInput,
@@ -638,6 +639,14 @@ export const hrService = {
     const { data } = await http.get<{ data: EmployeeLookupItem[] }>(
       HR_ENDPOINTS.employeesLookup,
       { params },
+    );
+    return data?.data || [];
+  },
+
+  async lookupCandidates(q?: string, limit = 10): Promise<CandidateLookupItem[]> {
+    const { data } = await http.get<{ data: CandidateLookupItem[] }>(
+      HR_ENDPOINTS.candidatesLookup,
+      { params: { q: q?.trim() || "", limit } },
     );
     return data?.data || [];
   },

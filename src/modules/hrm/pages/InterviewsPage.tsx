@@ -565,35 +565,24 @@ interface SelectOption {
   badge?: string;
 }
 
-const EXCLUDED_INTERVIEW_STATUSES = new Set(["HIRED", "REJECTED", "WITHDRAWN"]);
-
 async function fetchCandidates(q: string): Promise<SelectOption[]> {
   if (q.trim().length < 2) return [];
-  const { items } = await hrService.searchCandidates(q.trim(), 0, 25, {});
-  return items
-    .filter((c) => !EXCLUDED_INTERVIEW_STATUSES.has((c.status ?? "").toUpperCase()))
-    .slice(0, 8)
-    .map((c) => ({
-      value: c.id,
-      label: c.name,
-      sublabel: c.email,
-      badge: c.status?.replaceAll("_", " ") || "ACTIVE",
-    }));
+  const items = await hrService.lookupCandidates(q.trim(), 8);
+  return items.map((c) => ({
+    value: c.id,
+    label: c.name,
+    sublabel: c.email || undefined,
+    badge: c.status?.replaceAll("_", " ") || "ACTIVE",
+  }));
 }
 
 async function fetchEmployees(q: string): Promise<SelectOption[]> {
   if (q.trim().length < 2) return [];
-  const { items } = await hrService.listEmployees({
-    page: 0,
-    size: 8,
-    q: q.trim(),
-    status: "active",
-    sort: "employeeCode,asc",
-  });
-  return items.map((e) => ({
+  const items = await hrService.lookupEmployees({ q: q.trim() });
+  return items.slice(0, 8).map((e) => ({
     value: e.id,
     label: e.name,
-    sublabel: [e.employeeCode, e.designationName].filter(Boolean).join(" • "),
+    sublabel: [e.employeeCode, e.designationTitle].filter(Boolean).join(" • "),
     badge: e.role?.toUpperCase(),
   }));
 }

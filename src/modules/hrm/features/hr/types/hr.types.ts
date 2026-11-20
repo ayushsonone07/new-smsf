@@ -155,6 +155,13 @@ export interface EmployeeLookupItem {
   employmentType?: EmploymentType;
 }
 
+export interface CandidateLookupItem {
+  id: number;
+  name: string;
+  email?: string | null;
+  status?: string | null;
+}
+
 export interface EmployeeListItem {
   id: number;
   employeeCode: string;
