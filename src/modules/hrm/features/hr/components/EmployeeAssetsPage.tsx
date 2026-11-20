@@ -26,7 +26,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
   TableSkeleton,
 } from "@shared/components/ui";
 import { useDebouncedValue } from "@shared/hooks";
@@ -95,6 +94,7 @@ export function EmployeeAssetsPage() {
           status: "active",
           onboardingStatus: undefined,
           sort: undefined,
+          force: true,
         }),
       ).unwrap();
       toast.success("Assets list refreshed", "Latest asset allocations loaded.");
@@ -187,27 +187,9 @@ export function EmployeeAssetsPage() {
   const totalPages = meta?.totalPages ?? 1;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Employees"
-        title="Asset Management"
-        description="Track, assign, and audit company assets (laptops, serial numbers, company SIM cards) for all active employees."
-        actions={
-          <button
-            type="button"
-            onClick={() => void handleRefresh()}
-            disabled={refreshing}
-            aria-label="Refresh asset list"
-            title="Refresh asset list"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow transition hover:bg-muted disabled:opacity-75"
-          >
-            <RefreshCw size={18} className={refreshing ? "animate-spin" : undefined} />
-          </button>
-        }
-      />
-
+    <div className="space-y-4">
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="flex items-center gap-4 p-4 border border-border bg-card shadow-sm">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Users size={24} />
@@ -296,6 +278,17 @@ export function EmployeeAssetsPage() {
             <option value="has_id_card">ID Card Issued</option>
             <option value="has_visiting_card">Visiting Card Issued</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            aria-label="Refresh asset list"
+            title="Refresh asset list"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow transition hover:bg-muted disabled:opacity-75"
+          >
+            <RefreshCw size={18} className={refreshing ? "animate-spin" : undefined} />
+          </button>
         </div>
       </div>
 

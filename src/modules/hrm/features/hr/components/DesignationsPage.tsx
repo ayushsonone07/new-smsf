@@ -24,7 +24,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
   StatusBadge,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
@@ -141,15 +140,8 @@ export function DesignationsPage() {
 
   return (
     <>
-      <div className="space-y-6">
-        <PageHeader
-          eyebrow="Organization"
-          title="Designations"
-          description="Define job titles and roles across departments."
-         
-        />
-
-        <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="space-y-4">
+        <section className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
           <MetricCard
             icon={<Briefcase size={22} />}
             tone="blue"
@@ -169,31 +161,32 @@ export function DesignationsPage() {
             label="Departments covered"
           />
         </section>
-<div className="flex items-center justify-between gap-6">
- <div className="w-full max-w-2xl">
-        <SearchBox value={query} placeholder="Search designations..." onChange={setQuery} />
- </div>
-             <div className="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDialog("create")}
-                className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-7 text-sm font-medium text-white shadow transition-colors hover:bg-primary/90"
-              >
-                <Plus size={17} />
-                Designation
-              </button>
-              <button
-                type="button"
-                onClick={() => void refreshDesignations()}
-                disabled={isRefreshing}
-                aria-label={isRefreshing ? "Refreshing designations" : "Refresh designations"}
-                title="Refresh designations"
-                className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface-elevated text-foreground shadow transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <RefreshCw size={18} className={isRefreshing ? "animate-spin" : undefined} />
-              </button>
-            </div>
-         </div> 
+
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full sm:max-w-md">
+            <SearchBox value={query} placeholder="Search designations..." onChange={setQuery} />
+          </div>
+          <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setDialog("create")}
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover"
+            >
+              <Plus size={15} />
+              Designation
+            </button>
+            <button
+              type="button"
+              onClick={() => void refreshDesignations()}
+              disabled={isRefreshing}
+              aria-label={isRefreshing ? "Refreshing designations" : "Refresh designations"}
+              title="Refresh designations"
+              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-70"
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : undefined} />
+            </button>
+          </div>
+        </div> 
         {error ? (
           <ErrorDisplay
             message={`Failed to load designations: ${error}`}

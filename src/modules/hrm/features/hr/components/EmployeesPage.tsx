@@ -109,7 +109,7 @@ export function EmployeesPage() {
     setRefreshing(true);
 
     try {
-      await dispatch(fetchEmployees(employeeRequest)).unwrap();
+      await dispatch(fetchEmployees({ ...employeeRequest, force: true })).unwrap();
 
       toast.success("Employees refreshed", "The latest employee list was loaded.");
     } catch (error) {

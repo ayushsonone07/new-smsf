@@ -18,13 +18,14 @@ type EmployeeStatus =
   | "terminated"
   | "on_leave";
 
-interface EmployeeFilters {
-  q: string | undefined;
-  status: string | undefined;
-  onboardingStatus: string | undefined;
-  page: number;
-  size: number;
-  sort: string | undefined;
+export interface EmployeeFilters {
+  q?: string | undefined;
+  status?: string | undefined;
+  onboardingStatus?: string | undefined;
+  page?: number;
+  size?: number;
+  sort?: string | undefined;
+  force?: boolean;
 }
 
 interface EmployeeState {
@@ -33,12 +34,27 @@ interface EmployeeState {
   managerOptions: EmployeeListItem[];
   pagination: PaginationMeta;
   filters: EmployeeFilters;
+  activeFilterKey: string | null;
   isLoading: boolean;
   isDetailLoading: boolean;
   isManagerOptionsLoading: boolean;
   isMutating: boolean;
   error: string | null;
   mutationError: string | null;
+}
+
+interface EmployeeStateShape {
+  employees: EmployeeState;
+}
+
+function serializeFilters(f?: EmployeeFilters): string {
+  const q = f?.q?.trim() || "";
+  const status = f?.status || "";
+  const onboardingStatus = f?.onboardingStatus || "";
+  const page = f?.page ?? 0;
+  const size = f?.size ?? 12;
+  const sort = f?.sort || "";
+  return `${q}|${status}|${onboardingStatus}|${page}|${size}|${sort}`;
 }
 
 const initialPagination: PaginationMeta = {
@@ -64,6 +80,7 @@ const initialState: EmployeeState = {
   managerOptions: [],
   pagination: initialPagination,
   filters: initialFilters,
+  activeFilterKey: null,
   isLoading: false,
   isDetailLoading: false,
   isManagerOptionsLoading: false,
@@ -89,32 +106,44 @@ interface LegacyEnvelope<T> {
 export const fetchEmployees = createAsyncThunk<
   { items: EmployeeListItem[]; meta: PaginationMeta },
   EmployeeFilters | undefined,
-  { rejectValue: ApiErrorPayload }
->("employees/fetchEmployees", async (filters, { rejectWithValue }) => {
-  try {
-    const f = filters ?? initialFilters;
-    const params: Record<string, string | number> = {};
-    if (f.q) params.q = f.q;
-    if (f.status) params.status = f.status;
-    if (f.onboardingStatus) params.onboardingStatus = f.onboardingStatus;
-    params.page = f.page;
-    params.size = f.size;
-    if (f.sort) params.sort = f.sort;
-    const response = await apiClient.get<HrEnvelope<{ items: EmployeeListItem[] }>>(
-      HR_ENDPOINTS.employees,
-      { params },
-    );
-    const envelope = response.data;
-    if (!envelope.success || !envelope.data || !envelope.meta) {
-      return rejectWithValue({
-        message: envelope.error?.message ?? "Failed to load employees",
-      });
+  { rejectValue: ApiErrorPayload; state: EmployeeStateShape }
+>(
+  "employees/fetchEmployees",
+  async (filters, { rejectWithValue }) => {
+    try {
+      const f = filters ?? initialFilters;
+      const params: Record<string, string | number> = {};
+      if (f.q) params.q = f.q;
+      if (f.status) params.status = f.status;
+      if (f.onboardingStatus) params.onboardingStatus = f.onboardingStatus;
+      params.page = f.page ?? 0;
+      params.size = f.size ?? 12;
+      if (f.sort) params.sort = f.sort;
+      const response = await apiClient.get<HrEnvelope<{ items: EmployeeListItem[] }>>(
+        HR_ENDPOINTS.employees,
+        { params },
+      );
+      const envelope = response.data;
+      if (!envelope.success || !envelope.data || !envelope.meta) {
+        return rejectWithValue({
+          message: envelope.error?.message ?? "Failed to load employees",
+        });
+      }
+      return { items: envelope.data.items, meta: envelope.meta };
+    } catch (error) {
+      return rejectWithValue(normalizeApiError(error, "Unable to load employees"));
     }
-    return { items: envelope.data.items, meta: envelope.meta };
-  } catch (error) {
-    return rejectWithValue(normalizeApiError(error, "Unable to load employees"));
-  }
-});
+  },
+  {
+    condition: (filters, { getState }) => {
+      if (filters?.force) return true;
+      const { employees } = getState();
+      if (!employees.isLoading) return true;
+      const currentKey = serializeFilters(filters);
+      return currentKey !== employees.activeFilterKey;
+    },
+  },
+);
 
 export const fetchEmployeeById = createAsyncThunk<
   EmployeeListItem,
@@ -155,10 +184,6 @@ export const updateEmployee = createAsyncThunk<
     return rejectWithValue(normalizeApiError(error, "Unable to update employee"));
   }
 });
-
-interface EmployeeStateShape {
-  employees: EmployeeState;
-}
 
 export const fetchManagerEmployees = createAsyncThunk<
   EmployeeListItem[],
@@ -229,18 +254,21 @@ const employeeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchEmployees.pending, (state) => {
+      .addCase(fetchEmployees.pending, (state, action) => {
         state.isLoading = true;
+        state.activeFilterKey = serializeFilters(action.meta.arg);
         state.error = null;
       })
       .addCase(fetchEmployees.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.activeFilterKey = null;
         state.items = action.payload.items;
         state.pagination = action.payload.meta;
         state.error = null;
       })
       .addCase(fetchEmployees.rejected, (state, action) => {
         state.isLoading = false;
+        state.activeFilterKey = null;
         state.error = action.payload?.message ?? "Unable to load employees";
       })
       .addCase(fetchEmployeeById.pending, (state) => {
