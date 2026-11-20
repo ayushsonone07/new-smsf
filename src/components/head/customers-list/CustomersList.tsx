@@ -69,6 +69,7 @@ export interface OnboardingCustomer {
   serviceExpiration?: string
   clientRemark?: string
   createdAt?: string
+  onboardingCompletedAt?: string
 }
 
 export interface CustomersListProps {
@@ -138,6 +139,17 @@ const STATUS_OPTIONS: OnboardingStatus[] = [
   'in-progress',
   'completed',
 ]
+
+function formatOnboardingCompletedDate(value?: string): string {
+  if (!value) return ''
+  const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'))
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
 
 /* ── Motion variants ──────────────────────────────────────── */
 
@@ -1541,6 +1553,12 @@ function CustomerRow({
                 <Icon name="chevronDown" size={12} strokeWidth={2.5} />
               )}
             </button>
+
+            {isCompleted && customer.onboardingCompletedAt ? (
+              <span className="cl-onboarding-completed-date">
+                {formatOnboardingCompletedDate(customer.onboardingCompletedAt)}
+              </span>
+            ) : null}
 
             {canChangeStatus && statusOpen && statusMenuPosition && createPortal(
               <motion.div

@@ -564,6 +564,12 @@ export function CustomerListPage() {
             }]
           })(),
           serviceFlowJson: (c as any).serviceFlowJson || (c.customerDetails as any)?.serviceFlowJson,
+          onboardingCompletedAt:
+            (c as any).onboardingCompletedAt ||
+            (c as any).completedAt ||
+            (c as any).departmentStatuses?.ONBOARDING_DEPARTMENT?.completedAt ||
+            (c.customerDetails as any)?.onboardingCompletedAt ||
+            c.updatedAt,
           rawCustomer: c,
         }
       })
@@ -642,6 +648,12 @@ export function CustomerListPage() {
               return sub
             })
           })(),
+          onboardingCompletedAt:
+            (c as any).onboardingCompletedAt ||
+            (c as any).completedAt ||
+            (c as any).departmentStatuses?.ONBOARDING_DEPARTMENT?.completedAt ||
+            (c.customerDetails as any)?.onboardingCompletedAt ||
+            (c as any).updatedAt,
           rawCustomer: c,
         }
       })
@@ -678,6 +690,10 @@ export function CustomerListPage() {
       duplicateCount: customer.duplicateCount,
       hasDuplicateCustomer: (customer.duplicateCount ?? 0) > 0,
       serviceTags: extractServiceTags(customer),
+      onboardingCompletedAt:
+        (customer as any).onboardingCompletedAt ||
+        (customer as any).completedAt ||
+        (customer as any).updatedAt,
       rawCustomer: customer,
     }))
   }, [

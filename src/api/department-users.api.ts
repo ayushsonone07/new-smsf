@@ -61,6 +61,9 @@ export interface OnboardedCustomerItem {
   onboardingStatus?: string
   onboardingLink?: string
   createdAt?: string
+  updatedAt?: string
+  onboardingCompletedAt?: string
+  completedAt?: string
   assignedUser?: string
   assignedUserEmail?: string
   assignedUserName?: string
@@ -288,6 +291,8 @@ export interface DepartmentCustomerRowItem {
   status?: string
   createdAt?: string
   updatedAt?: string
+  onboardingCompletedAt?: string
+  completedAt?: string
   customerDetails?: {
     email?: string
     ownerName?: string
