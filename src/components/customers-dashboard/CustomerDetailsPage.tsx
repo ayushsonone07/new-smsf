@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type FormEvent } from 'react'
+import { useState, useEffect, useMemo, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { CustomerDashboardLayout } from './CustomerDashboardLayout'
 import { Icon } from '../head/shared/Icon'
@@ -6,12 +6,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Lock,
   X as CloseIcon,
   ArrowRight,
   ArrowLeft,
 } from 'lucide-react'
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
-import { decryptUrlParams } from '../../utils/urlEncryption'
+import { decryptUrlParams, getCustomerFormUrl } from '../../utils/urlEncryption'
 import { getCustomerProfileDetails, saveCustomerProfileDetails, type CustomerProfileDetails } from '../../api/customer-drawer.api'
 
 export interface OfferItem {
@@ -20,6 +21,21 @@ export interface OfferItem {
   discountValue: string
   description: string
 }
+
+interface WorkingHourItem {
+  day: string
+  from: string
+  to: string
+}
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
+  'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala',
+  'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+  'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir',
+  'Ladakh', 'Puducherry',
+]
 
 const COMMON_SERVICE_SUGGESTIONS = [
   'Website Development',
@@ -120,6 +136,9 @@ export function CustomerDetailsPage() {
 
   // Active step state: 1: Basic Info, 2: Billing, 3: Website, 4: Google, 5: Automation, 6: Done
   const [activeStep, setActiveStep] = useState<number>(1) // Default to step 1 for onboarding
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set())
+  const [showCompletionConfirm, setShowCompletionConfirm] = useState(false)
+  const [completionAcknowledged, setCompletionAcknowledged] = useState(false)
 
   const [phone, setPhone] = useState('')
   const [searchContact, setSearchContact] = useState('')
@@ -130,9 +149,7 @@ export function CustomerDetailsPage() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
 
   // Step 2: Billing Form State
-  const [billingAddress, setBillingAddress] = useState(
-    'N/A, MIC Institute Narmadapuram 461001',
-  )
+  const [billingAddress, setBillingAddress] = useState('')
   const [noGstNumber, setNoGstNumber] = useState(false)
   const [gstNumber, setGstNumber] = useState('')
 
@@ -141,17 +158,34 @@ export function CustomerDetailsPage() {
   const [domainName, setDomainName] = useState('')
   const [logoOption, setLogoOption] = useState('')
   const [imageOption, setImageOption] = useState('')
-  const [businessName, setBusinessName] = useState('MICU Group')
+  const [businessName, setBusinessName] = useState('')
+  const [basicBrandName, setBasicBrandName] = useState('')
+  const [businessType, setBusinessType] = useState('')
+  const [yearStarted, setYearStarted] = useState('')
+  const [happyCustomers, setHappyCustomers] = useState('')
+  const [additionalNumber, setAdditionalNumber] = useState('')
+  const [basicAddress, setBasicAddress] = useState('')
+  const [basicArea, setBasicArea] = useState('')
+  const [basicState, setBasicState] = useState('')
+  const [basicCity, setBasicCity] = useState('')
+  const [zipCode, setZipCode] = useState('')
+  const [country, setCountry] = useState('India')
   const [bookingLink, setBookingLink] = useState('')
   const [paymentLink, setPaymentLink] = useState('')
   const [businessCategory, setBusinessCategory] = useState('')
-  const [businessTagline, setBusinessTagline] = useState(
-    'Best IT Services in Navi Mumbai, Maharashtra',
-  )
-  const [email, setEmail] = useState(session?.email ?? 'hemantdubey.mic@gmail.com')
+  const [businessTagline, setBusinessTagline] = useState('')
+  const [email, setEmail] = useState(session?.email ?? '')
   const [servicesInput, setServicesInput] = useState('')
   const [mainServices, setMainServices] = useState<string[]>([])
   const [serviceSuggestionsOpen, setServiceSuggestionsOpen] = useState(false)
+  const [websiteBusinessName, setWebsiteBusinessName] = useState('')
+  const [websiteCategory, setWebsiteCategory] = useState('')
+  const [websiteFullAddress, setWebsiteFullAddress] = useState('')
+  const [websiteContactEmail, setWebsiteContactEmail] = useState('')
+  const [mapLink, setMapLink] = useState('')
+  const [socialLinkInput, setSocialLinkInput] = useState('')
+  const [socialLinks, setSocialLinks] = useState<string[]>([])
+  const [websiteWorkingHours, setWebsiteWorkingHours] = useState<WorkingHourItem[]>([])
 
   // Step 4: Google Step Specific Form State
   const [gmbProfileLink, setGmbProfileLink] = useState('')
@@ -162,20 +196,21 @@ export function CustomerDetailsPage() {
   const [appointmentLink, setAppointmentLink] = useState('')
 
   // Step 5: Automation Step Specific Form State
-  const [automationBusinessName, setAutomationBusinessName] = useState('MICU Group')
+  const [automationBusinessName, setAutomationBusinessName] = useState('')
   const [automationCategory, setAutomationCategory] = useState('')
   const [mainGoal, setMainGoal] = useState('')
   const [offers, setOffers] = useState<OfferItem[]>([
     { id: 'off-1', offerType: '', discountValue: '', description: '' },
   ])
   const [area, setArea] = useState('')
-  const [fullAddress, setFullAddress] = useState('N/A, MIC Institute Narmadapuram 461001')
+  const [fullAddress, setFullAddress] = useState('')
   const [stateName, setStateName] = useState('')
   const [cityName, setCityName] = useState('')
   const [googleMapLink, setGoogleMapLink] = useState('')
   const [websiteLink, setWebsiteLink] = useState('')
   const [autoServicesInput, setAutoServicesInput] = useState('')
   const [autoServices, setAutoServices] = useState<string[]>([])
+  const [automationWorkingHours, setAutomationWorkingHours] = useState<WorkingHourItem[]>([])
   const [aiChatbotEmail, setAiChatbotEmail] = useState('')
   const [aiChatbotLink, setAiChatbotLink] = useState('')
 
@@ -203,13 +238,22 @@ export function CustomerDetailsPage() {
           if (profile.phone) setPhone(profile.phone)
           if (profile.ownerName) setOwnerName(profile.ownerName)
           if (profile.businessName) setBusinessName(profile.businessName)
+          if (profile.businessName) setWebsiteBusinessName(profile.businessName)
+          if (profile.brandName) setBasicBrandName(profile.brandName)
+          if (profile.businessType) setBusinessType(profile.businessType)
+          if (profile.yearStarted) setYearStarted(profile.yearStarted)
+          if (profile.happyCustomers) setHappyCustomers(profile.happyCustomers)
+          if (profile.additionalNumber) setAdditionalNumber(profile.additionalNumber)
           if (profile.email) setEmail(profile.email)
           if (profile.billingAddress) setBillingAddress(profile.billingAddress)
           if (profile.gstNumber) setGstNumber(profile.gstNumber)
           if (profile.domain) setDomainName(profile.domain)
           if (profile.domainStatus) setDomainStatus(profile.domainStatus)
+          if (profile.logoLink) setLogoOption(profile.logoLink)
+          if (profile.imagesLink) setImageOption(profile.imagesLink)
           if (profile.tagline) setBusinessTagline(profile.tagline)
           if (profile.businessCategory) setBusinessCategory(profile.businessCategory)
+          if (profile.businessCategory) setWebsiteCategory(profile.businessCategory)
           if (profile.bookingLink) setBookingLink(profile.bookingLink)
           if (profile.paymentLink) setPaymentLink(profile.paymentLink)
           if (profile.topProducts) {
@@ -221,10 +265,30 @@ export function CustomerDetailsPage() {
           if (profile.appointmentLink) setAppointmentLink(profile.appointmentLink)
           if (profile.brandName) setBrandName(profile.brandName)
           if (profile.websiteLink) setWebsiteLink(profile.websiteLink)
-          if (profile.area) setArea(profile.area)
-          if (profile.city) setCityName(profile.city)
-          if (profile.state) setStateName(profile.state)
-          if (profile.address) setFullAddress(profile.address)
+          if (profile.area) { setBasicArea(profile.area); setArea(profile.area) }
+          if (profile.city) { setBasicCity(profile.city); setCityName(profile.city) }
+          if (profile.state) { setBasicState(profile.state); setStateName(profile.state) }
+          if (profile.address) { setBasicAddress(profile.address); setWebsiteFullAddress(profile.address); setFullAddress(profile.address) }
+          if (profile.zipCode) setZipCode(profile.zipCode)
+          if (profile.country) setCountry(profile.country)
+          if (profile.email) setWebsiteContactEmail(profile.email)
+          if (profile.socialLinks) setSocialLinks(profile.socialLinks.split(',').map((item) => item.trim()).filter(Boolean))
+          if (profile.workingHours) {
+            try {
+              const parsedHours = JSON.parse(profile.workingHours)
+              if (Array.isArray(parsedHours)) {
+                const hours = parsedHours.map((item) => ({
+                  day: item.day || item.d || 'Mon',
+                  from: item.from || item.f || '09:00',
+                  to: item.to || item.t || '18:00',
+                }))
+                setWebsiteWorkingHours(hours)
+                setAutomationWorkingHours(hours)
+              }
+            } catch {
+              // Older records may contain free-text working hours.
+            }
+          }
           if (profile.mainGoal) setMainGoal(profile.mainGoal)
           if (profile.aiChatbotEmail) setAiChatbotEmail(profile.aiChatbotEmail)
           if (profile.aiChatbotLink) setAiChatbotLink(profile.aiChatbotLink)
@@ -246,9 +310,20 @@ export function CustomerDetailsPage() {
     }
   }, [])
 
-  // Compute profile progress % strictly by active step
-  const progressPercent =
-    activeStep === 1 ? 20 : activeStep === 2 ? 20 : activeStep === 3 ? 40 : activeStep === 4 ? 60 : activeStep === 5 ? 80 : 100
+  const allFormStepsCompleted = [1, 2, 3, 4, 5].every((step) => completedSteps.has(step))
+  const progressPercent = Math.round((completedSteps.size / 5) * 100)
+
+  const missingRecommendedFields = useMemo(() => {
+    const fields = [
+      { label: 'Brand Name', value: basicBrandName || brandName },
+      { label: 'Business Category', value: businessCategory || googleBusinessCategory },
+      { label: 'Area', value: basicArea || area },
+      { label: 'State', value: basicState || stateName },
+      { label: 'City', value: basicCity || cityName },
+      { label: 'Google Review Link', value: googleReviewLink },
+    ]
+    return fields.filter((field) => !field.value.trim()).map((field) => field.label)
+  }, [area, basicArea, basicBrandName, basicCity, basicState, brandName, businessCategory, cityName, googleBusinessCategory, googleReviewLink, stateName])
 
   const serviceSuggestions = useMemo(() => {
     const entered = servicesInput.trim()
@@ -262,9 +337,15 @@ export function CustomerDetailsPage() {
     return (canAddEntered ? [entered, ...matches] : matches).slice(0, 6)
   }, [mainServices, servicesInput])
 
-  async function handleNextStep(e?: FormEvent) {
+  async function handleNextStep(e?: FormEvent, confirmedRecommendedFields = false) {
     if (e) e.preventDefault()
     if (isSaving) return
+
+    if (activeStep === 5 && missingRecommendedFields.length > 0 && !confirmedRecommendedFields) {
+      setCompletionAcknowledged(false)
+      setShowCompletionConfirm(true)
+      return
+    }
 
     const effectivePhone = (phone || searchContact || session?.phone || '').trim()
 
@@ -292,7 +373,7 @@ export function CustomerDetailsPage() {
     const pendingService = servicesInput.trim()
     const servicesForSave = [...mainServices]
     if (
-      activeStep === 1
+      activeStep === 3
       && pendingService
       && servicesForSave.length < 15
       && !servicesForSave.some((service) => service.toLowerCase() === pendingService.toLowerCase())
@@ -306,26 +387,38 @@ export function CustomerDetailsPage() {
     const rawPayload: Record<string, any> = {
       phone: effectivePhone,
       customerId: customerId ? Number(customerId) : undefined,
-      businessName: businessName.trim() || undefined,
+      businessName: businessName.trim() || websiteBusinessName.trim() || undefined,
       ownerName: ownerName.trim() || undefined,
       email: email.trim() || undefined,
+      brandName: basicBrandName.trim() || brandName.trim() || undefined,
+      businessType: businessType.trim() || undefined,
+      yearStarted: yearStarted.trim() || undefined,
+      happyCustomers: happyCustomers.trim() || undefined,
+      additionalNumber: additionalNumber.trim() || undefined,
       billingAddress: billingAddress.trim() || undefined,
       gstNumber: noGstNumber ? undefined : gstNumber.trim() || undefined,
       domain: domainName.trim() || undefined,
       domainStatus: domainStatus.trim() || undefined,
+      logoLink: logoOption.trim() || undefined,
+      imagesLink: imageOption.trim() || undefined,
       tagline: businessTagline.trim() || undefined,
-      businessCategory: businessCategory.trim() || undefined,
+      businessCategory: businessCategory.trim() || websiteCategory.trim() || googleBusinessCategory.trim() || undefined,
       bookingLink: bookingLink.trim() || undefined,
       paymentLink: paymentLink.trim() || undefined,
-      topProducts: servicesForSave.length ? servicesForSave.join(', ') : undefined,
-      gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || undefined,
-      brandName: brandName.trim() || undefined,
+      topProducts: [...new Set([...servicesForSave, ...autoServices])].join(', ') || undefined,
+      gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || mapLink.trim() || undefined,
       googleReviewLink: googleReviewLink.trim() || undefined,
       appointmentLink: appointmentLink.trim() || undefined,
-      address: fullAddress.trim() || undefined,
-      area: area.trim() || undefined,
-      city: cityName.trim() || undefined,
-      state: stateName.trim() || undefined,
+      address: websiteFullAddress.trim() || basicAddress.trim() || fullAddress.trim() || undefined,
+      area: area.trim() || basicArea.trim() || undefined,
+      city: cityName.trim() || basicCity.trim() || undefined,
+      state: stateName.trim() || basicState.trim() || undefined,
+      zipCode: zipCode.trim() || undefined,
+      country: country.trim() || undefined,
+      socialLinks: socialLinks.length ? socialLinks.join(', ') : undefined,
+      workingHours: (websiteWorkingHours.length || automationWorkingHours.length)
+        ? JSON.stringify(websiteWorkingHours.length ? websiteWorkingHours : automationWorkingHours)
+        : undefined,
       websiteLink: websiteLink.trim() || undefined,
       mainGoal: mainGoal.trim() || undefined,
       offers: offers.filter(o => o.offerType || o.discountValue || o.description).length
@@ -333,7 +426,7 @@ export function CustomerDetailsPage() {
         : undefined,
       aiChatbotEmail: aiChatbotEmail.trim() || undefined,
       aiChatbotLink: aiChatbotLink.trim() || undefined,
-      source: 'INTERNAL_CUSTOMER_FORM',
+      source: 'ONBOARDING_FORM',
     }
 
     // Filter out undefined and empty string values
@@ -357,8 +450,20 @@ export function CustomerDetailsPage() {
       })
       setTimeout(() => setToast(null), 4000)
 
-      if (activeStep < 6) {
+      setCompletedSteps((previous) => {
+        const next = new Set(previous)
+        next.add(activeStep)
+        return next
+      })
+
+      if (activeStep < 5) {
+        prefillRepeatedFields(activeStep + 1, servicesForSave)
         setActiveStep((prev) => prev + 1)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } else if (activeStep === 5) {
+        setShowCompletionConfirm(false)
+        setCompletionAcknowledged(false)
+        setActiveStep(6)
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
     } catch (err: any) {
@@ -407,6 +512,70 @@ export function CustomerDetailsPage() {
     if (autoServicesInput.trim() && autoServices.length < 15) {
       setAutoServices([...autoServices, autoServicesInput.trim()])
       setAutoServicesInput('')
+    }
+  }
+
+  function addSocialLink() {
+    const link = socialLinkInput.trim()
+    if (!link || socialLinks.length >= 10 || socialLinks.includes(link)) return
+    setSocialLinks((items) => [...items, link])
+    setSocialLinkInput('')
+  }
+
+  function addWorkingHour(setter: Dispatch<SetStateAction<WorkingHourItem[]>>) {
+    setter((items) => [...items, { day: 'Mon', from: '09:00', to: '18:00' }])
+  }
+
+  function updateWorkingHour(
+    setter: Dispatch<SetStateAction<WorkingHourItem[]>>,
+    index: number,
+    field: keyof WorkingHourItem,
+    value: string,
+  ) {
+    setter((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item))
+  }
+
+  function prefillRepeatedFields(step: number, servicesOverride?: string[]) {
+    if (step === 2) {
+      setBillingAddress((value) => value.trim() ? value : basicAddress)
+    }
+
+    if (step === 3) {
+      setWebsiteBusinessName((value) => value.trim() ? value : businessName)
+      setWebsiteCategory((value) => value.trim() ? value : businessCategory)
+      setWebsiteFullAddress((value) => value.trim() ? value : basicAddress)
+      setWebsiteContactEmail((value) => value.trim() ? value : email)
+    }
+
+    if (step === 4) {
+      setBrandName((value) => value.trim() ? value : basicBrandName)
+      setGoogleBusinessCategory((value) => value.trim() ? value : businessCategory)
+    }
+
+    if (step === 5) {
+      setAutomationBusinessName((value) => value.trim() ? value : businessName)
+      setAutomationCategory((value) => value.trim() ? value : businessCategory)
+      setArea((value) => value.trim() ? value : basicArea)
+      setFullAddress((value) => value.trim() ? value : basicAddress)
+      setStateName((value) => value.trim() ? value : basicState)
+      setCityName((value) => value.trim() ? value : basicCity)
+      setAutoServices((items) => items.length > 0 ? items : [...(servicesOverride ?? mainServices)])
+    }
+  }
+
+  async function copyShareableFormLink() {
+    const link = getCustomerFormUrl(phone || searchContact || session?.phone, isDuplicate, customerId)
+    if (!link) {
+      setToast({ type: 'error', title: 'Phone Required', message: 'Enter a phone number before copying the shareable form link.' })
+      return
+    }
+    const absoluteLink = `${window.location.origin}${link}`
+    try {
+      await navigator.clipboard.writeText(absoluteLink)
+      setToast({ type: 'success', title: 'Shareable Link Copied', message: 'Anyone with this link can open and complete the customer details form.' })
+      window.setTimeout(() => setToast(null), 4000)
+    } catch {
+      setToast({ type: 'error', title: 'Copy Failed', message: 'Clipboard access was unavailable. Please copy the URL from the address bar.' })
     }
   }
 
@@ -566,18 +735,20 @@ export function CustomerDetailsPage() {
               </div>
               <button
                 type="button"
-                className="cdb-btn-icon"
+                className="cdb-btn-secondary cdb-share-link-button"
+                onClick={() => void copyShareableFormLink()}
                 style={{
-                  border: 0,
-                  background: '#f1f5f9',
-                  borderRadius: '6px',
-                  width: '32px',
-                  height: '32px',
+                  borderRadius: '8px',
+                  height: '36px',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '7px',
                 }}
-                title="Copy profile link"
+                title="Copy shareable customer form link"
               >
                 <Icon name="copy" size={16} />
+                <span>Copy shareable link</span>
               </button>
             </div>
           </div>
@@ -602,13 +773,18 @@ export function CustomerDetailsPage() {
               { step: 6, label: 'Done' },
             ].map((st) => {
               const isCurrent = activeStep === st.step
-              const isDone = activeStep > st.step
+              const isDone = st.step <= 5 && completedSteps.has(st.step)
+              const isLocked = st.step === 6 && !allFormStepsCompleted
 
               return (
                 <button
                   key={st.label}
                   type="button"
+                  disabled={isLocked}
+                  aria-current={isCurrent ? 'step' : undefined}
                   onClick={() => {
+                    if (isLocked) return
+                    prefillRepeatedFields(st.step)
                     setActiveStep(st.step)
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
@@ -624,10 +800,11 @@ export function CustomerDetailsPage() {
                       : isDone
                         ? '#f0fdf4'
                         : '#ffffff',
-                    color: isCurrent ? '#ffffff' : isDone ? '#15803d' : '#475569',
+                    color: isCurrent ? '#ffffff' : isDone ? '#15803d' : isLocked ? '#94a3b8' : '#475569',
                     fontSize: '13px',
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                    opacity: isLocked ? 0.72 : 1,
                     whiteSpace: 'nowrap',
                     boxShadow: isCurrent ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -635,6 +812,8 @@ export function CustomerDetailsPage() {
                 >
                   {isDone ? (
                     <CheckCircle2 style={{ width: '14px', height: '14px', color: '#16a34a' }} />
+                  ) : isLocked ? (
+                    <Lock style={{ width: '13px', height: '13px' }} />
                   ) : null}
                   <span>{st.label}</span>
                 </button>
@@ -644,6 +823,32 @@ export function CustomerDetailsPage() {
 
           {/* STEP 1: Basic Info */}
           {activeStep === 1 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Basic Information</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Tell us about your business</p>
+              </div>
+              <div className="cdb-details-grid">
+                <label className="cdb-field"><span>Business Name *</span><input className="cdb-input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
+                <label className="cdb-field"><span>Brand Name</span><input className="cdb-input" value={basicBrandName} onChange={(e) => setBasicBrandName(e.target.value)} placeholder="As per Google My Business" /></label>
+                <label className="cdb-field"><span>Business Category</span><select className="cdb-select" value={businessCategory} onChange={(e) => setBusinessCategory(e.target.value)}><option value="">Select business category...</option>{['Retail','Restaurant','IT Services','Healthcare','Education','Real Estate','Salon & Beauty','Other'].map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field"><span>Business Type</span><input className="cdb-input" value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="e.g. Proprietorship, Partnership, Pvt Ltd" /></label>
+                <label className="cdb-field"><span>Year Started</span><input className="cdb-input" value={yearStarted} onChange={(e) => setYearStarted(e.target.value)} placeholder="e.g. 2020" /></label>
+                <label className="cdb-field"><span>Happy Customers</span><input type="number" min="0" className="cdb-input" value={happyCustomers} onChange={(e) => setHappyCustomers(e.target.value)} placeholder="e.g. 100" /></label>
+                <label className="cdb-field"><span>Email *</span><input type="email" className="cdb-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
+                <label className="cdb-field"><span>Phone / WhatsApp *</span><input type="tel" className="cdb-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 9876543210" /></label>
+                <label className="cdb-field"><span>Additional Number</span><input type="tel" className="cdb-input" value={additionalNumber} onChange={(e) => setAdditionalNumber(e.target.value)} placeholder="Optional secondary phone number" /></label>
+                <label className="cdb-field"><span>Address</span><input className="cdb-input" value={basicAddress} onChange={(e) => setBasicAddress(e.target.value)} placeholder="e.g. 123, Main Street" /></label>
+                <label className="cdb-field"><span>Area</span><input className="cdb-input" value={basicArea} onChange={(e) => setBasicArea(e.target.value)} placeholder="Dhanwantri chowk, Deen Dayal, etc." /></label>
+                <label className="cdb-field"><span>State</span><select className="cdb-select" value={basicState} onChange={(e) => setBasicState(e.target.value)}><option value="">Select state...</option>{INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field"><span>City</span><input className="cdb-input" value={basicCity} onChange={(e) => setBasicCity(e.target.value)} placeholder="e.g. Jabalpur" /></label>
+                <label className="cdb-field"><span>Zip Code</span><input className="cdb-input" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="000000" maxLength={10} /></label>
+                <label className="cdb-field cdb-field-wide"><span>Country</span><input className="cdb-input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. India" /></label>
+              </div>
+            </div>
+          ) : null}
+
+          {false && activeStep === 1 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
@@ -1077,6 +1282,39 @@ export function CustomerDetailsPage() {
                     />
                   </div>
                 </div>
+
+                <div className="cdb-details-grid">
+                  <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Design a logo for me</option><option>Use business name</option></select></label>
+                  <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label>
+                  <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => setWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
+                  <label className="cdb-field"><span>Booking Link</span><input className="cdb-input" value={bookingLink} onChange={(e) => setBookingLink(e.target.value)} placeholder="e.g. https://..." /></label>
+                  <label className="cdb-field"><span>Payment Link</span><input className="cdb-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="e.g. https://razorpay.me/..." /></label>
+                  <label className="cdb-field"><span>Business Category</span><input className="cdb-input" value={websiteCategory} onChange={(e) => setWebsiteCategory(e.target.value)} placeholder="e.g. Restaurant, Clothing Store" /><small>Will display as: Best [category] in [area], [city] [state] India</small></label>
+                  <label className="cdb-field cdb-field-wide"><span>Business Tagline</span><textarea className="cdb-textarea" rows={2} value={businessTagline} onChange={(e) => setBusinessTagline(e.target.value)} placeholder="e.g. Best IT Services in Navi Mumbai, Maharashtra" /><small>Auto-generated: Best [category] in [area], [city], [state], India</small></label>
+                  <div className="cdb-field cdb-field-wide">
+                    <span>Main Services / Products</span>
+                    <div className="cdb-service-entry">
+                      <div className="cdb-service-input-wrap">
+                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { setServicesInput(e.target.value); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="List one at a time and click +" />
+                        {serviceSuggestionsOpen && serviceSuggestions.length > 0 ? <div className="cdb-service-suggestions">{serviceSuggestions.map((suggestion) => <button key={suggestion} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addMainService(suggestion)}><span>{suggestion}</span><span>+</span></button>)}</div> : null}
+                      </div>
+                      <button type="button" className="cdb-btn-primary" onClick={handleAddService}>+</button>
+                    </div>
+                    <div className="cdb-service-stack">{mainServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}>{service}<button type="button" onClick={() => removeMainService(index)}><CloseIcon size={12} /></button></span>)}</div>
+                    <small>{mainServices.length}/15 added</small>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+                  <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px', marginBottom: '16px' }}><h3 style={{ margin: 0, fontSize: '16px' }}>Contact Details</h3></div>
+                  <div className="cdb-details-grid">
+                    <label className="cdb-field"><span>Full Address</span><input className="cdb-input" value={websiteFullAddress} onChange={(e) => setWebsiteFullAddress(e.target.value)} placeholder="e.g. 123, Main Street, Jabalpur" /></label>
+                    <label className="cdb-field"><span>Email</span><input type="email" className="cdb-input" value={websiteContactEmail} onChange={(e) => setWebsiteContactEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
+                    <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => setMapLink(e.target.value)} placeholder="Google maps link" /></label>
+                    <div className="cdb-field"><span>Social Links</span><div className="cdb-service-entry"><input className="cdb-input" value={socialLinkInput} onChange={(e) => setSocialLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSocialLink() } }} placeholder="https://instagram.com/your-handle" /><button type="button" className="cdb-btn-primary" onClick={addSocialLink}>+</button></div><div className="cdb-service-stack">{socialLinks.map((link, index) => <span className="cdb-service-chip" key={`${link}-${index}`}>{link}<button type="button" onClick={() => setSocialLinks((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div></div>
+                    <div className="cdb-field cdb-field-wide"><div className="cdb-working-hours-heading"><span>Working Hours (From ~ To)</span><button type="button" className="cdb-btn-secondary" onClick={() => addWorkingHour(setWebsiteWorkingHours)}>+ Add</button></div>{websiteWorkingHours.length === 0 ? <div className="cdb-empty-hours">No working hours added.</div> : websiteWorkingHours.map((hour, index) => <div className="cdb-working-hour-row" key={`${hour.day}-${index}`}><select className="cdb-select" value={hour.day} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'day', e.target.value)}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day) => <option key={day}>{day}</option>)}</select><input type="time" className="cdb-input" value={hour.from} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'from', e.target.value)} /><input type="time" className="cdb-input" value={hour.to} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'to', e.target.value)} /><button type="button" onClick={() => setWebsiteWorkingHours((items) => items.filter((_, i) => i !== index))}><CloseIcon size={15} /></button></div>)}</div>
+                  </div>
+                </div>
               </div>
 
               {/* Website Graphic Box */}
@@ -1408,18 +1646,17 @@ export function CustomerDetailsPage() {
                     <button type="button" className="cdb-btn-primary" onClick={handleAddAutoService} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>+</button>
                   </div>
                   <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>Add one item at a time and click +</span>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Nothing added yet - {autoServices.length}/15</span>
+                  {autoServices.length > 0 ? <div className="cdb-service-stack">{autoServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}>{service}<button type="button" onClick={() => setAutoServices((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div> : null}
+                  <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>{autoServices.length}/15 added</span>
                 </div>
 
                 {/* 7. Working Hours */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>Working Hours (From ~ To)</label>
-                    <button type="button" className="cdb-btn-secondary" style={{ fontSize: '11px', padding: '2px 8px' }}>+ Add</button>
+                    <button type="button" className="cdb-btn-secondary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => addWorkingHour(setAutomationWorkingHours)}>+ Add</button>
                   </div>
-                  <div style={{ padding: '12px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', fontSize: '12px', color: '#64748b', textAlign: 'center' }}>
-                    No working hours added.
-                  </div>
+                  {automationWorkingHours.length === 0 ? <div className="cdb-empty-hours">No working hours added.</div> : automationWorkingHours.map((hour, index) => <div className="cdb-working-hour-row" key={`${hour.day}-${index}`}><select className="cdb-select" value={hour.day} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'day', e.target.value)}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day) => <option key={day}>{day}</option>)}</select><input type="time" className="cdb-input" value={hour.from} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'from', e.target.value)} /><input type="time" className="cdb-input" value={hour.to} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'to', e.target.value)} /><button type="button" onClick={() => setAutomationWorkingHours((items) => items.filter((_, i) => i !== index))}><CloseIcon size={15} /></button></div>)}
                 </div>
 
                 {/* 8. AI Chatbot Configuration (Purple Card Box) */}
@@ -1502,21 +1739,19 @@ export function CustomerDetailsPage() {
                 Thank you for filling your information — your onboarding is successfully completed. Approve this onboarding via email too!
               </p>
 
-              {/* Yellow Alert Box */}
-              <div style={{ background: '#fef3c7', border: '1px solid #fde047', borderRadius: '12px', padding: '16px 20px', width: '100%', maxWidth: '550px', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon name="alert" size={16} /> Missing recommended information
-                </span>
-                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12.5px', color: '#78350f' }}>
-                  <li>Brand Name</li>
-                  <li>Business Category</li>
-                  <li>Area</li>
-                  <li>Google Review Link</li>
-                </ul>
-                <span style={{ fontSize: '11.5px', color: '#92400e', fontStyle: 'italic', marginTop: '4px' }}>
-                  Note: providing these details later will help us serve you better.
-                </span>
-              </div>
+              {missingRecommendedFields.length > 0 ? (
+                <div style={{ background: '#fef3c7', border: '1px solid #fde047', borderRadius: '12px', padding: '16px 20px', width: '100%', maxWidth: '550px', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="alert" size={16} /> Missing recommended information
+                  </span>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12.5px', color: '#78350f' }}>
+                    {missingRecommendedFields.map((field) => <li key={field}>{field}</li>)}
+                  </ul>
+                  <span style={{ fontSize: '11.5px', color: '#92400e', fontStyle: 'italic', marginTop: '4px' }}>
+                    Note: providing these details later will help us serve you better.
+                  </span>
+                </div>
+              ) : null}
 
               {/* Registered Contact box */}
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', color: '#475569' }}>
@@ -1604,6 +1839,61 @@ export function CustomerDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      {showCompletionConfirm ? (
+        <div className="cdb-completion-modal-backdrop" role="presentation">
+          <div className="cdb-completion-modal" role="dialog" aria-modal="true" aria-labelledby="completion-confirm-title">
+            <button
+              type="button"
+              className="cdb-completion-modal-close"
+              onClick={() => setShowCompletionConfirm(false)}
+              aria-label="Close confirmation"
+            >
+              <CloseIcon size={18} />
+            </button>
+
+            <div className="cdb-completion-modal-title" id="completion-confirm-title">
+              <AlertCircle size={25} />
+              <span>Important Information Missing</span>
+            </div>
+            <p className="cdb-completion-modal-description">
+              The following fields are highly recommended for better service and results. While they are not mandatory to save, having them filled now will help us process your request faster.
+            </p>
+
+            <div className="cdb-completion-missing-heading">
+              <Icon name="copy" size={16} /> Missing Recommended Fields:
+            </div>
+            <div className="cdb-completion-missing-list">
+              <ul>
+                {missingRecommendedFields.map((field) => <li key={field}>{field}</li>)}
+              </ul>
+            </div>
+
+            <label className="cdb-completion-acknowledgement">
+              <input
+                type="checkbox"
+                checked={completionAcknowledged}
+                onChange={(event) => setCompletionAcknowledged(event.target.checked)}
+              />
+              <span>I understand that these fields are important and I agree to provide this data later if not now. I wish to proceed with saving.</span>
+            </label>
+
+            <div className="cdb-completion-modal-actions">
+              <button type="button" className="cdb-btn-secondary" onClick={() => setShowCompletionConfirm(false)}>
+                Go Back &amp; Fill
+              </button>
+              <button
+                type="button"
+                className="cdb-completion-save-anyway"
+                disabled={!completionAcknowledged || isSaving}
+                onClick={() => void handleNextStep(undefined, true)}
+              >
+                {isSaving ? 'Saving...' : 'Save Anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </CustomerDashboardLayout>
   )
 }
