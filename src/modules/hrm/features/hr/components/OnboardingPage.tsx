@@ -23,9 +23,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
-  StaggerContainer,
-  StaggerItem,
   TableSkeleton,
 } from "@shared/components/ui";
 import { useDebouncedValue } from "@shared/hooks";
@@ -160,32 +157,22 @@ export function OnboardingPage() {
 
   return (
     <>
-      <StaggerContainer className="space-y-6">
-        <StaggerItem>
-          <PageHeader
-            title="Onboarding"
-            description="Manage employee onboarding workflows, track progress, and verify documents."
-          />
-        </StaggerItem>
+      <div className="space-y-4">
+        <section
+          className={`grid gap-3.5 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${refreshingClass}`}
+          aria-busy={listRefreshing}
+        >
+          {counts.map(({ label, tone, total: count }) => (
+            <Card key={label}>
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <p className={`mt-2 text-3xl font-extrabold ${tone}`}>
+                <AnimatedNumber value={count ?? "—"} />
+              </p>
+            </Card>
+          ))}
+        </section>
 
-        <StaggerItem variant="card">
-          <section
-            className={`grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${refreshingClass}`}
-            aria-busy={listRefreshing}
-          >
-            {counts.map(({ label, tone, total: count }) => (
-              <Card key={label}>
-                <p className="text-sm font-medium text-muted-foreground">{label}</p>
-                <p className={`mt-2 text-3xl font-extrabold ${tone}`}>
-                  <AnimatedNumber value={count ?? "—"} />
-                </p>
-              </Card>
-            ))}
-          </section>
-        </StaggerItem>
-
-        <StaggerItem variant="card">
-          <Card padding="none">
+        <Card padding="none">
             <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center">
               <label className="relative min-w-0 flex-1">
                 <Search
@@ -276,8 +263,7 @@ export function OnboardingPage() {
               }}
             />
           </Card>
-        </StaggerItem>
-      </StaggerContainer>
+      </div>
 
       <LinkDialog
         link={generatedLink}

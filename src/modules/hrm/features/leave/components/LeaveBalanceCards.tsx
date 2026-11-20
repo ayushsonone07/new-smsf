@@ -47,7 +47,17 @@ export function LeaveBalanceCards({ balances, isLoading, error }: LeaveBalanceCa
   if (isLoading) return <CardSkeleton count={1} />;
   if (error) return <ErrorDisplay message="Leave balances could not be loaded. Please try again." />;
   if (sorted.length === 0) {
-    return <Card padding="md"><p className="text-sm text-muted-foreground">No leave entitlements are configured for your profile.</p></Card>;
+    return (
+      <div className="flex items-center gap-3.5 rounded-2xl border border-dashed border-border bg-card/60 p-4 shadow-xs">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <Briefcase size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">No leave balance configured</p>
+          <p className="text-xs text-muted-foreground">No leave entitlements have been assigned to your profile for this year.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

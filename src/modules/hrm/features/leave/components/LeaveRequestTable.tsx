@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Clock, Eye, User } from "lucide-react";
+import { CalendarDays, Clock, Eye, Plus, User } from "lucide-react";
 
-import { Dialog, ErrorDisplay, TableSkeleton } from "@shared/components/ui";
+import { Dialog, EmptyState, ErrorDisplay, TableSkeleton } from "@shared/components/ui";
 
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -14,6 +14,7 @@ interface LeaveRequestTableProps {
   showEmployee?: boolean;
   renderActions?: (request: LeaveRequest) => React.ReactNode;
   onRetry?: () => void;
+  onOpenApply?: () => void;
 }
 
 export function LeaveRequestTable({
@@ -23,6 +24,7 @@ export function LeaveRequestTable({
   showEmployee = false,
   renderActions,
   onRetry,
+  onOpenApply,
 }: LeaveRequestTableProps) {
   const [viewTarget, setViewTarget] = useState<LeaveRequest | null>(null);
 
@@ -35,7 +37,25 @@ export function LeaveRequestTable({
   );
   const displayRequests = requests ?? [];
   if (displayRequests.length === 0) {
-    return <div className="rounded-2xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">No leave requests match this view.</div>;
+    return (
+      <EmptyState
+        icon={CalendarDays}
+        title="No leave requests"
+        description="No leave requests have been submitted yet."
+        action={
+          onOpenApply ? (
+            <button
+              type="button"
+              onClick={onOpenApply}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
+            >
+              <Plus size={16} />
+              Apply for Leave
+            </button>
+          ) : undefined
+        }
+      />
+    );
   }
 
   return (

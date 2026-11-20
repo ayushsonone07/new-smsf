@@ -40,6 +40,7 @@ import type { Candidate, CandidateStatus, DateRange } from "../types";
 interface CandidatesSectionProps {
   range: DateRange;
   showRecruiter: boolean;
+  actions?: React.ReactNode;
 }
 
 const PAGE_SIZE = 8;
@@ -69,7 +70,7 @@ const STATUS_OPTIONS: { value: "" | CandidateStatus; label: string }[] = [
  * When the search box has 2+ chars we switch to the search branch so list
  * filters don't get clobbered.
  */
-export function CandidatesSection({ range, showRecruiter }: CandidatesSectionProps) {
+export function CandidatesSection({ range, showRecruiter, actions }: CandidatesSectionProps) {
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("");
   const [status, setStatus] = useState<"" | CandidateStatus>("");
@@ -134,23 +135,16 @@ export function CandidatesSection({ range, showRecruiter }: CandidatesSectionPro
   const meta = active.data?.meta;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow">
-      <header className="flex flex-col gap-4 bg-white px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-950">All candidates</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {meta?.totalElements ?? items.length} total | sorted by newest
-          </p>
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <header className="flex flex-col gap-3 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between border-b border-border">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <SearchBox value={search} onChange={onSearchChange} />
+          <SourceSelect value={source} onChange={onSourceChange} />
+          <StatusFilter value={status} onChange={onStatusChange} />
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-            <SearchBox value={search} onChange={onSearchChange} />
-            <SourceSelect value={source} onChange={onSourceChange} />
-            <StatusFilter value={status} onChange={onStatusChange} />
-          </div>
-          <div className="flex justify-end sm:justify-end">
-            <RefreshButton onClick={() => void onRefresh()} isRefreshing={isRefreshing} />
-          </div>
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+          <RefreshButton onClick={() => void onRefresh()} isRefreshing={isRefreshing} />
+          {actions}
         </div>
       </header>
 
@@ -227,10 +221,10 @@ function SearchBox({
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
-    <div className="relative w-full max-w-xs">
+    <div className="relative w-full sm:w-56">
       <Search
         size={14}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
       />
       <input
         type="search"
@@ -241,7 +235,7 @@ function SearchBox({
         value={value}
         onChange={onChange}
         placeholder="Search name, email, phone..."
-        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:border-cyan-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-100"
+        className="h-9 w-full rounded-xl border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
       />
     </div>
   );
@@ -298,14 +292,14 @@ function RefreshButton({ onClick, isRefreshing }: { onClick: () => void; isRefre
       disabled={isRefreshing}
       aria-label={isRefreshing ? "Refreshing candidates" : "Refresh candidates"}
       title="Refresh candidates"
-      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition duration-150 ease-in-out hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-60"
     >
       <RefreshCw
-        size={16}
+        size={15}
         className={
           isRefreshing
-            ? "animate-spin text-slate-700"
-            : "text-slate-500 transition duration-150 ease-in-out hover:text-slate-900"
+            ? "animate-spin text-foreground"
+            : "text-muted-foreground transition hover:text-foreground"
         }
       />
     </button>
