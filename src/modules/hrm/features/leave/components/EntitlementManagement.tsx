@@ -3,20 +3,47 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, RefreshCw, Trash2, Building2, Save, Users, Sparkles, Info, Search, ArrowLeft, ArrowRight } from "lucide-react";
 
 import { useToast } from "@shared/components/feedback";
-import { ConfirmDialog } from "@shared/components/ui";
+import { ConfirmDialog, EmptyState, StatusBadge } from "@shared/components/ui";
 import { useDebouncedValue } from "@shared/hooks";
 import type { PaginationMeta } from "@shared/types";
 import { hrService } from "@features/hr";
 import { useLeaveTypes } from "../hooks";
 import { leaveService } from "../services/leaveService";
-
 import { Select } from "@hrm/components/ui/select";
+import { RefreshButton } from "@/components/ui/RefreshButton";
 
 import type { LeaveEntitlement, LeaveTypeValue, LeavePolicyItem } from "../types";
 
 const LEAVE_TYPE_OPTIONS: { value: LeaveTypeValue; label: string }[] = [
   { value: "CASUAL", label: "Casual Leave" },
+  { value: "SICK", label: "Sick Leave" },
+  { value: "PAID", label: "Paid Leave" },
+  { value: "UNPAID", label: "Unpaid Leave" },
 ];
+
+function getInitials(name?: string) {
+  if (!name) return "EM";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+function getLeaveTypeBadge(type: string, label?: string) {
+  const display = label || type;
+  switch (type) {
+    case "CASUAL":
+      return <StatusBadge label={display} tone="emerald" dot={false} />;
+    case "SICK":
+      return <StatusBadge label={display} tone="rose" dot={false} />;
+    case "PAID":
+      return <StatusBadge label={display} tone="blue" dot={false} />;
+    case "UNPAID":
+    default:
+      return <StatusBadge label={display} tone="slate" dot={false} />;
+  }
+}
 
 export function EntitlementManagement() {
   const toast = useToast();
@@ -177,91 +204,97 @@ export function EntitlementManagement() {
   return (
     <div className="space-y-4">
       {/* 1. COMPANY DEFAULT LEAVE POLICY CARD */}
-      <section className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50/50 via-card to-card p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
-                <Building2 size={18} />
-              </span>
-              <h2 className="text-lg font-bold text-foreground">Company Default Leave Policy</h2>
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+              <Building2 size={20} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-foreground">Company Default Leave Policy</h2>
+                <span className="inline-flex items-center rounded-full bg-primary-soft px-2.5 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-inset ring-primary/20">
+                  Global Rule
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Standard annual quotas inherited automatically by all employees and new joiners unless overridden.
+              </p>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Define standard annual leave quotas for the whole company. Employees without custom overrides automatically inherit these leaves, including new joiners.
-            </p>
           </div>
           <button
             type="button"
             onClick={handleSyncAll}
             disabled={isSyncingAll}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-xs font-semibold text-secondary-foreground shadow-sm hover:bg-secondary/80 disabled:opacity-50"
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-muted disabled:opacity-50"
           >
             <Sparkles size={14} className={isSyncingAll ? "animate-spin text-blue-600" : "text-blue-600"} />
             {isSyncingAll ? "Syncing..." : `Sync Policy to All (${year})`}
           </button>
         </div>
 
-        <form onSubmit={handleSavePolicy} className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {LEAVE_TYPE_OPTIONS.map((opt) => (
-              <div key={opt.value} className="rounded-xl border border-border bg-card p-3 shadow-xs">
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  {opt.label}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    max={365}
-                    value={policies[opt.value] ?? 0}
-                    onChange={(e) =>
-                      setPolicies((prev) => ({
-                        ...prev,
-                        [opt.value]: Number(e.target.value),
-                      }))
-                    }
-                    className="mbg-filter-control h-10 w-full rounded-lg border border-border bg-surface-elevated px-3 text-sm font-bold text-foreground outline-none focus:border-blue-500"
-                    required
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-muted-foreground pointer-events-none">
-                    days/yr
-                  </span>
-                </div>
+        <form onSubmit={handleSavePolicy} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-2 px-3 shadow-xs">
+              <div className="text-xs">
+                <p className="font-semibold text-foreground">Casual Leave</p>
+                <p className="text-[11px] text-muted-foreground">Default quota</p>
               </div>
-            ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={policies.CASUAL ?? 12}
+                  onChange={(e) =>
+                    setPolicies((prev) => ({
+                      ...prev,
+                      CASUAL: Number(e.target.value),
+                    }))
+                  }
+                  className="h-9 w-20 rounded-lg border border-border bg-muted/30 px-2 text-center font-mono text-sm font-bold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  required
+                />
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  days / year
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-soft/60 px-3 py-2 text-xs text-foreground">
+              <Info size={14} className="shrink-0 text-primary" />
+              <span>1 paid casual leave / month (12 / year). Additional month leaves deducted in payroll.</span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Info size={14} className="text-blue-500 shrink-0" />
-              <span>HR does not need to set leaves individually. Default quota is automatically assigned.</span>
-            </div>
-            <button
-              type="submit"
-              disabled={isSavingPolicy}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50"
-            >
-              <Save size={14} />
-              {isSavingPolicy ? "Saving Policy..." : "Save Company Policy"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isSavingPolicy}
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:brightness-110 disabled:opacity-50"
+          >
+            <Save size={14} />
+            {isSavingPolicy ? "Saving Policy..." : "Save Policy"}
+          </button>
         </form>
       </section>
 
       {/* 2. SET SPECIFIC OR BULK ENTITLEMENTS */}
-      <section className="rounded-2xl border border-border bg-card p-5 shadow">
-        <div className="flex items-center justify-between">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="flex items-center gap-3 border-b border-border pb-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Users size={20} />
+          </span>
           <div>
-            <h2 className="text-base font-extrabold text-foreground">Custom / Bulk Leave Entitlements</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <h2 className="text-base font-bold text-foreground">Custom & Bulk Entitlements</h2>
+            <p className="text-xs text-muted-foreground">
               Select <strong>&quot;All Active Employees&quot;</strong> to apply in bulk, or pick a specific employee to override default leaves.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSetEntitlement} className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="col-span-2 lg:col-span-1">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Target</label>
+        <form onSubmit={handleSetEntitlement} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 items-end">
+          <div className="sm:col-span-2 lg:col-span-4">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Target Employee</label>
             <Select
               value={employeeId}
               onChange={(event) => {
@@ -271,7 +304,7 @@ export function EntitlementManagement() {
                 else setEmployeeId(Number(val));
               }}
               required
-              className="h-10 w-full rounded-xl border border-border bg-surface-elevated px-3 text-xs font-medium text-foreground"
+              className="h-10 w-full rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Select target</option>
               <option value="ALL">★ All Active Employees ({employees.length})</option>
@@ -282,12 +315,13 @@ export function EntitlementManagement() {
               ))}
             </Select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Leave Type</label>
+
+          <div className="lg:col-span-3">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Leave Type</label>
             <Select
               value={leaveType}
               onChange={(event) => setLeaveType(event.target.value as LeaveTypeValue)}
-              className="h-10 w-full rounded-xl border border-border bg-surface-elevated px-3 text-xs font-medium text-foreground"
+              className="h-10 w-full rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
               {LEAVE_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -296,8 +330,9 @@ export function EntitlementManagement() {
               ))}
             </Select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Total Days</label>
+
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Total Days</label>
             <input
               type="number"
               value={totalDays}
@@ -305,11 +340,12 @@ export function EntitlementManagement() {
               placeholder="12"
               min={0}
               required
-              className="mbg-filter-control h-10 w-full rounded-xl border border-border bg-surface-elevated px-3 text-xs font-medium text-foreground outline-none"
+              className="h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Year</label>
+
+          <div className="lg:col-span-1">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Year</label>
             <input
               type="number"
               value={year}
@@ -318,16 +354,17 @@ export function EntitlementManagement() {
               min={2020}
               max={2030}
               required
-              className="mbg-filter-control h-10 w-full rounded-xl border border-border bg-surface-elevated px-3 text-xs font-medium text-foreground outline-none"
+              className="h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <div className="flex items-end col-span-2 lg:col-span-1">
+
+          <div className="sm:col-span-2 lg:col-span-2">
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:brightness-110 disabled:opacity-50"
             >
-              {employeeId === "ALL" ? <Users size={16} /> : <Plus size={16} />}
+              {employeeId === "ALL" ? <Users size={15} /> : <Plus size={15} />}
               {employeeId === "ALL" ? "Assign to All" : "Set Entitlement"}
             </button>
           </div>
@@ -335,26 +372,21 @@ export function EntitlementManagement() {
       </section>
 
       {/* 3. ASSIGNED ENTITLEMENTS TABLE */}
-      <section className="rounded-2xl border border-border bg-card shadow">
+      <section className="rounded-2xl border border-border bg-card shadow-xs overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h2 className="font-extrabold text-foreground">Assigned Entitlements ({year})</h2>
+            <h2 className="font-bold text-foreground">Assigned Entitlements ({year})</h2>
             <p className="text-xs text-muted-foreground">List of saved entitlement entries in the database for {year}.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loading}
-            aria-label={loading ? "Refreshing entitlements" : "Refresh entitlements"}
-            title="Refresh entitlements"
-            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface-elevated text-foreground shadow transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : undefined} />
-          </button>
+          <RefreshButton
+            onRefresh={handleRefresh}
+            isRefreshing={loading}
+            label="entitlements"
+          />
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="border-b border-border bg-surface-muted/30 p-3 sm:px-5">
+        <div className="border-b border-border bg-muted/20 p-3 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative min-w-0 flex-1 max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -366,7 +398,7 @@ export function EntitlementManagement() {
                   setCurrentPage(1);
                 }}
                 placeholder="Search by employee name or code..."
-                className="mbg-filter-control h-9 w-full rounded-xl border border-border bg-surface-elevated pl-9 pr-3 text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground focus:border-blue-500"
+                className="h-9 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div className="flex items-center gap-3">
@@ -376,7 +408,7 @@ export function EntitlementManagement() {
                   setTableTypeFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="h-9 rounded-xl border border-border bg-surface-elevated px-3 text-xs font-medium text-foreground outline-none"
+                className="h-9 rounded-xl border border-border bg-card px-3 text-xs font-medium text-foreground outline-none focus:border-primary"
               >
                 <option value="ALL">All Leave Types</option>
                 {LEAVE_TYPE_OPTIONS.map((opt) => (
@@ -392,49 +424,75 @@ export function EntitlementManagement() {
         {loading && entitlements.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">Loading entitlements...</div>
         ) : totalElements === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            {debouncedSearch || tableTypeFilter !== "ALL" ? (
-              <>No matching entitlements found for &quot;{tableSearch}&quot;.</>
-            ) : (
-              <>No individual overrides found. All employees are automatically using the <strong>Company Default Leave Policy</strong> above!</>
-            )}
+          <div className="p-8">
+            <EmptyState
+              icon={Users}
+              title={debouncedSearch || tableTypeFilter !== "ALL" ? "No matching entitlements" : "No custom overrides"}
+              description={
+                debouncedSearch || tableTypeFilter !== "ALL"
+                  ? `No entitlements found matching "${tableSearch}".`
+                  : "All employees are currently using the Company Default Leave Policy (12 Casual leaves/year)."
+              }
+            />
           </div>
         ) : (
           <div
-            className={`overflow-auto transition-opacity ${loading ? "pointer-events-none opacity-60" : ""}`}
+            className={`overflow-x-auto transition-opacity ${loading ? "pointer-events-none opacity-60" : ""}`}
             aria-busy={loading}
           >
             <table className="min-w-[700px] w-full text-sm">
-              <thead className="sticky top-0 bg-surface-muted text-left text-xs uppercase text-muted-foreground">
-                <tr>
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <th className="px-5 py-3">Employee</th>
                   <th className="px-5 py-3">Code</th>
                   <th className="px-5 py-3">Leave Type</th>
-                  <th className="px-5 py-3">Total Days</th>
-                  <th className="px-5 py-3">Year</th>
+                  <th className="px-5 py-3 text-center">Total Days</th>
+                  <th className="px-5 py-3 text-center">Year</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {entitlements.map((ent) => (
-                  <tr key={ent.id} className="hover:bg-muted/40">
-                    <td className="px-5 py-3 font-semibold">{ent.employeeName ?? "—"}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{ent.employeeCode ?? "—"}</td>
-                    <td className="px-5 py-3">{leaveTypes?.find((t) => t.type === ent.leaveType)?.label ?? ent.leaveType}</td>
-                    <td className="px-5 py-3 font-mono">{ent.totalDays}</td>
-                    <td className="px-5 py-3">{ent.year}</td>
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(ent)}
-                        disabled={deletingId === ent.id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-danger-soft px-2.5 py-1.5 text-xs font-bold text-danger hover:brightness-90 disabled:opacity-50"
-                      >
-                        <Trash2 size={12} /> {deletingId === ent.id ? "Deleting..." : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {entitlements.map((ent) => {
+                  const typeLabel = leaveTypes?.find((t) => t.type === ent.leaveType)?.label ?? ent.leaveType;
+                  return (
+                    <tr key={ent.id} className="transition-colors hover:bg-muted/40">
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                            {getInitials(ent.employeeName)}
+                          </span>
+                          <span className="font-semibold text-foreground">{ent.employeeName ?? "—"}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-medium text-foreground">
+                          {ent.employeeCode ?? "—"}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        {getLeaveTypeBadge(ent.leaveType, typeLabel)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-center">
+                        <span className="font-mono text-sm font-bold text-foreground">{ent.totalDays}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">days</span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-center text-xs text-muted-foreground font-mono">
+                        {ent.year}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(ent)}
+                          disabled={deletingId === ent.id}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger transition-colors hover:border-danger/30 hover:bg-danger/20 disabled:opacity-50"
+                        >
+                          <Trash2 size={12} />
+                          {deletingId === ent.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -456,7 +514,7 @@ export function EntitlementManagement() {
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="rounded-lg border border-border bg-surface-elevated px-2 py-1 text-xs font-medium text-foreground"
+                  className="rounded-lg border border-border bg-card px-2 py-1 text-xs font-medium text-foreground"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -471,7 +529,7 @@ export function EntitlementManagement() {
                 type="button"
                 disabled={currentPage <= 1 || loading}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-elevated px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ArrowLeft size={13} />
                 Previous
@@ -489,8 +547,8 @@ export function EntitlementManagement() {
                     onClick={() => setCurrentPage(item)}
                     className={`grid h-7 min-w-[28px] place-items-center rounded-lg text-xs font-medium transition-colors ${
                       item === currentPage
-                        ? "bg-primary text-primary-foreground shadow"
-                        : "border border-border bg-surface-elevated text-foreground hover:bg-surface-hover"
+                        ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                        : "border border-border bg-card text-foreground hover:bg-muted"
                     }`}
                   >
                     {item}
@@ -501,7 +559,7 @@ export function EntitlementManagement() {
                 type="button"
                 disabled={currentPage >= totalPages || loading}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-elevated px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
                 <ArrowRight size={13} />
@@ -554,4 +612,3 @@ function getPageNumbers(current: number, total: number): (number | "ellipsis")[]
 
   return pages;
 }
-
