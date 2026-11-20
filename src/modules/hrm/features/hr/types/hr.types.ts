@@ -251,6 +251,7 @@ export interface Department {
   headEmployeeId: number | null;
   managerName: string | null;
   managerEmail: string | null;
+  employeeCount?: number;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -273,6 +274,7 @@ export interface Designation {
   title: string;
   departmentId: number | null;
   departmentName: string | null;
+  employeeCount?: number;
   createdAt: string;
   updatedAt: string | null;
 }

@@ -40,7 +40,6 @@ import type {
   Department,
   DepartmentInput,
   DepartmentManager,
-  EmployeeListItem,
 } from "../types";
 
 type DialogState = "none" | "create" | "update" | "delete";
@@ -79,17 +78,11 @@ export function DepartmentsPage() {
   const isLoading = useAppSelector(selectDepartmentsLoading);
   const error = useAppSelector(selectDepartmentsError);
 
-  const employees = useQuery({
-    queryKey: ["hr", "employees", "department-metrics"],
-    queryFn: () => hrService.listEmployees({ page: 0, size: 100, sort: "employeeCode,asc" }),
-  });
-
   useEffect(() => {
     void dispatch(fetchDepartments(undefined));
   }, [dispatch]);
 
   const items = departments ?? [];
-  const employeeItems = employees.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState>("none");
   const [query, setQuery] = useState("");
@@ -106,10 +99,6 @@ export function DepartmentsPage() {
     [items, selectedId],
   );
 
-  const memberCounts = useMemo(
-    () => countByDepartment(employeeItems, items),
-    [employeeItems, items],
-  );
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
@@ -120,7 +109,10 @@ export function DepartmentsPage() {
     );
   }, [items, query]);
 
-  const totalMembers = employeeItems.filter((employee) => employee.departmentId != null).length;
+  const totalMembers = useMemo(
+    () => items.reduce((sum, d) => sum + (d.employeeCount ?? 0), 0),
+    [items],
+  );
   const avgTeamSize = items.length ? Math.round(totalMembers / items.length) : 0;
 
   useEffect(() => {
@@ -132,8 +124,7 @@ export function DepartmentsPage() {
   async function refreshDepartments() {
     setIsRefreshing(true);
     try {
-      // Member counts / team sizes come from the employees query, so reload it with the list.
-      await Promise.all([dispatch(fetchDepartments({ force: true })).unwrap(), employees.refetch()]);
+      await dispatch(fetchDepartments({ force: true })).unwrap();
       toast.success("Departments refreshed", "The latest departments were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh departments", getApiErrorMessage(err));
@@ -235,7 +226,7 @@ export function DepartmentsPage() {
               <DepartmentCard
                 department={department}
                 tone={deptToneFor(department.name) ?? DEPT_TONES[index % DEPT_TONES.length] ?? DEPT_TONES[0]}
-                members={memberCounts.get(department.id) ?? 0}
+                members={department.employeeCount ?? 0}
                 onEdit={() => openUpdate(department)}
                 onDelete={() => openDelete(department)}
               />
@@ -728,31 +719,6 @@ function Field({
   );
 }
 
-function countByDepartment(
-  employees: EmployeeListItem[],
-  departments: Department[],
-): Map<number, number> {
-  const counts = new Map<number, number>();
-  const activeIds = new Set(departments.map((department) => department.id));
-  const departmentIdByName = new Map(
-    departments.map((department) => [normalizeDepartmentName(department.name), department.id]),
-  );
-
-  for (const employee of employees) {
-    let departmentId = employee.departmentId;
-    if (departmentId == null || !activeIds.has(departmentId)) {
-      departmentId =
-        departmentIdByName.get(normalizeDepartmentName(employee.departmentName ?? "")) ?? null;
-    }
-    if (departmentId == null) continue;
-    counts.set(departmentId, (counts.get(departmentId) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function normalizeDepartmentName(name: string): string {
-  return name.trim().toLowerCase();
-}
 
 function departmentCode(department: Department): string {
   const prefix =

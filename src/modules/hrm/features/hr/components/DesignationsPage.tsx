@@ -43,7 +43,7 @@ import {
 import { useDepartments } from "../hooks";
 import { hrService } from "../services";
 
-import type { Department, Designation, DesignationInput, EmployeeListItem } from "../types";
+import type { Department, Designation, DesignationInput } from "../types";
 
 type DialogState = "none" | "create" | "update" | "delete";
 type DesignationLevel = "Entry" | "Mid" | "Senior";
@@ -69,10 +69,6 @@ export function DesignationsPage() {
   const error = useAppSelector(selectDesignationsError);
 
   const departments = useDepartments();
-  const employees = useQuery({
-    queryKey: ["hr", "employees", "designation-metrics"],
-    queryFn: () => hrService.listEmployees({ page: 0, size: 100, sort: "employeeCode,asc" }),
-  });
 
   useEffect(() => {
     void dispatch(fetchDesignations(undefined));
@@ -80,7 +76,6 @@ export function DesignationsPage() {
 
   const items = designations ?? [];
   const departmentItems = departments.data ?? [];
-  const employeeItems = employees.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState>("none");
   const [query, setQuery] = useState("");
@@ -91,7 +86,10 @@ export function DesignationsPage() {
     [items, selectedId],
   );
 
-  const peopleCounts = useMemo(() => countByDesignation(employeeItems), [employeeItems]);
+  const peopleCounts = useMemo(
+    () => new Map(items.map((d) => [d.id, d.employeeCount ?? 0])),
+    [items],
+  );
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
@@ -102,7 +100,10 @@ export function DesignationsPage() {
     );
   }, [items, query]);
 
-  const peopleAssigned = employeeItems.filter((employee) => employee.designationId != null).length;
+  const peopleAssigned = useMemo(
+    () => items.reduce((sum, d) => sum + (d.employeeCount ?? 0), 0),
+    [items],
+  );
   const departmentsCovered = new Set(
     items.map((designation) => designation.departmentId).filter(isNumber),
   ).size;
@@ -116,10 +117,7 @@ export function DesignationsPage() {
   async function refreshDesignations() {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        dispatch(fetchDesignations({ force: true })).unwrap(),
-        employees.refetch(),
-      ]);
+      await dispatch(fetchDesignations({ force: true })).unwrap();
       toast.success("Designations refreshed", "The latest designations were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh designations", getApiErrorMessage(err));
@@ -706,15 +704,6 @@ function Field({
       {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
     </div>
   );
-}
-
-function countByDesignation(employees: EmployeeListItem[]): Map<number, number> {
-  const counts = new Map<number, number>();
-  for (const employee of employees) {
-    if (employee.designationId == null) continue;
-    counts.set(employee.designationId, (counts.get(employee.designationId) ?? 0) + 1);
-  }
-  return counts;
 }
 
 function inferLevel(title: string): DesignationLevel {
