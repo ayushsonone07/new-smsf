@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { StaggerContainer, StaggerItem } from "@shared/components/ui";
 
 import { cn } from "@hrm/lib/utils";
+import { BirthdayCelebrationModal } from "../../birthdays";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -27,6 +28,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className={cn("space-y-4", className)}
     >
+      <BirthdayCelebrationModal />
       {children}
     </motion.div>
   );

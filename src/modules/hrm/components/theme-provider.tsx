@@ -44,6 +44,8 @@ export function ThemeProvider({
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(resolved);
+    document.body.classList.remove("light", "dark");
+    document.body.classList.add(resolved);
   }, []);
 
   const getResolvedTheme = useCallback((): "light" | "dark" => {

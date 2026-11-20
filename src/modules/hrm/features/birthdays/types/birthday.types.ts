@@ -13,3 +13,11 @@ export interface BirthdayRequest {
   employeeCode: string;
   dateOfBirth: string;
 }
+
+export interface MyBirthdayStatus {
+  isBirthdayToday: boolean;
+  employeeName: string | null;
+  employeeCode: string | null;
+  age: number | null;
+  birthDate: string | null;
+}

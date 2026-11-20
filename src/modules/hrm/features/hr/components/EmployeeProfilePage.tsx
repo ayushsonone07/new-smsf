@@ -60,10 +60,12 @@ const EMPLOYMENT_TYPES: { value: EmploymentType; label: string }[] = [
 ];
 
 const EMPLOYEE_STATUSES: { value: EmployeeStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "on_leave", label: "On leave" },
-  { value: "notice", label: "Notice" },
-  { value: "terminated", label: "Terminated" },
+  { value: "active", label: "Live" },
+  { value: "notice", label: "On notice" },
+  { value: "resignation", label: "Resignation" },
+  { value: "exit", label: "Exit" },
+  { value: "abscond", label: "Abscond" },
+  { value: "terminated", label: "Terminate" },
 ];
 
 const USER_ROLES: { value: UserRole; label: string }[] = [
@@ -479,18 +481,30 @@ function StatusPanel({ employee }: { employee: EmployeeListItem }) {
     exitDate: employee.exitDate,
   });
 
+  const isTerminal =
+    employee.status === "terminated" || employee.status === "exit" || employee.status === "abscond";
+  const isSelectedTerminal =
+    values.status === "terminated" || values.status === "exit" || values.status === "abscond";
+
+  const statusOptions = useMemo(() => {
+    if (values.status === "on_leave") {
+      return [...EMPLOYEE_STATUSES, { value: "on_leave" as EmployeeStatus, label: "On leave (Legacy)" }];
+    }
+    return EMPLOYEE_STATUSES;
+  }, [values.status]);
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (employee.status === "terminated") {
-      toast.error("Terminated employee status cannot be changed");
+    if (isTerminal) {
+      toast.error("Employee in terminal status (Exit / Abscond / Terminate) cannot be changed");
       return;
     }
-    if (values.status === "terminated" && !values.exitDate) {
-      toast.error("Exit date is mandatory when terminating an employee");
+    if (isSelectedTerminal && !values.exitDate) {
+      toast.error("Exit date is mandatory for Exit, Abscond, or Terminate status");
       return;
     }
-    if ((values.status === "active" || values.status === "on_leave") && values.exitDate) {
-      toast.error("Exit date cannot be set for active or on-leave employees");
+    if (values.status === "active" && values.exitDate) {
+      toast.error("Exit date cannot be set for live employees");
       return;
     }
     void dispatch(
@@ -512,28 +526,29 @@ function StatusPanel({ employee }: { employee: EmployeeListItem }) {
       <form className="space-y-4 px-5 py-5" onSubmit={handleSubmit}>
         <Select
           label="Employee status"
-          disabled={employee.status === "terminated"}
+          disabled={isTerminal}
           value={values.status}
           onChange={(value) => {
             const newStatus = value as EmployeeStatus;
             setValues((current) => ({
               ...current,
               status: newStatus,
-              exitDate: newStatus === "active" || newStatus === "on_leave" ? null : current.exitDate,
+              exitDate: newStatus === "active" ? null : current.exitDate,
             }));
           }}
-          options={EMPLOYEE_STATUSES}
+          options={statusOptions}
         />
         <Field
           label="Exit date"
           type="date"
-          required={values.status === "terminated"}
+          required={isSelectedTerminal}
+          disabled={isTerminal}
           value={values.exitDate ?? ""}
           onChange={(value) => setValues((current) => ({ ...current, exitDate: value || null }))}
         />
         <button
           type="submit"
-          disabled={isMutating}
+          disabled={isMutating || isTerminal}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isMutating ? (
@@ -554,12 +569,14 @@ function Field({
   onChange,
   type = "text",
   required,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -569,6 +586,7 @@ function Field({
           value={value}
           onChange={onChange}
           required={required}
+          disabled={disabled}
           ariaLabel={`Choose ${label.toLowerCase()}`}
           className="mt-1"
           buttonClassName="rounded-lg border-slate-300 px-3 text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -578,8 +596,9 @@ function Field({
           type={type}
           value={value}
           required={required}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
-          className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm normal-case tracking-normal text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm normal-case tracking-normal text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
         />
       )}
     </label>
@@ -685,15 +704,28 @@ function Detail({
   );
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Live",
+  notice: "On notice",
+  resignation: "Resignation",
+  exit: "Exit",
+  abscond: "Abscond",
+  terminated: "Terminate",
+  on_leave: "On leave",
+};
+
 function EmployeeStatusPill({ status }: { status: EmployeeStatus }) {
   const toneMap: Record<EmployeeStatus, "emerald" | "sky" | "amber" | "rose"> = {
     active: "emerald",
-    on_leave: "sky",
     notice: "amber",
+    resignation: "sky",
+    exit: "rose",
+    abscond: "rose",
     terminated: "rose",
+    on_leave: "sky",
   };
 
-  return <StatusBadge label={formatValue(status)} tone={toneMap[status]} />;
+  return <StatusBadge label={STATUS_LABELS[status] ?? formatValue(status)} tone={toneMap[status] ?? "sky"} />;
 }
 
 function LoadingState() {
