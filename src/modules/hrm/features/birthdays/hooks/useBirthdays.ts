@@ -15,6 +15,14 @@ export function useBirthdaysToday() {
   });
 }
 
+export function useMyBirthdayStatus() {
+  return useQuery({
+    queryKey: ["birthdays", "my-status"] as const,
+    queryFn: () => birthdayService.getMyBirthdayStatus(),
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+}
+
 export function useUpcomingBirthdays(days: number = 30) {
   return useQuery({
     queryKey: birthdayKeys.upcoming(days),

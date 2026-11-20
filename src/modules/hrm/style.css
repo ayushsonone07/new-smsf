@@ -229,7 +229,23 @@ body.hrm-active {
   }
 
   .hrm-scope.dark,
-  body.hrm-active.dark {
+  body.hrm-active.dark,
+  .dark .hrm-scope,
+  html.dark body.hrm-active {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 32% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 30% 13%;
+    --popover-foreground: 210 40% 96%;
+    --muted: 222 28% 16%;
+    --muted-foreground: 215 16% 68%;
+    --border: 222 20% 22%;
+    --surface: 222 47% 7%;
+    --surface-elevated: 222 32% 12%;
+    --surface-muted: 222 28% 14%;
+    --surface-hover: 222 28% 18%;
+    --surface-active: 24 40% 20%;
     --hrm-background: 222 47% 7%;
     --hrm-foreground: 210 40% 96%;
     --hrm-card: 222 32% 12%;
@@ -497,18 +513,21 @@ body.hrm-active {
     min-height: 100vh;
   }
 
-  /* ── Scrollbar ──────────────────────────────── */
+  /* ── Ultra clean scrollbars ────────────────── */
   .hrm-scope * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--hrm-border-strong)) transparent;
+    scrollbar-color: hsl(var(--hrm-border)) transparent;
   }
   .hrm-scope *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 4px;
+    height: 4px;
   }
   .hrm-scope *::-webkit-scrollbar-thumb {
-    background: hsl(var(--hrm-border-strong));
+    background: hsl(var(--hrm-border));
     border-radius: 999px;
+  }
+  .hrm-scope *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--hrm-border-strong));
   }
   .hrm-scope *::-webkit-scrollbar-track {
     background: transparent;
@@ -1178,3 +1197,109 @@ body.hrm-active a {
 .hrm-scope .text-green-ink, body.hrm-active .text-green-ink { color: hsl(var(--green-ink)) !important; }
 .hrm-scope .bg-amber-soft, body.hrm-active .bg-amber-soft { background-color: hsl(var(--amber-soft)) !important; }
 .hrm-scope .text-amber-ink, body.hrm-active .text-amber-ink { color: hsl(var(--amber-ink)) !important; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ENTERPRISE GRADE DATA TABLE & COMPONENT SYSTEM (100k+ Scale)
+   Workday / Rippling inspired micro-interactions & layout polish
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Professional Table Polish */
+.hrm-scope table {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.hrm-scope table thead th {
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  background-color: hsl(var(--surface-muted)) !important;
+  backdrop-filter: blur(8px) !important;
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+.hrm-scope table tbody tr {
+  transition: all 140ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.hrm-scope table tbody tr:hover {
+  background-color: hsl(var(--surface-hover) / 0.8) !important;
+}
+
+
+
+/* Enterprise Card Elevation & Sharp Edges */
+.hrm-scope .mbg-card {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.02) !important;
+}
+
+.hrm-scope .mbg-card:hover {
+  border-color: hsl(var(--border-strong)) !important;
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.06), 0 2px 6px -2px rgb(0 0 0 / 0.04) !important;
+}
+
+/* Enterprise Input Fields */
+.hrm-scope input[type="text"],
+.hrm-scope input[type="search"],
+.hrm-scope input[type="email"],
+.hrm-scope input[type="tel"],
+.hrm-scope input[type="password"],
+.hrm-scope input[type="date"],
+.hrm-scope select {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.625rem !important;
+  font-size: 0.8125rem !important;
+  transition: all 150ms ease !important;
+}
+
+.hrm-scope input:focus,
+.hrm-scope select:focus {
+  border-color: hsl(var(--primary)) !important;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15) !important;
+  outline: none !important;
+}
+
+/* Status Badges */
+.hrm-scope .status-badge,
+.hrm-scope [class*="StatusBadge"] {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* Enterprise Buttons */
+.hrm-scope button {
+  letter-spacing: -0.01em;
+}
+
+/* Dark Mode Deep Layering for Enterprise */
+.hrm-scope.dark .mbg-card,
+html.dark .hrm-scope .mbg-card {
+  background-color: hsl(222 36% 10% / 0.85) !important;
+  border-color: hsl(222 20% 18%) !important;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35) !important;
+}
+
+.hrm-scope.dark table thead th,
+html.dark .hrm-scope table thead th {
+  background-color: hsl(222 36% 8%) !important;
+  border-bottom-color: hsl(222 20% 18%) !important;
+}
+
+.hrm-scope.dark table tbody td,
+html.dark .hrm-scope table tbody td {
+  background-color: transparent !important;
+  border-bottom-color: hsl(222 20% 16%) !important;
+}
+
+.hrm-scope.dark table tbody tr:hover,
+html.dark .hrm-scope table tbody tr:hover {
+  background-color: hsl(222 28% 14% / 0.7) !important;
+}

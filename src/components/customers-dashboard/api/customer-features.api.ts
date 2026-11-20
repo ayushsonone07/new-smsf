@@ -1187,4 +1187,68 @@ export async function fetchActivePriorities(): Promise<ActivePriorityItem[]> {
   ]
 }
 
+export interface ActiveStatusItem {
+  id: number
+  name: string
+  code: string
+  isDefault?: boolean
+  sortOrder?: number
+}
+
+export async function fetchActiveStatuses(): Promise<ActiveStatusItem[]> {
+  try {
+    const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/config/statuses/active`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      if (list.length > 0) {
+        return list
+          .filter((s: any) => s && s.isActive !== false)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            code: (s.code || s.name).toUpperCase(),
+            isDefault: Boolean(s.isDefault),
+            sortOrder: s.sortOrder ?? 0,
+          }))
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active statuses directly:', err)
+  }
+
+  try {
+    const res = await fetch(`/api/help-center/config/statuses/active`, {
+      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      if (list.length > 0) {
+        return list
+          .filter((s: any) => s && s.isActive !== false)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            code: (s.code || s.name).toUpperCase(),
+            isDefault: Boolean(s.isDefault),
+            sortOrder: s.sortOrder ?? 0,
+          }))
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active statuses via proxy:', err)
+  }
+
+  return [
+    { id: 1, name: 'Open', code: 'OPEN', isDefault: true },
+    { id: 2, name: 'In Progress', code: 'IN_PROGRESS', isDefault: false },
+    { id: 3, name: 'Waiting On Customer', code: 'WAITING_ON_CUSTOMER', isDefault: false },
+    { id: 4, name: 'Resolved', code: 'RESOLVED', isDefault: false },
+    { id: 5, name: 'Closed', code: 'CLOSED', isDefault: false },
+  ]
+}
+
 

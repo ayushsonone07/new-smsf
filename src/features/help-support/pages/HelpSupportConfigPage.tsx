@@ -100,9 +100,9 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   const [editingPriority, setEditingPriority] = useState<HelpCenterConfigItem | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<HelpCenterConfigItem | null>(null)
   const [editingStatus, setEditingStatus] = useState<HelpCenterConfigItem | null>(null)
-  const [statusEditForm, setStatusEditForm] = useState({ name: '', sortOrder: '' })
+  const [statusEditForm, setStatusEditForm] = useState({ name: '', sortOrder: '', isDefault: false })
   const [deleteStatusCandidate, setDeleteStatusCandidate] = useState<HelpCenterConfigItem | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', followupHours: '', resolveHours: '' })
+  const [editForm, setEditForm] = useState({ name: '', followupHours: '', resolveHours: '', isDefault: false })
   const statusFilterRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const isStatus = type === 'status'
@@ -150,8 +150,8 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
           resolveHours: Number(form.resolveHours),
           color: '#2563EB',
           sortOrder: Math.max(0, ...(query.data ?? []).map((item) => item.sortOrder)) + 1,
-          isActive: true,
-          isDefault: false,
+          isActive: form.isActive,
+          isDefault: form.isDefault,
         }),
     onSuccess: async (createdItem) => {
       if (createdItem) {
@@ -172,7 +172,15 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
     onSuccess: async (updatedItem) => {
       if (updatedItem) {
         queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'priority'], (old) =>
-          old?.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item)) ?? [updatedItem]
+          old?.map((item) => {
+            if (item.id === updatedItem.id) {
+              return { ...item, ...updatedItem }
+            }
+            if (updatedItem.isDefault) {
+              return { ...item, isDefault: false }
+            }
+            return item
+          }) ?? [updatedItem]
         )
       }
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'priority'] })
@@ -196,7 +204,15 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
     onSuccess: async (updatedItem) => {
       if (updatedItem) {
         queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', 'status'], (old) =>
-          old?.map((item) => (item.id === updatedItem.id ? { ...item, ...updatedItem } : item)) ?? [updatedItem]
+          old?.map((item) => {
+            if (item.id === updatedItem.id) {
+              return { ...item, ...updatedItem }
+            }
+            if (updatedItem.isDefault) {
+              return { ...item, isDefault: false }
+            }
+            return item
+          }) ?? [updatedItem]
         )
       }
       await queryClient.invalidateQueries({ queryKey: ['help-center-config', 'status'] })
@@ -261,6 +277,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
       name: item.name,
       followupHours: String(item.followupHours ?? ''),
       resolveHours: String(item.resolveHours ?? ''),
+      isDefault: Boolean(item.isDefault),
     })
   }
 
@@ -276,7 +293,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
         color: editingPriority.color || '#2563EB',
         sortOrder: editingPriority.sortOrder,
         isActive: editingPriority.isActive,
-        isDefault: editingPriority.isDefault,
+        isDefault: editForm.isDefault,
       },
     })
   }
@@ -284,7 +301,11 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   function openEditStatus(item: HelpCenterConfigItem) {
     updateStatusMutation.reset()
     setEditingStatus(item)
-    setStatusEditForm({ name: item.name, sortOrder: String(item.sortOrder) })
+    setStatusEditForm({
+      name: item.name,
+      sortOrder: String(item.sortOrder),
+      isDefault: Boolean(item.isDefault),
+    })
   }
 
   function submitStatusUpdate(event: FormEvent<HTMLFormElement>) {
@@ -296,7 +317,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
         name: statusEditForm.name.trim(),
         sortOrder: Number(statusEditForm.sortOrder),
         isActive: editingStatus.isActive,
-        isDefault: editingStatus.isDefault,
+        isDefault: statusEditForm.isDefault,
       },
     })
   }
@@ -433,6 +454,11 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                       <div className="flex items-center gap-2.5">
                         <span className="h-3 w-3 rounded-full border border-black/5" style={{ backgroundColor: item.color || '#94A3B8' }} />
                         <span className="font-bold text-slate-900">{item.name}</span>
+                        {item.isDefault && (
+                          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                            Default
+                          </span>
+                        )}
                       </div>
                     </td>
                     {!isStatus && (
@@ -455,7 +481,13 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
                           active={Boolean(item.isActive)}
                           disabled={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === item.id}
                           isPending={toggleActiveMutation.isPending && toggleActiveMutation.variables?.id === item.id}
-                          onChange={(nextActive) => toggleActiveMutation.mutate({ id: item.id, active: nextActive })}
+                          onChange={(nextActive) => {
+                            if (!nextActive && item.isDefault) {
+                              alert(`Cannot deactivate default ${label.toLowerCase()} (“${item.name}”). Please designate another ${label.toLowerCase()} as default first by clicking 'Update' and marking it as Default.`)
+                              return
+                            }
+                            toggleActiveMutation.mutate({ id: item.id, active: nextActive })
+                          }}
                         />
                         <span className={`text-[11px] font-bold ${item.isActive ? 'text-emerald-700' : 'text-slate-500'}`}>
                           {item.isActive ? 'Active' : 'Inactive'}
@@ -528,7 +560,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
             </div>
           )}
 
-          {isStatus && <div className="flex flex-wrap gap-5 rounded-xl bg-slate-50 p-3">
+          <div className="flex flex-wrap gap-5 rounded-xl bg-slate-50 p-3">
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
               <input type="checkbox" checked={statusForm.isActive} onChange={(event) => setStatusForm((form) => ({ ...form, isActive: event.target.checked }))} className="peer sr-only" />
               <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-200 after:h-1.5 after:w-1.5 after:rounded-full after:bg-white after:content-['']" />
@@ -539,7 +571,7 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
               <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-200 after:h-1.5 after:w-1.5 after:rounded-full after:bg-white after:content-['']" />
               Default {label.toLowerCase()}
             </label>
-          </div>}
+          </div>
 
           {createStatusMutation.isError && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
@@ -577,6 +609,17 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
             <label>
               <span className="mb-1.5 block text-xs font-bold text-slate-700">Resolve time (hours)</span>
               <input required type="number" min="1" step="1" value={editForm.resolveHours} onChange={(event) => setEditForm((form) => ({ ...form, resolveHours: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={editForm.isDefault}
+                onChange={(event) => setEditForm((form) => ({ ...form, isDefault: event.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Default priority (tickets will default to this priority)
             </label>
           </div>
           {updatePriorityMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{updatePriorityMutation.error instanceof Error ? updatePriorityMutation.error.message : 'Could not update priority.'}</p>}
@@ -625,6 +668,17 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
         <form onSubmit={submitStatusUpdate} className="space-y-4">
           <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Status name</span><input required autoFocus maxLength={80} value={statusEditForm.name} onChange={(event) => setStatusEditForm((form) => ({ ...form, name: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
           <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-700">Display order</span><input required type="number" min="1" step="1" value={statusEditForm.sortOrder} onChange={(event) => setStatusEditForm((form) => ({ ...form, sortOrder: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+          <div className="rounded-xl bg-slate-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={statusEditForm.isDefault}
+                onChange={(event) => setStatusEditForm((form) => ({ ...form, isDefault: event.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Default status (new tickets will default to this status)
+            </label>
+          </div>
           {updateStatusMutation.isError && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{updateStatusMutation.error instanceof Error ? updateStatusMutation.error.message : 'Could not update status.'}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" disabled={updateStatusMutation.isPending} onClick={() => setEditingStatus(null)} className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button><button type="submit" disabled={updateStatusMutation.isPending} className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60">{updateStatusMutation.isPending ? 'Updating...' : 'Update Status'}</button></div>
         </form>

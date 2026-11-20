@@ -19,7 +19,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
@@ -41,7 +40,6 @@ import type {
   Department,
   DepartmentInput,
   DepartmentManager,
-  EmployeeListItem,
 } from "../types";
 
 type DialogState = "none" | "create" | "update" | "delete";
@@ -80,17 +78,11 @@ export function DepartmentsPage() {
   const isLoading = useAppSelector(selectDepartmentsLoading);
   const error = useAppSelector(selectDepartmentsError);
 
-  const employees = useQuery({
-    queryKey: ["hr", "employees", "department-metrics"],
-    queryFn: () => hrService.listEmployees({ page: 0, size: 100, sort: "employeeCode,asc" }),
-  });
-
   useEffect(() => {
     void dispatch(fetchDepartments(undefined));
   }, [dispatch]);
 
   const items = departments ?? [];
-  const employeeItems = employees.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState>("none");
   const [query, setQuery] = useState("");
@@ -107,10 +99,6 @@ export function DepartmentsPage() {
     [items, selectedId],
   );
 
-  const memberCounts = useMemo(
-    () => countByDepartment(employeeItems, items),
-    [employeeItems, items],
-  );
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
@@ -121,7 +109,10 @@ export function DepartmentsPage() {
     );
   }, [items, query]);
 
-  const totalMembers = employeeItems.filter((employee) => employee.departmentId != null).length;
+  const totalMembers = useMemo(
+    () => items.reduce((sum, d) => sum + (d.employeeCount ?? 0), 0),
+    [items],
+  );
   const avgTeamSize = items.length ? Math.round(totalMembers / items.length) : 0;
 
   useEffect(() => {
@@ -133,8 +124,7 @@ export function DepartmentsPage() {
   async function refreshDepartments() {
     setIsRefreshing(true);
     try {
-      // Member counts / team sizes come from the employees query, so reload it with the list.
-      await Promise.all([dispatch(fetchDepartments({ force: true })).unwrap(), employees.refetch()]);
+      await dispatch(fetchDepartments({ force: true })).unwrap();
       toast.success("Departments refreshed", "The latest departments were loaded.");
     } catch (err) {
       toast.error("Couldn't refresh departments", getApiErrorMessage(err));
@@ -154,59 +144,49 @@ export function DepartmentsPage() {
   }
 
   return (
-    <div className="w-full lg:pl-4">
-      <PageHeader
-        eyebrow="Organization"
-        title="Departments"
-        description="Manage your organization's department structure."
-        className="mb-8"
-        actions={
-  <div className="flex w-full items-center justify-between gap-3">
-    <SearchBox
-      value={query}
-      placeholder="Search departments..."
-      onChange={setQuery}
-    />
-
-    <div className="flex shrink-0 items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setDialog("create")}
-        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-orange px-5 text-sm font-semibold text-white shadow transition hover:bg-orange-ink"
-      >
-        <Plus size={16} />
-        <span className="hidden sm:inline">Add Department</span>
-        <span className="sm:hidden">Add</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => void refreshDepartments()}
-        disabled={isRefreshing}
-        aria-label="Refresh departments"
-        title="Refresh departments"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-white text-ink-soft shadow transition hover:bg-orange-soft hover:text-orange-ink disabled:opacity-70"
-      >
-        <RefreshCw
-          size={18}
-          className={isRefreshing ? "animate-spin" : undefined}
+    <div className="w-full space-y-4">
+      {/* Top Filter & Action Bar */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <SearchBox
+          value={query}
+          placeholder="Search departments..."
+          onChange={setQuery}
         />
-      </button>
-    </div>
-  </div>
-}
-      />
 
-      <div className="mb-6 mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-medium text-ink-faint">
+        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setDialog("create")}
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover cursor-pointer"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add Department</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void refreshDepartments()}
+            disabled={isRefreshing}
+            aria-label="Refresh departments"
+            title="Refresh departments"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-70 cursor-pointer"
+          >
+            <RefreshCw
+              size={16}
+              className={isRefreshing ? "animate-spin" : undefined}
+            />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 px-1 text-xs font-medium text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <p>
           {items.length} departments · {totalMembers} members · avg team size {avgTeamSize}
         </p>
-        
-          
-          <p className="hidden shrink-0 text-xs font-medium text-ink-faint sm:block">
-            Showing {filteredItems.length} of {items.length}
-          </p>
-        
+        <p className="hidden shrink-0 sm:block">
+          Showing {filteredItems.length} of {items.length}
+        </p>
       </div>
 
       {error ? (
@@ -246,7 +226,7 @@ export function DepartmentsPage() {
               <DepartmentCard
                 department={department}
                 tone={deptToneFor(department.name) ?? DEPT_TONES[index % DEPT_TONES.length] ?? DEPT_TONES[0]}
-                members={memberCounts.get(department.id) ?? 0}
+                members={department.employeeCount ?? 0}
                 onEdit={() => openUpdate(department)}
                 onDelete={() => openDelete(department)}
               />
@@ -374,16 +354,16 @@ function SearchBox({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="relative block w-full sm:max-w-xl">
+    <label className="relative block w-full sm:max-w-md">
       <Search
         size={16}
-        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
+        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
       />
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-11 w-full rounded-[10px] border border-line bg-white pl-10 pr-4 text-sm text-ink shadow outline-none transition-colors placeholder:text-ink-faint focus:border-orange focus:ring-2 focus:ring-orange/20"
+        className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-xs text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20"
       />
     </label>
   );
@@ -739,31 +719,6 @@ function Field({
   );
 }
 
-function countByDepartment(
-  employees: EmployeeListItem[],
-  departments: Department[],
-): Map<number, number> {
-  const counts = new Map<number, number>();
-  const activeIds = new Set(departments.map((department) => department.id));
-  const departmentIdByName = new Map(
-    departments.map((department) => [normalizeDepartmentName(department.name), department.id]),
-  );
-
-  for (const employee of employees) {
-    let departmentId = employee.departmentId;
-    if (departmentId == null || !activeIds.has(departmentId)) {
-      departmentId =
-        departmentIdByName.get(normalizeDepartmentName(employee.departmentName ?? "")) ?? null;
-    }
-    if (departmentId == null) continue;
-    counts.set(departmentId, (counts.get(departmentId) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function normalizeDepartmentName(name: string): string {
-  return name.trim().toLowerCase();
-}
 
 function departmentCode(department: Department): string {
   const prefix =

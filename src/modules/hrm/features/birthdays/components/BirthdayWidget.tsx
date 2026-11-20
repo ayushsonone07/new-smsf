@@ -1,16 +1,25 @@
-import { Cake, Gift, Sparkles } from "lucide-react";
+import { Cake, Gift, Sparkles, PartyPopper } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "../../auth";
 import { useBirthdaysToday, useUpcomingBirthdays } from "../hooks/useBirthdays";
 import { Card } from "@shared/components/ui";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 
 export function BirthdayWidget() {
+  const { user } = useAuth();
   const todayQuery = useBirthdaysToday();
   const upcomingQuery = useUpcomingBirthdays(7);
   const { data: todayBirthdays = [], isLoading: loadingToday } = todayQuery;
   const { data: upcomingBirthdays = [], isLoading: loadingUpcoming } = upcomingQuery;
   const refreshing =
     (todayQuery.isFetching || upcomingQuery.isFetching) && !loadingToday && !loadingUpcoming;
+
+  const isMyBirthday = todayBirthdays.some((b) => {
+    if (!user?.name) return false;
+    const cleanUserName = user.name.trim().toLowerCase();
+    const cleanBdayName = b.employeeName.trim().toLowerCase();
+    return cleanBdayName === cleanUserName || cleanBdayName.includes(cleanUserName);
+  });
 
   if (loadingToday && loadingUpcoming) {
     return (
@@ -69,7 +78,16 @@ export function BirthdayWidget() {
                   {todayBirthdays.length === 1 ? "is" : "are"} celebrating their birthday today! Send your warm wishes and make their day special! 🥳🎈
                 </p>
 
-
+                {isMyBirthday && (
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent("open-birthday-celebration"))}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition hover:brightness-110 active:scale-95"
+                  >
+                    <PartyPopper size={14} />
+                    <span>Celebrate My Birthday! 🎊</span>
+                  </button>
+                )}
               </div>
           </div>
         </div>

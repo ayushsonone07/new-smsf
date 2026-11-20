@@ -165,6 +165,64 @@
   --app-font-weight-heading: 700;
 }
 
+.dark,
+:root.dark,
+html.dark {
+  /* HRM Dark Theme Tokens */
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  --card: 222 32% 12%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 30% 13%;
+  --popover-foreground: 210 40% 96%;
+
+  --primary: 24 95% 55%;
+  --primary-hover: 23 92% 48%;
+  --primary-foreground: 0 0% 100%;
+  --primary-soft: 24 40% 16%;
+
+  --secondary: 222 30% 16%;
+  --secondary-foreground: 210 40% 88%;
+  --muted: 222 28% 16%;
+  --muted-foreground: 215 16% 68%;
+  --accent: 222 30% 16%;
+  --accent-foreground: 210 40% 88%;
+  --destructive: 0 84% 62%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 222 20% 22%;
+  --border-strong: 222 18% 32%;
+  --input: 222 22% 24%;
+  --ring: 24 95% 55%;
+
+  --sidebar: 222 36% 8%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-muted: 215 16% 68%;
+  --sidebar-hover: 222 28% 14%;
+  --sidebar-active: 24 95% 55%;
+  --sidebar-border: 222 20% 18%;
+
+  --surface: 222 47% 7%;
+  --surface-elevated: 222 32% 12%;
+  --surface-muted: 222 28% 14%;
+  --surface-hover: 222 28% 18%;
+  --surface-active: 24 40% 20%;
+
+  --danger: 0 84% 62%;
+  --danger-soft: 0 45% 16%;
+  --success: 142 71% 50%;
+  --success-soft: 142 45% 16%;
+  --warning: 38 96% 55%;
+  --warning-soft: 38 45% 16%;
+  --info: 199 89% 52%;
+  --info-soft: 199 45% 16%;
+
+  --ink: 210 40% 96%;
+  --ink-soft: 215 16% 68%;
+  --ink-faint: 222 18% 45%;
+  --line: 222 20% 22%;
+}
+
 html {
   font-size: 12px;
   -webkit-text-size-adjust: 100%;
@@ -183,8 +241,8 @@ body {
   font-weight: var(--app-font-weight-body);
   line-height: 1.45;
   letter-spacing: 0.005em;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -3191,4 +3249,1154 @@ input[type="search"]:focus,
 input[type="search"]:focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Dark Mode Overrides
+   Remaps ALL hardcoded light colors to dark theme tokens.
+   ═══════════════════════════════════════════════════════════════ */
+
+.dark .route-skeleton,
+html.dark .route-skeleton {
+  background: hsl(var(--background));
+}
+.dark .route-skeleton__sidebar,
+html.dark .route-skeleton__sidebar {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+.dark .skeleton-shimmer,
+html.dark .skeleton-shimmer {
+  background: hsl(222 28% 16%);
+}
+.dark .skeleton-shimmer::after,
+html.dark .skeleton-shimmer::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 8%), transparent);
+}
+.dark .route-skeleton__row,
+html.dark .route-skeleton__row {
+  border-bottom-color: hsl(var(--border));
+}
+.dark .route-skeleton__row span,
+html.dark .route-skeleton__row span {
+  background: rgb(255 255 255 / 8%);
+}
+
+/* ── Top bar / Shell ───────────────────────────── */
+.dark .shell-topbar,
+html.dark .shell-topbar {
+  border-bottom-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+
+.dark .menu-button,
+html.dark .menu-button {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+}
+.dark .menu-button:hover,
+html.dark .menu-button:hover {
+  background: hsl(var(--surface-muted));
+}
+
+.dark .shell-brand,
+html.dark .shell-brand {
+  color: hsl(var(--foreground));
+}
+.dark .shell-brand span,
+html.dark .shell-brand span {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Sidebar ───────────────────────────────────── */
+.dark .sidebar,
+html.dark .sidebar {
+  background: hsl(222 36% 8%);
+  color: hsl(210 40% 80%);
+}
+.dark .brand strong,
+html.dark .brand strong {
+  color: #fff;
+}
+.dark .brand span,
+html.dark .brand span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .nav-label,
+html.dark .nav-label {
+  color: hsl(var(--muted-foreground));
+}
+.dark .nav-item,
+html.dark .nav-item {
+  color: hsl(210 40% 80%);
+}
+.dark .nav-item:hover,
+html.dark .nav-item:hover {
+  background: hsl(222 28% 14%);
+  color: #fff;
+}
+.dark .nav-item.active,
+html.dark .nav-item.active {
+  background: hsl(var(--primary));
+  color: #fff;
+}
+.dark .sidebar-footer,
+html.dark .sidebar-footer {
+  border-top-color: hsl(222 20% 18%);
+}
+.dark .admin-avatar,
+html.dark .admin-avatar {
+  background: hsl(222 28% 20%);
+}
+.dark .admin-avatar.small,
+html.dark .admin-avatar.small {
+  background: hsl(var(--primary));
+}
+.dark .admin-info strong,
+.dark .profile-chip strong,
+html.dark .admin-info strong,
+html.dark .profile-chip strong {
+  color: hsl(var(--foreground));
+}
+.dark .admin-info span,
+.dark .profile-chip span,
+html.dark .admin-info span,
+html.dark .profile-chip span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .sidebar-close,
+html.dark .sidebar-close {
+  border-color: hsl(222 20% 22%);
+  color: hsl(var(--muted-foreground));
+}
+.dark .sidebar-close:hover,
+html.dark .sidebar-close:hover {
+  background: hsl(222 28% 14%);
+  color: #fff;
+}
+
+/* ── Logout / icon / close buttons ─────────────── */
+.dark .logout-button,
+.dark .icon-button,
+.dark .close-button,
+html.dark .logout-button,
+html.dark .icon-button,
+html.dark .close-button {
+  border-color: hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+.dark .logout-button:hover,
+html.dark .logout-button:hover {
+  background: hsl(222 28% 14%);
+  color: #fff;
+}
+.dark .icon-button,
+html.dark .icon-button {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+}
+.dark .close-button:hover,
+html.dark .close-button:hover {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+
+/* ── Topbar / breadcrumb ───────────────────────── */
+.dark .breadcrumb,
+.dark .page-description,
+html.dark .breadcrumb,
+html.dark .page-description {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Profile chip ──────────────────────────────── */
+.dark .profile-chip,
+html.dark .profile-chip {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+.dark .profile-chip strong,
+html.dark .profile-chip strong {
+  color: hsl(var(--foreground));
+}
+
+/* ── Content card ──────────────────────────────── */
+.dark .content-card,
+html.dark .content-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+}
+
+/* ── Table toolbar ─────────────────────────────── */
+.dark .table-toolbar p,
+html.dark .table-toolbar p {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Buttons ───────────────────────────────────── */
+.dark .primary-button,
+html.dark .primary-button {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: #fff;
+}
+.dark .primary-button:hover,
+html.dark .primary-button:hover {
+  background: hsl(var(--primary-hover));
+}
+.dark .secondary-button,
+html.dark .secondary-button {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+.dark .secondary-button:hover,
+html.dark .secondary-button:hover {
+  background: hsl(var(--surface-muted));
+}
+.dark .danger-button,
+html.dark .danger-button {
+  border-color: hsl(var(--danger));
+  background: hsl(var(--danger));
+}
+.dark .danger-button:hover,
+html.dark .danger-button:hover {
+  background: hsl(0 72% 48%);
+}
+
+/* ── Search box ────────────────────────────────── */
+.dark .search-box,
+html.dark .search-box {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+}
+.dark .search-box span,
+html.dark .search-box span {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Stat cards ────────────────────────────────── */
+.dark .stat-card,
+html.dark .stat-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+.dark .stat-icon,
+html.dark .stat-icon {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .stat-icon.green,
+html.dark .stat-icon.green {
+  background: hsl(142 45% 16%);
+  color: hsl(142 71% 50%);
+}
+.dark .stat-icon.gray,
+html.dark .stat-icon.gray {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+.dark .stat-card span,
+html.dark .stat-card span {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Tables ────────────────────────────────────── */
+.dark .table-wrapper,
+html.dark .table-wrapper {
+  border-color: hsl(var(--border));
+}
+.dark .table-wrapper th,
+html.dark .table-wrapper th {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+  border-bottom-color: hsl(var(--border));
+}
+.dark .table-wrapper td,
+html.dark .table-wrapper td {
+  border-bottom-color: hsl(var(--border));
+}
+.dark .clickable-row:hover,
+html.dark .clickable-row:hover {
+  background: hsl(var(--surface-hover));
+}
+.dark .department-icon,
+html.dark .department-icon {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .department-cell span,
+.dark .feature-cell span,
+html.dark .department-cell span,
+html.dark .feature-cell span {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Route select ──────────────────────────────── */
+.dark .route-select-button,
+html.dark .route-select-button {
+  color: hsl(var(--foreground));
+}
+.dark .route-select-button:hover,
+.dark .route-select-button:focus-visible,
+.dark .route-select-button[aria-pressed='true'],
+html.dark .route-select-button:hover,
+html.dark .route-select-button:focus-visible,
+html.dark .route-select-button[aria-pressed='true'] {
+  color: hsl(var(--primary));
+}
+.dark tr.is-selected-row td,
+html.dark tr.is-selected-row td {
+  background: hsl(var(--surface-hover));
+}
+
+/* ── Username / badges ─────────────────────────── */
+.dark .username,
+html.dark .username {
+  background: hsl(var(--surface-muted));
+}
+.dark .badge--active,
+html.dark .badge--active {
+  background: hsl(142 45% 16%);
+  color: hsl(142 71% 50%);
+}
+.dark .badge--inactive,
+html.dark .badge--inactive {
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+
+/* ── Action buttons ────────────────────────────── */
+.dark .action-button,
+html.dark .action-button {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+}
+.dark .action-button:hover,
+html.dark .action-button:hover {
+  background: hsl(var(--surface-muted));
+}
+.dark .action-button.features:hover,
+html.dark .action-button.features:hover {
+  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .action-button.edit:hover,
+html.dark .action-button.edit:hover {
+  border-color: hsl(216 60% 35%);
+  background: hsl(216 45% 18%);
+  color: hsl(216 85% 65%);
+}
+.dark .action-button.delete:hover,
+html.dark .action-button.delete:hover {
+  border-color: hsl(0 50% 35%);
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+.dark .action-button.dashboard:hover,
+html.dark .action-button.dashboard:hover {
+  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+
+/* ── Empty / Loading / Error states ────────────── */
+.dark .empty-state,
+.dark .loading-state,
+.dark .error-state,
+html.dark .empty-state,
+html.dark .loading-state,
+html.dark .error-state {
+  color: hsl(var(--muted-foreground));
+}
+.dark .empty-state div,
+html.dark .empty-state div {
+  color: hsl(var(--muted-foreground));
+}
+.dark .empty-state strong,
+.dark .error-state strong,
+html.dark .empty-state strong,
+html.dark .error-state strong {
+  color: hsl(var(--foreground));
+}
+
+/* ── Form errors ───────────────────────────────── */
+.dark .form-error,
+html.dark .form-error {
+  border-color: hsl(0 50% 30%);
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 70%);
+}
+.dark .auth-error,
+html.dark .auth-error {
+  border-color: hsl(0 50% 30%);
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 70%);
+}
+
+/* ── Modals / dialogs ──────────────────────────── */
+.dark .modal-backdrop,
+html.dark .modal-backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.dark .modal,
+.dark .delete-modal,
+html.dark .modal,
+html.dark .delete-modal {
+  background: hsl(var(--card));
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+  scrollbar-color: hsl(var(--border)) hsl(var(--surface-muted));
+}
+.dark .modal::-webkit-scrollbar-track,
+.dark .delete-modal::-webkit-scrollbar-track,
+html.dark .modal::-webkit-scrollbar-track,
+html.dark .delete-modal::-webkit-scrollbar-track {
+  background: hsl(var(--surface-muted));
+}
+.dark .modal::-webkit-scrollbar-thumb,
+.dark .delete-modal::-webkit-scrollbar-thumb,
+html.dark .modal::-webkit-scrollbar-thumb,
+html.dark .delete-modal::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+}
+.dark .modal::-webkit-scrollbar-thumb:hover,
+.dark .delete-modal::-webkit-scrollbar-thumb:hover,
+html.dark .modal::-webkit-scrollbar-thumb:hover,
+html.dark .delete-modal::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+.dark .delete-modal p,
+.dark .modal-header p,
+html.dark .delete-modal p,
+html.dark .modal-header p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .modal label:not(.checkbox-field):not(.inline-label),
+html.dark .modal label:not(.checkbox-field):not(.inline-label) {
+  color: hsl(var(--muted-foreground));
+}
+.dark .modal input:not([type="checkbox"]):not([type="radio"]),
+html.dark .modal input:not([type="checkbox"]):not([type="radio"]) {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+.dark .modal input:not([type="checkbox"]):not([type="radio"]):focus,
+html.dark .modal input:not([type="checkbox"]):not([type="radio"]):focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+.dark .modal input[type="checkbox"],
+.dark .modal input[type="radio"],
+html.dark .modal input[type="checkbox"],
+html.dark .modal input[type="radio"] {
+  accent-color: hsl(var(--primary));
+}
+.dark .modal select,
+html.dark .modal select {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+
+/* ── Dynamic permission form actions ───────────── */
+.dark .dynamic-permission-form__actions,
+html.dark .dynamic-permission-form__actions {
+  border-top-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 -8px 18px rgb(0 0 0 / 25%);
+}
+
+/* ── Service modal ─────────────────────────────── */
+.dark .service-modal .close-button,
+html.dark .service-modal .close-button {
+  border-color: hsl(0 50% 30%);
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+.dark .service-modal .close-button:hover,
+html.dark .service-modal .close-button:hover {
+  border-color: hsl(0 60% 40%);
+  background: hsl(0 50% 20%);
+  color: hsl(0 84% 70%);
+}
+.dark .service-modal input[type="checkbox"],
+html.dark .service-modal input[type="checkbox"] {
+  border-color: hsl(var(--muted-foreground));
+  background: hsl(var(--surface-muted));
+}
+.dark .service-modal input[type="checkbox"]:checked,
+html.dark .service-modal input[type="checkbox"]:checked {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+}
+
+/* ── Warning icon ──────────────────────────────── */
+.dark .warning-icon,
+html.dark .warning-icon {
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+
+/* ── Toggle switch ─────────────────────────────── */
+.dark .toggle-switch,
+html.dark .toggle-switch {
+  background: hsl(222 20% 25%);
+}
+.dark .toggle-switch span,
+html.dark .toggle-switch span {
+  background: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 40%);
+}
+.dark .toggle-switch.on,
+html.dark .toggle-switch.on {
+  background: hsl(var(--primary));
+}
+
+/* ── Permission select ─────────────────────────── */
+.dark .permission-select,
+html.dark .permission-select {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+.dark .permission-select:disabled,
+html.dark .permission-select:disabled {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Dashboard sections ────────────────────────── */
+.dark .card-section-header p,
+html.dark .card-section-header p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .activity-item,
+html.dark .activity-item {
+  border-bottom-color: hsl(var(--border));
+}
+.dark .activity-dot,
+html.dark .activity-dot {
+  background: hsl(var(--primary));
+}
+.dark .activity-content strong,
+html.dark .activity-content strong {
+  color: hsl(var(--foreground));
+}
+.dark .activity-content p,
+html.dark .activity-content p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .activity-time,
+html.dark .activity-time {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Quick action cards ────────────────────────── */
+.dark .quick-action-card,
+html.dark .quick-action-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+}
+.dark .quick-action-card:hover,
+html.dark .quick-action-card:hover {
+  background: hsl(var(--surface-hover));
+  border-color: hsl(var(--primary) / 0.3);
+}
+.dark .quick-action-icon,
+html.dark .quick-action-icon {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .quick-action-card strong,
+html.dark .quick-action-card strong {
+  color: hsl(var(--foreground));
+}
+.dark .quick-action-card span,
+html.dark .quick-action-card span {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Article cards ─────────────────────────────── */
+.dark .article-card,
+html.dark .article-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+.dark .article-category,
+html.dark .article-category {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .article-card h3,
+html.dark .article-card h3 {
+  color: hsl(var(--foreground));
+}
+.dark .article-card p,
+html.dark .article-card p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .article-updated,
+html.dark .article-updated {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Service cards ─────────────────────────────── */
+.dark .service-card,
+html.dark .service-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+}
+.dark .service-card h3,
+html.dark .service-card h3 {
+  color: hsl(var(--foreground));
+}
+.dark .service-card p,
+html.dark .service-card p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .service-category,
+html.dark .service-category {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Role toggle ───────────────────────────────── */
+.dark .role-toggle,
+html.dark .role-toggle {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+}
+.dark .role-option,
+html.dark .role-option {
+  color: hsl(var(--muted-foreground));
+}
+.dark .role-option:hover,
+html.dark .role-option:hover {
+  color: hsl(var(--foreground));
+}
+.dark .role-option.active,
+html.dark .role-option.active {
+  background: hsl(var(--card));
+  color: hsl(var(--primary));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+}
+
+/* ── Auth pages ────────────────────────────────── */
+.dark .auth-page,
+html.dark .auth-page {
+  background:
+    radial-gradient(circle at 15% 20%, hsl(var(--primary) / 0.1), transparent 45%),
+    radial-gradient(circle at 85% 80%, hsl(var(--primary) / 0.08), transparent 45%),
+    hsl(var(--background));
+}
+.dark .auth-card,
+html.dark .auth-card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 20px 45px rgb(0 0 0 / 40%);
+}
+.dark .auth-card h1,
+html.dark .auth-card h1 {
+  color: hsl(var(--foreground));
+}
+.dark .auth-brand span,
+html.dark .auth-brand span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-subtitle,
+html.dark .auth-subtitle {
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-form label,
+html.dark .auth-form label {
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-form input,
+html.dark .auth-form input {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+.dark .auth-form input::placeholder,
+html.dark .auth-form input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-password-toggle,
+html.dark .auth-password-toggle {
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-password-toggle:hover,
+html.dark .auth-password-toggle:hover {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--primary));
+}
+.dark .auth-hint,
+html.dark .auth-hint {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+.dark .auth-hint code,
+html.dark .auth-hint code {
+  background: hsl(var(--surface-hover));
+  color: hsl(var(--foreground));
+}
+
+/* ── Forbidden page ────────────────────────────── */
+.dark .forbidden-card h2,
+html.dark .forbidden-card h2 {
+  color: hsl(var(--foreground));
+}
+.dark .forbidden-card p,
+html.dark .forbidden-card p {
+  color: hsl(var(--muted-foreground));
+}
+.dark .forbidden-icon,
+html.dark .forbidden-icon {
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+.dark .forbidden-rules,
+html.dark .forbidden-rules {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* ── Role / status badges ──────────────────────── */
+.dark .role-badge,
+html.dark .role-badge {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+.dark .role-badge.admin,
+html.dark .role-badge.admin {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .role-badge.user,
+html.dark .role-badge.user {
+  background: hsl(216 45% 18%);
+  color: hsl(216 85% 65%);
+}
+.dark .status-badge.active,
+html.dark .status-badge.active {
+  background: hsl(142 45% 16%);
+  color: hsl(142 71% 50%);
+}
+.dark .status-badge.inactive,
+html.dark .status-badge.inactive {
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+
+/* ── Department creation loading ───────────────── */
+.dark .department-creation-loading__card,
+html.dark .department-creation-loading__card {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+}
+.dark .department-creation-loading__icon,
+html.dark .department-creation-loading__icon {
+  background: hsl(var(--primary-soft));
+}
+.dark .department-creation-loading__icon span,
+html.dark .department-creation-loading__icon span {
+  border-color: hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+}
+.dark .department-creation-loading__card strong,
+html.dark .department-creation-loading__card strong {
+  color: hsl(var(--foreground));
+}
+.dark .department-creation-loading__track,
+html.dark .department-creation-loading__track {
+  background: hsl(var(--surface-muted));
+}
+.dark .department-creation-loading__bar,
+html.dark .department-creation-loading__bar {
+  background: linear-gradient(90deg, hsl(var(--primary)), hsl(216 85% 56%), hsl(199 89% 48%));
+}
+
+/* ── Department form modal ─────────────────────── */
+.dark .department-form-modal,
+html.dark .department-form-modal {
+  background: hsl(var(--card));
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+}
+.dark .department-form-modal .modal-header,
+html.dark .department-form-modal .modal-header {
+  background: hsl(var(--card));
+  border-bottom-color: hsl(var(--border));
+}
+.dark .department-form-modal .modal-actions,
+html.dark .department-form-modal .modal-actions {
+  background: hsl(var(--card));
+  border-top-color: hsl(var(--border));
+}
+.dark .department-form-modal label:not(.checkbox-field):not(.inline-label),
+.dark .department-form-embedded label:not(.checkbox-field):not(.inline-label),
+html.dark .department-form-modal label:not(.checkbox-field):not(.inline-label),
+html.dark .department-form-embedded label:not(.checkbox-field):not(.inline-label) {
+  color: hsl(var(--muted-foreground));
+}
+.dark .department-form-modal input:not([type="checkbox"]):not([type="radio"]),
+.dark .department-form-modal select,
+.dark .department-form-embedded input:not([type="checkbox"]):not([type="radio"]),
+.dark .department-form-embedded select,
+html.dark .department-form-modal input:not([type="checkbox"]):not([type="radio"]),
+html.dark .department-form-modal select,
+html.dark .department-form-embedded input:not([type="checkbox"]):not([type="radio"]),
+html.dark .department-form-embedded select {
+  background: hsl(var(--surface-muted));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.dark .department-form-modal input:not([type="checkbox"]):not([type="radio"]):focus,
+.dark .department-form-modal select:focus,
+html.dark .department-form-modal input:not([type="checkbox"]):not([type="radio"]):focus,
+html.dark .department-form-modal select:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+
+/* ── Pills ─────────────────────────────────────── */
+.dark .pill--success,
+html.dark .pill--success {
+  background: hsl(142 45% 16%);
+  color: hsl(142 71% 50%);
+}
+.dark .pill--warning,
+html.dark .pill--warning {
+  background: hsl(38 45% 16%);
+  color: hsl(38 96% 55%);
+}
+.dark .pill--info,
+html.dark .pill--info {
+  background: hsl(216 45% 18%);
+  color: hsl(216 85% 65%);
+}
+.dark .pill--danger,
+html.dark .pill--danger {
+  background: hsl(0 45% 16%);
+  color: hsl(0 84% 62%);
+}
+.dark .pill--neutral,
+html.dark .pill--neutral {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Stat tiles ────────────────────────────────── */
+.dark .stat-tile,
+html.dark .stat-tile {
+  background: hsl(var(--surface-muted));
+}
+.dark .stat-tile__label,
+html.dark .stat-tile__label {
+  color: hsl(var(--muted-foreground));
+}
+.dark .stat-tile__value,
+html.dark .stat-tile__value {
+  color: hsl(var(--foreground));
+}
+.dark .stat-tile__value--primary,
+.dark .stat-tile__part--primary,
+html.dark .stat-tile__value--primary,
+html.dark .stat-tile__part--primary {
+  color: hsl(216 85% 65%);
+}
+.dark .stat-tile__value--success,
+.dark .stat-tile__part--success,
+html.dark .stat-tile__value--success,
+html.dark .stat-tile__part--success {
+  color: hsl(142 71% 50%);
+}
+.dark .stat-tile__value--danger,
+.dark .stat-tile__part--danger,
+html.dark .stat-tile__value--danger,
+html.dark .stat-tile__part--danger {
+  color: hsl(0 84% 62%);
+}
+.dark .stat-tile__value--warning,
+.dark .stat-tile__part--warning,
+html.dark .stat-tile__value--warning,
+html.dark .stat-tile__part--warning {
+  color: hsl(38 96% 60%);
+}
+.dark .stat-tile__value--teal,
+.dark .stat-tile__part--teal,
+html.dark .stat-tile__value--teal,
+html.dark .stat-tile__part--teal {
+  color: hsl(173 70% 50%);
+}
+
+/* ── Filter tabs ───────────────────────────────── */
+.dark .filter-tabs,
+html.dark .filter-tabs {
+  background: hsl(var(--surface-muted));
+}
+.dark .filter-tab,
+html.dark .filter-tab {
+  color: hsl(var(--muted-foreground));
+}
+.dark .filter-tab:hover,
+html.dark .filter-tab:hover {
+  background: hsl(var(--surface-hover));
+}
+.dark .filter-tab.active,
+html.dark .filter-tab.active {
+  background: hsl(var(--primary));
+  color: #fff;
+}
+.dark .filter-tab__count,
+html.dark .filter-tab__count {
+  background: hsl(var(--surface-hover));
+  color: hsl(var(--muted-foreground));
+}
+.dark .filter-tabs-trailing,
+html.dark .filter-tabs-trailing {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Profile headers ───────────────────────────── */
+.dark .profile-header--light,
+html.dark .profile-header--light {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+  border-bottom-color: hsl(var(--border));
+}
+.dark .profile-header__close,
+html.dark .profile-header__close {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+.dark .profile-header--light .profile-header__close,
+html.dark .profile-header--light .profile-header__close {
+  background: hsl(var(--surface-hover));
+  color: hsl(var(--foreground));
+}
+.dark .profile-header__close:hover,
+html.dark .profile-header__close:hover {
+  background: hsl(var(--surface-hover));
+}
+
+/* ── Entity cells ──────────────────────────────── */
+.dark .entity-cell strong,
+html.dark .entity-cell strong {
+  color: hsl(var(--foreground));
+}
+.dark .entity-cell span,
+html.dark .entity-cell span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .delay-cell__text--ok,
+html.dark .delay-cell__text--ok {
+  color: hsl(142 71% 50%);
+}
+.dark .delay-cell__text--late,
+html.dark .delay-cell__text--late {
+  color: hsl(0 84% 62%);
+}
+.dark .remark-cell,
+.dark .remark-cell__title,
+.dark .remark-cell__note,
+html.dark .remark-cell,
+html.dark .remark-cell__title,
+html.dark .remark-cell__note {
+  color: hsl(var(--muted-foreground));
+}
+.dark .remark-cell__title--alert,
+html.dark .remark-cell__title--alert {
+  color: hsl(0 84% 62%);
+}
+.dark .table-empty-cell,
+html.dark .table-empty-cell {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Staff report / Work report ────────────────── */
+.dark .staff-report-modal .work-report-table,
+html.dark .staff-report-modal .work-report-table {
+  border-top-color: hsl(var(--border));
+}
+.dark .work-report-table th,
+html.dark .work-report-table th {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Order controls / Feature permissions ──────── */
+.dark .order-controls,
+html.dark .order-controls {
+  color: hsl(var(--muted-foreground));
+}
+.dark .order-button,
+html.dark .order-button {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+}
+.dark .feature-icon,
+html.dark .feature-icon {
+  background: hsl(var(--primary-soft));
+  color: hsl(var(--primary));
+}
+.dark .feature-path,
+html.dark .feature-path {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Field hint / icon picker ──────────────────── */
+.dark .field-hint,
+html.dark .field-hint {
+  color: hsl(var(--muted-foreground));
+}
+.dark .icon-picker__preview,
+html.dark .icon-picker__preview {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--primary));
+}
+
+/* ── Scrollable select scrollbar ───────────────── */
+.dark .scrollable-select-menu::-webkit-scrollbar-track,
+html.dark .scrollable-select-menu::-webkit-scrollbar-track {
+  background: hsl(var(--surface-muted));
+}
+.dark .scrollable-select-menu::-webkit-scrollbar-thumb,
+html.dark .scrollable-select-menu::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+}
+
+/* ── Profile chip clickable ────────────────────── */
+.dark button.profile-chip--clickable:hover,
+html.dark button.profile-chip--clickable:hover {
+  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(var(--surface-hover));
+}
+.dark .profile-chip__chevron,
+.dark .sidebar-footer__chevron,
+html.dark .profile-chip__chevron,
+html.dark .sidebar-footer__chevron {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Profile menu (light variant — dark variant already handled) ── */
+.dark .profile-menu,
+html.dark .profile-menu {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 10px 28px rgb(0 0 0 / 40%);
+}
+.dark .profile-menu__phone,
+html.dark .profile-menu__phone {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+}
+.dark .profile-menu__phone-icon,
+html.dark .profile-menu__phone-icon {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-menu__phone-text span,
+html.dark .profile-menu__phone-text span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-menu__phone-text strong,
+html.dark .profile-menu__phone-text strong {
+  color: hsl(var(--foreground));
+}
+.dark .profile-menu__list,
+html.dark .profile-menu__list {
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+.dark .profile-menu__list::-webkit-scrollbar-thumb,
+html.dark .profile-menu__list::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+}
+.dark .profile-menu__item:hover,
+html.dark .profile-menu__item:hover {
+  background: hsl(var(--surface-muted));
+}
+.dark .profile-menu__item-icon,
+html.dark .profile-menu__item-icon {
+  background: hsl(var(--surface-muted));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.dark .profile-menu__item-text strong,
+html.dark .profile-menu__item-text strong {
+  color: hsl(var(--foreground));
+}
+.dark .profile-menu__item-text span,
+html.dark .profile-menu__item-text span {
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-menu__item-chevron,
+html.dark .profile-menu__item-chevron {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Profile update page ───────────────────────── */
+.dark .profile-update__mark,
+html.dark .profile-update__mark {
+  background: hsl(var(--primary));
+}
+.dark .profile-update__field,
+html.dark .profile-update__field {
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-update__field input,
+html.dark .profile-update__field input {
+  border-color: hsl(var(--border));
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--foreground));
+}
+.dark .profile-update__field input:disabled,
+html.dark .profile-update__field input:disabled {
+  background: hsl(var(--surface-muted));
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-update__field input:not(:disabled):focus,
+html.dark .profile-update__field input:not(:disabled):focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+.dark .profile-update__readonly-hint,
+html.dark .profile-update__readonly-hint {
+  color: hsl(var(--muted-foreground));
+}
+.dark .profile-update__success,
+html.dark .profile-update__success {
+  border-color: hsl(142 50% 30%);
+  background: hsl(142 45% 16%);
+  color: hsl(142 71% 55%);
+}
+
+/* ── Filter row split ──────────────────────────── */
+.dark .filter-row-split,
+html.dark .filter-row-split {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Global link color ─────────────────────────── */
+.dark a,
+html.dark a {
+  color: hsl(var(--primary));
+}
+
+/* ── Sidebar footer clickable ──────────────────── */
+.dark .sidebar-footer--clickable:hover,
+html.dark .sidebar-footer--clickable:hover {
+  background: hsl(222 28% 14%);
 }

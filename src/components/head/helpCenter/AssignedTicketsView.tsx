@@ -44,6 +44,7 @@ import { CustomerTicketHistoryModal } from './CustomerTicketHistoryModal'
 import { CallsHistoryModal } from './CallsHistoryModal'
 import { useTicketCall } from './useTicketCall'
 import { TicketAttachmentsView } from '../../customers-dashboard/TicketAttachmentsView'
+import { fetchActiveStatuses } from '../../customers-dashboard/api/customer-features.api'
 import { RefreshButton } from '../../ui/RefreshButton'
 
 /** A ticket row, optionally tagged with who it is assigned to (All Tickets view). */
@@ -321,6 +322,29 @@ export function AssignedTicketsView({
   const [statusRemark, setStatusRemark] = useState('')
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
+  const [activeStatusesList, setActiveStatusesList] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchActiveStatuses()
+      .then((list) => {
+        if (active && list && list.length > 0) {
+          setActiveStatusesList(list.map((s) => s.code.toUpperCase()))
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load active statuses in AssignedTicketsView:', err)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const effectiveStatusOptions = useMemo(() => {
+    if (!activeStatusesList || activeStatusesList.length === 0) return ALL_STATUS_OPTIONS
+    const set = new Set(activeStatusesList)
+    return ALL_STATUS_OPTIONS.filter((s) => set.has(s))
+  }, [activeStatusesList])
 
   // History modal state
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
@@ -469,6 +493,12 @@ export function AssignedTicketsView({
         }
       : computedStatusCounts
 
+  const visibleStatusTabs = useMemo(() => {
+    if (!activeStatusesList || activeStatusesList.length === 0) return STATUS_TABS
+    const set = new Set(activeStatusesList)
+    return STATUS_TABS.filter((tab) => tab.key === 'ALL' || (tab.status && set.has(tab.status)) || (statusCounts[tab.key] ?? 0) > 0)
+  }, [activeStatusesList, statusCounts])
+
   const filteredTickets = useMemo(
     () =>
       activeTab === 'ALL'
@@ -543,8 +573,8 @@ export function AssignedTicketsView({
     if (!target || !canUpdateStatus) return
     setStatusTicketNumber(target.ticketNumber)
     const curStatus = (target.ticketStatus || 'OPEN') as TicketStatus
-    const curIndex = ALL_STATUS_OPTIONS.indexOf(curStatus)
-    const nextOptions = curIndex < 0 ? ALL_STATUS_OPTIONS : ALL_STATUS_OPTIONS.slice(curIndex + 1)
+    const curIndex = effectiveStatusOptions.indexOf(curStatus)
+    const nextOptions = curIndex < 0 ? effectiveStatusOptions : effectiveStatusOptions.slice(curIndex + 1)
 
     setNewStatus(nextOptions.length > 0 ? nextOptions[0] : curStatus)
     setStatusRemark('')
@@ -740,33 +770,7 @@ export function AssignedTicketsView({
   // Row actions
   function renderActions(t: TicketWithAssignee) {
     return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          className={ICON_BTN}
-          title="Call History"
-          aria-label={`Call history for ${t.ticketNumber}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            setCallsView({ ticketNumber: t.ticketNumber })
-          }}
-        >
-          <PhoneCall className="h-[15px] w-[15px]" />
-        </button>
-        {canViewHistory && (
-          <button
-            type="button"
-            className={ICON_BTN}
-            title="Status history"
-            aria-label={`History for ${t.ticketNumber}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              handleOpenHistoryModal(t.ticketNumber, t.ticketStatus)
-            }}
-          >
-            <History className="h-[15px] w-[15px]" />
-          </button>
-        )}
+      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           className={ICON_BTN}
@@ -933,7 +937,7 @@ export function AssignedTicketsView({
 
         {/* Status tabs */}
         <div className="flex gap-1 overflow-x-auto border-b border-[#e6e9f0] px-3.5 py-2">
-          {STATUS_TABS.map((tab) => {
+          {visibleStatusTabs.map((tab) => {
             const isActive = activeTab === tab.key
             return (
               <button
@@ -1000,16 +1004,16 @@ export function AssignedTicketsView({
                 </thead>
                 <tbody>
                   {pagedTickets.map((t, idx) => (
-                    // Details open only from the 👁 View button, not by clicking the row
                     <tr
                       key={t.ticketNumber}
-                      className={`border-t border-slate-100 align-middle transition-colors hover:bg-[#f8faff] ${
+                      onClick={() => setSelectedTicketNumber(t.ticketNumber)}
+                      className={`group cursor-pointer border-t border-slate-100 align-middle transition-colors hover:bg-[#f8faff] ${
                         selectedTicketNumber === t.ticketNumber ? 'bg-[#f1f5ff]' : ''
                       }`}
                     >
                       <td className="px-3.5 py-3 text-xs font-semibold text-slate-400">{pageStart + idx + 1}</td>
                       <td className="px-3.5 py-3">
-                        <div className="break-all font-mono text-[11.5px] font-bold text-[#2459e0]">{t.ticketNumber}</div>
+                        <div className="break-all font-mono text-[11.5px] font-bold text-[#2459e0] group-hover:underline">{t.ticketNumber}</div>
                         <div className="mt-1 text-[13px] font-semibold leading-snug text-slate-900">{t.subject || 'No Subject'}</div>
                       </td>
                       <td className="px-3.5 py-3">
@@ -1031,7 +1035,13 @@ export function AssignedTicketsView({
             {/* Mobile cards */}
             <div className="divide-y divide-slate-100 md:hidden">
               {pagedTickets.map((t, idx) => (
-                <div key={t.ticketNumber} className="space-y-2 px-3.5 py-3">
+                <div
+                  key={t.ticketNumber}
+                  onClick={() => setSelectedTicketNumber(t.ticketNumber)}
+                  className={`cursor-pointer space-y-2 px-3.5 py-3 transition-colors hover:bg-slate-50 ${
+                    selectedTicketNumber === t.ticketNumber ? 'bg-[#f1f5ff]' : ''
+                  }`}
+                >
                   {[
                     {
                       label: 'S. No.',
@@ -1181,6 +1191,26 @@ export function AssignedTicketsView({
                   {formatPriority(selectedTicket.priority)} priority
                 </span>
                 {renderStatusBadge(selectedTicket, 'text-[11px] px-2')}
+                <button
+                  type="button"
+                  onClick={() => setCallsView({ ticketNumber: selectedTicket.ticketNumber })}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#c7d6fb] bg-[#eaf0ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#2459e0] transition hover:bg-[#dbe6ff]"
+                  title={`Call history for ${selectedTicket.ticketNumber}`}
+                >
+                  <PhoneCall className="h-3 w-3" />
+                  <span>Call History</span>
+                </button>
+                {canViewHistory && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenHistoryModal(selectedTicket.ticketNumber, selectedTicket.ticketStatus)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
+                    title={`Status history for ${selectedTicket.ticketNumber}`}
+                  >
+                    <History className="h-3 w-3 text-slate-500" />
+                    <span>History</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1389,8 +1419,8 @@ export function AssignedTicketsView({
       {/* ── Modal: Update Status ── */}
       {isStatusModalOpen && statusTicket && (() => {
         const curStatus = (statusTicket.ticketStatus || 'OPEN') as TicketStatus
-        const curIndex = ALL_STATUS_OPTIONS.indexOf(curStatus)
-        const availableNextStatuses = curIndex < 0 ? ALL_STATUS_OPTIONS : ALL_STATUS_OPTIONS.slice(curIndex + 1)
+        const curIndex = effectiveStatusOptions.indexOf(curStatus)
+        const availableNextStatuses = curIndex < 0 ? effectiveStatusOptions : effectiveStatusOptions.slice(curIndex + 1)
         const isTicketClosed = curStatus === 'CLOSED' || availableNextStatuses.length === 0
 
         return (
