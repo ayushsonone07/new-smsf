@@ -1,20 +1,18 @@
 import { useState } from "react";
 
-import { Plus, RefreshCw } from "lucide-react";
-
 import { useToast } from "@shared/components/feedback";
-import { PageHeader } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
-import { ApplyLeaveDialog } from "../components/ApplyLeaveDialog";
 import { LeaveBalanceCards } from "../components/LeaveBalanceCards";
 import { LeaveRequestTable } from "../components/LeaveRequestTable";
 import { useCancelLeave, useLeaveBalances, useLeaveRequests } from "../hooks";
 
-export function EmployeeLeaveView() {
-  const [showApply, setShowApply] = useState(false);
+interface EmployeeLeaveViewProps {
+  onOpenApply?: () => void;
+}
+
+export function EmployeeLeaveView({ onOpenApply }: EmployeeLeaveViewProps) {
   const [page, setPage] = useState(1);
-  const [refreshing, setRefreshing] = useState(false);
 
   const balances = useLeaveBalances();
   const { data: balanceData, isLoading: balanceLoading, error: balanceError } = balances;
@@ -40,37 +38,7 @@ export function EmployeeLeaveView() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="My Leave"
-        description="View your leave balance and manage requests."
-        actions={
-          <div className="flex items-center gap-2">
-            <RefreshIconButton
-              refreshing={refreshing || requestsLoading}
-              onClick={async () => {
-                setRefreshing(true);
-                try {
-                  // Reload both parts of the page: leave balances and the request list.
-                  await Promise.all([refetch(), balances.refetch()]);
-                  toast.success("Refresh successfully");
-                } finally {
-                  setRefreshing(false);
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowApply(true)}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
-            >
-              <Plus size={18} />
-              Apply for Leave
-            </button>
-          </div>
-        }
-      />
-
+    <div className="space-y-4">
       <section
         aria-label="Leave balances"
         aria-busy={balancesRefreshing}
@@ -89,6 +57,7 @@ export function EmployeeLeaveView() {
           isLoading={requestsLoading}
           error={requestsError}
           onRetry={() => void refetch()}
+          onOpenApply={onOpenApply}
           renderActions={(req) =>
             req.status === "PENDING" ? (
               <button
@@ -128,27 +97,6 @@ export function EmployeeLeaveView() {
           </div>
         ) : null}
       </section>
-
-      <ApplyLeaveDialog open={showApply} onClose={() => setShowApply(false)} />
     </div>
-  );
-}
-
-function RefreshIconButton({ refreshing, onClick }: { refreshing: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (!refreshing) {
-          void onClick();
-        }
-      }}
-      disabled={refreshing}
-      aria-label="Refresh leave"
-      title="Refresh leave"
-      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-elevated text-foreground transition-colors hover:border-border-strong hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />
-    </button>
   );
 }

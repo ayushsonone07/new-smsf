@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
-import { Card, ErrorDisplay, PageHeader, StaggerContainer, StaggerItem, DatePicker,
+import { Card, ErrorDisplay, DatePicker,
   AnimatedFilterSelect } from "@shared/components/ui";
 import { useDebouncedValue } from "@shared/hooks";
 import { getApiErrorMessage } from "@shared/lib";
@@ -60,9 +60,8 @@ async function refresh() {
 }
 
   return (
-    <StaggerContainer className="space-y-6">
-      <StaggerItem>
-        <PageHeader eyebrow="Time" title="Attendance" description="Check in securely and review attendance records." />
+    <div className="space-y-4">
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           {canViewTeam ? (
             <div className="inline-flex rounded-xl border border-border bg-card p-1 shadow" role="tablist">
@@ -88,9 +87,7 @@ async function refresh() {
             
           </div>
         </div>
-      </StaggerItem>
 
-      <StaggerItem>
         <div
           className={`transition-opacity ${isRefreshing ? "pointer-events-none opacity-60" : ""}`}
           aria-busy={isRefreshing}
@@ -99,8 +96,7 @@ async function refresh() {
   date={selectedDate}
 /> : <MyAttendance />}
         </div>
-      </StaggerItem>
-    </StaggerContainer>
+    </div>
   );
 }
 

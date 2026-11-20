@@ -32,14 +32,11 @@ import {
 } from "@features/interviews";
 import {
   AnimatedFilterSelect,
-  PageHeader,
   EmptyState,
   Card,
   DatePicker,
   Dialog,
   DateRangePickerPopup,
-  StaggerContainer,
-  StaggerItem,
   type DateRangeValue,
 } from "@shared/components/ui";
 import { useToast } from "@shared/components/feedback";
@@ -118,29 +115,7 @@ export default function InterviewsPage() {
   };
 
   return (
-    <StaggerContainer className="space-y-6">
-      <StaggerItem>
-        <PageHeader
-          eyebrow="Recruitment"
-          title="Interviews"
-          description="Schedule and track candidate interview rounds."
-          actions={
-            <div className="flex items-center gap-2">
-              <RefreshIconButton
-                refreshing={isFetching}
-                onClick={async () => {
-                  await refetch();
-                  toast.success("Refresh successfully");
-                }}
-              />
-              <Button onClick={() => setScheduleOpen(true)}>
-                <Plus size={16} /> Schedule Interview
-              </Button>
-            </div>
-          }
-        />
-      </StaggerItem>
-
+    <div className="space-y-4">
       <Dialog
         open={scheduleOpen}
         onClose={() => setScheduleOpen(false)}
@@ -158,21 +133,28 @@ export default function InterviewsPage() {
         />
       </Dialog>
 
-      <StaggerItem variant="card">
-        <Card
-          padding="md"
-          className="border-border/90 bg-card/90 shadow-[0_12px_28px_rgba(15,23,42,0.05)]"
-        >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-bold text-card-foreground">Find interviews</p>
-            <p className="text-xs text-muted-foreground">
-              Search candidates or narrow the schedule by status.
-            </p>
+      <Card
+        padding="md"
+        className="border-border/90 bg-card/90 shadow-[0_12px_28px_rgba(15,23,42,0.05)]"
+      >
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">
+              {meta?.totalElements ?? interviews.length} total
+            </span>
           </div>
-          <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary">
-            {meta?.totalElements ?? interviews.length} total
-          </span>
+          <div className="flex items-center gap-2">
+            <RefreshIconButton
+              refreshing={isFetching}
+              onClick={async () => {
+                await refetch();
+                toast.success("Refreshed successfully");
+              }}
+            />
+            <Button onClick={() => setScheduleOpen(true)}>
+              <Plus size={16} /> Schedule Interview
+            </Button>
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px_280px_auto]">
           <div className="relative min-w-0">
@@ -349,10 +331,9 @@ export default function InterviewsPage() {
           ) : null}
         </>
       )}
-      </div>
-        </Card>
-      </StaggerItem>
-    </StaggerContainer>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -584,35 +565,24 @@ interface SelectOption {
   badge?: string;
 }
 
-const EXCLUDED_INTERVIEW_STATUSES = new Set(["HIRED", "REJECTED", "WITHDRAWN"]);
-
 async function fetchCandidates(q: string): Promise<SelectOption[]> {
   if (q.trim().length < 2) return [];
-  const { items } = await hrService.searchCandidates(q.trim(), 0, 25, {});
-  return items
-    .filter((c) => !EXCLUDED_INTERVIEW_STATUSES.has((c.status ?? "").toUpperCase()))
-    .slice(0, 8)
-    .map((c) => ({
-      value: c.id,
-      label: c.name,
-      sublabel: c.email,
-      badge: c.status?.replaceAll("_", " ") || "ACTIVE",
-    }));
+  const items = await hrService.lookupCandidates(q.trim(), 8);
+  return items.map((c) => ({
+    value: c.id,
+    label: c.name,
+    sublabel: c.email || undefined,
+    badge: c.status?.replaceAll("_", " ") || "ACTIVE",
+  }));
 }
 
 async function fetchEmployees(q: string): Promise<SelectOption[]> {
   if (q.trim().length < 2) return [];
-  const { items } = await hrService.listEmployees({
-    page: 0,
-    size: 8,
-    q: q.trim(),
-    status: "active",
-    sort: "employeeCode,asc",
-  });
-  return items.map((e) => ({
+  const items = await hrService.lookupEmployees({ q: q.trim() });
+  return items.slice(0, 8).map((e) => ({
     value: e.id,
     label: e.name,
-    sublabel: [e.employeeCode, e.designationName].filter(Boolean).join(" • "),
+    sublabel: [e.employeeCode, e.designationTitle].filter(Boolean).join(" • "),
     badge: e.role?.toUpperCase(),
   }));
 }

@@ -10,6 +10,7 @@ export const HR_ENDPOINTS = {
   charts: "/api/v1/hr/dashboard/charts",
   candidates: "/api/v1/hr/candidates",
   candidatesSearch: "/api/v1/hr/candidates/search",
+  candidatesLookup: "/api/v1/hr/candidates/lookup",
   employees: "/api/v1/hr/employees",
   employeesLookup: "/api/v1/hr/employees/lookup",
   addCandidate: "/api/v1/hr/add/candidate",

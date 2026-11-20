@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChevronDown, Download, Plus, Upload } from "lucide-react";
 
 import { useAuth } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
-import { PageHeader, StaggerContainer, StaggerItem } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { AddCandidateDialog } from "./AddCandidateDialog";
@@ -12,18 +11,11 @@ import { BulkUploadDialog } from "./BulkUploadDialog";
 import { CandidatesSection } from "./CandidatesSection";
 import { hrService } from "../services";
 
-import type { Candidate, DateRange } from "../types";
+import type { Candidate } from "../types";
 
 type Dialog = "none" | "bulkUpload" | "addCandidate";
 
 export function AllCandidatesPage() {
-  const initialRange = useMemo<DateRange>(() => {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - 29);
-    return { from, to };
-  }, []);
-  const [range] = useState<DateRange>(initialRange);
   const [dialog, setDialog] = useState<Dialog>("none");
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -60,7 +52,6 @@ export function AllCandidatesPage() {
 
       while (hasNext) {
         const result = await hrService.listCandidates({
-          range,
           page,
           size: 100,
           sort: "createdAt,desc",
@@ -80,39 +71,31 @@ export function AllCandidatesPage() {
   }
 
   return (
-    <StaggerContainer className="space-y-5">
-      <StaggerItem>
-        <PageHeader
-          eyebrow="Candidate Pipeline"
-          title="All Candidates"
-          description="Search, filter, review, and progress every applicant from one workspace"
-          actions={
-            <>
-              <ImportExportMenu
-                open={importExportOpen}
-                exporting={exporting}
-                menuRef={importExportRef}
-                onToggle={() => setImportExportOpen((current) => !current)}
-                onImport={openImport}
-                onExport={() => void exportCandidates()}
-              />
-              <PrimaryButton
-                icon={<Plus size={14} />}
-                label="Candidate"
-                onClick={() => setDialog("addCandidate")}
-              />
-            </>
-          }
-        />
-      </StaggerItem>
-
-      <StaggerItem variant="card">
-        <CandidatesSection range={range} showRecruiter={user?.role === "HR"} />
-      </StaggerItem>
+    <div className="w-full space-y-4">
+      <CandidatesSection
+        showRecruiter={user?.role === "HR"}
+        actions={
+          <>
+            <ImportExportMenu
+              open={importExportOpen}
+              exporting={exporting}
+              menuRef={importExportRef}
+              onToggle={() => setImportExportOpen((current) => !current)}
+              onImport={openImport}
+              onExport={() => void exportCandidates()}
+            />
+            <PrimaryButton
+              icon={<Plus size={14} />}
+              label="Candidate"
+              onClick={() => setDialog("addCandidate")}
+            />
+          </>
+        }
+      />
 
       <BulkUploadDialog open={dialog === "bulkUpload"} onClose={() => setDialog("none")} />
       <AddCandidateDialog open={dialog === "addCandidate"} onClose={() => setDialog("none")} />
-    </StaggerContainer>
+    </div>
   );
 }
 
@@ -146,7 +129,7 @@ function ImportExportMenu({
         onClick={onToggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-surface-hover"
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-background px-3 text-xs font-medium text-foreground shadow-xs transition hover:bg-muted"
       >
         <Upload size={14} />
         Import / Export
@@ -156,7 +139,7 @@ function ImportExportMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-surface-elevated p-1.5 shadow-lg"
+          className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-lg"
         >
           <MenuItem icon={<Upload size={15} />} label="Import" onClick={onImport} />
           <MenuItem
@@ -183,7 +166,7 @@ function MenuItem({
       role="menuitem"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+      className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
     >
       {icon}
       {label}
@@ -196,7 +179,7 @@ function PrimaryButton({ icon, label, onClick }: ButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white shadow transition-colors hover:bg-primary/90"
+      className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover"
     >
       {icon}
       {label}
