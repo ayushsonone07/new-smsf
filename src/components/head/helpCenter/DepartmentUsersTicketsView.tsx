@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Users,
   Mail,
+  ChevronLeft,
   ChevronRight,
   RefreshCw,
   ArrowLeft,
@@ -27,6 +28,8 @@ const AVATAR_TONES = [
   'bg-[#e8f8f0] text-[#25966d]',
   'bg-[#fff2e3] text-[#d88a33]',
 ]
+
+const MEMBERS_PER_PAGE = 10
 
 function formatMemberRole(role?: string) {
   if (role === 'DEPARTMENT_SUB_USER') return 'Department Sub-user'
@@ -54,6 +57,7 @@ export function DepartmentUsersTicketsView({
   const [memberTicketsError, setMemberTicketsError] = useState<string | null>(null)
   const [refreshMemberTicketsKey, setRefreshMemberTicketsKey] = useState(0)
   const [memberSearch, setMemberSearch] = useState('')
+  const [memberPage, setMemberPage] = useState(1)
 
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase()
@@ -62,6 +66,20 @@ export function DepartmentUsersTicketsView({
       (u) => (u.username || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
     )
   }, [members, memberSearch])
+
+  const totalMemberPages = Math.max(1, Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE))
+  const paginatedMembers = useMemo(() => {
+    const start = (memberPage - 1) * MEMBERS_PER_PAGE
+    return filteredMembers.slice(start, start + MEMBERS_PER_PAGE)
+  }, [filteredMembers, memberPage])
+
+  useEffect(() => {
+    setMemberPage(1)
+  }, [memberSearch, departmentType])
+
+  useEffect(() => {
+    if (memberPage > totalMemberPages) setMemberPage(totalMemberPages)
+  }, [memberPage, totalMemberPages])
 
   // Load department members
   async function loadMembers(force = false) {
@@ -272,17 +290,18 @@ export function DepartmentUsersTicketsView({
                     </td>
                   </tr>
                 ) : (
-                  filteredMembers.map((u, idx) => {
+                  paginatedMembers.map((u, idx) => {
+                    const absoluteIndex = (memberPage - 1) * MEMBERS_PER_PAGE + idx
                     const username = u.username || u.email || '—'
                     const disabled = !u.email
-                    const tone = AVATAR_TONES[idx % AVATAR_TONES.length]
+                    const tone = AVATAR_TONES[absoluteIndex % AVATAR_TONES.length]
 
                     return (
                       <tr
-                        key={u.id ?? u.email ?? idx}
+                        key={u.id ?? u.email ?? absoluteIndex}
                         className="border-b border-[#f0f2f7] transition-colors last:border-b-0 hover:bg-[#f8faff]"
                       >
-                        <td className="w-[65px] px-5 py-[13px] text-[#a1acc0]">{idx + 1}</td>
+                        <td className="w-[65px] px-5 py-[13px] text-[#a1acc0]">{absoluteIndex + 1}</td>
                         <td className="px-5 py-[13px]">
                           <div className="flex items-center gap-[11px]">
                             <div className={`grid h-[35px] w-[35px] flex-shrink-0 place-items-center rounded-[10px] text-[13px] font-bold ${tone}`}>
@@ -326,13 +345,45 @@ export function DepartmentUsersTicketsView({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-[#e9edf4] px-5 py-3.5 text-[11px] text-[#8c9ab0]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e9edf4] px-5 py-3.5 text-[11px] text-[#8c9ab0]">
           <span>
-            Showing {filteredMembers.length} of {members.length} members
+            {filteredMembers.length === 0
+              ? 'Showing 0 members'
+              : `Showing ${(memberPage - 1) * MEMBERS_PER_PAGE + 1} to ${Math.min(
+                  memberPage * MEMBERS_PER_PAGE,
+                  filteredMembers.length
+                )} of ${filteredMembers.length} members`}
           </span>
+
+          {filteredMembers.length > MEMBERS_PER_PAGE && (
+            <div className="flex items-center gap-2" aria-label="Member list pagination">
+              <button
+                type="button"
+                onClick={() => setMemberPage((page) => Math.max(1, page - 1))}
+                disabled={memberPage === 1}
+                aria-label="Previous page"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e3e8f0] bg-white text-[#566780] transition hover:border-[#5146ef] hover:text-[#5146ef] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[72px] text-center font-semibold text-[#566780]">
+                Page {memberPage} of {totalMemberPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setMemberPage((page) => Math.min(totalMemberPages, page + 1))}
+                disabled={memberPage === totalMemberPages}
+                aria-label="Next page"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e3e8f0] bg-white text-[#566780] transition hover:border-[#5146ef] hover:text-[#5146ef] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <span className="h-[7px] w-[7px] rounded-full bg-[#26b87b]" />
-            Team Directory
+            10 per page
           </div>
         </div>
       </section>
