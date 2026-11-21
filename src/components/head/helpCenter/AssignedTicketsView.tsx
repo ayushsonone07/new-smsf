@@ -1393,9 +1393,31 @@ export function AssignedTicketsView({
                       <p className="text-xs text-slate-500">Current status</p>
                       <div className="mt-1">{renderStatusBadge(selectedTicket)}</div>
                     </div>
-                    <button type="button" onClick={() => handleOpenStatusModal()} className={BTN_PRIMARY}>
-                      Update status
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCallsView({ ticketNumber: selectedTicket.ticketNumber })}
+                        className={BTN}
+                        title={`Call history for ${selectedTicket.ticketNumber}`}
+                      >
+                        <PhoneCall className="h-3.5 w-3.5 text-slate-500" />
+                        <span>Call History</span>
+                      </button>
+                      {canViewHistory && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenHistoryModal(selectedTicket.ticketNumber, selectedTicket.ticketStatus)}
+                          className={BTN}
+                          title={`Status history for ${selectedTicket.ticketNumber}`}
+                        >
+                          <History className="h-3.5 w-3.5 text-slate-500" />
+                          <span>History</span>
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleOpenStatusModal()} className={BTN_PRIMARY}>
+                        Update status
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-start gap-2.5 rounded-[10px] border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">

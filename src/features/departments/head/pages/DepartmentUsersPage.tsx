@@ -18,7 +18,8 @@ import '../../../../components/head/customers-list/CustomersList.css'
 import { useColumnFeatures } from '../../../permissions/hooks/useColumnFeatures'
 import { useDynamicColumns } from '../../../permissions/hooks/useDynamicPermissions'
 import { useHeadDepartmentId } from '../hooks/useHeadDepartmentId'
-import { useInfiniteDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { useDepartmentUsersList } from '../../hooks/useDepartmentUsersList'
+import { TablePagination } from '../../../../components/ui/TablePagination'
 import {
   createDepartmentUser,
   updateDepartmentUser,
@@ -191,10 +192,17 @@ export function DepartmentUsersPage() {
   }, [deptType])
 
   const [autowebUserTab, setAutowebUserTab] = useState<'users' | 'subUsers' | 'autowebisionUsers'>('autowebisionUsers')
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+
+  // Reset page when search or tab changes
+  useEffect(() => {
+    setPage(0)
+  }, [debouncedSearch, autowebUserTab])
 
   // Hit exact Autowebsion user endpoint: GET /api/autowebision/users/department/{departmentType}?page=0&size=10
   const autowebUsersQuery = useQuery({
-    queryKey: ['autowebisionUsersDept', autowebUserTab, search.trim()],
+    queryKey: ['autowebisionUsersDept', autowebUserTab, debouncedSearch.trim(), page, pageSize],
     queryFn: async () => {
       const targetDept =
         autowebUserTab === 'autowebisionUsers'
@@ -202,7 +210,7 @@ export function DepartmentUsersPage() {
           : autowebUserTab === 'users'
             ? 'WEBSITE_DEPARTMENT'
             : 'AUTOMATION_DEPARTMENT'
-      return fetchUsersByDepartmentType(targetDept, 0, 100, search.trim() || undefined)
+      return fetchUsersByDepartmentType(targetDept, page, pageSize, debouncedSearch.trim() || undefined)
     },
     enabled: isAutowebsionDept,
   })
@@ -226,39 +234,15 @@ export function DepartmentUsersPage() {
     staleTime: 30_000,
   })
 
-  // Infinite query for Department Users: page 0, size 10 initial, next 10 on scroll
-  const departmentUsersQuery = useInfiniteDepartmentUsersList({
-    size: 10,
-    search: debouncedSearch.trim() || undefined,
-  })
-  const {
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = departmentUsersQuery
-  const loadingNextPageRef = useRef(false)
-  const loadNextUsersPage = useCallback(async () => {
-    if (
-      loadingNextPageRef.current ||
-      !hasNextPage ||
-      isFetchingNextPage
-    ) {
-      return
-    }
-
-    loadingNextPageRef.current = true
-    try {
-      await fetchNextPage({
-        cancelRefetch: false,
-      })
-    } finally {
-      loadingNextPageRef.current = false
-    }
-  }, [
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  ])
+  // Standard paginated query for Department Users
+  const departmentUsersQuery = useDepartmentUsersList(
+    {
+      page,
+      size: pageSize,
+      search: debouncedSearch.trim() || undefined,
+    },
+    { enabled: !isAutowebsionDept },
+  )
 
   // Load each member's customer activity for the latest seven calendar days.
   const reportStart = useMemo(() => {
@@ -360,21 +344,9 @@ export function DepartmentUsersPage() {
     }
   }, [memberDetailsQuery.data])
 
-  // Map API users to DepartmentUser table structure across all infinite pages
+  // Map API users to DepartmentUser table structure
   const apiUsersList = useMemo<DepartmentUser[]>(() => {
-    const pages = departmentUsersQuery.data?.pages ?? []
-    const allUsers: DepartmentUserApiItem[] = []
-    const seenIds = new Set<string>()
-
-    for (const p of pages) {
-      for (const u of p.data ?? []) {
-        const idKey = String(u.id ?? u.username ?? u.email ?? Math.random())
-        if (!seenIds.has(idKey)) {
-          seenIds.add(idKey)
-          allUsers.push(u)
-        }
-      }
-    }
+    const allUsers: DepartmentUserApiItem[] = departmentUsersQuery.data?.data ?? []
 
     return allUsers.map((u, idx) => {
       const isPresent =
@@ -431,7 +403,7 @@ export function DepartmentUsersPage() {
         dynamicValues: { ...u } as Record<string, unknown>,
       }
     })
-  }, [departmentUsersQuery.data?.pages])
+  }, [departmentUsersQuery.data?.data])
 
   const autowebUsersList = useMemo<DepartmentUser[]>(() => {
     if (!isAutowebsionDept) return []
@@ -501,10 +473,14 @@ export function DepartmentUsersPage() {
       : departmentUsersQuery.refetch()
   const isUsersRefreshing = isAutowebsionDept
     ? autowebUsersQuery.isFetching || autowebTabCountsQuery.isFetching
-    : departmentUsersQuery.isFetching && !departmentUsersQuery.isFetchingNextPage
+    : departmentUsersQuery.isFetching
   const usersListQuery = isAutowebsionDept ? autowebUsersQuery : departmentUsersQuery
   const isUsersListDimmed =
-    usersListQuery.isFetching && !usersListQuery.isLoading && !departmentUsersQuery.isFetchingNextPage
+    usersListQuery.isFetching && !usersListQuery.isLoading
+
+  const totalUsers = isAutowebsionDept
+    ? (autowebUsersQuery.data?.totalElements ?? users.length)
+    : (departmentUsersQuery.data?.totalElements ?? users.length)
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
