@@ -8,6 +8,7 @@ import { IconButton } from '../../../../components/head/shared/IconButton'
 import { Icon } from '../../../../components/head/shared/Icon'
 import { Button } from '../../../../components/ui/Button'
 import { RefreshButton } from '../../../../components/ui/RefreshButton'
+import { TablePagination } from '../../../../components/ui/TablePagination'
 import { useAssigningUsers } from '../../hooks/useAssigningUsers'
 import {
   useFollowUpRecentMeetings,
@@ -76,7 +77,14 @@ export function MeetingPage() {
   const [selectedUser, setSelectedUser] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const filterDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Reset page when any filter changes
+  useEffect(() => {
+    setPage(0)
+  }, [search, statusFilter, selectedUser, dateFrom, dateTo])
 
   const session = getSession()
   const isUser = session?.user?.role === 'USER'
@@ -109,15 +117,15 @@ export function MeetingPage() {
   // 3. Lists API
   const recentQuery = useFollowUpRecentMeetings({
     ...baseParams,
-    page: 0,
-    size: 20,
+    page: statusFilter === 'all' ? 0 : page,
+    size: statusFilter === 'all' ? Math.max(pageSize * (page + 1), 50) : pageSize,
     days: 15,
   })
 
   const dueQuery = useFollowUpDueMeetings({
     ...baseParams,
-    page: 0,
-    size: 20,
+    page: statusFilter === 'all' ? 0 : page,
+    size: statusFilter === 'all' ? Math.max(pageSize * (page + 1), 50) : pageSize,
   })
 
   // Assemble meetings list
@@ -138,7 +146,26 @@ export function MeetingPage() {
     return [...dueItems, ...recentItems]
   }, [recentQuery.data?.data, dueQuery.data?.data, statusFilter])
 
-  const meetings = liveMeetings
+  const totalResults = useMemo(() => {
+    if (statusFilter === 'done') {
+      return recentQuery.data?.totalElements ?? counts.doneCount
+    }
+    if (statusFilter === 'not-done') {
+      return dueQuery.data?.totalElements ?? counts.notDoneCount
+    }
+    const dCount = counts.doneCount || (recentQuery.data?.totalElements ?? 0)
+    const ndCount = counts.notDoneCount || (dueQuery.data?.totalElements ?? 0)
+    return dCount + ndCount
+  }, [statusFilter, recentQuery.data?.totalElements, dueQuery.data?.totalElements, counts.doneCount, counts.notDoneCount])
+
+  const displayedMeetings = useMemo(() => {
+    if (statusFilter === 'all') {
+      return liveMeetings.slice(page * pageSize, (page + 1) * pageSize)
+    }
+    return liveMeetings
+  }, [liveMeetings, statusFilter, page, pageSize])
+
+  const meetings = displayedMeetings
 
   const doneCount =
     counts.doneCount > 0
@@ -405,6 +432,22 @@ export function MeetingPage() {
           onMessageClick={handleMessageClick}
           onHistoryClick={handleHistoryClick}
         />
+        {totalResults > 0 && (
+          <div className="mt-4 rounded-xl border border-[#e7ebf3] bg-white p-3.5 shadow-xs">
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalResults={totalResults}
+              onPageChange={setPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setPage(0)
+              }}
+              pageSizeOptions={[10, 20, 50, 100]}
+              disabled={isMeetingsRefreshing}
+            />
+          </div>
+        )}
       </div>
       <DepartmentFlowModal
         selection={selectedDepartmentFlow}
