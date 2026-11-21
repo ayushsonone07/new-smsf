@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   const helpCenterUrl = (
     env.HELP_CENTER_URL ||
     env.VITE_HELP_CENTER_URL ||
-    'https://ducking-shore-remedial.ngrok-free.dev,https://displace-cupcake-aqueduct.ngrok-free.dev'
+    'https://displace-cupcake-aqueduct.ngrok-free.dev'
   ).trim().replace(/\/$/, '')
 
   return {
@@ -64,41 +64,10 @@ export default defineConfig(({ mode }) => {
             })
           },
         },
-        // These two must go through SMSB: it adds the department/scope from the logged-in
-        // user's token. Sent straight to help-center they have no scope (500 / empty).
-        // Keep them ABOVE '/api/help-center' — the first matching key wins.
-        '/api/help-center/department_users/fetch_department_tickets': {
-          target: backendUrl,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/help-center/tickets/customer-history': {
-          target: backendUrl,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/api/help-center': {
-          target: helpCenterUrl,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/api\/help-center/, '/api/v1'),
-          headers: {
-            'ngrok-skip-browser-warning': '1',
-            'X-OAuth-Key': 'mbgcard-helpcenter-oauth-secret-key-2026',
-          },
-          configure: (proxy) => {
-            proxy.on('error', (err) => {
-              console.error('[Help Center Proxy] Error:', err.message)
-            })
-            proxy.on('proxyReq', (proxyReq, req) => {
-              proxyReq.setHeader('ngrok-skip-browser-warning', '1')
-              if (!proxyReq.getHeader('X-OAuth-Key')) {
-                proxyReq.setHeader('X-OAuth-Key', 'mbgcard-helpcenter-oauth-secret-key-2026')
-              }
-              console.info('[Help Center Proxy]', req.method, req.url, '→', helpCenterUrl + proxyReq.path)
-            })
-          },
-        },
+        // '/api/help-center/*' is NOT proxied to help-center here: it falls through to '/api'
+        // below and goes to SMSB, exactly like production (vercel.json sends every /api/* to
+        // SMSB). Sending it straight to help-center hid production-only failures (wrong paths,
+        // role names SMSB can't read). SMSB then calls help-center via helpcenter.api.base-url.
         '/api': {
           target: backendUrl,
           changeOrigin: true,
