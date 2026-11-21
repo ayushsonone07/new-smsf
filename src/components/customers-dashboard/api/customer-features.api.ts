@@ -1,4 +1,5 @@
-import { apiRequest } from '../../../api/client'
+import { apiRequest, authedApiRequest } from '../../../api/client'
+import { fetchTicketStatuses, fetchTicketPriorities } from '../../../api/help-center-config.api'
 import { getSession } from '../../../app/auth/session'
 import { getCustomerSession } from '../../../features/customers/hooks/useCustomerSession'
 
@@ -1131,7 +1132,44 @@ export interface ActivePriorityItem {
 }
 
 export async function fetchActivePriorities(): Promise<ActivePriorityItem[]> {
-  // 1. Try directly via Help Center proxy or direct URL
+  // 1. Try authenticated config API (matches HelpSupportConfigPage)
+  try {
+    const list = await fetchTicketPriorities()
+    if (Array.isArray(list) && list.length > 0) {
+      return list
+        .filter((p: any) => p && p.isActive !== false)
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          code: (p.code || p.name).toUpperCase(),
+          isDefault: Boolean(p.isDefault),
+          sortOrder: p.sortOrder ?? 0,
+        }))
+    }
+  } catch (err) {
+    console.warn('Failed to fetch priorities via help-center-config API:', err)
+  }
+
+  // 2. Try authed request to active endpoint
+  try {
+    const res = await authedApiRequest<any>('/api/help-center/config/priorities/active')
+    const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+    if (list.length > 0) {
+      return list
+        .filter((p: any) => p && p.isActive !== false)
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          code: (p.code || p.name).toUpperCase(),
+          isDefault: Boolean(p.isDefault),
+          sortOrder: p.sortOrder ?? 0,
+        }))
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active priorities via proxy:', err)
+  }
+
+  // 3. Try directly via Help Center direct URL
   try {
     const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/config/priorities/active`, {
       headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
@@ -1155,36 +1193,7 @@ export async function fetchActivePriorities(): Promise<ActivePriorityItem[]> {
     console.warn('Failed to fetch active priorities directly:', err)
   }
 
-  // 2. Try through Vite local proxy
-  try {
-    const res = await fetch(`/api/help-center/config/priorities/active`, {
-      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
-    })
-    if (res.ok) {
-      const json = await res.json()
-      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
-      if (list.length > 0) {
-        return list
-          .filter((p: any) => p && p.isActive !== false)
-          .map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            code: (p.code || p.name).toUpperCase(),
-            isDefault: Boolean(p.isDefault),
-            sortOrder: p.sortOrder ?? 0,
-          }))
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to fetch active priorities via proxy:', err)
-  }
-
-  return [
-    { id: 1, name: 'Low', code: 'LOW', isDefault: false },
-    { id: 2, name: 'Medium', code: 'MEDIUM', isDefault: true },
-    { id: 3, name: 'High', code: 'HIGH', isDefault: false },
-    { id: 4, name: 'Critical', code: 'CRITICAL', isDefault: false },
-  ]
+  return []
 }
 
 export interface ActiveStatusItem {
@@ -1196,6 +1205,44 @@ export interface ActiveStatusItem {
 }
 
 export async function fetchActiveStatuses(): Promise<ActiveStatusItem[]> {
+  // 1. Try authenticated config API (matches HelpSupportConfigPage)
+  try {
+    const list = await fetchTicketStatuses()
+    if (Array.isArray(list) && list.length > 0) {
+      return list
+        .filter((s: any) => s && s.isActive !== false)
+        .map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          code: (s.code || s.name).toUpperCase(),
+          isDefault: Boolean(s.isDefault),
+          sortOrder: s.sortOrder ?? 0,
+        }))
+    }
+  } catch (err) {
+    console.warn('Failed to fetch statuses via help-center-config API:', err)
+  }
+
+  // 2. Try authed request to active endpoint
+  try {
+    const res = await authedApiRequest<any>('/api/help-center/config/statuses/active')
+    const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+    if (list.length > 0) {
+      return list
+        .filter((s: any) => s && s.isActive !== false)
+        .map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          code: (s.code || s.name).toUpperCase(),
+          isDefault: Boolean(s.isDefault),
+          sortOrder: s.sortOrder ?? 0,
+        }))
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active statuses via proxy:', err)
+  }
+
+  // 3. Try directly via Help Center direct URL
   try {
     const res = await fetch(`${HELP_CENTER_DIRECT_BASE}/config/statuses/active`, {
       headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
@@ -1219,36 +1266,7 @@ export async function fetchActiveStatuses(): Promise<ActiveStatusItem[]> {
     console.warn('Failed to fetch active statuses directly:', err)
   }
 
-  try {
-    const res = await fetch(`/api/help-center/config/statuses/active`, {
-      headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
-    })
-    if (res.ok) {
-      const json = await res.json()
-      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
-      if (list.length > 0) {
-        return list
-          .filter((s: any) => s && s.isActive !== false)
-          .map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            code: (s.code || s.name).toUpperCase(),
-            isDefault: Boolean(s.isDefault),
-            sortOrder: s.sortOrder ?? 0,
-          }))
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to fetch active statuses via proxy:', err)
-  }
-
-  return [
-    { id: 1, name: 'Open', code: 'OPEN', isDefault: true },
-    { id: 2, name: 'In Progress', code: 'IN_PROGRESS', isDefault: false },
-    { id: 3, name: 'Waiting On Customer', code: 'WAITING_ON_CUSTOMER', isDefault: false },
-    { id: 4, name: 'Resolved', code: 'RESOLVED', isDefault: false },
-    { id: 5, name: 'Closed', code: 'CLOSED', isDefault: false },
-  ]
+  return []
 }
 
 
