@@ -14,6 +14,7 @@ export type {
   HourOfDayPoint,
   CumulativeGrowthPoint,
   Candidate,
+  CandidateLookupItem,
   DateRange,
   Department,
   DepartmentInput,

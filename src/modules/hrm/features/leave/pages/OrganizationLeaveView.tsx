@@ -73,20 +73,7 @@ export function OrganizationLeaveView({ role }: OrganizationLeaveViewProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Leave Management
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">View and manage all leave requests.</p>
-        </div>
-        <RefreshIconButton
-          refreshing={isRefreshing || isLoading}
-          onClick={() => void handleRefresh()}
-        />
-      </div>
-
+    <div className="space-y-4">
       <section
         className={`grid grid-cols-2 gap-4 transition-opacity lg:grid-cols-4 ${
           summaryRefreshing ? "pointer-events-none opacity-60" : ""

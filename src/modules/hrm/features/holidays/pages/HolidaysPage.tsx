@@ -20,9 +20,6 @@ import {
   Dialog,
   ConfirmDialog,
   EmptyState,
-  PageHeader,
-  StaggerContainer,
-  StaggerItem,
   TableSkeleton,
 } from "@shared/components/ui";
 import { Select } from "@hrm/components/ui/select";
@@ -133,40 +130,18 @@ export function HolidaysPage() {
   }
 
   return (
-    <StaggerContainer className="space-y-6">
-      <StaggerItem>
-        <PageHeader
-          title="Holidays"
-          description="Manage company holidays and regional observances."
-          actions={
-            canManage ? (
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
-              >
-                <Plus size={18} />
-                Holiday
-              </button>
-            ) : undefined
-          }
+    <div className="space-y-4">
+      <div className={`grid gap-4 transition-opacity md:grid-cols-4 ${holidaysRefreshingClass}`}>
+        <MetricCard label="Total holidays" value={records.length} />
+        <MetricCard label="Active" value={activeCount} tone="success" />
+        <MetricCard label="Optional" value={optionalCount} tone="violet" />
+        <MetricCard
+          label="Next holiday"
+          value={upcoming ? formatShortDate(upcoming.holidayDate) : "-"}
+          {...(upcoming ? { subtitle: upcoming.name } : {})}
         />
-      </StaggerItem>
+      </div>
 
-      <StaggerItem variant="card">
-        <div className={`grid gap-4 transition-opacity md:grid-cols-4 ${holidaysRefreshingClass}`}>
-          <MetricCard label="Total holidays" value={records.length} />
-          <MetricCard label="Active" value={activeCount} tone="success" />
-          <MetricCard label="Optional" value={optionalCount} tone="violet" />
-          <MetricCard
-            label="Next holiday"
-            value={upcoming ? formatShortDate(upcoming.holidayDate) : "-"}
-            {...(upcoming ? { subtitle: upcoming.name } : {})}
-          />
-        </div>
-      </StaggerItem>
-
-      <StaggerItem variant="card">
       <Card padding="md">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative min-w-0 flex-1">
@@ -195,6 +170,16 @@ export function HolidaysPage() {
               ariaLabel="Filter holidays by type"
             />
           </div>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
+            >
+              <Plus size={18} />
+              Holiday
+            </button>
+          ) : null}
           <RefreshButton
             onRefresh={() => holidays.refetch()}
             isRefreshing={holidays.isFetching}
@@ -203,9 +188,7 @@ export function HolidaysPage() {
           />
         </div>
       </Card>
-      </StaggerItem>
 
-      <StaggerItem variant="card">
       <Card padding="none" className={`overflow-hidden transition-opacity ${holidaysRefreshingClass}`}>
         {holidays.isLoading ? (
           <div className="p-5">
@@ -234,7 +217,6 @@ export function HolidaysPage() {
           />
         )}
       </Card>
-      </StaggerItem>
 
       <HolidayDialog open={showDialog} holiday={editing} onClose={() => setShowDialog(false)} />
       <ConfirmDialog
@@ -247,7 +229,7 @@ export function HolidaysPage() {
         onClose={() => setToDelete(null)}
         onConfirm={confirmDelete}
       />
-    </StaggerContainer>
+    </div>
   );
 }
 
