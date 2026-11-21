@@ -1039,10 +1039,7 @@ export function DepartmentUsersPage() {
               ...mappedHiddenColumns,
             ]}
             canEditActions={canManageUsers}
-            hasNextPage={departmentUsersQuery.hasNextPage}
-            isFetchingNextPage={departmentUsersQuery.isFetchingNextPage}
-            onLoadMore={loadNextUsersPage}
-            totalUsers={departmentUsersQuery.data?.pages?.[0]?.totalElements ?? users.length}
+            totalUsers={totalUsers}
             onView={(user) => setModal({ kind: 'report', user })}
             onEdit={(user) => setModal({ kind: 'edit', user })}
             onDelete={(user) =>
@@ -1063,6 +1060,20 @@ export function DepartmentUsersPage() {
               />
             )}
           />
+          <div className="p-4 border-t border-[#e7ebf3] bg-[#fafcff]/60">
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              totalResults={totalUsers}
+              onPageChange={setPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setPage(0)
+              }}
+              pageSizeOptions={[10, 20, 50, 100]}
+              disabled={isUsersRefreshing}
+            />
+          </div>
         </div>
       </SectionCard>
 
