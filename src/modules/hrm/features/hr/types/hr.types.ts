@@ -190,6 +190,9 @@ export interface EmployeeListItem {
   onboardedAt: string | null;
   laptopSerialNumber?: string | null;
   laptopType?: string | null;
+  laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
+  laptopAssignedDate?: string | null;
+  lastLoginAt?: string | null;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
   isIdCard?: boolean | null;
@@ -217,6 +220,8 @@ export interface CreateEmployeeInput {
   managerId?: number | null;
   laptopSerialNumber?: string;
   laptopType?: string;
+  laptopStatus?: string | null;
+  laptopAssignedDate?: string | null;
   isCompanySim?: boolean;
   companyPhoneNumber?: string;
   isIdCard?: boolean;
@@ -238,6 +243,9 @@ export interface UpdateEmployeeInput {
   managerId: number | null;
   laptopSerialNumber?: string | null;
   laptopType?: string | null;
+  laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
+  laptopAssignedDate?: string | null;
+  lastLoginAt?: string | null;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
   isIdCard?: boolean | null;
