@@ -327,3 +327,77 @@ export async function generateDepartmentSession(
         : undefined),
   })
 }
+
+export interface SendForgotPasswordOtpPayload {
+  phone?: string
+  email?: string
+}
+
+export interface ResetForgotPasswordPayload {
+  phone?: string
+  email?: string
+  otp: string
+  newPassword: string
+  confirmPassword: string
+}
+
+export interface ForgotPasswordApiResponse {
+  success?: boolean
+  message?: string
+  status?: string
+  data?: unknown
+}
+
+export async function sendForgotPasswordOtp(
+  payload: SendForgotPasswordOtpPayload,
+): Promise<ForgotPasswordApiResponse> {
+  const isPhone = Boolean(payload.phone?.trim())
+  const endpoint = isPhone
+    ? '/api/auth/forgot-whatsappOtp/send'
+    : '/api/auth/forgot-email-password/send-otp'
+
+  const body = isPhone
+    ? { phone: payload.phone!.trim() }
+    : { email: payload.email!.trim() }
+
+  return apiRequest<ForgotPasswordApiResponse>(
+    endpoint,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    true,
+  )
+}
+
+export async function resetForgotPassword(
+  payload: ResetForgotPasswordPayload,
+): Promise<ForgotPasswordApiResponse> {
+  const isPhone = Boolean(payload.phone?.trim())
+  const endpoint = isPhone
+    ? '/api/auth/forgot-whatsappOtp/verify-and-reset'
+    : '/api/auth/forgot-email-password/verify-and-reset'
+
+  const body = isPhone
+    ? {
+        phone: payload.phone!.trim(),
+        otp: payload.otp.trim(),
+        newPassword: payload.newPassword,
+        confirmPassword: payload.confirmPassword,
+      }
+    : {
+        email: payload.email!.trim(),
+        otp: payload.otp.trim(),
+        newPassword: payload.newPassword,
+        confirmPassword: payload.confirmPassword,
+      }
+
+  return apiRequest<ForgotPasswordApiResponse>(
+    endpoint,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    true,
+  )
+}

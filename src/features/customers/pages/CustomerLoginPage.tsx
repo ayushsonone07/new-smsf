@@ -6,6 +6,7 @@ import { Icon } from '../../../components/head/shared/Icon'
 import { setCustomerSessionFromAuth } from '../hooks/useCustomerSession'
 import { setSession } from '../../../app/auth/session'
 import { useLoginWithCredentials } from '../../auth/hooks/useLoginWithCredentials'
+import { ForgotPasswordModal } from '../../auth/components/ForgotPasswordModal'
 import './CustomerLoginPage.css'
 
 export function CustomerLoginPage() {
@@ -15,6 +16,7 @@ export function CustomerLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [error, setError] = useState('')
   const isLoading = credentialsMutation.isPending
 
@@ -88,8 +90,17 @@ export function CustomerLoginPage() {
             />
           </label>
 
-          <label className="cust-auth-label">
-            Password
+          <div className="cust-auth-label">
+            <div className="flex items-center justify-between mb-1">
+              <span>Password</span>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-xs font-semibold text-[#2459e0] hover:underline cursor-pointer bg-transparent border-0 p-0"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="cust-auth-password-wrapper">
               <Input
                 type={showPassword ? 'text' : 'password'}
@@ -110,7 +121,7 @@ export function CustomerLoginPage() {
                 <Icon name={showPassword ? 'eye' : 'eye'} size={18} strokeWidth={2} />
               </button>
             </div>
-          </label>
+          </div>
 
           <Button
             type="submit"
@@ -122,6 +133,12 @@ export function CustomerLoginPage() {
           </Button>
         </form>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialContact={email}
+      />
     </main>
   )
 }

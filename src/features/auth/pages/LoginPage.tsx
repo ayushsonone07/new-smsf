@@ -6,6 +6,7 @@ import { useLoginWithCredentials } from '../hooks/useLoginWithCredentials'
 import { homeForRole, setSession } from '../../../app/auth/session'
 import { setCustomerSessionFromAuth } from '../../customers/hooks/useCustomerSession'
 import type { AuthSession } from '../types/auth.types'
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal'
 
 const menu = ['Overview', 'Customers', 'Onboarding', 'Tasks', 'Team', 'Reports']
 const stages = ['New Lead', 'Assigned', 'Processing', 'Completed']
@@ -144,6 +145,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const credentialsMutation = useLoginWithCredentials()
 
   const handleSessionCreated = useCallback((session: AuthSession) => {
@@ -176,7 +178,24 @@ export function LoginPage() {
             </div>
             <form onSubmit={handleCredentialsSubmit} className="space-y-3">
               <div><label htmlFor="login-email" className="mb-1.5 block text-[13px] font-semibold text-slate-700">Email or Mobile Number</label><input id="login-email" required type="text" value={email} onChange={event => setEmail(event.target.value)} placeholder="name@company.com or mobile number" autoComplete="username" className="h-[46px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100" /></div>
-              <div><label htmlFor="login-password" className="mb-1.5 block text-[13px] font-semibold text-slate-700">Password</label><div className="relative"><input id="login-password" required type={showPassword ? 'text' : 'password'} minLength={6} value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" className="h-[46px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 pr-12 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100" /><button type="button" onClick={() => setShowPassword(current => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></div>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label htmlFor="login-password" className="block text-[13px] font-semibold text-slate-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-xs font-semibold text-sky-600 transition-colors hover:text-sky-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <input id="login-password" required type={showPassword ? 'text' : 'password'} minLength={6} value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" className="h-[46px] w-full rounded-xl border border-slate-200 bg-slate-50 px-4 pr-12 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100" />
+                  <button type="button" onClick={() => setShowPassword(current => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500">
+                    {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+                  </button>
+                </div>
+              </div>
               {credentialsError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{credentialsError}</p>}
               <button type="submit" disabled={credentialsMutation.isPending} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:from-sky-600 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60">{credentialsMutation.isPending ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"/>Signing in...</> : <>Sign in <ArrowRight size={17}/></>}</button>
             </form>
@@ -195,6 +214,12 @@ export function LoginPage() {
           <div className="relative z-10 shrink-0 pb-5 text-center text-[11px] text-sky-700/70">Customers · Onboarding · Tasks · Team Management</div>
         </section>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialContact={email}
+      />
     </main>
   )
 }
