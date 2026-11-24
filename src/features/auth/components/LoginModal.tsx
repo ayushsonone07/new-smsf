@@ -4,6 +4,7 @@ import { Building2, Eye, EyeOff } from 'lucide-react'
 import { useLoginWithCredentials } from '../hooks/useLoginWithCredentials'
 import { homeForRole, setSession } from '../../../app/auth/session'
 import type { AuthSession } from '../types/auth.types'
+import { ForgotPasswordModal } from './ForgotPasswordModal'
 
 interface LoginModalProps {
   open: boolean
@@ -35,6 +36,7 @@ export function LoginModal({ open, onClose, onRegister }: LoginModalProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const credentialsMutation = useLoginWithCredentials()
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -165,12 +167,21 @@ export function LoginModal({ open, onClose, onRegister }: LoginModalProps) {
               </div>
 
               <div className="space-y-1.5">
-                <label
-                  htmlFor="login-password"
-                  className="block text-xs font-medium text-slate-600"
-                >
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="login-password"
+                    className="block text-xs font-medium text-slate-600"
+                  >
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     id="login-password"
@@ -233,6 +244,12 @@ export function LoginModal({ open, onClose, onRegister }: LoginModalProps) {
           </div>
         </main>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialContact={email}
+      />
     </div>
   )
 }

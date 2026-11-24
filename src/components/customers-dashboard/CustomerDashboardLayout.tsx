@@ -11,6 +11,7 @@ import './CustomerDashboard.css'
 interface CustomerDashboardLayoutProps {
   activeKey?: string
   children?: ReactNode
+  standalone?: boolean
 }
 
 interface CustomerNotificationPayload {
@@ -34,6 +35,7 @@ interface UnreadCountResponse {
 export function CustomerDashboardLayout({
   activeKey = 'dashboard',
   children,
+  standalone = false,
 }: CustomerDashboardLayoutProps) {
   const [collapsed, setCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768,
@@ -110,6 +112,9 @@ export function CustomerDashboardLayout({
       </main>
     </div>
   )
+  if (standalone) {
+    return <div className="cdb-public-form-shell">{children}</div>
+  }
   return isCustomerAuthenticated ? (
     <NotificationCenter
       items={notifications}

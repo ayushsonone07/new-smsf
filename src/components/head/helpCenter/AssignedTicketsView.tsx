@@ -1175,14 +1175,36 @@ export function AssignedTicketsView({
             <div className="border-b border-[#e6e9f0] px-4 py-4 sm:px-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[10.5px] font-bold tracking-[0.08em] text-slate-400">TICKET DETAILS</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTicketNumber(null)}
-                  aria-label="Close details"
-                  className="grid h-8 w-8 place-items-center rounded-lg border border-[#e6e9f0] text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCallsView({ ticketNumber: selectedTicket.ticketNumber })}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#c7d6fb] bg-[#eaf0ff] px-2.5 py-1 text-xs font-semibold text-[#2459e0] transition hover:bg-[#dbe6ff]"
+                    title={`Call history for ${selectedTicket.ticketNumber}`}
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    <span>Call History</span>
+                  </button>
+                  {canViewHistory && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenHistoryModal(selectedTicket.ticketNumber, selectedTicket.ticketStatus)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
+                      title={`Status history for ${selectedTicket.ticketNumber}`}
+                    >
+                      <History className="h-3.5 w-3.5 text-slate-500" />
+                      <span>History</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTicketNumber(null)}
+                    aria-label="Close details"
+                    className="grid h-8 w-8 place-items-center rounded-lg border border-[#e6e9f0] text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <h2 className="mb-2.5 mt-3 text-xl font-bold leading-snug text-slate-900">{selectedTicket.subject || 'No Subject'}</h2>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -1191,26 +1213,6 @@ export function AssignedTicketsView({
                   {formatPriority(selectedTicket.priority)} priority
                 </span>
                 {renderStatusBadge(selectedTicket, 'text-[11px] px-2')}
-                <button
-                  type="button"
-                  onClick={() => setCallsView({ ticketNumber: selectedTicket.ticketNumber })}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#c7d6fb] bg-[#eaf0ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#2459e0] transition hover:bg-[#dbe6ff]"
-                  title={`Call history for ${selectedTicket.ticketNumber}`}
-                >
-                  <PhoneCall className="h-3 w-3" />
-                  <span>Call History</span>
-                </button>
-                {canViewHistory && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenHistoryModal(selectedTicket.ticketNumber, selectedTicket.ticketStatus)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
-                    title={`Status history for ${selectedTicket.ticketNumber}`}
-                  >
-                    <History className="h-3 w-3 text-slate-500" />
-                    <span>History</span>
-                  </button>
-                )}
               </div>
             </div>
 
