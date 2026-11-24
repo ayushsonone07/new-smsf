@@ -1568,6 +1568,89 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 12px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cdb-working-hours-add {
+  min-height: 36px;
+  padding: 0 15px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  color: #334155;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cdb-working-hours-add:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.cdb-working-hours-list {
+  display: grid;
+  gap: 12px;
+}
+
+.cdb-working-hours-card {
+  position: relative;
+  padding: 16px 14px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.cdb-working-hours-card-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cdb-working-hours-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cdb-working-hours-range:last-child {
+  margin-bottom: 0;
+}
+
+.cdb-working-hours-range > span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.cdb-working-hours-range > .cdb-input,
+.cdb-working-hours-range > .cdb-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.cdb-working-hours-remove {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  z-index: 1;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #ef4444;
+  background: #fee2e2;
+  cursor: pointer;
 }
 
 .cdb-empty-hours {
@@ -1581,26 +1664,6 @@
   font-weight: 500;
 }
 
-.cdb-working-hour-row {
-  display: grid;
-  grid-template-columns: minmax(100px, 0.8fr) 1fr 1fr 34px;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.cdb-working-hour-row > button {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  color: #dc2626;
-  background: #fff;
-  cursor: pointer;
-}
-
 @media (max-width: 720px) {
   .cdb-details-grid {
     grid-template-columns: 1fr;
@@ -1610,8 +1673,8 @@
     grid-column: auto;
   }
 
-  .cdb-working-hour-row {
-    grid-template-columns: 1fr 1fr;
+  .cdb-working-hours-range {
+    gap: 7px;
   }
 }
 .cdb-share-link-button {

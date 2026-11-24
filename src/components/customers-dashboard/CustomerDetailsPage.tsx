@@ -23,10 +23,64 @@ export interface OfferItem {
 }
 
 interface WorkingHourItem {
-  day: string
-  from: string
-  to: string
+  startDay: string
+  endDay: string
+  startTime: string
+  endTime: string
 }
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function WorkingHoursEditor({
+  value,
+  onChange,
+}: {
+  value: WorkingHourItem[]
+  onChange: Dispatch<SetStateAction<WorkingHourItem[]>>
+}) {
+  const addRange = () => {
+    onChange((items) => [...items, { startDay: 'Mon', endDay: 'Fri', startTime: '09:00', endTime: '18:00' }])
+  }
+
+  const updateRange = (index: number, field: keyof WorkingHourItem, fieldValue: string) => {
+    onChange((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: fieldValue } : item))
+  }
+
+  return (
+    <div className="cdb-working-hours-editor">
+      <div className="cdb-working-hours-heading">
+        <span>Working Hours (From ~ To)</span>
+        <button type="button" className="cdb-working-hours-add" onClick={addRange}>+ Add</button>
+      </div>
+      {value.length === 0 ? <div className="cdb-empty-hours">No working hours added.</div> : (
+        <div className="cdb-working-hours-list">
+          {value.map((range, index) => (
+            <div className="cdb-working-hours-card" key={index}>
+              <button type="button" className="cdb-working-hours-remove" aria-label="Remove working hours" onClick={() => onChange((items) => items.filter((_, itemIndex) => itemIndex !== index))}><CloseIcon size={14} /></button>
+              <span className="cdb-working-hours-card-label">Days</span>
+              <div className="cdb-working-hours-range">
+                <select className="cdb-select" value={range.startDay} onChange={(event) => updateRange(index, 'startDay', event.target.value)}>{WEEKDAYS.map((day) => <option key={day}>{day}</option>)}</select>
+                <span>to</span>
+                <select className="cdb-select" value={range.endDay} onChange={(event) => updateRange(index, 'endDay', event.target.value)}>{WEEKDAYS.map((day) => <option key={day}>{day}</option>)}</select>
+              </div>
+              <span className="cdb-working-hours-card-label">Hours</span>
+              <div className="cdb-working-hours-range">
+                <input type="time" className="cdb-input" value={range.startTime} onChange={(event) => updateRange(index, 'startTime', event.target.value)} />
+                <span>to</span>
+                <input type="time" className="cdb-input" value={range.endTime} onChange={(event) => updateRange(index, 'endTime', event.target.value)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const BUSINESS_CATEGORIES = [
+  'Retail', 'Restaurant', 'IT Services', 'Healthcare', 'Education',
+  'Real Estate', 'Salon & Beauty', 'Other',
+]
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
@@ -173,6 +227,7 @@ export function CustomerDetailsPage() {
   const [bookingLink, setBookingLink] = useState('')
   const [paymentLink, setPaymentLink] = useState('')
   const [businessCategory, setBusinessCategory] = useState('')
+  const [customBusinessCategory, setCustomBusinessCategory] = useState('')
   const [businessTagline, setBusinessTagline] = useState('')
   const [email, setEmail] = useState(session?.email ?? '')
   const [servicesInput, setServicesInput] = useState('')
@@ -214,6 +269,10 @@ export function CustomerDetailsPage() {
   const [aiChatbotEmail, setAiChatbotEmail] = useState('')
   const [aiChatbotLink, setAiChatbotLink] = useState('')
 
+  const resolvedBusinessCategory = businessCategory === 'Other'
+    ? customBusinessCategory.trim()
+    : businessCategory.trim()
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const search = new URLSearchParams(window.location.search)
@@ -252,7 +311,14 @@ export function CustomerDetailsPage() {
           if (profile.logoLink) setLogoOption(profile.logoLink)
           if (profile.imagesLink) setImageOption(profile.imagesLink)
           if (profile.tagline) setBusinessTagline(profile.tagline)
-          if (profile.businessCategory) setBusinessCategory(profile.businessCategory)
+          if (profile.businessCategory) {
+            if (BUSINESS_CATEGORIES.includes(profile.businessCategory)) {
+              setBusinessCategory(profile.businessCategory)
+            } else {
+              setBusinessCategory('Other')
+              setCustomBusinessCategory(profile.businessCategory)
+            }
+          }
           if (profile.businessCategory) setWebsiteCategory(profile.businessCategory)
           if (profile.bookingLink) setBookingLink(profile.bookingLink)
           if (profile.paymentLink) setPaymentLink(profile.paymentLink)
@@ -277,11 +343,18 @@ export function CustomerDetailsPage() {
             try {
               const parsedHours = JSON.parse(profile.workingHours)
               if (Array.isArray(parsedHours)) {
-                const hours = parsedHours.map((item) => ({
-                  day: item.day || item.d || 'Mon',
-                  from: item.from || item.f || '09:00',
-                  to: item.to || item.t || '18:00',
-                }))
+                const hours = parsedHours.map((item) => {
+                  const legacyFrom = String(item.from || item.f || '')
+                  const legacyTo = String(item.to || item.t || '')
+                  const fromDate = legacyFrom.includes('T') ? new Date(legacyFrom) : null
+                  const toDate = legacyTo.includes('T') ? new Date(legacyTo) : null
+                  return {
+                    startDay: String(item.startDay || item.fromDay || item.day || item.d || (fromDate && !Number.isNaN(fromDate.getTime()) ? WEEKDAYS[(fromDate.getDay() + 6) % 7] : 'Mon')).slice(0, 3),
+                    endDay: String(item.endDay || item.toDay || (toDate && !Number.isNaN(toDate.getTime()) ? WEEKDAYS[(toDate.getDay() + 6) % 7] : 'Fri')).slice(0, 3),
+                    startTime: item.startTime || item.fromTime || item.f || (legacyFrom.includes('T') ? legacyFrom.split('T')[1].slice(0, 5) : legacyFrom) || '09:00',
+                    endTime: item.endTime || item.toEndTime || item.fromEndTime || item.t || (legacyTo.includes('T') ? legacyTo.split('T')[1].slice(0, 5) : legacyTo) || '18:00',
+                  }
+                })
                 setWebsiteWorkingHours(hours)
                 setAutomationWorkingHours(hours)
               }
@@ -316,14 +389,14 @@ export function CustomerDetailsPage() {
   const missingRecommendedFields = useMemo(() => {
     const fields = [
       { label: 'Brand Name', value: basicBrandName || brandName },
-      { label: 'Business Category', value: businessCategory || googleBusinessCategory },
+      { label: 'Business Category', value: resolvedBusinessCategory || googleBusinessCategory },
       { label: 'Area', value: basicArea || area },
       { label: 'State', value: basicState || stateName },
       { label: 'City', value: basicCity || cityName },
       { label: 'Google Review Link', value: googleReviewLink },
     ]
     return fields.filter((field) => !field.value.trim()).map((field) => field.label)
-  }, [area, basicArea, basicBrandName, basicCity, basicState, brandName, businessCategory, cityName, googleBusinessCategory, googleReviewLink, stateName])
+  }, [area, basicArea, basicBrandName, basicCity, basicState, brandName, cityName, googleBusinessCategory, googleReviewLink, resolvedBusinessCategory, stateName])
 
   const serviceSuggestions = useMemo(() => {
     const entered = servicesInput.trim()
@@ -402,7 +475,7 @@ export function CustomerDetailsPage() {
       logoLink: logoOption.trim() || undefined,
       imagesLink: imageOption.trim() || undefined,
       tagline: businessTagline.trim() || undefined,
-      businessCategory: businessCategory.trim() || websiteCategory.trim() || googleBusinessCategory.trim() || undefined,
+      businessCategory: resolvedBusinessCategory || websiteCategory.trim() || googleBusinessCategory.trim() || undefined,
       bookingLink: bookingLink.trim() || undefined,
       paymentLink: paymentLink.trim() || undefined,
       topProducts: [...new Set([...servicesForSave, ...autoServices])].join(', ') || undefined,
@@ -487,15 +560,36 @@ export function CustomerDetailsPage() {
     }
   }
 
-  function addMainService(value: string) {
-    const service = value.trim()
-    if (!service || mainServices.length >= 15) return
-    if (mainServices.some((item) => item.toLowerCase() === service.toLowerCase())) {
-      setServicesInput('')
-      setServiceSuggestionsOpen(false)
+  function mergeServices(items: string[], values: string[]) {
+    const merged = [...items]
+    const selected = new Set(items.map((item) => item.toLowerCase()))
+    for (const rawValue of values) {
+      const service = rawValue.trim()
+      const key = service.toLowerCase()
+      if (!service || selected.has(key) || merged.length >= 15) continue
+      merged.push(service)
+      selected.add(key)
+    }
+    return merged
+  }
+
+  function handleCommaSeparatedInput(
+    value: string,
+    setter: Dispatch<SetStateAction<string[]>>,
+    setInput: Dispatch<SetStateAction<string>>,
+  ) {
+    if (!value.includes(',')) {
+      setInput(value)
       return
     }
-    setMainServices((items) => [...items, service])
+    const parts = value.split(',')
+    const unfinishedValue = parts.pop() ?? ''
+    setter((items) => mergeServices(items, parts))
+    setInput(unfinishedValue.trimStart())
+  }
+
+  function addMainService(value: string) {
+    setMainServices((items) => mergeServices(items, value.split(',')))
     setServicesInput('')
     setServiceSuggestionsOpen(false)
   }
@@ -509,10 +603,8 @@ export function CustomerDetailsPage() {
   }
 
   function handleAddAutoService() {
-    if (autoServicesInput.trim() && autoServices.length < 15) {
-      setAutoServices([...autoServices, autoServicesInput.trim()])
-      setAutoServicesInput('')
-    }
+    setAutoServices((items) => mergeServices(items, autoServicesInput.split(',')))
+    setAutoServicesInput('')
   }
 
   function addSocialLink() {
@@ -522,19 +614,6 @@ export function CustomerDetailsPage() {
     setSocialLinkInput('')
   }
 
-  function addWorkingHour(setter: Dispatch<SetStateAction<WorkingHourItem[]>>) {
-    setter((items) => [...items, { day: 'Mon', from: '09:00', to: '18:00' }])
-  }
-
-  function updateWorkingHour(
-    setter: Dispatch<SetStateAction<WorkingHourItem[]>>,
-    index: number,
-    field: keyof WorkingHourItem,
-    value: string,
-  ) {
-    setter((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item))
-  }
-
   function prefillRepeatedFields(step: number, servicesOverride?: string[]) {
     if (step === 2) {
       setBillingAddress((value) => value.trim() ? value : basicAddress)
@@ -542,19 +621,19 @@ export function CustomerDetailsPage() {
 
     if (step === 3) {
       setWebsiteBusinessName((value) => value.trim() ? value : businessName)
-      setWebsiteCategory((value) => value.trim() ? value : businessCategory)
+      setWebsiteCategory((value) => value.trim() ? value : resolvedBusinessCategory)
       setWebsiteFullAddress((value) => value.trim() ? value : basicAddress)
       setWebsiteContactEmail((value) => value.trim() ? value : email)
     }
 
     if (step === 4) {
       setBrandName((value) => value.trim() ? value : basicBrandName)
-      setGoogleBusinessCategory((value) => value.trim() ? value : businessCategory)
+      setGoogleBusinessCategory((value) => value.trim() ? value : resolvedBusinessCategory)
     }
 
     if (step === 5) {
       setAutomationBusinessName((value) => value.trim() ? value : businessName)
-      setAutomationCategory((value) => value.trim() ? value : businessCategory)
+      setAutomationCategory((value) => value.trim() ? value : resolvedBusinessCategory)
       setArea((value) => value.trim() ? value : basicArea)
       setFullAddress((value) => value.trim() ? value : basicAddress)
       setStateName((value) => value.trim() ? value : basicState)
@@ -831,7 +910,29 @@ export function CustomerDetailsPage() {
               <div className="cdb-details-grid">
                 <label className="cdb-field"><span>Business Name *</span><input className="cdb-input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
                 <label className="cdb-field"><span>Brand Name</span><input className="cdb-input" value={basicBrandName} onChange={(e) => setBasicBrandName(e.target.value)} placeholder="As per Google My Business" /></label>
-                <label className="cdb-field"><span>Business Category</span><select className="cdb-select" value={businessCategory} onChange={(e) => setBusinessCategory(e.target.value)}><option value="">Select business category...</option>{['Retail','Restaurant','IT Services','Healthcare','Education','Real Estate','Salon & Beauty','Other'].map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field">
+                  <span>Business Category</span>
+                  <select
+                    className="cdb-select"
+                    value={businessCategory}
+                    onChange={(e) => {
+                      setBusinessCategory(e.target.value)
+                      if (e.target.value !== 'Other') setCustomBusinessCategory('')
+                    }}
+                  >
+                    <option value="">Select business category...</option>
+                    {BUSINESS_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                  {businessCategory === 'Other' ? (
+                    <input
+                      className="cdb-input"
+                      value={customBusinessCategory}
+                      onChange={(e) => setCustomBusinessCategory(e.target.value)}
+                      placeholder="Enter your business category"
+                      aria-label="Custom business category"
+                    />
+                  ) : null}
+                </label>
                 <label className="cdb-field"><span>Business Type</span><input className="cdb-input" value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="e.g. Proprietorship, Partnership, Pvt Ltd" /></label>
                 <label className="cdb-field"><span>Year Started</span><input className="cdb-input" value={yearStarted} onChange={(e) => setYearStarted(e.target.value)} placeholder="e.g. 2020" /></label>
                 <label className="cdb-field"><span>Happy Customers</span><input type="number" min="0" className="cdb-input" value={happyCustomers} onChange={(e) => setHappyCustomers(e.target.value)} placeholder="e.g. 100" /></label>
@@ -984,14 +1085,14 @@ export function CustomerDetailsPage() {
                     <input
                       type="text"
                       className="cdb-input"
-                      placeholder="Type a service or product"
+                      placeholder="Enter services separated by commas"
                       value={servicesInput}
                       maxLength={100}
                       autoComplete="off"
                       onFocus={() => setServiceSuggestionsOpen(true)}
                       onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)}
                       onChange={(e) => {
-                        setServicesInput(e.target.value)
+                        handleCommaSeparatedInput(e.target.value, setMainServices, setServicesInput)
                         setServiceSuggestionsOpen(true)
                       }}
                       onKeyDown={(event) => {
@@ -1295,7 +1396,7 @@ export function CustomerDetailsPage() {
                     <span>Main Services / Products</span>
                     <div className="cdb-service-entry">
                       <div className="cdb-service-input-wrap">
-                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { setServicesInput(e.target.value); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="List one at a time and click +" />
+                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { handleCommaSeparatedInput(e.target.value, setMainServices, setServicesInput); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="Enter services separated by commas" />
                         {serviceSuggestionsOpen && serviceSuggestions.length > 0 ? <div className="cdb-service-suggestions">{serviceSuggestions.map((suggestion) => <button key={suggestion} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addMainService(suggestion)}><span>{suggestion}</span><span>+</span></button>)}</div> : null}
                       </div>
                       <button type="button" className="cdb-btn-primary" onClick={handleAddService}>+</button>
@@ -1312,7 +1413,7 @@ export function CustomerDetailsPage() {
                     <label className="cdb-field"><span>Email</span><input type="email" className="cdb-input" value={websiteContactEmail} onChange={(e) => setWebsiteContactEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
                     <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => setMapLink(e.target.value)} placeholder="Google maps link" /></label>
                     <div className="cdb-field"><span>Social Links</span><div className="cdb-service-entry"><input className="cdb-input" value={socialLinkInput} onChange={(e) => setSocialLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSocialLink() } }} placeholder="https://instagram.com/your-handle" /><button type="button" className="cdb-btn-primary" onClick={addSocialLink}>+</button></div><div className="cdb-service-stack">{socialLinks.map((link, index) => <span className="cdb-service-chip" key={`${link}-${index}`}>{link}<button type="button" onClick={() => setSocialLinks((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div></div>
-                    <div className="cdb-field cdb-field-wide"><div className="cdb-working-hours-heading"><span>Working Hours (From ~ To)</span><button type="button" className="cdb-btn-secondary" onClick={() => addWorkingHour(setWebsiteWorkingHours)}>+ Add</button></div>{websiteWorkingHours.length === 0 ? <div className="cdb-empty-hours">No working hours added.</div> : websiteWorkingHours.map((hour, index) => <div className="cdb-working-hour-row" key={`${hour.day}-${index}`}><select className="cdb-select" value={hour.day} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'day', e.target.value)}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day) => <option key={day}>{day}</option>)}</select><input type="time" className="cdb-input" value={hour.from} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'from', e.target.value)} /><input type="time" className="cdb-input" value={hour.to} onChange={(e) => updateWorkingHour(setWebsiteWorkingHours, index, 'to', e.target.value)} /><button type="button" onClick={() => setWebsiteWorkingHours((items) => items.filter((_, i) => i !== index))}><CloseIcon size={15} /></button></div>)}</div>
+                    <div className="cdb-field cdb-field-wide"><WorkingHoursEditor value={websiteWorkingHours} onChange={setWebsiteWorkingHours} /></div>
                   </div>
                 </div>
               </div>
@@ -1639,25 +1740,20 @@ export function CustomerDetailsPage() {
                     <input
                       type="text"
                       className="cdb-input"
-                      placeholder="List one at a time and click +"
+                      placeholder="Enter services separated by commas"
                       value={autoServicesInput}
-                      onChange={(e) => setAutoServicesInput(e.target.value)}
+                      onChange={(e) => handleCommaSeparatedInput(e.target.value, setAutoServices, setAutoServicesInput)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddAutoService() } }}
                     />
                     <button type="button" className="cdb-btn-primary" onClick={handleAddAutoService} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>+</button>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>Add one item at a time and click +</span>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>Separate multiple services with commas.</span>
                   {autoServices.length > 0 ? <div className="cdb-service-stack">{autoServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}>{service}<button type="button" onClick={() => setAutoServices((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div> : null}
                   <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>{autoServices.length}/15 added</span>
                 </div>
 
                 {/* 7. Working Hours */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>Working Hours (From ~ To)</label>
-                    <button type="button" className="cdb-btn-secondary" style={{ fontSize: '11px', padding: '2px 8px' }} onClick={() => addWorkingHour(setAutomationWorkingHours)}>+ Add</button>
-                  </div>
-                  {automationWorkingHours.length === 0 ? <div className="cdb-empty-hours">No working hours added.</div> : automationWorkingHours.map((hour, index) => <div className="cdb-working-hour-row" key={`${hour.day}-${index}`}><select className="cdb-select" value={hour.day} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'day', e.target.value)}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day) => <option key={day}>{day}</option>)}</select><input type="time" className="cdb-input" value={hour.from} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'from', e.target.value)} /><input type="time" className="cdb-input" value={hour.to} onChange={(e) => updateWorkingHour(setAutomationWorkingHours, index, 'to', e.target.value)} /><button type="button" onClick={() => setAutomationWorkingHours((items) => items.filter((_, i) => i !== index))}><CloseIcon size={15} /></button></div>)}
-                </div>
+                <WorkingHoursEditor value={automationWorkingHours} onChange={setAutomationWorkingHours} />
 
                 {/* 8. AI Chatbot Configuration (Purple Card Box) */}
                 <div style={{ background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
