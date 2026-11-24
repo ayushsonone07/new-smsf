@@ -40,8 +40,16 @@ export type {
   UpdateAdditionalInfoInput,
   UpdateEmployeeInput,
   UpdateEmployeeStatusInput,
+  LaptopAssignmentHistory,
+  SimAssignmentHistory,
   UpdateRemarkInput,
   UserRole,
+  CompanyAsset,
+  CompanyAssetType,
+  CompanyAssetStatus,
+  InventorySummary,
+  CreateAssetInput,
+  UpdateAssetStatusInput,
 } from "./hr.types";
 
 export { CANDIDATE_STATUSES, HIRING_APPROVAL_STATUSES, ONBOARDING_STATUSES } from "./hr.types";

@@ -193,8 +193,14 @@ export interface EmployeeListItem {
   laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
+  forceTransfer?: boolean;
+  returnCondition?: string;
+  returnRemarks?: string;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  forceSimTransfer?: boolean;
+  simReturnCondition?: string;
+  simReturnRemarks?: string;
   isIdCard?: boolean | null;
   idCardNumber?: string | null;
   isVisitingCard?: boolean | null;
@@ -246,8 +252,14 @@ export interface UpdateEmployeeInput {
   laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
+  forceTransfer?: boolean;
+  returnCondition?: string;
+  returnRemarks?: string;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  forceSimTransfer?: boolean;
+  simReturnCondition?: string;
+  simReturnRemarks?: string;
   isIdCard?: boolean | null;
   idCardNumber?: string | null;
   isVisitingCard?: boolean | null;
@@ -257,6 +269,33 @@ export interface UpdateEmployeeInput {
 export interface UpdateEmployeeStatusInput {
   status: EmployeeStatus;
   exitDate: string | null;
+}
+
+export interface LaptopAssignmentHistory {
+  id: number;
+  serialNumber: string;
+  laptopType?: string | null;
+  actionType: "ASSIGNED" | "RETURNED" | "TRANSFERRED" | "DAMAGED";
+  employeeId?: number | null;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  performedByName?: string | null;
+  deviceCondition?: "WORKING" | "DAMAGED" | string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export interface SimAssignmentHistory {
+  id: number;
+  phoneNumber: string;
+  actionType: "ASSIGNED" | "RETURNED" | "TRANSFERRED" | "LOST" | "DAMAGED";
+  employeeId?: number | null;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  performedByName?: string | null;
+  simStatus?: "ACTIVE" | "INACTIVE" | "LOST" | "DAMAGED" | string | null;
+  remarks?: string | null;
+  createdAt: string;
 }
 export interface Department {
   id: number;
@@ -501,4 +540,55 @@ export interface EmployeeAttendanceMonthlyResponse {
   employee: EmployeeAttendanceEmployee;
   records: AttendanceRecord[];
   summary: EmployeeAttendanceSummary;
+}
+
+export type CompanyAssetType = "LAPTOP" | "SIM" | "OTHER";
+export type CompanyAssetStatus = "AVAILABLE" | "ASSIGNED" | "UNDER_REPAIR" | "SCRAPPED";
+
+export interface CompanyAsset {
+  id: number;
+  assetType: CompanyAssetType;
+  assetName: string;
+  identifier: string;
+  status: CompanyAssetStatus;
+  currentEmployeeId?: number | null;
+  currentEmployeeName?: string | null;
+  currentEmployeeCode?: string | null;
+  specifications?: string | null;
+  purchaseDate?: string | null;
+  warrantyExpiryDate?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventorySummary {
+  totalAssets: number;
+  totalLaptops: number;
+  laptopsAvailable: number;
+  laptopsAssigned: number;
+  laptopsUnderRepair: number;
+  totalSims: number;
+  simsAvailable: number;
+  simsAssigned: number;
+  totalAvailable: number;
+  totalAssigned: number;
+  totalUnderRepair: number;
+}
+
+export interface CreateAssetInput {
+  assetType: CompanyAssetType;
+  assetName: string;
+  identifier: string;
+  specifications?: string;
+  purchaseDate?: string;
+  warrantyExpiryDate?: string;
+  assignToEmployeeId?: number | null;
+  remarks?: string;
+}
+
+export interface UpdateAssetStatusInput {
+  status: CompanyAssetStatus;
+  assignToEmployeeId?: number | null;
+  remarks?: string;
 }

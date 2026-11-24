@@ -35,7 +35,13 @@ import type {
   UpdateAdditionalInfoInput,
   UpdateEmployeeInput,
   UpdateEmployeeStatusInput,
+  LaptopAssignmentHistory,
+  SimAssignmentHistory,
   UpdateRemarkInput,
+  CompanyAsset,
+  CreateAssetInput,
+  InventorySummary,
+  UpdateAssetStatusInput,
 } from "../types";
 
 /** Turn a {from,to} Date range into the {from,to} DD/MM/YYYY params the API expects. */
@@ -292,6 +298,22 @@ export const hrService = {
     const { data } = await http.patch<ApiEnvelope<EmployeeListItem>>(
       HR_ENDPOINT_BUILDERS.employeeStatus(employeeId),
       input,
+    );
+    return data.data;
+  },
+
+  async getLaptopHistory(serialNumber: string): Promise<LaptopAssignmentHistory[]> {
+    const { data } = await http.get<ApiEnvelope<LaptopAssignmentHistory[]>>(
+      "/api/v1/hr/assets/laptop-history",
+      { params: { serialNumber } },
+    );
+    return data.data;
+  },
+
+  async getSimHistory(phoneNumber: string): Promise<SimAssignmentHistory[]> {
+    const { data } = await http.get<ApiEnvelope<SimAssignmentHistory[]>>(
+      "/api/v1/hr/assets/sim-history",
+      { params: { phoneNumber } },
     );
     return data.data;
   },
@@ -649,6 +671,45 @@ export const hrService = {
       { params: { q: q?.trim() || "", limit } },
     );
     return data?.data || [];
+  },
+
+  async getInventoryAssets(params?: {
+    type?: string;
+    status?: string;
+    q?: string;
+    page?: number;
+    size?: number;
+  }): Promise<{ content: CompanyAsset[]; totalElements: number; totalPages: number }> {
+    const { data } = await http.get<{
+      data: {
+        content: CompanyAsset[];
+        totalElements: number;
+        totalPages: number;
+      };
+    }>("/api/v1/hr/assets/inventory", { params });
+    return data?.data || { content: [], totalElements: 0, totalPages: 0 };
+  },
+
+  async getInventorySummary(): Promise<InventorySummary> {
+    const { data } = await http.get<{ data: InventorySummary }>("/api/v1/hr/assets/inventory/summary");
+    return data.data;
+  },
+
+  async getAvailableAssets(type?: "LAPTOP" | "SIM" | "OTHER"): Promise<CompanyAsset[]> {
+    const { data } = await http.get<{ data: CompanyAsset[] }>("/api/v1/hr/assets/inventory/available", {
+      params: { type: type || "LAPTOP" },
+    });
+    return data?.data || [];
+  },
+
+  async createInventoryAsset(input: CreateAssetInput): Promise<CompanyAsset> {
+    const { data } = await http.post<{ data: CompanyAsset }>("/api/v1/hr/assets/inventory", input);
+    return data.data;
+  },
+
+  async updateInventoryAssetStatus(id: number, input: UpdateAssetStatusInput): Promise<CompanyAsset> {
+    const { data } = await http.patch<{ data: CompanyAsset }>(`/api/v1/hr/assets/inventory/${id}/status`, input);
+    return data.data;
   },
 
 };
