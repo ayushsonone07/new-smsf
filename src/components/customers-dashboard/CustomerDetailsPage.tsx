@@ -14,6 +14,7 @@ import {
 import { useCustomerSession } from '../../features/customers/hooks/useCustomerSession'
 import { decryptUrlParams, getCustomerFormUrl } from '../../utils/urlEncryption'
 import { getCustomerProfileDetails, saveCustomerProfileDetails, type CustomerProfileDetails } from '../../api/customer-drawer.api'
+import { getCitiesForState } from '../../constants/indianStateCities'
 
 export interface OfferItem {
   id: string
@@ -185,6 +186,7 @@ function parseFriendlyError(rawMsg: string): { title: string; message: string; f
 }
 
 export function CustomerDetailsPage() {
+  const isSharedForm = typeof window !== 'undefined' && window.location.pathname === '/customer-details'
   const navigate = useNavigate()
   const { session } = useCustomerSession()
 
@@ -199,6 +201,8 @@ export function CustomerDetailsPage() {
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [isDuplicate, setIsDuplicate] = useState(false)
   const [ownerName, setOwnerName] = useState('')
+  const [clientRemark, setClientRemark] = useState('')
+  const [additionalInformation, setAdditionalInformation] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
 
@@ -337,6 +341,8 @@ export function CustomerDetailsPage() {
           if (profile.address) { setBasicAddress(profile.address); setWebsiteFullAddress(profile.address); setFullAddress(profile.address) }
           if (profile.zipCode) setZipCode(profile.zipCode)
           if (profile.country) setCountry(profile.country)
+          if (profile.remarks) setClientRemark(profile.remarks)
+          if (profile.additionalInstructions) setAdditionalInformation(profile.additionalInstructions)
           if (profile.email) setWebsiteContactEmail(profile.email)
           if (profile.socialLinks) setSocialLinks(profile.socialLinks.split(',').map((item) => item.trim()).filter(Boolean))
           if (profile.workingHours) {
@@ -410,11 +416,14 @@ export function CustomerDetailsPage() {
     return (canAddEntered ? [entered, ...matches] : matches).slice(0, 6)
   }, [mainServices, servicesInput])
 
+  const basicCityOptions = useMemo(() => getCitiesForState(basicState, basicCity), [basicCity, basicState])
+  const automationCityOptions = useMemo(() => getCitiesForState(stateName, cityName), [cityName, stateName])
+
   async function handleNextStep(e?: FormEvent, confirmedRecommendedFields = false) {
     if (e) e.preventDefault()
     if (isSaving) return
 
-    if (activeStep === 5 && missingRecommendedFields.length > 0 && !confirmedRecommendedFields) {
+    if ((isSharedForm || activeStep === 5) && missingRecommendedFields.length > 0 && !confirmedRecommendedFields) {
       setCompletionAcknowledged(false)
       setShowCompletionConfirm(true)
       return
@@ -423,7 +432,7 @@ export function CustomerDetailsPage() {
     const effectivePhone = (phone || searchContact || session?.phone || '').trim()
 
     // Validation
-    if (activeStep === 1) {
+    if (isSharedForm || activeStep === 1) {
       if (!businessName.trim()) {
         setToast({ type: 'error', title: 'Required Field', message: 'Business Name is required before proceeding.' })
         return
@@ -446,7 +455,7 @@ export function CustomerDetailsPage() {
     const pendingService = servicesInput.trim()
     const servicesForSave = [...mainServices]
     if (
-      activeStep === 3
+      (isSharedForm || activeStep === 3)
       && pendingService
       && servicesForSave.length < 15
       && !servicesForSave.some((service) => service.toLowerCase() === pendingService.toLowerCase())
@@ -494,6 +503,8 @@ export function CustomerDetailsPage() {
         : undefined,
       websiteLink: websiteLink.trim() || undefined,
       mainGoal: mainGoal.trim() || undefined,
+      remarks: clientRemark.trim() || undefined,
+      additionalInstructions: additionalInformation.trim() || undefined,
       offers: offers.filter(o => o.offerType || o.discountValue || o.description).length
         ? JSON.stringify(offers.filter(o => o.offerType || o.discountValue || o.description))
         : undefined,
@@ -519,7 +530,7 @@ export function CustomerDetailsPage() {
       setToast({
         type: 'success',
         title: 'Details Saved Successfully',
-        message: activeStep === 5 ? 'All customer details have been saved to your business profile.' : 'Step details saved. Proceeding to next step.',
+        message: isSharedForm || activeStep === 5 ? 'All customer details have been saved to your business profile.' : 'Step details saved. Proceeding to next step.',
       })
       setTimeout(() => setToast(null), 4000)
 
@@ -529,7 +540,11 @@ export function CustomerDetailsPage() {
         return next
       })
 
-      if (activeStep < 5) {
+      if (isSharedForm) {
+        setShowCompletionConfirm(false)
+        setCompletionAcknowledged(false)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } else if (activeStep < 5) {
         prefillRepeatedFields(activeStep + 1, servicesForSave)
         setActiveStep((prev) => prev + 1)
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -672,17 +687,17 @@ export function CustomerDetailsPage() {
   }
 
   return (
-    <CustomerDashboardLayout activeKey="my-details">
+    <CustomerDashboardLayout activeKey="my-details" standalone={isSharedForm}>
       <div className="cdb-body">
         {/* Breadcrumb line */}
-        <div className="cdb-preview-bar">
+        {!isSharedForm ? <div className="cdb-preview-bar">
           <span className="cdb-preview-icon">
             <Icon name="eye" size={16} />
           </span>
           <span>
             MBG Card &gt; <strong>Customer Dashboard</strong> — Your services, bills &amp; account at a glance
           </span>
-        </div>
+        </div> : null}
 
         {/* Main Details Card */}
         <div className="cdb-card" style={{ padding: '24px' }}>
@@ -797,15 +812,16 @@ export function CustomerDetailsPage() {
                     textTransform: 'uppercase',
                   }}
                 >
-                  CUSTOMER DETAILS
+                  {isSharedForm ? 'SHAREABLE CUSTOMER FORM' : 'CUSTOMER DETAILS'}
                 </span>
                 <h2 className="cdb-card-title" style={{ fontSize: '20px' }}>
-                  Complete your business profile
+                  {isSharedForm ? 'Customer Details' : 'Complete your business profile'}
                 </h2>
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {!isSharedForm ? <>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                   PROFILE
@@ -829,11 +845,17 @@ export function CustomerDetailsPage() {
                 <Icon name="copy" size={16} />
                 <span>Copy shareable link</span>
               </button>
+              </> : (
+                <button type="button" className="cdb-btn-secondary cdb-share-link-button" onClick={() => void copyShareableFormLink()} title="Copy this editable customer form link">
+                  <Icon name="copy" size={16} />
+                  <span>Copy Form Link</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Stepper Tabs Bar (Strict 5 Steps + Done) */}
-          <div
+          {!isSharedForm ? <div
             style={{
               display: 'flex',
               gap: '8px',
@@ -898,10 +920,12 @@ export function CustomerDetailsPage() {
                 </button>
               )
             })}
-          </div>
+          </div> : null}
+
+          <div className={isSharedForm ? 'cdb-shared-form-sections' : undefined}>
 
           {/* STEP 1: Basic Info */}
-          {activeStep === 1 ? (
+          {isSharedForm || activeStep === 1 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Basic Information</h3>
@@ -941,8 +965,8 @@ export function CustomerDetailsPage() {
                 <label className="cdb-field"><span>Additional Number</span><input type="tel" className="cdb-input" value={additionalNumber} onChange={(e) => setAdditionalNumber(e.target.value)} placeholder="Optional secondary phone number" /></label>
                 <label className="cdb-field"><span>Address</span><input className="cdb-input" value={basicAddress} onChange={(e) => setBasicAddress(e.target.value)} placeholder="e.g. 123, Main Street" /></label>
                 <label className="cdb-field"><span>Area</span><input className="cdb-input" value={basicArea} onChange={(e) => setBasicArea(e.target.value)} placeholder="Dhanwantri chowk, Deen Dayal, etc." /></label>
-                <label className="cdb-field"><span>State</span><select className="cdb-select" value={basicState} onChange={(e) => setBasicState(e.target.value)}><option value="">Select state...</option>{INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}</select></label>
-                <label className="cdb-field"><span>City</span><input className="cdb-input" value={basicCity} onChange={(e) => setBasicCity(e.target.value)} placeholder="e.g. Jabalpur" /></label>
+                <label className="cdb-field"><span>State</span><select className="cdb-select" value={basicState} onChange={(e) => { const nextState = e.target.value; setBasicState(nextState); if (!getCitiesForState(nextState).includes(basicCity)) setBasicCity('') }}><option value="">Select state...</option>{INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field"><span>City</span><select className="cdb-select" value={basicCity} disabled={!basicState} onChange={(e) => setBasicCity(e.target.value)}><option value="">{basicState ? 'Select city...' : 'Select state first...'}</option>{basicCityOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
                 <label className="cdb-field"><span>Zip Code</span><input className="cdb-input" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="000000" maxLength={10} /></label>
                 <label className="cdb-field cdb-field-wide"><span>Country</span><input className="cdb-input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. India" /></label>
               </div>
@@ -992,18 +1016,6 @@ export function CustomerDetailsPage() {
                   <select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}>
                     <option value="">Select logo options...</option>
                     <option value="Have Logo">Have Logo</option>
-                    <option value="Need Logo Design">Need Logo Design</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                    Image Options
-                  </label>
-                  <select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}>
-                    <option value="">Select image options...</option>
-                    <option value="Have Images">Have Images</option>
-                    <option value="Need Stock">Need Stock Images</option>
                   </select>
                 </div>
 
@@ -1211,7 +1223,7 @@ export function CustomerDetailsPage() {
           ) : null}
 
           {/* STEP 2: Billing */}
-          {activeStep === 2 ? (
+          {isSharedForm || activeStep === 2 ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ borderLeft: '3px solid #16a34a', paddingLeft: '12px' }}>
@@ -1350,7 +1362,7 @@ export function CustomerDetailsPage() {
           ) : null}
 
           {/* STEP 3: Website */}
-          {activeStep === 3 ? (
+          {isSharedForm || activeStep === 3 ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
@@ -1385,8 +1397,8 @@ export function CustomerDetailsPage() {
                 </div>
 
                 <div className="cdb-details-grid">
-                  <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Design a logo for me</option><option>Use business name</option></select></label>
-                  <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label>
+                  <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Use business name</option></select></label>
+                  {/* <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label> */}
                   <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => setWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
                   <label className="cdb-field"><span>Booking Link</span><input className="cdb-input" value={bookingLink} onChange={(e) => setBookingLink(e.target.value)} placeholder="e.g. https://..." /></label>
                   <label className="cdb-field"><span>Payment Link</span><input className="cdb-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="e.g. https://razorpay.me/..." /></label>
@@ -1455,7 +1467,7 @@ export function CustomerDetailsPage() {
           ) : null}
 
           {/* STEP 4: GOOGLE STEP (EXACT MATCH FOR SCREENSHOT 1) */}
-          {activeStep === 4 ? (
+          {isSharedForm || activeStep === 4 ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
@@ -1595,7 +1607,7 @@ export function CustomerDetailsPage() {
           ) : null}
 
           {/* STEP 5: AUTOMATION STEP (EXACT MATCH FOR SCREENSHOTS 2, 3, 4) */}
-          {activeStep === 5 ? (
+          {isSharedForm || activeStep === 5 ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px' }}>
@@ -1703,20 +1715,16 @@ export function CustomerDetailsPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>State</label>
-                    <select className="cdb-select" value={stateName} onChange={(e) => setStateName(e.target.value)}>
+                    <select className="cdb-select" value={stateName} onChange={(e) => { const nextState = e.target.value; setStateName(nextState); if (!getCitiesForState(nextState).includes(cityName)) setCityName('') }}>
                       <option value="">Select state...</option>
-                      <option value="Maharashtra">Maharashtra</option>
-                      <option value="Madhya Pradesh">Madhya Pradesh</option>
-                      <option value="Delhi">Delhi</option>
+                      {INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}
                     </select>
                   </div>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>City</label>
-                    <select className="cdb-select" value={cityName} onChange={(e) => setCityName(e.target.value)}>
-                      <option value="">Select city...</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Bhopal">Bhopal</option>
-                      <option value="Indore">Indore</option>
+                    <select className="cdb-select" value={cityName} disabled={!stateName} onChange={(e) => setCityName(e.target.value)}>
+                      <option value="">{stateName ? 'Select city...' : 'Select state first...'}</option>
+                      {automationCityOptions.map((item) => <option key={item}>{item}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1823,8 +1831,49 @@ export function CustomerDetailsPage() {
             </div>
           ) : null}
 
+          </div>
+
+          {isSharedForm || activeStep === 5 ? (
+            <div className="cdb-form-notes">
+              <div className="cdb-client-remark">
+                <label htmlFor="customer-client-remark">Client Remark</label>
+                <textarea
+                  id="customer-client-remark"
+                  className="cdb-textarea"
+                  rows={4}
+                  value={clientRemark}
+                  onChange={(event) => setClientRemark(event.target.value)}
+                  placeholder="Enter any client remarks..."
+                  maxLength={2000}
+                />
+                <small>{clientRemark.length}/2000</small>
+              </div>
+              <div className="cdb-client-remark">
+                <label htmlFor="customer-additional-information">Additional Information</label>
+                <textarea
+                  id="customer-additional-information"
+                  className="cdb-textarea"
+                  rows={5}
+                  value={additionalInformation}
+                  onChange={(event) => setAdditionalInformation(event.target.value)}
+                  placeholder="Enter any other information about the customer or business..."
+                  maxLength={5000}
+                />
+                <small>{additionalInformation.length}/5000</small>
+              </div>
+            </div>
+          ) : null}
+
+          {isSharedForm ? (
+            <div className="cdb-shared-form-actions">
+              <button type="button" className="cdb-shared-form-save" disabled={isSaving} onClick={() => void handleNextStep()}>
+                {isSaving ? <><Loader2 size={17} className="cdb-spin" /> Saving details...</> : <><span>Save Changes</span><CheckCircle2 size={17} /></>}
+              </button>
+            </div>
+          ) : null}
+
           {/* STEP 6: Done (Completed Page) */}
-          {activeStep === 6 ? (
+          {!isSharedForm && activeStep === 6 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '16px', padding: '20px 0' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'grid', placeItems: 'center' }}>
                 <Icon name="check" size={32} strokeWidth={3} />
@@ -1873,7 +1922,7 @@ export function CustomerDetailsPage() {
           ) : null}
 
           {/* Stepper Footer Controls (For Steps 1-5) */}
-          {activeStep <= 5 ? (
+          {!isSharedForm && activeStep <= 5 ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '20px', marginTop: '20px', borderTop: '1px solid #e2e8f0' }}>
               <div>
                 {activeStep > 1 ? (
