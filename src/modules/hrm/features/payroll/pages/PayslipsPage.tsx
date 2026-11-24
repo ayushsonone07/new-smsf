@@ -4,7 +4,7 @@ import { Building2, Download, Eye, FileText } from "lucide-react";
 
 import { useMyProfile } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
-import { ErrorDisplay, EmptyState, PageHeader, Card, Skeleton } from "@shared/components/ui";
+import { ErrorDisplay, EmptyState, Card, Skeleton } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 
@@ -47,20 +47,20 @@ export function PayslipsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Self service"
-        title="My Payslips"
-        description="Download your monthly payslips as PDFs."
-        actions={
-          <RefreshButton
-            onRefresh={() => (employeeId > 0 ? payslipsQuery.refetch() : undefined)}
-            isRefreshing={payslipsQuery.isFetching}
-            label="payslips"
-            className="h-10 w-10 rounded-xl"
-          />
-        }
-      />
+    <div className="space-y-4">
+      {/* Top action row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <FileText size={15} className="text-primary" />
+          <span>My Payslips {payslips && payslips.length > 0 ? `(${payslips.length})` : ""}</span>
+        </div>
+        <RefreshButton
+          onRefresh={() => (employeeId > 0 ? payslipsQuery.refetch() : undefined)}
+          isRefreshing={payslipsQuery.isFetching}
+          label="payslips"
+          className="h-9 w-9 rounded-xl"
+        />
+      </div>
 
       {error ? (
         <ErrorDisplay message={getApiErrorMessage(error, "Failed to load payslips.")} />

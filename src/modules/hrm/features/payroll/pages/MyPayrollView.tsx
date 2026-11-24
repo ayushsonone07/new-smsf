@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ReceiptText, RefreshCw } from "lucide-react";
 
 import { useToast } from "@shared/components/feedback";
-import { ErrorDisplay, PageHeader } from "@shared/components/ui";
+import { ErrorDisplay } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { PayrollDetailsDialog } from "../components/PayrollDetailsDialog";
@@ -36,31 +36,25 @@ export function MyPayrollView() {
   const totalPages = Math.max(1, data?.meta.totalPages ?? 1);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Self service"
-        title="My Payroll"
-        description="Your payroll records, scoped to what you are allowed to see."
-        actions={
-          <button
-            type="button"
-            onClick={() => void handleRefresh()}
-            disabled={isRefreshing}
-            aria-label="Refresh payroll"
-            title="Refresh payroll"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow transition hover:bg-muted disabled:opacity-75"
-          >
-            <RefreshCw size={18} className={isRefreshing ? "animate-spin" : undefined} />
-          </button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <ReceiptText className="h-4 w-4" />
+          <span>Payroll records are snapshots — past months never change when your salary structure is updated.</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleRefresh()}
+          disabled={isRefreshing}
+          aria-label="Refresh payroll"
+          title="Refresh payroll"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-xs transition hover:bg-muted disabled:opacity-75"
+        >
+          <RefreshCw size={15} className={isRefreshing ? "animate-spin" : undefined} />
+        </button>
+      </div>
 
       {error ? <ErrorDisplay message={getApiErrorMessage(error, "Failed to load payroll records.")} /> : null}
-
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <ReceiptText className="h-4 w-4" />
-        Payroll records are snapshots — past months never change when your salary structure is updated.
-      </div>
 
       <div
         className={`transition-opacity ${payrollsRefreshing ? "pointer-events-none opacity-60" : ""}`}

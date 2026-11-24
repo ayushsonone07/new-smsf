@@ -4,7 +4,7 @@ import { CalendarRange, CheckCircle2, FileSpreadsheet, Loader2, Plus, RefreshCw,
 
 import { useRole } from "@features/auth";
 import { useToast } from "@shared/components/feedback";
-import { AnimatedFilterSelect, ErrorDisplay, PageHeader } from "@shared/components/ui";
+import { AnimatedFilterSelect, ErrorDisplay } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
 
 import { BulkPaymentDialog } from "../components/BulkPaymentDialog";
@@ -149,127 +149,127 @@ export function PayrollManagementView() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Finance"
-        title="Payroll"
-        description="Generate monthly payroll runs and manage the approval-to-payment workflow."
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              disabled={isRefreshing}
-              aria-label="Refresh payroll"
-              title="Refresh payroll"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow transition hover:bg-muted disabled:opacity-75"
-            >
-              <RefreshCw size={18} className={isRefreshing ? "animate-spin" : undefined} />
-            </button>
-            {canManage ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowStructure(true)}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-                >
-                  <SlidersHorizontal size={18} />
-                  Salary Structures
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowBulkImport(true)}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-                >
-                  <FileSpreadsheet size={18} className="text-emerald-600 dark:text-emerald-400" />
-                  Bulk Import
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowGenerate(true)}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
-                >
-                  <Plus size={18} />
-                  Generate Payroll
-                </button>
-              </>
-            ) : null}
-          </div>
-        }
-      />
+    <div className="space-y-4">
+      {/* Top Action & Stage Pills Row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {summary.data ? (
+          <PayrollStagePills summary={summary.data} />
+        ) : (
+          <div />
+        )}
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => void handleRefresh()}
+            disabled={isRefreshing}
+            aria-label="Refresh payroll"
+            title="Refresh payroll"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-xs transition hover:bg-muted disabled:opacity-75"
+          >
+            <RefreshCw size={15} className={isRefreshing ? "animate-spin" : undefined} />
+          </button>
+          {canManage ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowStructure(true)}
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-muted"
+              >
+                <SlidersHorizontal size={14} />
+                Salary Structures
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBulkImport(true)}
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-muted"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-600 dark:text-emerald-400" />
+                Bulk Import
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowGenerate(true)}
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:brightness-110"
+              >
+                <Plus size={15} />
+                Generate Payroll
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
 
       {summary.data ? (
         <div
-          className={`space-y-6 transition-opacity ${summaryRefreshing ? "pointer-events-none opacity-60" : ""}`}
+          className={`transition-opacity ${summaryRefreshing ? "pointer-events-none opacity-60" : ""}`}
           aria-busy={summaryRefreshing}
         >
           <PayrollSummaryCards summary={summary.data} />
-          <PayrollStagePills summary={summary.data} />
         </div>
       ) : null}
 
-     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4 lg:flex-row lg:items-center">
-  {/* Search */}
-  <label className="relative min-w-0 flex-1">
-    <Search
-      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-      size={16}
-    />
-    <input
-      type="search"
-      value={q}
-      onChange={(e) => {
-        setQ(e.target.value);
-        setPage(1);
-      }}
-      placeholder="Search name, email, code…"
-      className="block h-10 w-full rounded-xl border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground shadow placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-    />
-  </label>
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted/40 px-4 py-3 lg:flex-row lg:items-center">
+        {/* Search */}
+        <label className="relative min-w-0 flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={16}
+          />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search name, email, code…"
+            className="block h-9 w-full rounded-xl border border-border bg-card py-1.5 pl-9 pr-3 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+          />
+        </label>
 
-  {/* Filters */}
-  <div className="flex shrink-0 items-center gap-2">
-    <CalendarRange
-      className="hidden h-4 w-4 shrink-0 text-muted-foreground xl:block"
-    />
+        {/* Filters */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <CalendarRange
+            className="hidden h-4 w-4 shrink-0 text-muted-foreground xl:block"
+          />
 
-    {/* Month */}
-    <AnimatedFilterSelect
-      value={month === "" ? "" : String(month)}
-      onValueChange={(nextMonth) => {
-        setMonth(nextMonth === "" ? "" : Number(nextMonth));
-        setPage(1);
-      }}
-      options={MONTH_OPTIONS}
-      ariaLabel="Filter by month"
-      className="w-[132px]"
-    />
+          {/* Month */}
+          <AnimatedFilterSelect
+            value={month === "" ? "" : String(month)}
+            onValueChange={(nextMonth) => {
+              setMonth(nextMonth === "" ? "" : Number(nextMonth));
+              setPage(1);
+            }}
+            options={MONTH_OPTIONS}
+            ariaLabel="Filter by month"
+            className="w-[132px]"
+          />
 
-    {/* Year */}
-    <AnimatedFilterSelect
-      value={year === "" ? "" : String(year)}
-      onValueChange={(nextYear) => {
-        setYear(nextYear === "" ? "" : Number(nextYear));
-        setPage(1);
-      }}
-      options={YEAR_OPTIONS}
-      ariaLabel="Filter by year"
-      className="w-[120px]"
-    />
+          {/* Year */}
+          <AnimatedFilterSelect
+            value={year === "" ? "" : String(year)}
+            onValueChange={(nextYear) => {
+              setYear(nextYear === "" ? "" : Number(nextYear));
+              setPage(1);
+            }}
+            options={YEAR_OPTIONS}
+            ariaLabel="Filter by year"
+            className="w-[110px]"
+          />
 
-    {/* Status */}
-    <AnimatedFilterSelect
-      value={status}
-      onValueChange={(nextStatus) => {
-        setStatus(nextStatus as PayrollStatus | "");
-        setPage(1);
-      }}
-      options={STATUS_OPTIONS}
-      ariaLabel="Filter by status"
-      className="w-[180px]"
-    />
-  </div>
-</div>
+          {/* Status */}
+          <AnimatedFilterSelect
+            value={status}
+            onValueChange={(nextStatus) => {
+              setStatus(nextStatus as PayrollStatus | "");
+              setPage(1);
+            }}
+            options={STATUS_OPTIONS}
+            ariaLabel="Filter by status"
+            className="w-[160px]"
+          />
+        </div>
+      </div>
 
       {error ? <ErrorDisplay message={getApiErrorMessage(error, "Failed to load payrolls.")} /> : null}
 

@@ -7,6 +7,7 @@ import {
   FileSearch,
   Filter,
   RefreshCw,
+  RotateCcw,
   ScrollText,
 } from "lucide-react";
 
@@ -18,6 +19,8 @@ import { useDebouncedValue } from "@shared/hooks";
 import { getApiErrorMessage } from "@shared/lib";
 import {
   Card,
+  DateRangePickerPopup,
+  type DateRangeValue,
   Dialog,
   EmptyState,
   ErrorDisplay,
@@ -64,8 +67,7 @@ export function AuditLogsPage() {
   const [entityType, setEntityType] = useState("");
   const [username, setUsername] = useState("");
   const [successFilter, setSuccessFilter] = useState<"" | "true" | "false">("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState<AuditLogRecord | null>(null);
@@ -82,8 +84,8 @@ export function AuditLogsPage() {
   if (debouncedEntity) params.entityType = debouncedEntity;
   if (debouncedUsername) params.username = debouncedUsername;
   if (successFilter !== "") params.success = successFilter === "true";
-  if (fromDate) params.fromDate = `${fromDate}T00:00:00`;
-  if (toDate) params.toDate = `${toDate}T23:59:59`;
+  if (dateRange.from) params.fromDate = `${dateRange.from}T00:00:00`;
+  if (dateRange.to) params.toDate = `${dateRange.to}T23:59:59`;
 
   const auditLogs = useAuditLogs(params);
   const items = auditLogs.data?.items ?? [];
@@ -103,8 +105,7 @@ export function AuditLogsPage() {
     setEntityType("");
     setUsername("");
     setSuccessFilter("");
-    setFromDate("");
-    setToDate("");
+    setDateRange({ from: "", to: "" });
     setPage(0);
   }
 
@@ -198,34 +199,24 @@ export function AuditLogsPage() {
             <option value="false">Failed</option>
           </select>
 
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(event) => {
-              setFromDate(event.target.value);
-              setPage(0);
-            }}
-            aria-label="From date"
-            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm font-medium text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-40"
-          />
-
-          <input
-            type="date"
-            value={toDate}
-            onChange={(event) => {
-              setToDate(event.target.value);
-              setPage(0);
-            }}
-            min={fromDate || undefined}
-            aria-label="To date"
-            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm font-medium text-card-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-40"
-          />
+          <div className="w-full sm:w-64">
+            <DateRangePickerPopup
+              value={dateRange}
+              onChange={(value) => {
+                setDateRange(value);
+                setPage(0);
+              }}
+              placeholder="Select Date"
+              buttonClassName="w-full"
+            />
+          </div>
 
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-muted-foreground shadow transition-all hover:bg-surface-hover"
+            className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-muted-foreground shadow transition-all hover:bg-surface-hover"
           >
+            <RotateCcw size={14} />
             Clear
           </button>
         </div>
