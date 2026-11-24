@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   RotateCw,
   Search,
@@ -22,7 +22,12 @@ import {
   type AdminDepartmentSummary,
 } from '../../../api/admin-summary.api'
 import { getAdminDepartments, getAdminDepartmentUserCounts } from '../../../api/admin-departments.api'
-import { getDepartmentServiceStatuses } from '../../../api/departments.api'
+import {
+  getDepartmentServiceStatuses,
+  getDepartmentHelpCenterStatuses,
+  updateDepartmentHelpCenterStatus,
+  syncAllDepartmentsToHelpCenter,
+} from '../../../api/departments.api'
 import type {
   Department,
   UpdateDepartmentRequest,
@@ -99,6 +104,59 @@ export function DepartmentManagementPage() {
     staleTime: 120_000,
   })
 
+  const helpCenterStatusesQuery = useQuery({
+    queryKey: ['department-help-center-statuses'],
+    queryFn: getDepartmentHelpCenterStatuses,
+    staleTime: 120_000,
+  })
+
+  const queryClient = useQueryClient()
+  const updateHelpCenterStatusMutation = useMutation({
+    mutationFn: ({
+      departmentType,
+      showInHelpCenter,
+    }: {
+      departmentType: string
+      showInHelpCenter: boolean
+    }) => updateDepartmentHelpCenterStatus(departmentType, showInHelpCenter),
+    onMutate: async ({ departmentType, showInHelpCenter }) => {
+      await queryClient.cancelQueries({ queryKey: ['department-help-center-statuses'] })
+      const previous = queryClient.getQueryData<Record<string, boolean>>(['department-help-center-statuses'])
+      const upper = departmentType.toUpperCase()
+      const base = upper.replace(/_DEPARTMENT$/, '')
+      queryClient.setQueryData<Record<string, boolean>>(['department-help-center-statuses'], (old) => ({
+        ...old,
+        [upper]: showInHelpCenter,
+        [base]: showInHelpCenter,
+        [`${base}_DEPARTMENT`]: showInHelpCenter,
+      }))
+      return { previous }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['department-help-center-statuses'], context.previous)
+      }
+      alert(`Failed to update Help Center status: ${err?.message || err}`)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['department-help-center-statuses'] })
+    },
+  })
+
+  const [isSyncingHelpCenter, setIsSyncingHelpCenter] = useState(false)
+  async function handleSyncAllToHelpCenter() {
+    setIsSyncingHelpCenter(true)
+    try {
+      const res = await syncAllDepartmentsToHelpCenter()
+      alert(res.message || `Synced ${res.syncedCount ?? 0} departments to Help Center successfully!`)
+      queryClient.invalidateQueries({ queryKey: ['department-help-center-statuses'] })
+    } catch (err: any) {
+      alert(`Sync failed: ${err?.message || err}`)
+    } finally {
+      setIsSyncingHelpCenter(false)
+    }
+  }
+
   // Map departmentType -> user count
   const userCountByDept = useMemo(() => {
     const map = new Map<string, number>()
@@ -116,6 +174,29 @@ export function DepartmentManagementPage() {
     }
     return map
   }, [serviceStatusesQuery.data])
+
+  const helpCenterStatusByDept = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const [key, value] of Object.entries(helpCenterStatusesQuery.data ?? {})) {
+      const upper = key.toUpperCase()
+      map.set(upper, value)
+      const base = upper.replace(/_DEPARTMENT$/, '')
+      map.set(base, value)
+      map.set(`${base}_DEPARTMENT`, value)
+    }
+    return map
+  }, [helpCenterStatusesQuery.data])
+
+  const getHelpCenterStatus = (deptType?: string): boolean => {
+    if (!deptType) return false
+    const upper = deptType.toUpperCase()
+    if (helpCenterStatusByDept.has(upper)) return helpCenterStatusByDept.get(upper)!
+    const base = upper.replace(/_DEPARTMENT$/, '')
+    if (helpCenterStatusByDept.has(base)) return helpCenterStatusByDept.get(base)!
+    const suffixed = `${base}_DEPARTMENT`
+    if (helpCenterStatusByDept.has(suffixed)) return helpCenterStatusByDept.get(suffixed)!
+    return false
+  }
 
   const allDepartments = useMemo<Department[]>(
     () => (departmentHeadsQuery.data?.data ?? []).map((user) => {
@@ -201,10 +282,11 @@ export function DepartmentManagementPage() {
         completionPercent,
         delayed,
         status: dept.status || 'ACTIVE',
+        showInHelpCenter: getHelpCenterStatus(type),
         visual: getDepartmentVisual(label),
       }
     })
-  }, [uniqueHeads, summaryByDept, userCountByDept])
+  }, [uniqueHeads, summaryByDept, userCountByDept, helpCenterStatusByDept])
 
   // Filtered by Search & Status
   const filteredDepartments = useMemo(() => {
@@ -257,6 +339,15 @@ export function DepartmentManagementPage() {
     updateStatusMutation.mutate({
       departmentType: department.type,
       active: department.status !== 'ACTIVE',
+    })
+  }
+
+  function handleToggleHelpCenter(department: Department) {
+    if (!department.type || updateHelpCenterStatusMutation.isPending) return
+    const current = getHelpCenterStatus(department.type)
+    updateHelpCenterStatusMutation.mutate({
+      departmentType: department.type,
+      showInHelpCenter: !current,
     })
   }
 
@@ -318,12 +409,14 @@ export function DepartmentManagementPage() {
 
   const isRefreshing =
     departmentHeadsQuery.isFetching || userCountsQuery.isFetching ||
-    serviceStatusesQuery.isFetching || summaryAllQuery.isFetching
+    serviceStatusesQuery.isFetching || helpCenterStatusesQuery.isFetching ||
+    summaryAllQuery.isFetching
 
   const handleRefreshAll = () => {
     departmentHeadsQuery.refetch()
     userCountsQuery.refetch()
     serviceStatusesQuery.refetch()
+    helpCenterStatusesQuery.refetch()
     summaryAllQuery.refetch()
   }
 
@@ -406,6 +499,17 @@ export function DepartmentManagementPage() {
                 <span>Create Department</span>
               </button>
 
+              {/* Sync Help Center Button */}
+              <button
+                type="button"
+                className="dept-header-icon-btn"
+                onClick={handleSyncAllToHelpCenter}
+                title="Sync all departments to Help Center"
+                disabled={isSyncingHelpCenter || isRefreshing}
+              >
+                <RotateCw className={`w-4 h-4 text-sky-600 ${isSyncingHelpCenter ? 'animate-spin' : ''}`} />
+              </button>
+
               {/* Refresh Button */}
               <button
                 type="button"
@@ -433,6 +537,7 @@ export function DepartmentManagementPage() {
               onViewFeatures={handleViewFeatures}
               onViewDashboard={handleLoginAsDepartment}
               onToggleStatus={handleToggleStatus}
+              onToggleHelpCenter={handleToggleHelpCenter}
               loggingInId={
                 loginAsMutation.isPending
                   ? (uniqueHeads.find(

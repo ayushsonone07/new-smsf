@@ -24,6 +24,7 @@ export interface EnrichedDepartment {
   completionPercent: number
   delayed: number
   status: 'ACTIVE' | 'INACTIVE'
+  showInHelpCenter?: boolean
   visual: { initial: string; bg: string }
 }
 
@@ -34,6 +35,7 @@ interface DepartmentTableProps {
   onViewFeatures: (department: Department) => void
   onViewDashboard: (department: Department) => void
   onToggleStatus?: (department: Department) => void
+  onToggleHelpCenter?: (department: Department) => void
   loggingInId?: string | null
 }
 
@@ -46,6 +48,7 @@ export function DepartmentTable({
   onViewFeatures: _onViewFeatures,
   onViewDashboard,
   onToggleStatus,
+  onToggleHelpCenter,
   loggingInId = null,
 }: DepartmentTableProps) {
   const [expandedDepartmentId, setExpandedDepartmentId] = useState<string | null>(null)
@@ -73,6 +76,7 @@ export function DepartmentTable({
             <th className="dept-th-completion">COMPLETION</th>
             <th className="dept-th-delayed">DELAYED</th>
             <th className="dept-th-active">ACTIVE</th>
+            <th className="dept-th-helpcenter" title="Allow customer tickets for this department in Help Center">HELP CENTER</th>
             <th className="dept-th-actions">ACTIONS</th>
           </tr>
         </thead>
@@ -193,6 +197,20 @@ export function DepartmentTable({
                       className={`dept-toggle-switch ${isActive ? 'is-active' : ''}`}
                       onClick={() => onToggleStatus?.(item.department)}
                       title={`Status: ${item.status}. Click to toggle.`}
+                    >
+                      <span className="dept-toggle-thumb" />
+                    </button>
+                  </td>
+
+                  {/* 10. Help Center Ticket Visibility Toggle */}
+                  <td className="dept-td-helpcenter">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={item.showInHelpCenter ?? false}
+                      className={`dept-toggle-switch is-helpcenter ${item.showInHelpCenter ? 'is-active' : ''}`}
+                      onClick={() => onToggleHelpCenter?.(item.department)}
+                      title={`Help Center Tickets: ${item.showInHelpCenter ? 'Shown in customer ticket form' : 'Hidden from customer ticket form'}. Click to toggle.`}
                     >
                       <span className="dept-toggle-thumb" />
                     </button>

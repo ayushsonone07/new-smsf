@@ -63,6 +63,7 @@
 .dept-th-completion { min-width: 130px; }
 .dept-th-delayed { width: 75px; text-align: center; }
 .dept-th-active { width: 70px; text-align: center; }
+.dept-th-helpcenter { width: 95px; text-align: center; }
 .dept-th-actions { width: 80px; text-align: right; padding-right: 1rem; }
 
 /* Table Body Rows */
@@ -239,7 +240,8 @@
 }
 
 /* iOS-style Active Toggle Switch */
-.dept-td-active {
+.dept-td-active,
+.dept-td-helpcenter {
   text-align: center;
 }
 
@@ -259,6 +261,10 @@
 
 .dept-toggle-switch.is-active {
   background-color: #10b981;
+}
+
+.dept-toggle-switch.is-helpcenter.is-active {
+  background-color: #0284c7;
 }
 
 .dept-toggle-thumb {
