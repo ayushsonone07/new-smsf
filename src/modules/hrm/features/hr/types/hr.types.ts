@@ -541,3 +541,54 @@ export interface EmployeeAttendanceMonthlyResponse {
   records: AttendanceRecord[];
   summary: EmployeeAttendanceSummary;
 }
+
+export type CompanyAssetType = "LAPTOP" | "SIM" | "OTHER";
+export type CompanyAssetStatus = "AVAILABLE" | "ASSIGNED" | "UNDER_REPAIR" | "SCRAPPED";
+
+export interface CompanyAsset {
+  id: number;
+  assetType: CompanyAssetType;
+  assetName: string;
+  identifier: string;
+  status: CompanyAssetStatus;
+  currentEmployeeId?: number | null;
+  currentEmployeeName?: string | null;
+  currentEmployeeCode?: string | null;
+  specifications?: string | null;
+  purchaseDate?: string | null;
+  warrantyExpiryDate?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventorySummary {
+  totalAssets: number;
+  totalLaptops: number;
+  laptopsAvailable: number;
+  laptopsAssigned: number;
+  laptopsUnderRepair: number;
+  totalSims: number;
+  simsAvailable: number;
+  simsAssigned: number;
+  totalAvailable: number;
+  totalAssigned: number;
+  totalUnderRepair: number;
+}
+
+export interface CreateAssetInput {
+  assetType: CompanyAssetType;
+  assetName: string;
+  identifier: string;
+  specifications?: string;
+  purchaseDate?: string;
+  warrantyExpiryDate?: string;
+  assignToEmployeeId?: number | null;
+  remarks?: string;
+}
+
+export interface UpdateAssetStatusInput {
+  status: CompanyAssetStatus;
+  assignToEmployeeId?: number | null;
+  remarks?: string;
+}
