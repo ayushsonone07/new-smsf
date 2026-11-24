@@ -35,6 +35,8 @@ import type {
   UpdateAdditionalInfoInput,
   UpdateEmployeeInput,
   UpdateEmployeeStatusInput,
+  LaptopAssignmentHistory,
+  SimAssignmentHistory,
   UpdateRemarkInput,
 } from "../types";
 
@@ -292,6 +294,22 @@ export const hrService = {
     const { data } = await http.patch<ApiEnvelope<EmployeeListItem>>(
       HR_ENDPOINT_BUILDERS.employeeStatus(employeeId),
       input,
+    );
+    return data.data;
+  },
+
+  async getLaptopHistory(serialNumber: string): Promise<LaptopAssignmentHistory[]> {
+    const { data } = await http.get<ApiEnvelope<LaptopAssignmentHistory[]>>(
+      "/api/v1/hr/assets/laptop-history",
+      { params: { serialNumber } },
+    );
+    return data.data;
+  },
+
+  async getSimHistory(phoneNumber: string): Promise<SimAssignmentHistory[]> {
+    const { data } = await http.get<ApiEnvelope<SimAssignmentHistory[]>>(
+      "/api/v1/hr/assets/sim-history",
+      { params: { phoneNumber } },
     );
     return data.data;
   },

@@ -40,6 +40,8 @@ export type {
   UpdateAdditionalInfoInput,
   UpdateEmployeeInput,
   UpdateEmployeeStatusInput,
+  LaptopAssignmentHistory,
+  SimAssignmentHistory,
   UpdateRemarkInput,
   UserRole,
 } from "./hr.types";

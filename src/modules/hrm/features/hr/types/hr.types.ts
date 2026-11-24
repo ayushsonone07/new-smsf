@@ -194,8 +194,13 @@ export interface EmployeeListItem {
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
   forceTransfer?: boolean;
+  returnCondition?: string;
+  returnRemarks?: string;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  forceSimTransfer?: boolean;
+  simReturnCondition?: string;
+  simReturnRemarks?: string;
   isIdCard?: boolean | null;
   idCardNumber?: string | null;
   isVisitingCard?: boolean | null;
@@ -248,8 +253,13 @@ export interface UpdateEmployeeInput {
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
   forceTransfer?: boolean;
+  returnCondition?: string;
+  returnRemarks?: string;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
+  forceSimTransfer?: boolean;
+  simReturnCondition?: string;
+  simReturnRemarks?: string;
   isIdCard?: boolean | null;
   idCardNumber?: string | null;
   isVisitingCard?: boolean | null;
@@ -259,6 +269,33 @@ export interface UpdateEmployeeInput {
 export interface UpdateEmployeeStatusInput {
   status: EmployeeStatus;
   exitDate: string | null;
+}
+
+export interface LaptopAssignmentHistory {
+  id: number;
+  serialNumber: string;
+  laptopType?: string | null;
+  actionType: "ASSIGNED" | "RETURNED" | "TRANSFERRED" | "DAMAGED";
+  employeeId?: number | null;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  performedByName?: string | null;
+  deviceCondition?: "WORKING" | "DAMAGED" | string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export interface SimAssignmentHistory {
+  id: number;
+  phoneNumber: string;
+  actionType: "ASSIGNED" | "RETURNED" | "TRANSFERRED" | "LOST" | "DAMAGED";
+  employeeId?: number | null;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  performedByName?: string | null;
+  simStatus?: "ACTIVE" | "INACTIVE" | "LOST" | "DAMAGED" | string | null;
+  remarks?: string | null;
+  createdAt: string;
 }
 export interface Department {
   id: number;
