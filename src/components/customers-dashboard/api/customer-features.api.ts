@@ -1071,11 +1071,22 @@ export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepart
       headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': '1' },
     })
     if (res.ok) {
-      const json = (await res.json()) as { data?: Array<{ id?: number | string; name?: string; isActive?: boolean }> }
+      const json = (await res.json()) as {
+        data?: Array<{
+          id?: number | string
+          name?: string
+          displayName?: string
+          isActive?: boolean
+          acceptsCustomerTickets?: boolean
+        }>
+      }
       if (Array.isArray(json?.data)) {
         return json.data
-          .filter((d) => d && d.id != null && d.isActive !== false)
-          .map((d) => ({ id: d.id as number | string, name: d.name || String(d.id) }))
+          .filter((d) => d && d.id != null && d.isActive !== false && d.acceptsCustomerTickets !== false)
+          .map((d) => ({
+            id: d.id as number | string,
+            name: d.displayName || d.name || String(d.id),
+          }))
       }
     }
   } catch (err) {
@@ -1087,10 +1098,12 @@ export async function fetchHelpCenterDepartmentsList(): Promise<HelpCenterDepart
     const res = await requestCustomerTicketProxy<{ success?: boolean; data?: any[] }>(`/departments`)
     const list = res?.data || (res as any)
     if (Array.isArray(list)) {
-      return list.map((d) => ({
-        id: d.id ?? d.departmentId ?? d.name,
-        name: d.name ?? d.departmentName ?? String(d),
-      }))
+      return list
+        .filter((d) => d && d.isActive !== false && d.acceptsCustomerTickets !== false)
+        .map((d) => ({
+          id: d.id ?? d.departmentId ?? d.name,
+          name: d.displayName ?? d.name ?? d.departmentName ?? String(d),
+        }))
     }
   } catch (err) {
     console.warn('Failed to fetch Help Center departments through SMSB:', err)

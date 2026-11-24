@@ -376,3 +376,37 @@ export async function deleteDepartment(emailOrId: string): Promise<void> {
     throw new Error(response.message || 'Failed to delete department')
   }
 }
+
+export async function getDepartmentHelpCenterStatuses(): Promise<Record<string, boolean>> {
+  const response = await authedApiRequest<CustomApiResponse<Record<string, boolean>>>(
+    '/api/auth/departments/help-center-status',
+  )
+  return response.data || {}
+}
+
+export async function updateDepartmentHelpCenterStatus(
+  departmentType: string,
+  showInHelpCenter: boolean,
+): Promise<void> {
+  const response = await authedApiRequest<CustomApiResponse<unknown>>(
+    '/api/auth/admin/departments/help-center-status',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ departmentType, showInHelpCenter }),
+    },
+  )
+  if (response && response.success === false) {
+    throw new Error(response.message || 'Failed to update Help Center status')
+  }
+}
+
+export async function syncAllDepartmentsToHelpCenter(): Promise<{ syncedCount: number; message: string }> {
+  const response = await authedApiRequest<CustomApiResponse<{ syncedCount: number; message: string }>>(
+    '/api/auth/admin/departments/sync-all',
+    {
+      method: 'POST',
+    },
+  )
+  return response?.data || { syncedCount: 0, message: response?.message || 'Synced' }
+}
+
