@@ -107,12 +107,31 @@ export function EmployeeAssetsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [returningId, setReturningId] = useState<number | null>(null);
 
+  // Modern In-App Confirmation Modals
+  const [transferModal, setTransferModal] = useState<{
+    targetEmployee: EmployeeListItem;
+    duplicateOwner: EmployeeListItem;
+    cleanSerial: string;
+    cleanType: string;
+  } | null>(null);
+
+  const [returnModalEmployee, setReturnModalEmployee] = useState<EmployeeListItem | null>(null);
+
   const debouncedSearch = useDebouncedValue(search, 350);
 
   const items = useAppSelector(selectEmployees);
   const meta = useAppSelector(selectEmployeesPagination);
   const loading = useAppSelector(selectEmployeesLoading);
   const error = useAppSelector(selectEmployeesError);
+
+  // Check if entered serial number is currently held by another active employee
+  const duplicateOwner = useMemo(() => {
+    const clean = laptopSerialNumber.trim().toLowerCase();
+    if (!clean || !editingEmployee) return null;
+    return items.find(
+      (e) => e.id !== editingEmployee.id && e.laptopSerialNumber?.trim().toLowerCase() === clean,
+    );
+  }, [laptopSerialNumber, editingEmployee, items]);
 
   useEffect(() => {
     void dispatch(
@@ -168,16 +187,35 @@ export function EmployeeAssetsPage() {
     e.preventDefault();
     if (!editingEmployee) return;
 
+    const cleanSerial = laptopSerialNumber.trim();
+    if (duplicateOwner) {
+      setTransferModal({
+        targetEmployee: editingEmployee,
+        duplicateOwner,
+        cleanSerial,
+        cleanType: cleanSerial ? laptopType.trim() : "",
+      });
+      return;
+    }
+
+    await executeSave(false);
+  }
+
+  async function executeSave(forceTransfer: boolean) {
+    if (!editingEmployee) return;
+    const cleanSerial = laptopSerialNumber.trim();
+    const prevDuplicateOwner = transferModal?.duplicateOwner;
+
     setIsSubmitting(true);
     try {
-      const cleanSerial = laptopSerialNumber.trim();
       await dispatch(
         updateEmployee({
           id: editingEmployee.id,
           input: {
-            laptopType: laptopType.trim() || null,
-            laptopSerialNumber: cleanSerial || null,
+            laptopType: cleanSerial ? laptopType.trim() : "",
+            laptopSerialNumber: cleanSerial,
             laptopStatus: cleanSerial ? laptopStatus : null,
+            forceTransfer,
             isCompanySim,
             companyPhoneNumber: isCompanySim ? companyPhoneNumber.trim() || null : null,
             isIdCard,
@@ -188,10 +226,26 @@ export function EmployeeAssetsPage() {
         }),
       ).unwrap();
 
+      // If a transfer happened, re-fetch active employees so the previous owner is updated to "Not assigned" instantly!
+      if (forceTransfer || prevDuplicateOwner) {
+        await dispatch(
+          fetchEmployees({
+            page,
+            size: pageSize,
+            q: debouncedSearch.trim() || undefined,
+            status: "active",
+            force: true,
+          }),
+        ).unwrap();
+      }
+
       toast.success(
-        "Assets updated",
-        `Updated asset assignments for ${editingEmployee.name} (${editingEmployee.employeeCode}).`,
+        forceTransfer ? "Laptop Transferred" : "Assets updated",
+        forceTransfer
+          ? `Laptop successfully transferred from ${prevDuplicateOwner?.name || "colleague"} to ${editingEmployee.name}.`
+          : `Updated asset assignments for ${editingEmployee.name} (${editingEmployee.employeeCode}).`,
       );
+      setTransferModal(null);
       closeEditModal();
     } catch (err) {
       toast.error("Couldn't save assets", getApiErrorMessage(err, "Failed to save asset details"));
@@ -200,20 +254,19 @@ export function EmployeeAssetsPage() {
     }
   }
 
-  async function handleReturnLaptop(emp: EmployeeListItem) {
-    const confirmReturn = window.confirm(
-      `Confirm returning laptop (${emp.laptopType || "Device"} - ${emp.laptopSerialNumber}) from ${emp.name} to office stock?`,
-    );
-    if (!confirmReturn) return;
+  function openReturnModal(emp: EmployeeListItem) {
+    setReturnModalEmployee(emp);
+  }
 
+  async function executeReturn(emp: EmployeeListItem) {
     setReturningId(emp.id);
     try {
       await dispatch(
         updateEmployee({
           id: emp.id,
           input: {
-            laptopType: null,
-            laptopSerialNumber: null,
+            laptopType: "",
+            laptopSerialNumber: "",
             laptopStatus: null,
             isCompanySim: emp.isCompanySim,
             companyPhoneNumber: emp.companyPhoneNumber,
@@ -229,6 +282,7 @@ export function EmployeeAssetsPage() {
         "Laptop returned to stock",
         `Laptop successfully returned from ${emp.name} and is now available in office stock.`,
       );
+      setReturnModalEmployee(null);
     } catch (err) {
       toast.error("Couldn't return laptop", getApiErrorMessage(err, "Failed to return laptop"));
     } finally {
@@ -594,7 +648,7 @@ export function EmployeeAssetsPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => void handleReturnLaptop(emp)}
+                                onClick={() => openReturnModal(emp)}
                                 disabled={returningId === emp.id}
                                 title="Return laptop to office stock"
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
@@ -705,6 +759,19 @@ export function EmployeeAssetsPage() {
                 placeholder="e.g. SN-89472301"
                 className="block h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
               />
+              {duplicateOwner && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-amber-800 dark:text-amber-300">
+                      Already Assigned to {duplicateOwner.name} ({duplicateOwner.employeeCode})
+                    </p>
+                    <p className="text-amber-700/90 dark:text-amber-400">
+                      Saving will prompt to transfer this laptop to {editingEmployee.name}.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Laptop Hardware Condition */}
@@ -828,6 +895,153 @@ export function EmployeeAssetsPage() {
               </button>
             </div>
           </form>
+        </Dialog>
+      )}
+
+      {/* Transfer Laptop Confirmation Modal */}
+      {transferModal && (
+        <Dialog
+          open={Boolean(transferModal)}
+          onClose={() => !isSubmitting && setTransferModal(null)}
+          title="Transfer Laptop Asset"
+          size="sm"
+        >
+          <div className="space-y-4 p-6">
+            <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>This laptop is currently assigned to another employee.</span>
+            </div>
+
+            {/* Asset details badge */}
+            <div className="rounded-xl border border-border bg-surface-muted/30 p-3.5 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Asset Details</p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <Laptop className="h-4 w-4 text-primary" />
+                  {transferModal.cleanType || "Office Laptop"}
+                </span>
+                <span className="font-mono text-xs font-bold rounded-md bg-card border border-border px-2 py-0.5 text-foreground">
+                  {transferModal.cleanSerial}
+                </span>
+              </div>
+            </div>
+
+            {/* Visual Transfer Flow: Current Holder -> New Assignee */}
+            <div className="rounded-xl border border-border bg-card p-3.5 space-y-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Transfer Route</p>
+              
+              <div className="flex items-center justify-between gap-2">
+                {/* Previous Holder */}
+                <div className="flex-1 rounded-xl border border-rose-500/20 bg-rose-50/50 dark:bg-rose-950/20 p-2.5 min-w-0">
+                  <p className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 uppercase">Current Holder</p>
+                  <p className="font-semibold text-foreground text-xs truncate mt-0.5">{transferModal.duplicateOwner.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{transferModal.duplicateOwner.employeeCode}</p>
+                </div>
+
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-muted text-muted-foreground">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </div>
+
+                {/* New Assignee */}
+                <div className="flex-1 rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 min-w-0">
+                  <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase">New Assignee</p>
+                  <p className="font-semibold text-foreground text-xs truncate mt-0.5">{transferModal.targetEmployee.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{transferModal.targetEmployee.employeeCode}</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Confirming will unassign this laptop from <strong className="text-foreground">{transferModal.duplicateOwner.name}</strong> and reassign it to <strong className="text-foreground">{transferModal.targetEmployee.name}</strong>.
+            </p>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setTransferModal(null)}
+                disabled={isSubmitting}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void executeSave(true)}
+                disabled={isSubmitting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition hover:brightness-110 disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Transferring...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Transfer Laptop</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Return to Office Stock Modal */}
+      {returnModalEmployee && (
+        <Dialog
+          open={Boolean(returnModalEmployee)}
+          onClose={() => !returningId && setReturnModalEmployee(null)}
+          title="Return Laptop to Office Stock"
+          size="sm"
+        >
+          <div className="space-y-4 p-6">
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+              <Undo2 className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <p className="leading-relaxed">
+                This laptop will be returned to company inventory and unassigned from the employee.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-surface-muted/30 p-3.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Employee:</span>
+                <span className="font-semibold text-foreground">{returnModalEmployee.name} ({returnModalEmployee.employeeCode})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Laptop Model:</span>
+                <span className="font-semibold text-foreground">{returnModalEmployee.laptopType || "Office Laptop"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Serial Number:</span>
+                <span className="font-mono font-bold text-foreground">{returnModalEmployee.laptopSerialNumber}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setReturnModalEmployee(null)}
+                disabled={Boolean(returningId)}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void executeReturn(returnModalEmployee)}
+                disabled={Boolean(returningId)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-sm font-semibold text-white shadow transition disabled:opacity-60"
+              >
+                {returningId ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Returning...</span>
+                  </>
+                ) : (
+                  <span>Deposit to Office Stock</span>
+                )}
+              </button>
+            </div>
+          </div>
         </Dialog>
       )}
     </div>

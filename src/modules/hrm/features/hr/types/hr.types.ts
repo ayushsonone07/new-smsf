@@ -193,6 +193,7 @@ export interface EmployeeListItem {
   laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
+  forceTransfer?: boolean;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
   isIdCard?: boolean | null;
@@ -246,6 +247,7 @@ export interface UpdateEmployeeInput {
   laptopStatus?: "WORKING" | "IDLE" | "DAMAGED" | "NOT_ASSIGNED" | null;
   laptopAssignedDate?: string | null;
   lastLoginAt?: string | null;
+  forceTransfer?: boolean;
   isCompanySim?: boolean | null;
   companyPhoneNumber?: string | null;
   isIdCard?: boolean | null;
