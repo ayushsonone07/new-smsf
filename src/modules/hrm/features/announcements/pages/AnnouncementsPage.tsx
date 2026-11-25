@@ -21,7 +21,6 @@ import {
   Dialog,
   ConfirmDialog,
   EmptyState,
-  PageHeader,
   TableSkeleton,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
@@ -125,23 +124,19 @@ export function AnnouncementsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Announcements"
-        description="Company announcements and updates."
-        actions={
-          canManage ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
-            >
-              <Plus size={18} />
-              Announcement
-            </button>
-          ) : undefined
-        }
-      />
+    <div className="space-y-4">
+      {canManage ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
+          >
+            <Plus size={18} />
+            Announcement
+          </button>
+        </div>
+      ) : null}
 
       <div
         className={`grid gap-4 transition-opacity md:grid-cols-3 ${

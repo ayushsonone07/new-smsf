@@ -24,7 +24,6 @@ import {
   DatePicker,
   Dialog,
   EmptyState,
-  PageHeader,
   TableSkeleton,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
@@ -227,19 +226,15 @@ export function TargetsPage() {
 
   if (isEmployee) {
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title="My Sales Targets"
-          description="Track your active sales targets, revenue goal, and progress."
-          actions={
-            <RefreshButton
-              onRefresh={() => myTargets.refetch()}
-              isRefreshing={myTargets.isFetching}
-              label="my sales targets"
-              className="h-10 w-10 rounded-xl"
-            />
-          }
-        />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <RefreshButton
+            onRefresh={() => myTargets.refetch()}
+            isRefreshing={myTargets.isFetching}
+            label="my sales targets"
+            className="h-10 w-10 rounded-xl"
+          />
+        </div>
 
         {myTargets.isLoading ? (
           <TableSkeleton rows={4} />
@@ -315,31 +310,25 @@ export function TargetsPage() {
   const meta = targets.data?.meta;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Sales Targets"
-        description="Assign sales goals, track revenue and deals progress, and monitor sales team achievements."
-        actions={
-          <div className="flex items-center gap-2">
-            <RefreshButton
-              onRefresh={() => targets.refetch()}
-              isRefreshing={targets.isFetching}
-              label="sales targets"
-              className="h-10 w-10 rounded-xl"
-            />
-            {canManage && (
-              <button
-                type="button"
-                onClick={handleCreate}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow transition hover:bg-primary/90"
-              >
-                <Plus className="h-4 w-4" />
-                Assign Target
-              </button>
-            )}
-          </div>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2">
+        <RefreshButton
+          onRefresh={() => targets.refetch()}
+          isRefreshing={targets.isFetching}
+          label="sales targets"
+          className="h-10 w-10 rounded-xl"
+        />
+        {canManage && (
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow transition hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Assign Target
+          </button>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard

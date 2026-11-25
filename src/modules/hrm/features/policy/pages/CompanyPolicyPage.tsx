@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@features/auth";
-import { Card, PageHeader } from "@shared/components/ui";
+import { Card } from "@shared/components/ui";
 
 import { useCurrentPolicy, useMyPolicyStatus, usePolicyAcknowledgments } from "../hooks";
 import type { EmployeePolicyAcknowledgmentItem, PolicySection } from "../types";
@@ -90,23 +90,17 @@ export function CompanyPolicyPage() {
   }, [acksList, search, statusFilter]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Company Policies"
-        description="Official Employee Policies, Code of Conduct, and Compliance Guidelines of MBG Card India Pvt. Ltd."
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-3 text-xs font-semibold text-foreground hover:bg-surface-muted transition shadow-sm"
-            >
-              <Printer className="h-4 w-4" />
-              Print
-            </button>
-          </div>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-3 text-xs font-semibold text-foreground hover:bg-surface-muted transition shadow-sm"
+        >
+          <Printer className="h-4 w-4" />
+          Print
+        </button>
+      </div>
 
       {/* Tabs Header (Visible to HR & Admin) */}
       {canManage && (

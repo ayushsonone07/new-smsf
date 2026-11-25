@@ -5,7 +5,6 @@ import {
   Card,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
   StaggerContainer,
   StaggerItem,
 } from "@shared/components/ui";
@@ -36,13 +35,9 @@ export function ReportsPage() {
 
   if (!loading && (!reportData || error)) {
     return (
-      <StaggerContainer className="space-y-6">
+      <StaggerContainer className="space-y-4">
         <StaggerItem>
-          <PageHeader
-            title="Reports & Analytics"
-            description="Key metrics and trends across the organization."
-            actions={refreshButton}
-          />
+          <div className="flex justify-end">{refreshButton}</div>
         </StaggerItem>
         <StaggerItem>
           <ErrorDisplay message="Reports could not be loaded from the server." />
@@ -53,25 +48,19 @@ export function ReportsPage() {
   if (!reportData) return null;
 
   return (
-    <StaggerContainer className="space-y-6">
+    <StaggerContainer className="space-y-4">
       <StaggerItem>
-        <PageHeader
-          title="Reports & Analytics"
-          description="Key metrics and trends across the organization."
-          actions={
-            <>
-              {refreshButton}
-              <button
-                type="button"
-                onClick={() => window.print()}
-                title="Print or save this report"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-card-foreground shadow transition hover:bg-muted"
-              >
-                <Download size={16} /> Export
-              </button>
-            </>
-          }
-        />
+        <div className="flex items-center justify-end gap-2">
+          {refreshButton}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            title="Print or save this report"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-card-foreground shadow transition hover:bg-muted"
+          >
+            <Download size={16} /> Export
+          </button>
+        </div>
       </StaggerItem>
 
       <div

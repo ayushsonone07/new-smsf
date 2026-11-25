@@ -24,7 +24,6 @@ import {
   Dialog,
   EmptyState,
   ErrorDisplay,
-  PageHeader,
   TableSkeleton,
 } from "@shared/components/ui";
 
@@ -115,32 +114,27 @@ export function AuditLogsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </button>
 
-      <PageHeader
-        eyebrow="Administration"
-        title="Audit Logs"
-        description="A tamper-resistant trail of sensitive system actions, logins, and changes."
-        actions={
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={auditLogs.isFetching}
-            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-card-foreground shadow transition-all hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={auditLogs.isFetching ? "animate-spin" : undefined} />
-            Refresh
-          </button>
-        }
-      />
+        <button
+          type="button"
+          onClick={refresh}
+          disabled={auditLogs.isFetching}
+          className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-card-foreground shadow transition-all hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={16} className={auditLogs.isFetching ? "animate-spin" : undefined} />
+          Refresh
+        </button>
+      </div>
 
       <Card padding="md">
         <div className="flex flex-wrap items-center gap-3">
