@@ -592,3 +592,17 @@ export interface UpdateAssetStatusInput {
   assignToEmployeeId?: number | null;
   remarks?: string;
 }
+
+export interface BulkAssetImportRowError {
+  rowNumber: number;
+  identifier: string;
+  reason: string;
+}
+
+export interface BulkAssetImportResult {
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errors: BulkAssetImportRowError[];
+}
