@@ -50,6 +50,8 @@ export type {
   InventorySummary,
   CreateAssetInput,
   UpdateAssetStatusInput,
+  BulkAssetImportRowError,
+  BulkAssetImportResult,
 } from "./hr.types";
 
 export { CANDIDATE_STATUSES, HIRING_APPROVAL_STATUSES, ONBOARDING_STATUSES } from "./hr.types";
