@@ -215,6 +215,7 @@ export function EmployeeAssetsPage() {
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [isBulkImporting, setIsBulkImporting] = useState(false);
   const [bulkImportResult, setBulkImportResult] = useState<BulkAssetImportResult | null>(null);
+  const [editModalFocus, setEditModalFocus] = useState<"all" | "laptop" | "sim">("all");
 
   const [copiedIdentifier, setCopiedIdentifier] = useState<string | null>(null);
 
@@ -511,13 +512,14 @@ export function EmployeeAssetsPage() {
     }
   }
 
-  function openEditModal(emp: EmployeeListItem) {
+  function openEditModal(emp: EmployeeListItem, focus: "all" | "laptop" | "sim" = "all") {
     void loadAvailableStock();
+    setEditModalFocus(focus);
     setEditingEmployee(emp);
     setLaptopType(emp.laptopType ?? "");
     setLaptopSerialNumber(emp.laptopSerialNumber ?? "");
     setLaptopStatus(emp.laptopStatus === "DAMAGED" ? "DAMAGED" : "WORKING");
-    setIsCompanySim(Boolean(emp.isCompanySim));
+    setIsCompanySim(focus === "sim" ? true : Boolean(emp.isCompanySim));
     setCompanyPhoneNumber(emp.companyPhoneNumber ?? "");
     setIsIdCard(Boolean(emp.isIdCard));
     setIsVisitingCard(Boolean(emp.isVisitingCard));
@@ -597,6 +599,11 @@ export function EmployeeAssetsPage() {
         ).unwrap();
       }
 
+      // Keep Office Stock summary, ledger, and available dropdowns in sync after assign/transfer
+      void loadAvailableStock();
+      void loadInventorySummary();
+      void loadInventory();
+
       toast.success(
         forceTransfer || forceSimTransfer ? "Asset Transferred" : "Assets updated",
         forceSimTransfer
@@ -642,6 +649,10 @@ export function EmployeeAssetsPage() {
           },
         }),
       ).unwrap();
+
+      void loadAvailableStock();
+      void loadInventorySummary();
+      void loadInventory();
 
       toast.success(
         "Company SIM returned to stock",
@@ -697,6 +708,10 @@ export function EmployeeAssetsPage() {
           },
         }),
       ).unwrap();
+
+      void loadAvailableStock();
+      void loadInventorySummary();
+      void loadInventory();
 
       toast.success(
         "Laptop returned to stock",
@@ -1364,7 +1379,7 @@ export function EmployeeAssetsPage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => openEditModal(emp)}
+                            onClick={() => openEditModal(emp, "laptop")}
                             title={`Assign a laptop to ${emp.name}`}
                             className="group inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border/80 bg-surface-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
                           >
@@ -1431,7 +1446,7 @@ export function EmployeeAssetsPage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => openEditModal(emp)}
+                            onClick={() => openEditModal(emp, "sim")}
                             title={`Assign a company SIM to ${emp.name}`}
                             className="group inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border/80 bg-surface-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400"
                           >
@@ -2393,7 +2408,13 @@ export function EmployeeAssetsPage() {
         <Dialog
           open={Boolean(editingEmployee)}
           onClose={closeEditModal}
-          title={`Asset Management — ${editingEmployee.name}`}
+          title={
+            editModalFocus === "laptop"
+              ? `Assign Laptop — ${editingEmployee.name}`
+              : editModalFocus === "sim"
+              ? `Assign Company SIM — ${editingEmployee.name}`
+              : `Asset Management — ${editingEmployee.name}`
+          }
           size="md"
         >
           <form onSubmit={handleSaveAssets} className="space-y-4 p-6">
@@ -2412,6 +2433,8 @@ export function EmployeeAssetsPage() {
               </div>
             </div>
 
+            {editModalFocus !== "sim" && (
+              <>
             {/* Office Laptop Stock Dropdown Picker */}
             <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
@@ -2452,25 +2475,37 @@ export function EmployeeAssetsPage() {
                     }}
                     className="block h-10 w-full rounded-xl border border-blue-500/40 bg-card px-3 text-xs font-medium text-foreground shadow-xs focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                   >
-                    <option value="">-- Click here to select a laptop from stock ({availableLaptops.length} available) --</option>
+                    <option value="">Select laptop from stock ({availableLaptops.length} available)</option>
                     {availableLaptops.map((l) => (
                       <option key={l.id} value={l.identifier}>
-                        💻 {l.assetName} — S/N: {l.identifier} {l.specifications ? `(${l.specifications})` : ""}
+                        {l.assetName} — S/N: {l.identifier}
                       </option>
                     ))}
-                    <option value="custom">✍️ Manual Custom Entry (Type brand & serial below)</option>
+                    <option value="custom">Manual Entry (Not in stock)</option>
                   </select>
                   {laptopSerialNumber && availableLaptops.some((l) => l.identifier === laptopSerialNumber) && (
-                    <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      ✓ Selected from Office Stock: {laptopSerialNumber} ({laptopType})
-                    </p>
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                        Selected: {laptopType} (S/N: {laptopSerialNumber})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLaptopType("");
+                          setLaptopSerialNumber("");
+                        }}
+                        className="text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
                 <div className="flex items-center justify-between rounded-xl border border-dashed border-amber-500/30 bg-amber-500/10 p-2.5">
                   <div className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
                     <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <span>0 laptops currently marked "Available in Stock". Add one to stock or enter manually below.</span>
+                    <span>0 laptops available in stock. Add to stock or enter manually below.</span>
                   </div>
                   <button
                     type="button"
@@ -2482,52 +2517,55 @@ export function EmployeeAssetsPage() {
                     className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition"
                   >
                     <Plus className="h-3 w-3" />
-                    <span>+ Add to Stock</span>
+                    <span>Add Stock</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Laptop Brand / Model */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-foreground">
-                Laptop Brand / Model
-              </label>
-              <input
-                type="text"
-                value={laptopType}
-                onChange={(e) => setLaptopType(e.target.value)}
-                placeholder="e.g. Dell Latitude 3420, Lenovo ThinkPad, HP..."
-                className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-              />
-            </div>
-
-            {/* Laptop Serial Number */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-foreground">
-                Laptop Serial Number
-              </label>
-              <input
-                type="text"
-                value={laptopSerialNumber}
-                onChange={(e) => setLaptopSerialNumber(e.target.value)}
-                placeholder="e.g. SN-89472301"
-                className="block h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-              />
-              {duplicateOwner && (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-amber-800 dark:text-amber-300">
-                      Already Assigned to {duplicateOwner.name} ({duplicateOwner.employeeCode})
-                    </p>
-                    <p className="text-amber-700/90 dark:text-amber-400">
-                      Saving will prompt to transfer this laptop to {editingEmployee.name}.
-                    </p>
-                  </div>
+            {/* Laptop Brand / Model & Serial (hidden if picked cleanly from stock, or shown for manual/existing) */}
+            {!(laptopSerialNumber && availableLaptops.some((l) => l.identifier === laptopSerialNumber)) && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">
+                    Laptop Brand / Model
+                  </label>
+                  <input
+                    type="text"
+                    value={laptopType}
+                    onChange={(e) => setLaptopType(e.target.value)}
+                    placeholder="e.g. Dell Latitude 3420, Lenovo ThinkPad, HP..."
+                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
                 </div>
-              )}
-            </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">
+                    Laptop Serial Number
+                  </label>
+                  <input
+                    type="text"
+                    value={laptopSerialNumber}
+                    onChange={(e) => setLaptopSerialNumber(e.target.value)}
+                    placeholder="e.g. SN-89472301"
+                    className="block h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                  {duplicateOwner && (
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-amber-800 dark:text-amber-300">
+                          Already Assigned to {duplicateOwner.name} ({duplicateOwner.employeeCode})
+                        </p>
+                        <p className="text-amber-700/90 dark:text-amber-400">
+                          Saving will prompt to transfer this laptop to {editingEmployee.name}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Laptop Hardware Condition */}
             {laptopSerialNumber.trim() ? (
@@ -2569,8 +2607,11 @@ export function EmployeeAssetsPage() {
                 </button>
               </div>
             )}
+              </>
+            )}
 
             {/* Company SIM Toggle & Number */}
+            {editModalFocus !== "laptop" && (
             <div className="rounded-2xl border border-border bg-surface-muted/20 p-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -2619,25 +2660,34 @@ export function EmployeeAssetsPage() {
                           }}
                           className="block h-10 w-full rounded-xl border border-purple-500/40 bg-card px-3 text-xs font-medium text-foreground shadow-xs focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                         >
-                          <option value="">-- Click here to select a SIM from stock ({availableSims.length} available) --</option>
+                          <option value="">Select SIM from stock ({availableSims.length} available)</option>
                           {availableSims.map((s) => (
                             <option key={s.id} value={s.identifier}>
-                              📱 {s.identifier} ({s.assetName})
+                              {s.identifier} ({s.assetName})
                             </option>
                           ))}
-                          <option value="custom">✍️ Manual Entry (Type phone number below)</option>
+                          <option value="custom">Manual Entry (Not in stock)</option>
                         </select>
                         {companyPhoneNumber && availableSims.some((s) => s.identifier === companyPhoneNumber) && (
-                          <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                            ✓ Selected from Corporate SIM Stock: {companyPhoneNumber}
-                          </p>
+                          <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                              Selected SIM: {companyPhoneNumber}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCompanyPhoneNumber("")}
+                              className="text-[11px] font-bold text-muted-foreground hover:text-foreground"
+                            >
+                              Clear
+                            </button>
+                          </div>
                         )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-between rounded-xl border border-dashed border-amber-500/30 bg-amber-500/10 p-2.5">
                         <div className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
                           <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                          <span>0 SIM cards available in stock. Add one to stock or enter manually below.</span>
+                          <span>0 SIM cards available in stock. Add to stock or enter manually below.</span>
                         </div>
                         <button
                           type="button"
@@ -2649,24 +2699,26 @@ export function EmployeeAssetsPage() {
                           className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-purple-600 hover:bg-purple-700 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs transition"
                         >
                           <Plus className="h-3 w-3" />
-                          <span>+ Add to Stock</span>
+                          <span>Add Stock</span>
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">
-                      Company Phone Number
-                    </label>
-                    <input
-                      type="text"
-                      value={companyPhoneNumber}
-                      onChange={(e) => setCompanyPhoneNumber(e.target.value)}
-                      placeholder="e.g. +91 9876543210"
-                      className="block h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                    />
-                  </div>
+                  {!(companyPhoneNumber && availableSims.some((s) => s.identifier === companyPhoneNumber)) && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-muted-foreground">
+                        Company Phone Number
+                      </label>
+                      <input
+                        type="text"
+                        value={companyPhoneNumber}
+                        onChange={(e) => setCompanyPhoneNumber(e.target.value)}
+                        placeholder="e.g. +91 9876543210"
+                        className="block h-10 w-full rounded-xl border border-border bg-card px-3 font-mono text-sm text-foreground shadow focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                      />
+                    </div>
+                  )}
                   {duplicateSimOwner && (
                     <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs">
                       <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
@@ -2683,8 +2735,11 @@ export function EmployeeAssetsPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* ID Card Toggle */}
+            {editModalFocus === "all" && (
+              <>
             <div className="rounded-2xl border border-border bg-surface-muted/20 p-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -2709,6 +2764,8 @@ export function EmployeeAssetsPage() {
                 <span className="text-sm font-semibold text-foreground">Visiting Card Issued (Yes / No)</span>
               </label>
             </div>
+              </>
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
