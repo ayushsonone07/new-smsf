@@ -11,7 +11,9 @@ import {
   Contact,
   Copy,
   CreditCard,
+  Download,
   Edit3,
+  FileSpreadsheet,
   Filter,
   HardDrive,
   History,
@@ -30,6 +32,7 @@ import {
   Sparkles,
   Tag,
   Undo2,
+  Upload,
   Users,
   Wrench,
   X,
@@ -67,6 +70,7 @@ import type {
   CompanyAssetStatus,
   InventorySummary,
   CreateAssetInput,
+  BulkAssetImportResult,
 } from "../types";
 
 function formatLastSeen(dateStr: string | null | undefined): { label: string; isRecent: boolean; daysInactive: number } {
@@ -204,6 +208,13 @@ export function EmployeeAssetsPage() {
   const [newStatus, setNewStatus] = useState<CompanyAssetStatus>("AVAILABLE");
   const [newStatusRemarks, setNewStatusRemarks] = useState("");
   const [statusUpdating, setStatusUpdating] = useState(false);
+
+  // Bulk Import Modal State
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  const [bulkImportDefaultType, setBulkImportDefaultType] = useState<CompanyAssetType>("LAPTOP");
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [isBulkImporting, setIsBulkImporting] = useState(false);
+  const [bulkImportResult, setBulkImportResult] = useState<BulkAssetImportResult | null>(null);
 
   const [copiedIdentifier, setCopiedIdentifier] = useState<string | null>(null);
 
@@ -424,6 +435,80 @@ export function EmployeeAssetsPage() {
     setCopiedIdentifier(text);
     setTimeout(() => setCopiedIdentifier(null), 2000);
     toast.success("Copied", `${text} copied to clipboard`);
+  }
+
+  function openBulkImportModal(defaultType: CompanyAssetType) {
+    setBulkImportDefaultType(defaultType);
+    setBulkImportFile(null);
+    setBulkImportResult(null);
+    setBulkImportModalOpen(true);
+  }
+
+  function downloadSampleCsvTemplate() {
+    const isSim = bulkImportDefaultType === "SIM";
+    const rows = isSim
+      ? [
+          ["assetType", "assetName", "identifier", "employeeCode", "remarks"],
+          ["SIM", "Airtel Postpaid SIM", "9876543210", "", "Available in office stock"],
+          ["SIM", "Jio Corporate 5G", "9876501234", "EMP-3", "Sales team SIM"],
+        ]
+      : [
+          ["assetType", "assetName", "identifier", "employeeCode", "remarks"],
+          ["LAPTOP", "Dell Latitude 5420", "LPT-100201", "", "New IT stock batch"],
+          ["LAPTOP", "Lenovo ThinkPad T14", "LPT-100202", "EMP-2", "Assigned to HR"],
+        ];
+
+    const csvContent = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", isSim ? "bulk-sim-import-template.csv" : "bulk-laptop-import-template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleBulkImport(e: FormEvent) {
+    e.preventDefault();
+    if (!bulkImportFile) {
+      toast.error("File required", "Please select a .csv or .xlsx file to import.");
+      return;
+    }
+
+    setIsBulkImporting(true);
+    try {
+      const result = await hrService.bulkImportInventoryAssets(bulkImportFile, bulkImportDefaultType);
+      setBulkImportResult(result);
+
+      if (result.importedCount > 0) {
+        toast.success(
+          "Bulk import completed",
+          `${result.importedCount} imported${result.skippedCount ? `, ${result.skippedCount} skipped` : ""}${result.failedCount ? `, ${result.failedCount} failed` : ""}.`,
+        );
+        void loadInventory();
+        void loadInventorySummary();
+        void loadAvailableStock();
+        void dispatch(
+          fetchEmployees({
+            page,
+            size: pageSize,
+            q: debouncedSearch.trim() || undefined,
+            status: "active",
+            onboardingStatus: undefined,
+            sort: undefined,
+            force: true,
+          }),
+        );
+      } else {
+        toast.info("Import processed", "No new records were imported. Check the summary below.");
+      }
+    } catch (err) {
+      toast.error("Bulk import failed", getApiErrorMessage(err, "Could not process bulk import file"));
+    } finally {
+      setIsBulkImporting(false);
+    }
   }
 
   function openEditModal(emp: EmployeeListItem) {
@@ -787,7 +872,7 @@ export function EmployeeAssetsPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition hover:brightness-110 active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            <span>+ Add Asset to Stock</span>
+            <span>Add Asset to Stock</span>
           </button>
         )}
       </div>
@@ -1441,12 +1526,8 @@ export function EmployeeAssetsPage() {
       ) : (
         <div className="space-y-4">
           {/* Section Switcher: Laptops vs SIMs vs All Stock */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-muted/30 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-muted-foreground mr-1 hidden sm:inline">
-                Section:
-              </span>
-
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-border bg-card p-2.5 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -1454,16 +1535,16 @@ export function EmployeeAssetsPage() {
                   setInventoryType("LAPTOP");
                   setInventoryPage(0);
                 }}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                   inventorySubTab === "laptops"
-                    ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-500/30"
-                    : "border border-border bg-card text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "border border-border bg-surface-muted/40 text-foreground hover:bg-surface-hover"
                 }`}
               >
-                <Laptop className="h-4 w-4" />
-                <span>💻 Laptop Stock Section</span>
-                <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  inventorySubTab === "laptops" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                <Laptop className="h-3.5 w-3.5" />
+                <span>Laptops</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  inventorySubTab === "laptops" ? "bg-white/20 text-white" : "bg-muted text-foreground"
                 }`}>
                   {inventorySummary?.totalLaptops ?? 0}
                 </span>
@@ -1476,16 +1557,16 @@ export function EmployeeAssetsPage() {
                   setInventoryType("SIM");
                   setInventoryPage(0);
                 }}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                   inventorySubTab === "sims"
-                    ? "bg-purple-600 text-white shadow-md ring-2 ring-purple-500/30"
-                    : "border border-border bg-card text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "border border-border bg-surface-muted/40 text-foreground hover:bg-surface-hover"
                 }`}
               >
-                <Smartphone className="h-4 w-4" />
-                <span>📱 SIM Cards Section</span>
-                <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  inventorySubTab === "sims" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                <Smartphone className="h-3.5 w-3.5" />
+                <span>SIM Cards</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  inventorySubTab === "sims" ? "bg-white/20 text-white" : "bg-muted text-foreground"
                 }`}>
                   {inventorySummary?.totalSims ?? 0}
                 </span>
@@ -1498,56 +1579,30 @@ export function EmployeeAssetsPage() {
                   setInventoryType("ALL");
                   setInventoryPage(0);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                   inventorySubTab === "all"
                     ? "bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-sm"
-                    : "border border-border bg-card text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                    : "border border-border bg-surface-muted/40 text-foreground hover:bg-surface-hover"
                 }`}
               >
                 <Boxes className="h-3.5 w-3.5" />
-                <span>All Stock ({inventorySummary?.totalAssets ?? 0})</span>
+                <span>All Stock</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  inventorySubTab === "all" ? "bg-white/20 text-white dark:bg-slate-900/15 dark:text-slate-900" : "bg-muted text-foreground"
+                }`}>
+                  {inventorySummary?.totalAssets ?? 0}
+                </span>
               </button>
             </div>
 
-            {/* Quick Add Button */}
-            <div>
-              {inventorySubTab === "sims" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewAssetType("SIM");
-                    setNewAssetName("Airtel Postpaid SIM");
-                    setAddAssetModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 px-3.5 py-2 text-xs font-bold text-white shadow transition active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>+ Add SIM Card</span>
-                </button>
-              ) : inventorySubTab === "laptops" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewAssetType("LAPTOP");
-                    setNewAssetName("Dell Latitude 5420");
-                    setAddAssetModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 py-2 text-xs font-bold text-white shadow transition active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>+ Add Laptop</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setAddAssetModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow transition active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>+ Add Asset to Stock</span>
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => openBulkImportModal(inventorySubTab === "sims" ? "SIM" : "LAPTOP")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2 text-xs font-bold text-foreground shadow-xs transition hover:bg-primary/10 active:scale-95"
+            >
+              <Upload className="h-3.5 w-3.5 text-primary" />
+              <span>Bulk Import (CSV / Excel)</span>
+            </button>
           </div>
 
           {/* Section-Specific KPI Cards */}
@@ -1776,13 +1831,13 @@ export function EmployeeAssetsPage() {
                     <Laptop size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">💻 Office Laptops Stock Section</h3>
-                    <p className="text-[11px] text-muted-foreground">All office laptops, serial numbers, hardware specifications & assignments</p>
+                    <h3 className="text-sm font-bold text-foreground">Office Laptops Stock</h3>
+                    <p className="text-[11px] text-muted-foreground">All office laptops, serial numbers & assignments</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-blue-500/15 border border-blue-500/30 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
+                  <span className="rounded-full bg-blue-500/15 border border-blue-500/30 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-200">
                     {inventoryAssets.length} Laptops
                   </span>
                   <button
@@ -1795,7 +1850,7 @@ export function EmployeeAssetsPage() {
                     className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ Add Laptop</span>
+                    <span>Add Laptop</span>
                   </button>
                 </div>
               </div>
@@ -1965,13 +2020,13 @@ export function EmployeeAssetsPage() {
                     <Smartphone size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">📱 Company SIM Cards Stock Section</h3>
-                    <p className="text-[11px] text-muted-foreground">All corporate SIM cards, phone numbers, active employee allocations & plans</p>
+                    <h3 className="text-sm font-bold text-foreground">Company SIM Cards Stock</h3>
+                    <p className="text-[11px] text-muted-foreground">All corporate SIM cards, phone numbers & active allocations</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 text-xs font-bold text-purple-700 dark:text-purple-300">
+                  <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 text-xs font-bold text-purple-800 dark:text-purple-200">
                     {inventoryAssets.length} SIMs
                   </span>
                   <button
@@ -1984,7 +2039,7 @@ export function EmployeeAssetsPage() {
                     className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ Add SIM Card</span>
+                    <span>Add SIM Card</span>
                   </button>
                 </div>
               </div>
@@ -3630,6 +3685,162 @@ export function EmployeeAssetsPage() {
               </button>
             </div>
           </div>
+        </Dialog>
+      )}
+
+      {/* Bulk Import Assets Modal */}
+      {bulkImportModalOpen && (
+        <Dialog
+          open={bulkImportModalOpen}
+          onClose={() => !isBulkImporting && setBulkImportModalOpen(false)}
+          title="Bulk Import Assets (Laptops & SIMs)"
+          size="md"
+        >
+          <form onSubmit={handleBulkImport} className="space-y-4 p-6">
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3.5 text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span>Supported: .csv, .xlsx, .xls</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadSampleCsvTemplate}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-card px-2.5 py-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 transition hover:bg-blue-500/10"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Download {bulkImportDefaultType === "SIM" ? "SIM" : "Laptop"} Template</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Columns: <code className="font-mono text-foreground">assetType</code> (optional),{" "}
+                <code className="font-mono text-foreground">assetName</code> (required),{" "}
+                <code className="font-mono text-foreground">identifier</code> (Serial / SIM Phone, required),{" "}
+                <code className="font-mono text-foreground">employeeCode</code> (optional — auto-assigns if filled),{" "}
+                <code className="font-mono text-foreground">remarks</code> (optional).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-foreground">
+                Default Asset Type (used if <code className="font-mono">assetType</code> column is blank)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["LAPTOP", "SIM", "OTHER"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setBulkImportDefaultType(t)}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-semibold transition ${
+                      bulkImportDefaultType === t
+                        ? t === "LAPTOP"
+                          ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300 shadow-sm"
+                          : t === "SIM"
+                          ? "border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300 shadow-sm"
+                          : "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:bg-surface-muted"
+                    }`}
+                  >
+                    {t === "LAPTOP" ? <Laptop className="h-3.5 w-3.5" /> : t === "SIM" ? <Smartphone className="h-3.5 w-3.5" /> : <HardDrive className="h-3.5 w-3.5" />}
+                    <span>{t === "LAPTOP" ? "Laptops" : t === "SIM" ? "SIM Cards" : "Other"}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-foreground">
+                Upload CSV / Excel File <span className="text-rose-500">*</span>
+              </label>
+              <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface-muted/30 p-5 text-center cursor-pointer transition hover:border-primary/50 hover:bg-surface-muted/50">
+                <Upload className="h-6 w-6 text-primary" />
+                {bulkImportFile ? (
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-foreground">{bulkImportFile.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {(bulkImportFile.size / 1024).toFixed(1)} KB · Click to change file
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-foreground">Click to choose .csv, .xlsx, or .xls file</p>
+                    <p className="text-[11px] text-muted-foreground">Duplicates already in inventory will be safely skipped</p>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null;
+                    setBulkImportFile(selected);
+                    setBulkImportResult(null);
+                  }}
+                />
+              </label>
+            </div>
+
+            {bulkImportResult && (
+              <div className="space-y-3 rounded-2xl border border-border bg-card p-3.5">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-2">
+                    <p className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Imported</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{bulkImportResult.importedCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-2">
+                    <p className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300">Skipped</p>
+                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{bulkImportResult.skippedCount}</p>
+                  </div>
+                  <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-2">
+                    <p className="text-[10px] font-bold uppercase text-rose-700 dark:text-rose-300">Failed</p>
+                    <p className="text-lg font-bold text-rose-700 dark:text-rose-300">{bulkImportResult.failedCount}</p>
+                  </div>
+                </div>
+
+                {bulkImportResult.errors.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-border">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-surface-muted text-muted-foreground sticky top-0">
+                        <tr>
+                          <th className="px-2.5 py-1.5">Row</th>
+                          <th className="px-2.5 py-1.5">Identifier</th>
+                          <th className="px-2.5 py-1.5">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {bulkImportResult.errors.map((err, idx) => (
+                          <tr key={`${err.rowNumber}-${idx}`}>
+                            <td className="px-2.5 py-1.5 font-mono">#{err.rowNumber}</td>
+                            <td className="px-2.5 py-1.5 font-mono">{err.identifier || "—"}</td>
+                            <td className="px-2.5 py-1.5 text-muted-foreground">{err.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setBulkImportModalOpen(false)}
+                disabled={isBulkImporting}
+                className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
+              >
+                {bulkImportResult ? "Close" : "Cancel"}
+              </button>
+              <button
+                type="submit"
+                disabled={isBulkImporting || !bulkImportFile}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+              >
+                {isBulkImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                <span>{isBulkImporting ? "Importing..." : "Start Bulk Import"}</span>
+              </button>
+            </div>
+          </form>
         </Dialog>
       )}
     </div>

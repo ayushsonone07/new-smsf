@@ -39,9 +39,11 @@ import type {
   SimAssignmentHistory,
   UpdateRemarkInput,
   CompanyAsset,
+  CompanyAssetType,
   CreateAssetInput,
   InventorySummary,
   UpdateAssetStatusInput,
+  BulkAssetImportResult,
 } from "../types";
 
 /** Turn a {from,to} Date range into the {from,to} DD/MM/YYYY params the API expects. */
@@ -709,6 +711,20 @@ export const hrService = {
 
   async updateInventoryAssetStatus(id: number, input: UpdateAssetStatusInput): Promise<CompanyAsset> {
     const { data } = await http.patch<{ data: CompanyAsset }>(`/api/v1/hr/assets/inventory/${id}/status`, input);
+    return data.data;
+  },
+
+  async bulkImportInventoryAssets(file: File, defaultType?: CompanyAssetType): Promise<BulkAssetImportResult> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (defaultType) {
+      formData.append("defaultType", defaultType);
+    }
+    const { data } = await http.post<{ data: BulkAssetImportResult }>(
+      "/api/v1/hr/assets/inventory/bulk-import",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
     return data.data;
   },
 
