@@ -311,7 +311,7 @@ export function CustomerDetailsPage() {
           if (profile.phone) setPhone(profile.phone)
           if (profile.ownerName) setOwnerName(profile.ownerName)
           if (profile.businessName) setBusinessName(profile.businessName)
-          if (profile.businessName) setWebsiteBusinessName(profile.businessName)
+          if (profile.businessName) { setWebsiteBusinessName(profile.businessName); setAutomationBusinessName(profile.businessName) }
           if (profile.brandName) setBasicBrandName(profile.brandName)
           if (profile.businessType) setBusinessType(profile.businessType)
           if (profile.yearStarted) setYearStarted(profile.yearStarted)
@@ -333,14 +333,22 @@ export function CustomerDetailsPage() {
               setCustomBusinessCategory(profile.businessCategory)
             }
           }
-          if (profile.businessCategory) setWebsiteCategory(profile.businessCategory)
+          if (profile.businessCategory) {
+            setWebsiteCategory(profile.businessCategory)
+            setGoogleBusinessCategory(profile.businessCategory)
+            setAutomationCategory(profile.businessCategory)
+          }
           if (profile.bookingLink) setBookingLink(profile.bookingLink)
           if (profile.paymentLink) setPaymentLink(profile.paymentLink)
           if (profile.topProducts) {
             const list = profile.topProducts.split(',').map((s: string) => s.trim()).filter(Boolean)
-            if (list.length) setMainServices(list)
+            if (list.length) { setMainServices(list); setAutoServices(list) }
           }
-          if (profile.gmbProfileLink) setGmbProfileLink(profile.gmbProfileLink)
+          if (profile.gmbProfileLink) {
+            setGmbProfileLink(profile.gmbProfileLink)
+            setMapLink(profile.gmbProfileLink)
+            setGoogleMapLink(profile.gmbProfileLink)
+          }
           if (profile.googleReviewLink) setGoogleReviewLink(profile.googleReviewLink)
           if (profile.appointmentLink) setAppointmentLink(profile.appointmentLink)
           if (profile.brandName) setBrandName(profile.brandName)
@@ -465,6 +473,9 @@ export function CustomerDetailsPage() {
     const autoServicesForSave = mergeServices(autoServices, autoServicesInput.split(','))
     if ((isSharedForm || activeStep === 3) && servicesForSave.length !== mainServices.length) {
       setMainServices(servicesForSave)
+      setAutoServices((automationItems) => (
+        automationItems.length === 0 || servicesMatch(automationItems, mainServices) ? [...servicesForSave] : automationItems
+      ))
       setServicesInput('')
       setServiceSuggestionsOpen(false)
     }
@@ -476,10 +487,10 @@ export function CustomerDetailsPage() {
     const rawPayload: Record<string, any> = {
       phone: effectivePhone,
       customerId: customerId ? Number(customerId) : undefined,
-      businessName: businessName.trim() || websiteBusinessName.trim() || undefined,
+      businessName: automationBusinessName.trim() || websiteBusinessName.trim() || businessName.trim() || undefined,
       ownerName: ownerName.trim() || undefined,
       email: email.trim() || undefined,
-      brandName: basicBrandName.trim() || brandName.trim() || undefined,
+      brandName: brandName.trim() || basicBrandName.trim() || undefined,
       businessType: businessType.trim() || undefined,
       yearStarted: yearStarted.trim() || undefined,
       happyCustomers: happyCustomers.trim() || undefined,
@@ -491,14 +502,14 @@ export function CustomerDetailsPage() {
       logoLink: logoOption.trim() || undefined,
       imagesLink: imageOption.trim() || undefined,
       tagline: businessTagline.trim() || undefined,
-      businessCategory: resolvedBusinessCategory || websiteCategory.trim() || googleBusinessCategory.trim() || undefined,
+      businessCategory: automationCategory.trim() || googleBusinessCategory.trim() || websiteCategory.trim() || resolvedBusinessCategory || undefined,
       bookingLink: bookingLink.trim() || undefined,
       paymentLink: paymentLink.trim() || undefined,
-      topProducts: [...new Set([...servicesForSave, ...autoServicesForSave])].join(', ') || undefined,
-      gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || mapLink.trim() || undefined,
+      topProducts: (autoServicesForSave.length ? autoServicesForSave : servicesForSave).join(', ') || undefined,
+      gmbProfileLink: noGmbLink ? undefined : googleMapLink.trim() || gmbProfileLink.trim() || mapLink.trim() || undefined,
       googleReviewLink: googleReviewLink.trim() || undefined,
       appointmentLink: appointmentLink.trim() || undefined,
-      address: websiteFullAddress.trim() || basicAddress.trim() || fullAddress.trim() || undefined,
+      address: fullAddress.trim() || websiteFullAddress.trim() || billingAddress.trim() || basicAddress.trim() || undefined,
       area: area.trim() || basicArea.trim() || undefined,
       city: cityName.trim() || basicCity.trim() || undefined,
       state: stateName.trim() || basicState.trim() || undefined,
@@ -593,8 +604,17 @@ export function CustomerDetailsPage() {
     return merged
   }
 
+  function servicesMatch(first: string[], second: string[]) {
+    return first.length === second.length
+      && first.every((service, index) => service.toLowerCase() === second[index]?.toLowerCase())
+  }
+
   function addMainService(value: string) {
-    setMainServices((items) => mergeServices(items, value.split(',')))
+    const nextItems = mergeServices(mainServices, value.split(','))
+    setMainServices(nextItems)
+    setAutoServices((automationItems) => (
+      automationItems.length === 0 || servicesMatch(automationItems, mainServices) ? [...nextItems] : automationItems
+    ))
     setServicesInput('')
     setServiceSuggestionsOpen(false)
   }
@@ -604,7 +624,9 @@ export function CustomerDetailsPage() {
   }
 
   function removeMainService(index: number) {
-    setMainServices((items) => items.filter((_, itemIndex) => itemIndex !== index))
+    const nextItems = mainServices.filter((_, itemIndex) => itemIndex !== index)
+    setMainServices(nextItems)
+    setAutoServices((automationItems) => servicesMatch(automationItems, mainServices) ? [...nextItems] : automationItems)
   }
 
   function handleAddAutoService() {
@@ -637,6 +659,123 @@ export function CustomerDetailsPage() {
     setSocialLinkInput('')
   }
 
+  function canReplaceMappedValue(current: string, ...previousValues: string[]) {
+    const normalizedCurrent = current.trim()
+    return !normalizedCurrent || previousValues.some((value) => value.trim() && normalizedCurrent === value.trim())
+  }
+
+  function updateBasicAddress(nextValue: string) {
+    const previousValue = basicAddress
+    setBasicAddress(nextValue)
+    setBillingAddress((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setWebsiteFullAddress((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setFullAddress((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateBillingAddress(nextValue: string) {
+    const previousValue = billingAddress
+    setBillingAddress(nextValue)
+    setWebsiteFullAddress((current) => canReplaceMappedValue(current, previousValue, basicAddress) ? nextValue : current)
+    setFullAddress((current) => canReplaceMappedValue(current, previousValue, basicAddress) ? nextValue : current)
+  }
+
+  function updateWebsiteFullAddress(nextValue: string) {
+    const previousValue = websiteFullAddress
+    setWebsiteFullAddress(nextValue)
+    setFullAddress((current) => canReplaceMappedValue(current, previousValue, billingAddress, basicAddress) ? nextValue : current)
+  }
+
+  function updateBasicArea(nextValue: string) {
+    const previousValue = basicArea
+    setBasicArea(nextValue)
+    setArea((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateBasicState(nextValue: string) {
+    const previousValue = basicState
+    const automationStateIsMapped = canReplaceMappedValue(stateName, previousValue)
+    setBasicState(nextValue)
+    if (!getCitiesForState(nextValue).includes(basicCity)) setBasicCity('')
+    if (automationStateIsMapped) {
+      setStateName(nextValue)
+      if (!getCitiesForState(nextValue).includes(cityName)) setCityName('')
+    }
+  }
+
+  function updateBasicCity(nextValue: string) {
+    const previousValue = basicCity
+    setBasicCity(nextValue)
+    setCityName((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateBusinessName(nextValue: string) {
+    const previousValue = businessName
+    setBusinessName(nextValue)
+    setWebsiteBusinessName((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setAutomationBusinessName((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateWebsiteBusinessName(nextValue: string) {
+    const previousValue = websiteBusinessName
+    setWebsiteBusinessName(nextValue)
+    setAutomationBusinessName((current) => canReplaceMappedValue(current, previousValue, businessName) ? nextValue : current)
+  }
+
+  function updateBasicBrandName(nextValue: string) {
+    const previousValue = basicBrandName
+    setBasicBrandName(nextValue)
+    setBrandName((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function syncBusinessCategory(nextValue: string, previousValue: string) {
+    setWebsiteCategory((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setGoogleBusinessCategory((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setAutomationCategory((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateBusinessCategory(nextValue: string) {
+    const previousValue = resolvedBusinessCategory
+    setBusinessCategory(nextValue)
+    if (nextValue !== 'Other') {
+      setCustomBusinessCategory('')
+      syncBusinessCategory(nextValue, previousValue)
+    } else {
+      syncBusinessCategory('', previousValue)
+    }
+  }
+
+  function updateCustomBusinessCategory(nextValue: string) {
+    const previousValue = customBusinessCategory
+    setCustomBusinessCategory(nextValue)
+    syncBusinessCategory(nextValue, previousValue)
+  }
+
+  function updateWebsiteCategory(nextValue: string) {
+    const previousValue = websiteCategory
+    setWebsiteCategory(nextValue)
+    setGoogleBusinessCategory((current) => canReplaceMappedValue(current, previousValue, resolvedBusinessCategory) ? nextValue : current)
+    setAutomationCategory((current) => canReplaceMappedValue(current, previousValue, resolvedBusinessCategory) ? nextValue : current)
+  }
+
+  function updateGoogleBusinessCategory(nextValue: string) {
+    const previousValue = googleBusinessCategory
+    setGoogleBusinessCategory(nextValue)
+    setAutomationCategory((current) => canReplaceMappedValue(current, previousValue, websiteCategory, resolvedBusinessCategory) ? nextValue : current)
+  }
+
+  function updateMapLink(nextValue: string) {
+    const previousValue = mapLink
+    setMapLink(nextValue)
+    setGmbProfileLink((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+    setGoogleMapLink((current) => canReplaceMappedValue(current, previousValue) ? nextValue : current)
+  }
+
+  function updateGmbProfileLink(nextValue: string) {
+    const previousValue = gmbProfileLink
+    setGmbProfileLink(nextValue)
+    setGoogleMapLink((current) => canReplaceMappedValue(current, previousValue, mapLink) ? nextValue : current)
+  }
+
   function prefillRepeatedFields(step: number, servicesOverride?: string[]) {
     if (step === 2) {
       setBillingAddress((value) => value.trim() ? value : basicAddress)
@@ -645,23 +784,23 @@ export function CustomerDetailsPage() {
     if (step === 3) {
       setWebsiteBusinessName((value) => value.trim() ? value : businessName)
       setWebsiteCategory((value) => value.trim() ? value : resolvedBusinessCategory)
-      setWebsiteFullAddress((value) => value.trim() ? value : (basicAddress || billingAddress))
+      setWebsiteFullAddress((value) => value.trim() ? value : (billingAddress || basicAddress))
       setWebsiteContactEmail((value) => value.trim() ? value : email)
     }
 
     if (step === 4) {
       setBrandName((value) => value.trim() ? value : basicBrandName)
-      setGoogleBusinessCategory((value) => value.trim() ? value : resolvedBusinessCategory)
+      setGoogleBusinessCategory((value) => value.trim() ? value : (websiteCategory || resolvedBusinessCategory))
     }
 
     if (step === 5) {
       setAutomationBusinessName((value) => value.trim() ? value : (websiteBusinessName || businessName))
-      setAutomationCategory((value) => value.trim() ? value : (websiteCategory || resolvedBusinessCategory))
+      setAutomationCategory((value) => value.trim() ? value : (googleBusinessCategory || websiteCategory || resolvedBusinessCategory))
       setArea((value) => value.trim() ? value : basicArea)
-      setFullAddress((value) => value.trim() ? value : (websiteFullAddress || basicAddress || billingAddress))
+      setFullAddress((value) => value.trim() ? value : (websiteFullAddress || billingAddress || basicAddress))
       setStateName((value) => value.trim() ? value : basicState)
       setCityName((value) => value.trim() ? value : basicCity)
-      setGoogleMapLink((value) => value.trim() ? value : mapLink)
+      setGoogleMapLink((value) => value.trim() ? value : (gmbProfileLink || mapLink))
       setAutoServices((items) => items.length > 0 ? items : [...(servicesOverride ?? mainServices)])
     }
   }
@@ -941,17 +1080,14 @@ export function CustomerDetailsPage() {
                 <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Tell us about your business</p>
               </div>
               <div className="cdb-details-grid">
-                <label className="cdb-field"><span>Business Name *</span><input className="cdb-input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
-                <label className="cdb-field"><span>Brand Name</span><input className="cdb-input" value={basicBrandName} onChange={(e) => setBasicBrandName(e.target.value)} placeholder="As per Google My Business" /></label>
+                <label className="cdb-field"><span>Business Name *</span><input className="cdb-input" value={businessName} onChange={(e) => updateBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
+                <label className="cdb-field"><span>Brand Name</span><input className="cdb-input" value={basicBrandName} onChange={(e) => updateBasicBrandName(e.target.value)} placeholder="As per Google My Business" /></label>
                 <label className="cdb-field">
                   <span>Business Category</span>
                   <select
                     className="cdb-select"
                     value={businessCategory}
-                    onChange={(e) => {
-                      setBusinessCategory(e.target.value)
-                      if (e.target.value !== 'Other') setCustomBusinessCategory('')
-                    }}
+                    onChange={(e) => updateBusinessCategory(e.target.value)}
                   >
                     <option value="">Select business category...</option>
                     {BUSINESS_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
@@ -960,7 +1096,7 @@ export function CustomerDetailsPage() {
                     <input
                       className="cdb-input"
                       value={customBusinessCategory}
-                      onChange={(e) => setCustomBusinessCategory(e.target.value)}
+                      onChange={(e) => updateCustomBusinessCategory(e.target.value)}
                       placeholder="Enter your business category"
                       aria-label="Custom business category"
                     />
@@ -972,10 +1108,10 @@ export function CustomerDetailsPage() {
                 <label className="cdb-field"><span>Email *</span><input type="email" className="cdb-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
                 <label className="cdb-field"><span>Phone / WhatsApp *</span><input type="tel" className="cdb-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 9876543210" /></label>
                 <label className="cdb-field"><span>Additional Number</span><input type="tel" className="cdb-input" value={additionalNumber} onChange={(e) => setAdditionalNumber(e.target.value)} placeholder="Optional secondary phone number" /></label>
-                <label className="cdb-field"><span>Address</span><input className="cdb-input" value={basicAddress} onChange={(e) => setBasicAddress(e.target.value)} placeholder="e.g. 123, Main Street" /></label>
-                <label className="cdb-field"><span>Area</span><input className="cdb-input" value={basicArea} onChange={(e) => setBasicArea(e.target.value)} placeholder="Dhanwantri chowk, Deen Dayal, etc." /></label>
-                <label className="cdb-field"><span>State</span><select className="cdb-select" value={basicState} onChange={(e) => { const nextState = e.target.value; setBasicState(nextState); if (!getCitiesForState(nextState).includes(basicCity)) setBasicCity('') }}><option value="">Select state...</option>{INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}</select></label>
-                <label className="cdb-field"><span>City</span><select className="cdb-select" value={basicCity} disabled={!basicState} onChange={(e) => setBasicCity(e.target.value)}><option value="">{basicState ? 'Select city...' : 'Select state first...'}</option>{basicCityOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field"><span>Address</span><input className="cdb-input" value={basicAddress} onChange={(e) => updateBasicAddress(e.target.value)} placeholder="e.g. 123, Main Street" /></label>
+                <label className="cdb-field"><span>Area</span><input className="cdb-input" value={basicArea} onChange={(e) => updateBasicArea(e.target.value)} placeholder="Dhanwantri chowk, Deen Dayal, etc." /></label>
+                <label className="cdb-field"><span>State</span><select className="cdb-select" value={basicState} onChange={(e) => updateBasicState(e.target.value)}><option value="">Select state...</option>{INDIAN_STATES.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="cdb-field"><span>City</span><select className="cdb-select" value={basicCity} disabled={!basicState} onChange={(e) => updateBasicCity(e.target.value)}><option value="">{basicState ? 'Select city...' : 'Select state first...'}</option>{basicCityOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
                 <label className="cdb-field"><span>Zip Code</span><input className="cdb-input" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="000000" maxLength={10} /></label>
                 <label className="cdb-field cdb-field-wide"><span>Country</span><input className="cdb-input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. India" /></label>
               </div>
@@ -1248,7 +1384,7 @@ export function CustomerDetailsPage() {
                     className="cdb-textarea"
                     rows={3}
                     value={billingAddress}
-                    onChange={(e) => setBillingAddress(e.target.value)}
+                    onChange={(e) => updateBillingAddress(e.target.value)}
                     required
                   />
                   <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>
@@ -1408,10 +1544,10 @@ export function CustomerDetailsPage() {
                 <div className="cdb-details-grid">
                   <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Use business name</option></select></label>
                   {/* <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label> */}
-                  <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => setWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
+                  <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => updateWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
                   <label className="cdb-field"><span>Booking Link</span><input className="cdb-input" value={bookingLink} onChange={(e) => setBookingLink(e.target.value)} placeholder="e.g. https://..." /></label>
                   <label className="cdb-field"><span>Payment Link</span><input className="cdb-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="e.g. https://razorpay.me/..." /></label>
-                  <label className="cdb-field"><span>Business Category</span><input className="cdb-input" value={websiteCategory} onChange={(e) => setWebsiteCategory(e.target.value)} placeholder="e.g. Restaurant, Clothing Store" /><small>Will display as: Best [category] in [area], [city] [state] India</small></label>
+                  <label className="cdb-field"><span>Business Category</span><input className="cdb-input" value={websiteCategory} onChange={(e) => updateWebsiteCategory(e.target.value)} placeholder="e.g. Restaurant, Clothing Store" /><small>Will display as: Best [category] in [area], [city] [state] India</small></label>
                   <label className="cdb-field cdb-field-wide"><span>Business Tagline</span><textarea className="cdb-textarea" rows={2} value={businessTagline} onChange={(e) => setBusinessTagline(e.target.value)} placeholder="e.g. Best IT Services in Navi Mumbai, Maharashtra" /><small>Auto-generated: Best [category] in [area], [city], [state], India</small></label>
                   <div className="cdb-field cdb-field-wide">
                     <span>Main Services / Products</span>
@@ -1431,9 +1567,9 @@ export function CustomerDetailsPage() {
                 <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
                   <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px', marginBottom: '16px' }}><h3 style={{ margin: 0, fontSize: '16px' }}>Contact Details</h3></div>
                   <div className="cdb-details-grid">
-                    <label className="cdb-field"><span>Full Address</span><input className="cdb-input" value={websiteFullAddress} onChange={(e) => setWebsiteFullAddress(e.target.value)} placeholder="e.g. 123, Main Street, Jabalpur" /></label>
+                    <label className="cdb-field"><span>Full Address</span><input className="cdb-input" value={websiteFullAddress} onChange={(e) => updateWebsiteFullAddress(e.target.value)} placeholder="e.g. 123, Main Street, Jabalpur" /></label>
                     <label className="cdb-field"><span>Email</span><input type="email" className="cdb-input" value={websiteContactEmail} onChange={(e) => setWebsiteContactEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
-                    <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => setMapLink(e.target.value)} placeholder="Google maps link" /></label>
+                    <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => updateMapLink(e.target.value)} placeholder="Google maps link" /></label>
                     <div className="cdb-field"><span>Social Links</span><div className="cdb-service-entry"><input className="cdb-input" value={socialLinkInput} onChange={(e) => setSocialLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSocialLink() } }} placeholder="https://instagram.com/your-handle" /><button type="button" className="cdb-btn-primary" onClick={addSocialLink}>+</button></div><div className="cdb-service-stack">{socialLinks.map((link, index) => <span className="cdb-service-chip" key={`${link}-${index}`}>{link}<button type="button" onClick={() => setSocialLinks((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div></div>
                     <div className="cdb-field cdb-field-wide"><WorkingHoursEditor value={websiteWorkingHours} onChange={setWebsiteWorkingHours} /></div>
                   </div>
@@ -1495,7 +1631,7 @@ export function CustomerDetailsPage() {
                       className="cdb-input"
                       placeholder="https://g.page/YourBusinessName"
                       value={gmbProfileLink}
-                      onChange={(e) => setGmbProfileLink(e.target.value)}
+                      onChange={(e) => updateGmbProfileLink(e.target.value)}
                       disabled={noGmbLink}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
@@ -1534,7 +1670,7 @@ export function CustomerDetailsPage() {
                       className="cdb-input"
                       placeholder="Exact category. Area, Location, City, state"
                       value={googleBusinessCategory}
-                      onChange={(e) => setGoogleBusinessCategory(e.target.value)}
+                      onChange={(e) => updateGoogleBusinessCategory(e.target.value)}
                       required
                     />
                   </div>
