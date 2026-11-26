@@ -821,6 +821,92 @@ export function CustomerDetailsPage() {
     }
   }
 
+  async function copyCustomerFormDetails() {
+    const servicesForCopy = mergeServices(mainServices, servicesInput.split(','))
+    const automationServicesForCopy = mergeServices(autoServices, autoServicesInput.split(','))
+    const workingHoursText = websiteWorkingHours
+      .map((item) => `${item.startDay} ${item.startTime} to ${item.endDay} ${item.endTime}`)
+      .join('; ')
+    const offersText = offers
+      .filter((offer) => offer.offerType || offer.discountValue || offer.description)
+      .map((offer) => [offer.offerType, offer.discountValue, offer.description].filter(Boolean).join(' - '))
+      .join('; ')
+
+    const sections: Array<{ title: string; rows: Array<[string, string | undefined]> }> = [
+      {
+        title: 'Basic Information',
+        rows: [
+          ['Business Name', businessName], ['Brand Name', basicBrandName],
+          ['Business Category', resolvedBusinessCategory], ['Business Type', businessType],
+          ['Year Started', yearStarted], ['Happy Customers', happyCustomers],
+          ['Email', email], ['Phone / WhatsApp', phone], ['Additional Number', additionalNumber],
+          ['Address', basicAddress], ['Area', basicArea], ['State', basicState], ['City', basicCity],
+          ['Zip Code', zipCode], ['Country', country],
+        ],
+      },
+      {
+        title: 'Billing Information',
+        rows: [
+          ['Billing Address', billingAddress],
+          ['GST Number', noGstNumber ? 'I do not have a GST Number' : gstNumber],
+        ],
+      },
+      {
+        title: 'Website Information',
+        rows: [
+          ['Domain Status', domainStatus], ['Domain Name', domainName], ['Logo Option', logoOption],
+          ['Image Option', imageOption], ['Business Name', websiteBusinessName],
+          ['Booking Link', bookingLink], ['Payment Link', paymentLink],
+          ['Business Category', websiteCategory], ['Business Tagline', businessTagline],
+          ['Main Services / Products', servicesForCopy.join(', ')],
+          ['Full Address', websiteFullAddress], ['Contact Email', websiteContactEmail],
+          ['Google Map Link', mapLink], ['Social Links', socialLinks.join(', ')],
+          ['Working Hours', workingHoursText],
+        ],
+      },
+      {
+        title: 'Google Information',
+        rows: [
+          ['GMB Profile Link', noGmbLink ? "Don't have link" : gmbProfileLink],
+          ['Brand Name', brandName], ['Business Category', googleBusinessCategory],
+          ['Google Review Link', googleReviewLink], ['Appointment Link', appointmentLink],
+        ],
+      },
+      {
+        title: 'Automation Information',
+        rows: [
+          ['Business Name', automationBusinessName], ['Business Category', automationCategory],
+          ['Main Goal', mainGoal], ['Offers', offersText], ['Area', area], ['Full Address', fullAddress],
+          ['State', stateName], ['City', cityName], ['Google Map Link', googleMapLink],
+          ['Website Link', websiteLink],
+          ['Services / Products', automationServicesForCopy.join(', ')],
+          ['AI Chatbot Email', aiChatbotEmail], ['AI Chatbot Link', aiChatbotLink],
+        ],
+      },
+      {
+        title: 'Additional Details',
+        rows: [['Client Remark', clientRemark], ['Additional Information', additionalInformation]],
+      },
+    ]
+
+    const text = sections
+      .map((section) => {
+        const populatedRows = section.rows.filter(([, value]) => value?.trim())
+        if (!populatedRows.length) return ''
+        return `${section.title}\n${populatedRows.map(([label, value]) => `${label}: ${value?.trim()}`).join('\n')}`
+      })
+      .filter(Boolean)
+      .join('\n\n')
+
+    try {
+      await navigator.clipboard.writeText(text || 'No customer details entered.')
+      setToast({ type: 'success', title: 'Form Details Copied', message: 'All populated customer details were copied to the clipboard.' })
+      window.setTimeout(() => setToast(null), 3000)
+    } catch {
+      setToast({ type: 'error', title: 'Copy Failed', message: 'Clipboard access was unavailable. Please try again.' })
+    }
+  }
+
   function handleAddOffer() {
     setOffers([
       ...offers,
@@ -945,7 +1031,7 @@ export function CustomerDetailsPage() {
           )}
 
           {/* Card Title & Progress Header */}
-          <div className="cdb-card-header" style={{ marginBottom: '16px' }}>
+          <div className="cdb-card-header cdb-customer-form-header" style={{ marginBottom: '16px' }}>
             <div className="cdb-card-title-group">
               <div className="cdb-card-icon-box">
                 <Icon name="userIn" size={18} />
@@ -993,11 +1079,21 @@ export function CustomerDetailsPage() {
                 <Icon name="copy" size={16} />
                 <span>Copy shareable link</span>
               </button>
+              <button type="button" className="cdb-btn-secondary cdb-share-link-button" onClick={() => void copyCustomerFormDetails()} title="Copy all customer form details">
+                <Icon name="copy" size={16} />
+                <span>Copy Form</span>
+              </button>
               </> : (
-                <button type="button" className="cdb-btn-secondary cdb-share-link-button" onClick={() => void copyShareableFormLink()} title="Copy this editable customer form link">
-                  <Icon name="copy" size={16} />
-                  <span>Copy Form Link</span>
-                </button>
+                <>
+                  <button type="button" className="cdb-btn-secondary cdb-share-link-button" onClick={() => void copyShareableFormLink()} title="Copy this editable customer form link">
+                    <Icon name="copy" size={16} />
+                    <span>Copy Form Link</span>
+                  </button>
+                  <button type="button" className="cdb-btn-secondary cdb-share-link-button" onClick={() => void copyCustomerFormDetails()} title="Copy all customer form details">
+                    <Icon name="copy" size={16} />
+                    <span>Copy Form</span>
+                  </button>
+                </>
               )}
             </div>
           </div>

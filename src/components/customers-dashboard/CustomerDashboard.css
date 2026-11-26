@@ -946,6 +946,35 @@
   justify-content: space-between;
 }
 
+.cdb-customer-form-header {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  margin: -24px -24px 16px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 720px) {
+  .cdb-customer-form-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .cdb-customer-form-header > :last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .cdb-customer-form-header .cdb-share-link-button span {
+    display: none;
+  }
+}
+
 .cdb-card-title-group {
   display: flex;
   align-items: center;
