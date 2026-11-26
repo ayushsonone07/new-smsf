@@ -547,7 +547,51 @@
 .cl-biz-line .cl-biz-name {
   margin: 0;
   min-width: 0;
-  flex: 1 1 calc(100% - 30px);
+  flex: 1 1 calc(100% - 58px);
+}
+
+.cl-copy-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.cl-copy-button:hover {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.cl-copy-button--copied {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.cl-copy-feedback {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 18%);
 }
 
 .cl-biz-line .cl-form-pill {
@@ -634,11 +678,21 @@
 
 /* ── Contact cell ─────────────────────────────────────────── */
 
+.cl-contact-value-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 5px;
+}
+
 .cl-email {
   font-size: 13px;
   color: #1e293b;
   font-weight: 600;
-  margin-bottom: 5px;
+  margin-bottom: 0;
+  min-width: 0;
+  flex: 0 1 auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
