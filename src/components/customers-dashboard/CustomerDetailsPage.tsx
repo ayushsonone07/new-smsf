@@ -269,7 +269,6 @@ export function CustomerDetailsPage() {
   const [websiteLink, setWebsiteLink] = useState('')
   const [autoServicesInput, setAutoServicesInput] = useState('')
   const [autoServices, setAutoServices] = useState<string[]>([])
-  const [automationWorkingHours, setAutomationWorkingHours] = useState<WorkingHourItem[]>([])
   const [aiChatbotEmail, setAiChatbotEmail] = useState('')
   const [aiChatbotLink, setAiChatbotLink] = useState('')
 
@@ -287,17 +286,27 @@ export function CustomerDetailsPage() {
 
     const contact = (decrypted.contact || search.get('contact') || search.get('phone') || '').trim()
     const rawCustId = (decrypted.customerId || search.get('customerId') || '').trim()
-    if (rawCustId) setCustomerId(rawCustId)
     const rawIsDup = decrypted.isDuplicate === 'true' || search.get('isDuplicate') === 'true'
+    const hasUrlLookup = Boolean(contact || rawCustId || rawIsDup)
+    const sessionCustomerId = (session?.customerId || '').trim()
+    const sessionPhone = session?.phone && session.phone !== 'XXXXXXXXXX' ? session.phone.trim() : ''
+    const sessionContact = sessionPhone || (session?.email || '').trim()
+    const lookupContact = hasUrlLookup ? contact : sessionContact
+    const lookupCustomerId = hasUrlLookup
+      ? rawCustId
+      : (/^\d+$/.test(sessionCustomerId) ? sessionCustomerId : '')
+
+    if (lookupCustomerId) setCustomerId(lookupCustomerId)
     if (rawIsDup || rawCustId) setIsDuplicate(true)
 
-    if (contact || rawCustId) {
-      if (contact) {
-        setPhone(contact)
-        setSearchContact(contact)
+    if (lookupContact || lookupCustomerId) {
+      if (lookupContact) {
+        setPhone(lookupContact)
+        setSearchContact(lookupContact)
       }
-      getCustomerProfileDetails(contact, rawCustId ? Number(rawCustId) : undefined)
+      getCustomerProfileDetails(lookupContact, lookupCustomerId ? Number(lookupCustomerId) : undefined)
         .then((profile) => {
+          if (!rawIsDup && profile.customerId) setCustomerId(String(profile.customerId))
           if (profile.phone) setPhone(profile.phone)
           if (profile.ownerName) setOwnerName(profile.ownerName)
           if (profile.businessName) setBusinessName(profile.businessName)
@@ -362,7 +371,6 @@ export function CustomerDetailsPage() {
                   }
                 })
                 setWebsiteWorkingHours(hours)
-                setAutomationWorkingHours(hours)
               }
             } catch {
               // Older records may contain free-text working hours.
@@ -387,7 +395,7 @@ export function CustomerDetailsPage() {
         })
         .catch(console.error)
     }
-  }, [])
+  }, [session?.customerId, session?.email, session?.phone])
 
   const allFormStepsCompleted = [1, 2, 3, 4, 5].every((step) => completedSteps.has(step))
   const progressPercent = Math.round((completedSteps.size / 5) * 100)
@@ -498,9 +506,7 @@ export function CustomerDetailsPage() {
       zipCode: zipCode.trim() || undefined,
       country: country.trim() || undefined,
       socialLinks: socialLinks.length ? socialLinks.join(', ') : undefined,
-      workingHours: (websiteWorkingHours.length || automationWorkingHours.length)
-        ? JSON.stringify(websiteWorkingHours.length ? websiteWorkingHours : automationWorkingHours)
-        : undefined,
+      workingHours: websiteWorkingHours.length ? JSON.stringify(websiteWorkingHours) : undefined,
       websiteLink: websiteLink.trim() || undefined,
       mainGoal: mainGoal.trim() || undefined,
       remarks: clientRemark.trim() || undefined,
@@ -637,7 +643,7 @@ export function CustomerDetailsPage() {
     if (step === 3) {
       setWebsiteBusinessName((value) => value.trim() ? value : businessName)
       setWebsiteCategory((value) => value.trim() ? value : resolvedBusinessCategory)
-      setWebsiteFullAddress((value) => value.trim() ? value : basicAddress)
+      setWebsiteFullAddress((value) => value.trim() ? value : (basicAddress || billingAddress))
       setWebsiteContactEmail((value) => value.trim() ? value : email)
     }
 
@@ -647,12 +653,13 @@ export function CustomerDetailsPage() {
     }
 
     if (step === 5) {
-      setAutomationBusinessName((value) => value.trim() ? value : businessName)
-      setAutomationCategory((value) => value.trim() ? value : resolvedBusinessCategory)
+      setAutomationBusinessName((value) => value.trim() ? value : (websiteBusinessName || businessName))
+      setAutomationCategory((value) => value.trim() ? value : (websiteCategory || resolvedBusinessCategory))
       setArea((value) => value.trim() ? value : basicArea)
-      setFullAddress((value) => value.trim() ? value : basicAddress)
+      setFullAddress((value) => value.trim() ? value : (websiteFullAddress || basicAddress || billingAddress))
       setStateName((value) => value.trim() ? value : basicState)
       setCityName((value) => value.trim() ? value : basicCity)
+      setGoogleMapLink((value) => value.trim() ? value : mapLink)
       setAutoServices((items) => items.length > 0 ? items : [...(servicesOverride ?? mainServices)])
     }
   }
@@ -1760,10 +1767,7 @@ export function CustomerDetailsPage() {
                   <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>{autoServices.length}/15 added</span>
                 </div>
 
-                {/* 7. Working Hours */}
-                <WorkingHoursEditor value={automationWorkingHours} onChange={setAutomationWorkingHours} />
-
-                {/* 8. AI Chatbot Configuration (Purple Card Box) */}
+                {/* 7. AI Chatbot Configuration (Purple Card Box) */}
                 <div style={{ background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#ede9fe', color: '#7c3aed', display: 'grid', placeItems: 'center' }}>
