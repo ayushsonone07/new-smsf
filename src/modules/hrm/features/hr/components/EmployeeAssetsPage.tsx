@@ -1850,24 +1850,6 @@ export function EmployeeAssetsPage() {
                     <p className="text-[11px] text-muted-foreground">All office laptops, serial numbers & assignments</p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-blue-500/15 border border-blue-500/30 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-200">
-                    {inventoryAssets.length} Laptops
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewAssetType("LAPTOP");
-                      setNewAssetName("Dell Latitude 5420");
-                      setAddAssetModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Laptop</span>
-                  </button>
-                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -2038,24 +2020,6 @@ export function EmployeeAssetsPage() {
                     <h3 className="text-sm font-bold text-foreground">Company SIM Cards Stock</h3>
                     <p className="text-[11px] text-muted-foreground">All corporate SIM cards, phone numbers & active allocations</p>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 text-xs font-bold text-purple-800 dark:text-purple-200">
-                    {inventoryAssets.length} SIMs
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewAssetType("SIM");
-                      setNewAssetName("Airtel Postpaid SIM");
-                      setAddAssetModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add SIM Card</span>
-                  </button>
                 </div>
               </div>
 

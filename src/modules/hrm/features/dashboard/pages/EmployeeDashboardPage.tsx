@@ -144,69 +144,33 @@ export default function EmployeeDashboardPage() {
         dashboardQuery.isFetching && !isLoading ? "pointer-events-none opacity-60" : ""
       }`}
     >
-      {/* 1. RADIANT HERO HEADER CARD */}
+      {/* 1. CLEAN WELCOME HEADER CARD */}
       <StaggerContainer>
         <StaggerItem variant="card">
-          <section
-            style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 50%, #ffedd5 100%)',
-              borderColor: 'rgba(251, 146, 60, 0.35)',
-              boxShadow: '0 10px 25px -5px rgba(249, 115, 22, 0.08), 0 8px 10px -6px rgba(249, 115, 22, 0.05)',
-            }}
-            className="relative overflow-hidden rounded-2xl border p-6 transition-all"
-          >
-            {/* Ambient Background Radial Glows */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '-40px',
-                right: '-40px',
-                width: '260px',
-                height: '260px',
-                background: 'radial-gradient(circle, rgba(249,115,22,0.18) 0%, rgba(255,255,255,0) 70%)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              {/* Left: Avatar, Name & Live Meta */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 min-w-0">
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              {/* Left: Avatar, Name & Meta */}
+              <div className="flex items-start sm:items-center gap-4 min-w-0">
                 <div className="relative shrink-0">
-                  <div
-                    style={{
-                      background: 'linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%)',
-                      boxShadow: '0 8px 20px -4px rgba(234, 88, 12, 0.4)',
-                    }}
-                    className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-black text-white ring-4 ring-orange-500/15"
-                  >
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-600 text-lg font-bold text-white shadow-xs">
                     {getInitials(employee.name)}
                   </div>
                   <span
-                    className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ring-2 ${
-                      isCheckedIn
-                        ? "bg-emerald-500 ring-emerald-500/30 animate-pulse"
-                        : "bg-amber-400 ring-amber-400/30"
+                    className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
+                      isCheckedIn ? "bg-emerald-500" : "bg-slate-400"
                     }`}
                     title={isCheckedIn ? "Checked In" : "Pending Check-In"}
                   />
                 </div>
 
-                <div className="min-w-0">
-                  {/* Greeting & Date Header */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      style={{
-                        background: 'rgba(255, 237, 213, 0.9)',
-                        color: '#c2410c',
-                        border: '1px solid rgba(251, 146, 60, 0.4)',
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold"
-                    >
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1 font-semibold text-orange-600">
                       <GreetingIcon className="h-3.5 w-3.5" />
-                      <span>{greeting.text}</span>
+                      {greeting.text}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400">•</span>
-                    <span className="text-xs font-semibold text-slate-600">
+                    <span>•</span>
+                    <span>
                       {liveClock.toLocaleDateString(undefined, {
                         weekday: "short",
                         day: "numeric",
@@ -214,92 +178,46 @@ export default function EmployeeDashboardPage() {
                         year: "numeric",
                       })}
                     </span>
+                    <span>•</span>
+                    <span className="font-mono font-semibold text-slate-700">
+                      {liveClock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                     {refreshButton}
                   </div>
 
-                  {/* Employee Name */}
-                  <h1 className="mt-1 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                    {employee.name}
-                  </h1>
-
-                  {/* Department & Location */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2.5 py-0.5 font-bold text-slate-800 border border-orange-200 shadow-xs">
-                      <Briefcase size={12} className="text-orange-600" />
-                      {employee.department ?? "Technology Department"}
-                    </span>
-                    <span className="text-slate-400">•</span>
-                    <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
-                      <MapPin size={13} className="text-orange-600" />
-                      Mumbai HQ
-                    </span>
-                    <span className="text-slate-400">•</span>
-                    <span className="inline-flex items-center gap-1 font-mono font-bold text-orange-900 bg-orange-100/70 px-2 py-0.5 rounded-md">
-                      <Clock size={12} className="text-orange-600" />
-                      {liveClock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                      {employee.name}
+                    </h1>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
+                      <Briefcase size={12} />
+                      {employee.department ?? "Technology"} · Mumbai HQ
                     </span>
                   </div>
 
-                  {/* Clean High-Contrast Stat Chips */}
-                  <div className="mt-3.5 flex flex-wrap gap-2.5">
-                    <span
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        color: '#0f172a',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"
-                    >
-                      <ListTodo size={14} className="text-blue-600" />
-                      <span>
-                        <strong className="font-extrabold text-blue-700">{counts.pendingTasks ?? 0}</strong> pending task
-                        {(counts.pendingTasks ?? 0) === 1 ? "" : "s"}
-                      </span>
+                  {/* Subtle Stat Pills */}
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      <ListTodo size={13} className="text-blue-600" />
+                      <strong className="font-bold text-slate-900">{counts.pendingTasks ?? 0}</strong> pending task{(counts.pendingTasks ?? 0) === 1 ? "" : "s"}
                     </span>
-
-                    <span
-                      style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        color: '#92400e',
-                        boxShadow: '0 1px 3px rgba(180, 83, 9, 0.05)',
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"
-                    >
-                      <Clock size={14} className="text-amber-600" />
-                      <span>
-                        <strong className="font-extrabold text-amber-800">{counts.pendingLeaveRequests ?? 0}</strong> leave requests pending
-                      </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      <Clock size={13} className="text-amber-600" />
+                      <strong className="font-bold text-slate-900">{counts.pendingLeaveRequests ?? 0}</strong> leave requests
                     </span>
-
-                    <span
-                      style={{
-                        background: '#ecfdf5',
-                        border: '1px solid #a7f3d0',
-                        color: '#065f46',
-                        boxShadow: '0 1px 3px rgba(5, 150, 105, 0.05)',
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"
-                    >
-                      <CalendarCheck size={14} className="text-emerald-600" />
-                      <span>
-                        <strong className="font-extrabold text-emerald-800">{counts.presentDaysThisMonth ?? 0}</strong> days present this month
-                      </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      <CalendarCheck size={13} className="text-emerald-600" />
+                      <strong className="font-bold text-slate-900">{counts.presentDaysThisMonth ?? 0}</strong> days present
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Right: Primary Action Buttons */}
-              <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-orange-200/60 pt-4 lg:border-0 lg:pt-0">
+              <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                 <Link
                   to="/hrm/attendance"
-                  style={{
-                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                    boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35)',
-                  }}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-xs font-extrabold text-white transition-all hover:scale-[1.02] hover:brightness-105 active:scale-[0.98]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-orange-600 hover:bg-orange-700 px-4 text-xs font-bold text-white shadow-xs transition"
                 >
                   <Clock className="h-4 w-4" />
                   <span>{isCheckedOut ? "View Attendance" : isCheckedIn ? "Punch Out / Check" : "Log Attendance"}</span>
@@ -307,16 +225,10 @@ export default function EmployeeDashboardPage() {
 
                 <Link
                   to="/hrm/leave"
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #fdba74',
-                    color: '#c2410c',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                  }}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-xs font-extrabold transition-all hover:bg-orange-50 active:scale-[0.98]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 text-xs font-bold text-slate-700 shadow-xs transition"
                 >
-                  <CalendarDays className="h-4 w-4 text-orange-600" />
-                  <span>Apply For Leave</span>
+                  <CalendarDays className="h-4 w-4 text-slate-500" />
+                  <span>Apply for Leave</span>
                 </Link>
               </div>
             </div>
@@ -324,87 +236,53 @@ export default function EmployeeDashboardPage() {
         </StaggerItem>
       </StaggerContainer>
 
-      {/* 2. TOP METRIC CARDS (3 BALANCED COLUMNS) */}
+      {/* 2. TOP METRIC CARDS (3 CLEAN EQUAL COLUMNS) */}
       <StaggerContainer className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {/* CARD 1: TODAY'S SHIFT */}
         <StaggerItem variant="card">
-          <article
-            style={{
-              background: '#ffffff',
-              boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)',
-              border: '1px solid #f1f5f9',
-            }}
-            className="group flex h-full min-h-[240px] flex-col justify-between rounded-2xl p-5.5 transition-all duration-200 hover:-translate-y-1 hover:border-orange-300 hover:shadow-lg"
-          >
+          <article className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <div>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span
-                    style={{ background: '#fff7ed', color: '#ea580c' }}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl font-bold"
-                  >
-                    <Timer size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                    <Timer size={18} />
                   </span>
-                  <div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                      Shift Tracker
-                    </span>
-                    <h3 className="text-sm font-bold text-slate-800">Today&apos;s Work Hours</h3>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Today&apos;s Work Hours</h3>
                 </div>
                 <span
-                  style={{
-                    background: isCheckedIn ? '#ecfdf5' : '#f8fafc',
-                    color: isCheckedIn ? '#047857' : '#64748b',
-                    borderColor: isCheckedIn ? '#a7f3d0' : '#e2e8f0',
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold border"
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                    isCheckedIn
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}
                 >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isCheckedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
-                    }`}
-                  />
+                  <span className={`h-1.5 w-1.5 rounded-full ${isCheckedIn ? "bg-emerald-500" : "bg-slate-400"}`} />
                   {isCheckedIn ? "Checked In" : "Pending"}
                 </span>
               </div>
 
-              {/* Digital Timer Display Box */}
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-                  border: '1px solid #fed7aa',
-                }}
-                className="mt-4 rounded-xl p-3.5 text-center"
-              >
-                <p className="font-mono text-3xl font-black tracking-wider text-orange-950">
+              <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 text-center">
+                <p className="font-mono text-2xl font-bold tracking-wider text-slate-900">
                   {formatDuration(attendance?.workingMinutes)}
                 </p>
-                <p className="mt-1 text-xs font-semibold text-orange-800">
-                  Standard Shift: <span className="font-extrabold">09:30 AM – 06:30 PM</span>
+                <p className="mt-1 text-xs text-slate-500">
+                  Shift: <span className="font-semibold text-slate-700">09:30 AM – 06:30 PM</span>
                 </p>
               </div>
 
-              <div className="mt-3.5 flex items-center justify-between text-xs text-slate-600">
-                <span className="font-semibold truncate">
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span className="truncate">
                   {attendance?.checkIn ? `Punched in at ${attendance.checkIn}` : "Not punched in yet"}
                 </span>
-                <span className="font-bold text-slate-800 shrink-0 bg-slate-100 px-2 py-0.5 rounded-md">
-                  Mumbai HQ
-                </span>
+                <span className="font-medium text-slate-600 shrink-0">Mumbai HQ</span>
               </div>
             </div>
 
             <Link
               to="/hrm/attendance"
-              style={{
-                background: '#fff7ed',
-                borderColor: '#fed7aa',
-                color: '#c2410c',
-              }}
-              className="mt-4 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border text-xs font-extrabold transition-all hover:bg-orange-500 hover:text-white hover:border-orange-500"
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50/70 text-xs font-bold text-orange-700 transition hover:bg-orange-600 hover:text-white hover:border-orange-600"
             >
-              <span>{isCheckedOut ? "View Attendance Record" : isCheckedIn ? "Punch Out / Check Status" : "Punch In Now"}</span>
+              <span>{isCheckedOut ? "View Attendance" : isCheckedIn ? "Punch Out" : "Punch In Now"}</span>
               <ArrowRight size={14} />
             </Link>
           </article>
@@ -412,81 +290,56 @@ export default function EmployeeDashboardPage() {
 
         {/* CARD 2: MY LEAVE BALANCES */}
         <StaggerItem variant="card">
-          <article
-            style={{
-              background: '#ffffff',
-              boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)',
-              border: '1px solid #f1f5f9',
-            }}
-            className="group flex h-full min-h-[240px] flex-col justify-between rounded-2xl p-5.5 transition-all duration-200 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"
-          >
+          <article className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <div>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span
-                    style={{ background: '#ecfdf5', color: '#059669' }}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl font-bold"
-                  >
-                    <Palmtree size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Palmtree size={18} />
                   </span>
-                  <div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                      Leave Quota
-                    </span>
-                    <h3 className="text-sm font-bold text-slate-800">Leave Balances</h3>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Leave Balances</h3>
                 </div>
-                <span
-                  style={{ background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}
-                  className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
-                >
-                  Year 2026
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                  Year {new Date().getFullYear()}
                 </span>
               </div>
 
-              {/* Leave Breakdown with Thick Radiant Bars */}
               <div className="mt-4 space-y-3">
-                {balances.slice(0, 3).map((balance, idx) => {
+                {balances.slice(0, 3).map((balance) => {
                   const percent = Math.min(100, Math.round(((balance.remaining ?? 0) / (balance.total || 1)) * 100));
                   const used = Math.max(0, Number(((balance.total ?? 0) - (balance.remaining ?? 0)).toFixed(1)));
-                  const barGradients = [
-                    "linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)",
-                    "linear-gradient(90deg, #10b981 0%, #059669 100%)",
-                    "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)",
-                  ];
-                  const barBg = barGradients[idx % barGradients.length];
 
                   return (
                     <div key={balance.leaveType} className="space-y-2.5">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-700">{balance.leaveType}</span>
-                          <span className="font-black tabular-nums text-slate-900">
+                          <span className="font-semibold text-slate-700">{balance.leaveType}</span>
+                          <span className="font-bold tabular-nums text-slate-900">
                             {balance.remaining}{" "}
                             <span className="font-normal text-slate-400">/ {balance.total} days</span>
                           </span>
                         </div>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                           <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${percent}%`, background: barBg }}
+                            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                            style={{ width: `${percent}%` }}
                           />
                         </div>
                       </div>
 
                       {balances.length === 1 && (
-                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
+                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200/70 bg-slate-50/70 p-2.5 text-center">
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Available</p>
-                            <p className="text-sm font-black tabular-nums text-emerald-600">{balance.remaining}</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Available</p>
+                            <p className="text-sm font-bold tabular-nums text-emerald-600">{balance.remaining}</p>
                           </div>
-                          <div className="border-x border-slate-200/70">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Used</p>
-                            <p className="text-sm font-black tabular-nums text-slate-700">{used}</p>
+                          <div className="border-x border-slate-200">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Used</p>
+                            <p className="text-sm font-bold tabular-nums text-slate-700">{used}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quota</p>
-                            <p className="text-sm font-black tabular-nums text-slate-700">{balance.total}</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Quota</p>
+                            <p className="text-sm font-bold tabular-nums text-slate-700">{balance.total}</p>
                           </div>
                         </div>
                       )}
@@ -498,14 +351,9 @@ export default function EmployeeDashboardPage() {
 
             <Link
               to="/hrm/leave"
-              style={{
-                background: '#ecfdf5',
-                borderColor: '#a7f3d0',
-                color: '#047857',
-              }}
-              className="mt-4 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border text-xs font-extrabold transition-all hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 text-xs font-bold text-emerald-700 transition hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
             >
-              <span>Apply For Leave</span>
+              <span>Apply for Leave</span>
               <ArrowRight size={14} />
             </Link>
           </article>
@@ -513,34 +361,16 @@ export default function EmployeeDashboardPage() {
 
         {/* CARD 3: MONTHLY ATTENDANCE TRACKER */}
         <StaggerItem variant="card">
-          <article
-            style={{
-              background: '#ffffff',
-              boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)',
-              border: '1px solid #f1f5f9',
-            }}
-            className="group flex h-full min-h-[240px] flex-col justify-between rounded-2xl p-5.5 transition-all duration-200 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
-          >
+          <article className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <div>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <span
-                    style={{ background: '#eff6ff', color: '#2563eb' }}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl font-bold"
-                  >
-                    <UserCheck size={20} />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <UserCheck size={18} />
                   </span>
-                  <div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                      Monthly Summary
-                    </span>
-                    <h3 className="text-sm font-bold text-slate-800">Attendance Log</h3>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Attendance Log</h3>
                 </div>
-                <span
-                  style={{ background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}
-                  className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
-                >
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
                   {liveClock.toLocaleDateString(undefined, { month: "long" })}
                 </span>
               </div>
@@ -548,35 +378,30 @@ export default function EmployeeDashboardPage() {
               <div className="mt-4 space-y-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <div>
-                    <p className="text-3xl font-black tracking-tight text-slate-900">
+                    <p className="text-2xl font-bold tracking-tight text-slate-900">
                       {counts.presentDaysThisMonth ?? 0}
-                      <span className="text-xs font-bold text-slate-500 ml-1.5">Days Logged</span>
+                      <span className="text-xs font-medium text-slate-500 ml-1.5">Days Logged</span>
                     </p>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">
-                      Logged today: <strong className="text-slate-900">{formatHours(attendance?.workingMinutes)}</strong>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Today: <strong className="font-semibold text-slate-800">{formatHours(attendance?.workingMinutes)}</strong>
                     </p>
                   </div>
-                  <span
-                    style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}
-                    className="inline-flex items-center gap-1 text-xs font-black px-2 py-0.5 rounded-full shrink-0"
-                  >
-                    <CheckCircle2 size={13} />
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shrink-0">
+                    <CheckCircle2 size={12} />
                     On Track
                   </span>
                 </div>
 
-                {/* Monthly Progress Meter */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-bold text-slate-600">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-medium text-slate-600">
                     <span>Monthly Target (22 Days)</span>
-                    <span className="text-blue-700">{Math.round(((counts.presentDaysThisMonth ?? 0) / 22) * 100)}%</span>
+                    <span className="font-bold text-blue-700">{Math.round(((counts.presentDaysThisMonth ?? 0) / 22) * 100)}%</span>
                   </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full bg-blue-600 transition-all duration-500"
                       style={{
                         width: `${Math.min(100, ((counts.presentDaysThisMonth ?? 0) / 22) * 100)}%`,
-                        background: 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
                       }}
                     />
                   </div>
@@ -586,12 +411,7 @@ export default function EmployeeDashboardPage() {
 
             <Link
               to="/hrm/attendance"
-              style={{
-                background: '#eff6ff',
-                borderColor: '#bfdbfe',
-                color: '#1d4ed8',
-              }}
-              className="mt-4 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border text-xs font-extrabold transition-all hover:bg-blue-600 hover:text-white hover:border-blue-600"
+              className="mt-4 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white hover:border-blue-600"
             >
               <span>View Detailed Log</span>
               <ArrowRight size={14} />
@@ -713,48 +533,25 @@ export default function EmployeeDashboardPage() {
           {/* COMPANY ANNOUNCEMENTS & CIRCULARS */}
           <StaggerContainer>
             <StaggerItem variant="card">
-              <section
-                style={{
-                  background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #ffffff 100%)',
-                  border: '1px solid #fde68a',
-                  boxShadow: '0 4px 15px -2px rgba(217, 119, 6, 0.08)',
-                }}
-                className="relative overflow-hidden rounded-2xl p-5 transition-all"
-              >
+              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
-                    <span
-                      style={{
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
-                        boxShadow: '0 4px 12px rgba(234, 88, 12, 0.3)',
-                      }}
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-bold"
-                    >
-                      <Star size={22} fill="currentColor" className="text-amber-100" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                      <Star size={20} />
                     </span>
-                    <div className="space-y-1">
-                      <span
-                        style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
-                        className="inline-block rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider"
-                      >
-                        Company Circulars
-                      </span>
-                      <h2 className="text-base font-black text-slate-900">
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">
                         Company Announcements &amp; HR Updates
                       </h2>
-                      <p className="text-xs text-slate-600">
-                        Check out policy announcements, holiday schedules, and published payslips.
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Policy updates, holiday schedules, and published payslips.
                       </p>
                     </div>
                   </div>
 
                   <Link
                     to="/hrm/announcements"
-                    style={{
-                      background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
-                      boxShadow: '0 4px 12px rgba(234, 88, 12, 0.3)',
-                    }}
-                    className="shrink-0 inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-xs font-black text-white transition-all hover:scale-[1.02] hover:brightness-105 active:scale-95"
+                    className="shrink-0 inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 text-xs font-bold text-slate-700 transition"
                   >
                     <span>View Announcements</span>
                     <ArrowRight size={14} />
