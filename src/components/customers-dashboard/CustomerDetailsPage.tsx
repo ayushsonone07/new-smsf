@@ -935,7 +935,10 @@ export function CustomerDetailsPage() {
       },
       {
         title: 'Additional Details',
-        rows: [['Client Remark', clientRemark], ['Additional Information', additionalInformation]],
+        rows: [
+          ...(isSharedForm ? [['Client Remark', clientRemark] as [string, string]] : []),
+          ['Additional Information', additionalInformation],
+        ],
       },
     ]
 
@@ -2124,7 +2127,7 @@ export function CustomerDetailsPage() {
 
           {isSharedForm || activeStep === 5 ? (
             <div className="cdb-form-notes">
-              <div className="cdb-client-remark">
+              {isSharedForm ? <div className="cdb-client-remark">
                 <label htmlFor="customer-client-remark">Client Remark</label>
                 <textarea
                   id="customer-client-remark"
@@ -2136,7 +2139,7 @@ export function CustomerDetailsPage() {
                   maxLength={2000}
                 />
                 <small>{clientRemark.length}/2000</small>
-              </div>
+              </div> : null}
               <div className="cdb-client-remark">
                 <label htmlFor="customer-additional-information">Additional Information</label>
                 <textarea
