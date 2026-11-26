@@ -4,6 +4,7 @@ export type {
   SalesTargetListParams,
   SalesTargetProgressInput,
   SalesTargetSummary,
+  TargetCategory,
   TargetStatus,
   TargetType,
 } from "./targets.types";

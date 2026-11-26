@@ -2,6 +2,8 @@ export type TargetStatus = "PENDING" | "IN_PROGRESS" | "ACHIEVED" | "MISSED" | "
 
 export type TargetType = "MONTHLY" | "QUARTERLY" | "YEARLY" | "CUSTOM";
 
+export type TargetCategory = "SALES" | "OPERATION";
+
 export interface SalesTarget {
   id: number;
   employeeId: number;
@@ -10,6 +12,7 @@ export interface SalesTarget {
   employeeDepartment?: string | null;
   assignedById?: number | null;
   assignedByName?: string | null;
+  category: TargetCategory;
   targetType: TargetType;
   cycle: string;
   periodStart: string;
@@ -21,6 +24,9 @@ export interface SalesTarget {
   achievedDeals?: number | null;
   dealsAchievementPercentage?: number | null;
   incentiveAmount?: number | null;
+  clientTickets?: number | null;
+  solvedTickets?: number | null;
+  potentialCra?: number | null;
   status: TargetStatus;
   remarks?: string | null;
   createdAt: string;
@@ -30,15 +36,19 @@ export interface SalesTarget {
 export interface SalesTargetInput {
   employeeId: number | "";
   assignedById?: number | "";
+  category: TargetCategory;
   targetType: TargetType;
   cycle: string;
   periodStart: string;
   periodEnd: string;
-  targetAmount: number | "";
+  targetAmount?: number | "";
   achievedAmount?: number | "";
   targetDeals?: number | "";
   achievedDeals?: number | "";
   incentiveAmount?: number | "";
+  clientTickets?: number | "";
+  solvedTickets?: number | "";
+  potentialCra?: number | "";
   status: TargetStatus;
   remarks: string;
 }
@@ -46,6 +56,7 @@ export interface SalesTargetInput {
 export interface SalesTargetProgressInput {
   achievedAmount?: number;
   achievedDeals?: number;
+  solvedTickets?: number;
   status?: TargetStatus;
   remarks?: string;
 }
@@ -64,6 +75,7 @@ export interface SalesTargetSummary {
 export interface SalesTargetListParams {
   page?: number;
   size?: number;
+  category?: TargetCategory | "";
   status?: TargetStatus | "";
   targetType?: TargetType | "";
   cycle?: string;

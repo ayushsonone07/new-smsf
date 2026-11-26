@@ -43,6 +43,7 @@ import type {
   SalesTarget,
   SalesTargetInput,
   SalesTargetProgressInput,
+  TargetCategory,
   TargetStatus,
   TargetType,
 } from "../types";
@@ -95,6 +96,21 @@ function computeCycleData(type: TargetType, year: number, month: number, quarter
     return { cycle, periodStart, periodEnd };
   }
   return null;
+}
+
+function CategoryBadge({ category }: { category?: TargetCategory | null }) {
+  const isOperation = category === "OPERATION";
+  return (
+    <span
+      className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+        isOperation
+          ? "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20"
+          : "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20"
+      }`}
+    >
+      {isOperation ? "Operation" : "Sales"}
+    </span>
+  );
 }
 
 function TargetTypeBadge({ type }: { type?: TargetType | null }) {
@@ -174,6 +190,7 @@ export function TargetsPage() {
   const isEmployee = role === "EMPLOYEE";
   const toast = useToast();
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<TargetCategory | "">("");
   const [status, setStatus] = useState<TargetStatus | "">("");
   const [targetType, setTargetType] = useState<TargetType | "">("");
   const [cycle, setCycle] = useState("");
@@ -189,6 +206,7 @@ export function TargetsPage() {
     {
       page,
       size: 10,
+      category: category || undefined,
       status: status || undefined,
       targetType: targetType || undefined,
       cycle: cycle.trim() || undefined,
@@ -251,55 +269,91 @@ export function TargetsPage() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {myTargets.data.map((target) => (
-              <Card key={target.id} className="p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TargetTypeBadge type={target.targetType} />
-                    <span className="font-semibold text-foreground text-sm">{target.cycle}</span>
+            {myTargets.data.map((target) => {
+              const isOperation = target.category === "OPERATION";
+              return (
+                <Card key={target.id} className="p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CategoryBadge category={target.category} />
+                      <TargetTypeBadge type={target.targetType} />
+                      <span className="font-semibold text-foreground text-sm">{target.cycle}</span>
+                    </div>
+                    <StatusBadge status={target.status} />
                   </div>
-                  <StatusBadge status={target.status} />
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 py-2 border-y border-border/50 text-sm">
-                  <div>
-                    <span className="text-xs text-muted-foreground block">Target Amount</span>
-                    <span className="font-bold text-foreground text-base">{formatCurrency(target.targetAmount)}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground block">Achieved Amount</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-base">
-                      {formatCurrency(target.achievedAmount)}
-                    </span>
-                  </div>
-                </div>
+                  {isOperation ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 py-2 border-y border-border/50 text-sm">
+                        <div>
+                          <span className="text-xs text-muted-foreground block">Client Tickets</span>
+                          <span className="font-bold text-foreground text-base">{target.clientTickets ?? 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground block">Solved Tickets</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-base">
+                            {target.solvedTickets ?? 0}
+                          </span>
+                        </div>
+                      </div>
 
-                <ProgressBar percentage={target.achievementPercentage} />
+                      <ProgressBar percentage={target.achievementPercentage} />
 
-                {target.targetDeals && (
+                      {target.potentialCra != null && (
+                        <div className="rounded-lg bg-violet-500/10 p-2.5 flex items-center justify-between text-xs">
+                          <span className="font-medium text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+                            <Award className="h-4 w-4" /> Potential CRA:
+                          </span>
+                          <span className="font-bold text-violet-800 dark:text-violet-200">
+                            {formatCurrency(target.potentialCra)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 py-2 border-y border-border/50 text-sm">
+                        <div>
+                          <span className="text-xs text-muted-foreground block">Target Amount</span>
+                          <span className="font-bold text-foreground text-base">{formatCurrency(target.targetAmount)}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground block">Achieved Amount</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 text-base">
+                            {formatCurrency(target.achievedAmount)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <ProgressBar percentage={target.achievementPercentage} />
+
+                      {target.targetDeals && (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                          <span>Deals Target: {target.achievedDeals ?? 0} / {target.targetDeals}</span>
+                          <span>{target.dealsAchievementPercentage?.toFixed(0)}% deals met</span>
+                        </div>
+                      )}
+
+                      {target.incentiveAmount && (
+                        <div className="rounded-lg bg-amber-500/10 p-2.5 flex items-center justify-between text-xs">
+                          <span className="font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                            <Award className="h-4 w-4" /> Potential Incentive:
+                          </span>
+                          <span className="font-bold text-amber-800 dark:text-amber-200">
+                            {formatCurrency(target.incentiveAmount)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                    <span>Deals Target: {target.achievedDeals ?? 0} / {target.targetDeals}</span>
-                    <span>{target.dealsAchievementPercentage?.toFixed(0)}% deals met</span>
+                    <span>Period: {target.periodStart} to {target.periodEnd}</span>
+                    {target.assignedByName && <span>Assigned by: {target.assignedByName}</span>}
                   </div>
-                )}
-
-                {target.incentiveAmount && (
-                  <div className="rounded-lg bg-amber-500/10 p-2.5 flex items-center justify-between text-xs">
-                    <span className="font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                      <Award className="h-4 w-4" /> Potential Incentive:
-                    </span>
-                    <span className="font-bold text-amber-800 dark:text-amber-200">
-                      {formatCurrency(target.incentiveAmount)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                  <span>Period: {target.periodStart} to {target.periodEnd}</span>
-                  {target.assignedByName && <span>Assigned by: {target.assignedByName}</span>}
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -354,12 +408,38 @@ export function TargetsPage() {
       </div>
 
       <Card className="p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border/60 pb-3">
+          {(
+            [
+              { value: "", label: "All Targets" },
+              { value: "SALES", label: "Sales" },
+              { value: "OPERATION", label: "Operation" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={() => {
+                setCategory(tab.value);
+                setPage(1);
+              }}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+                category === tab.value
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-surface-muted/60 text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search sales employee..."
+              placeholder="Search employee..."
               value={employeeSearch}
               onChange={(e) => {
                 setEmployeeSearch(e.target.value);
@@ -434,14 +514,16 @@ export function TargetsPage() {
                   <th className="px-4 py-3">Frequency & Cycle</th>
                   <th className="px-4 py-3">Period</th>
                   <th className="px-4 py-3 min-w-[200px]">Target vs Achieved</th>
-                  <th className="px-4 py-3">Deals</th>
-                  <th className="px-4 py-3">Incentive</th>
+                  <th className="px-4 py-3">Deals / Tickets</th>
+                  <th className="px-4 py-3">Incentive / CRA</th>
                   <th className="px-4 py-3">Status</th>
                   {canManage && <th className="px-4 py-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {list.map((target) => (
+                {list.map((target) => {
+                  const isOperation = target.category === "OPERATION";
+                  return (
                   <tr key={target.id} className="hover:bg-surface-muted/30 transition-colors">
                     <td className="px-4 py-3.5">
                       <div className="font-semibold text-foreground">{target.employeeName}</div>
@@ -451,6 +533,7 @@ export function TargetsPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1.5 mb-1">
+                        <CategoryBadge category={target.category} />
                         <TargetTypeBadge type={target.targetType} />
                       </div>
                       <span className="font-medium text-foreground text-xs">{target.cycle}</span>
@@ -460,18 +543,34 @@ export function TargetsPage() {
                       <div>to {target.periodEnd}</div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-between text-xs font-semibold mb-1">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                          {formatCurrency(target.achievedAmount)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          of {formatCurrency(target.targetAmount)}
-                        </span>
-                      </div>
+                      {isOperation ? (
+                        <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            {target.solvedTickets ?? 0} solved
+                          </span>
+                          <span className="text-muted-foreground">
+                            of {target.clientTickets ?? 0} tickets
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            {formatCurrency(target.achievedAmount)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            of {formatCurrency(target.targetAmount)}
+                          </span>
+                        </div>
+                      )}
                       <ProgressBar percentage={target.achievementPercentage} />
                     </td>
                     <td className="px-4 py-3.5 text-xs">
-                      {target.targetDeals ? (
+                      {isOperation ? (
+                        <div>
+                          <span className="font-semibold text-foreground">{target.solvedTickets ?? 0}</span>
+                          <span className="text-muted-foreground"> / {target.clientTickets ?? 0} tickets</span>
+                        </div>
+                      ) : target.targetDeals ? (
                         <div>
                           <span className="font-semibold text-foreground">{target.achievedDeals ?? 0}</span>
                           <span className="text-muted-foreground"> / {target.targetDeals} deals</span>
@@ -484,7 +583,13 @@ export function TargetsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-xs font-semibold text-foreground">
-                      {target.incentiveAmount ? formatCurrency(target.incentiveAmount) : "—"}
+                      {isOperation
+                        ? target.potentialCra != null
+                          ? formatCurrency(target.potentialCra)
+                          : "—"
+                        : target.incentiveAmount
+                          ? formatCurrency(target.incentiveAmount)
+                          : "—"}
                     </td>
                     <td className="px-4 py-3.5">
                       <StatusBadge status={target.status} />
@@ -521,7 +626,8 @@ export function TargetsPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -710,8 +816,9 @@ function TargetDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const isOperation = form.category === "OPERATION";
     if (!form.employeeId) {
-      toast.error("Please select a sales employee.");
+      toast.error("Please select an employee.");
       return;
     }
     if (!form.cycle.trim()) {
@@ -722,50 +829,114 @@ function TargetDialog({
       toast.error("Period start and end dates are required.");
       return;
     }
-    if (form.targetAmount === "" || Number(form.targetAmount) < 0) {
+    if (isOperation) {
+      if (form.clientTickets === "" || form.clientTickets === undefined || Number(form.clientTickets) <= 0) {
+        toast.error("Please enter a valid client tickets target (> 0).");
+        return;
+      }
+      if (form.solvedTickets !== "" && form.solvedTickets !== undefined && Number(form.solvedTickets) < 0) {
+        toast.error("Solved tickets cannot be negative.");
+        return;
+      }
+      if (form.potentialCra !== "" && form.potentialCra !== undefined && Number(form.potentialCra) < 0) {
+        toast.error("Potential CRA must be greater than or equal to 0.");
+        return;
+      }
+    } else if (form.targetAmount === "" || form.targetAmount === undefined || Number(form.targetAmount) < 0) {
       toast.error("Please enter a valid target amount (>= 0).");
       return;
     }
 
     try {
-      const payload: SalesTargetInput = {
-        ...form,
-        targetAmount: Number(form.targetAmount),
-        achievedAmount: form.achievedAmount !== "" ? Number(form.achievedAmount) : 0,
-        targetDeals: form.targetDeals !== "" ? Number(form.targetDeals) : undefined,
-        achievedDeals: form.achievedDeals !== "" ? Number(form.achievedDeals) : 0,
-        incentiveAmount: form.incentiveAmount !== "" ? Number(form.incentiveAmount) : undefined,
-      };
+      const payload: SalesTargetInput = isOperation
+        ? {
+            employeeId: form.employeeId,
+            assignedById: form.assignedById || undefined,
+            category: "OPERATION",
+            targetType: form.targetType,
+            cycle: form.cycle,
+            periodStart: form.periodStart,
+            periodEnd: form.periodEnd,
+            clientTickets: Number(form.clientTickets),
+            solvedTickets: form.solvedTickets !== "" && form.solvedTickets !== undefined ? Number(form.solvedTickets) : 0,
+            potentialCra: form.potentialCra !== "" && form.potentialCra !== undefined ? Number(form.potentialCra) : undefined,
+            status: form.status,
+            remarks: form.remarks,
+          }
+        : {
+            employeeId: form.employeeId,
+            assignedById: form.assignedById || undefined,
+            category: "SALES",
+            targetType: form.targetType,
+            cycle: form.cycle,
+            periodStart: form.periodStart,
+            periodEnd: form.periodEnd,
+            targetAmount: Number(form.targetAmount),
+            achievedAmount: form.achievedAmount !== "" && form.achievedAmount !== undefined ? Number(form.achievedAmount) : 0,
+            targetDeals: form.targetDeals !== "" && form.targetDeals !== undefined ? Number(form.targetDeals) : undefined,
+            achievedDeals: form.achievedDeals !== "" && form.achievedDeals !== undefined ? Number(form.achievedDeals) : 0,
+            incentiveAmount: form.incentiveAmount !== "" && form.incentiveAmount !== undefined ? Number(form.incentiveAmount) : undefined,
+            status: form.status,
+            remarks: form.remarks,
+          };
 
       if (isEditing && target) {
         await updateTarget.mutateAsync({ id: target.id, input: payload });
-        toast.success("Sales target updated successfully.");
+        toast.success("Target updated successfully.");
       } else {
         await createTarget.mutateAsync(payload);
-        toast.success("Sales target created successfully.");
+        toast.success("Target created successfully.");
       }
       onClose();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to save sales target."));
+      toast.error(getApiErrorMessage(err, "Failed to save target."));
     }
   }
 
   const isSaving = createTarget.isPending || updateTarget.isPending;
+  const isOperation = form.category === "OPERATION";
 
   return (
-    <Dialog open={open} onClose={onClose} title={isEditing ? "Edit Sales Target" : "Assign Sales Target"}>
+    <Dialog open={open} onClose={onClose} title={isEditing ? "Edit Target" : "Assign Target"}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 py-1">
+        <div>
+          <label className="text-xs font-semibold text-foreground block mb-1.5">
+            Target Category
+          </label>
+          <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-surface-elevated p-1">
+            {(
+              [
+                { value: "SALES", label: "Sales" },
+                { value: "OPERATION", label: "Operation" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => update("category", opt.value)}
+                className={`rounded-md py-1.5 text-xs font-semibold transition ${
+                  form.category === opt.value
+                    ? "bg-primary text-primary-foreground shadow"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-foreground block mb-1">
-              Sales Employee <span className="text-danger">*</span>
+              {isOperation ? "Operation Employee" : "Sales Employee"} <span className="text-danger">*</span>
             </label>
             <Select
               value={form.employeeId ? String(form.employeeId) : ""}
               onChange={(e) => update("employeeId", e.target.value ? Number(e.target.value) : "")}
               disabled={isEditing}
             >
-              <option value="">Select sales employee...</option>
+              <option value="">{isOperation ? "Select operation employee..." : "Select sales employee..."}</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
                   {emp.name} ({emp.employeeCode}) {emp.departmentName ? `— ${emp.departmentName}` : ""}
@@ -926,94 +1097,158 @@ function TargetDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">
-              Target Sales Amount (₹) <span className="text-danger">*</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={form.targetAmount}
-              onChange={(e) => update("targetAmount", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g. 500000"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">
-              Achieved Amount (₹)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={form.achievedAmount ?? ""}
-              onChange={(e) => update("achievedAmount", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g. 0"
-              className={inputClass}
-            />
-          </div>
-        </div>
+        {isOperation ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Client Tickets <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.clientTickets ?? ""}
+                  onChange={(e) => update("clientTickets", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 50"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Solved Tickets
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.solvedTickets ?? ""}
+                  onChange={(e) => update("solvedTickets", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="0"
+                  className={inputClass}
+                />
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">
-              Target Deals Count (Optional)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={form.targetDeals ?? ""}
-              onChange={(e) => update("targetDeals", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g. 20"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">
-              Achieved Deals Count
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={form.achievedDeals ?? ""}
-              onChange={(e) => update("achievedDeals", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g. 0"
-              className={inputClass}
-            />
-          </div>
-        </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Potential CRA (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.potentialCra ?? ""}
+                  onChange={(e) => update("potentialCra", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 10000"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
+                <Select
+                  value={form.status}
+                  onChange={(e) => update("status", e.target.value as TargetStatus)}
+                >
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Target Sales Amount (₹) <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={form.targetAmount ?? ""}
+                  onChange={(e) => update("targetAmount", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 500000"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Achieved Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={form.achievedAmount ?? ""}
+                  onChange={(e) => update("achievedAmount", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 0"
+                  className={inputClass}
+                />
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">
-              Potential Incentive (₹)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={form.incentiveAmount ?? ""}
-              onChange={(e) => update("incentiveAmount", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="e.g. 15000"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
-            <Select
-              value={form.status}
-              onChange={(e) => update("status", e.target.value as TargetStatus)}
-            >
-              {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Target Deals Count (Optional)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.targetDeals ?? ""}
+                  onChange={(e) => update("targetDeals", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 20"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Achieved Deals Count
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.achievedDeals ?? ""}
+                  onChange={(e) => update("achievedDeals", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 0"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Potential Incentive (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.incentiveAmount ?? ""}
+                  onChange={(e) => update("incentiveAmount", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 15000"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
+                <Select
+                  value={form.status}
+                  onChange={(e) => update("status", e.target.value as TargetStatus)}
+                >
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          </>
+        )}
 
         <div>
           <label className="text-xs font-semibold text-foreground block mb-1">Remarks / Notes</label>
@@ -1059,21 +1294,29 @@ function ProgressDialog({
 }) {
   const toast = useToast();
   const updateProgress = useUpdateSalesTargetProgress();
+  const isOperation = target.category === "OPERATION";
 
   const [achievedAmount, setAchievedAmount] = useState<number | "">(target.achievedAmount ?? 0);
   const [achievedDeals, setAchievedDeals] = useState<number | "">(target.achievedDeals ?? 0);
+  const [solvedTickets, setSolvedTickets] = useState<number | "">(target.solvedTickets ?? 0);
   const [status, setStatus] = useState<TargetStatus>(target.status);
   const [remarks, setRemarks] = useState<string>(target.remarks ?? "");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      const payload: SalesTargetProgressInput = {
-        achievedAmount: achievedAmount !== "" ? Number(achievedAmount) : 0,
-        achievedDeals: achievedDeals !== "" ? Number(achievedDeals) : 0,
-        status,
-        remarks,
-      };
+      const payload: SalesTargetProgressInput = isOperation
+        ? {
+            solvedTickets: solvedTickets !== "" ? Number(solvedTickets) : 0,
+            status,
+            remarks,
+          }
+        : {
+            achievedAmount: achievedAmount !== "" ? Number(achievedAmount) : 0,
+            achievedDeals: achievedDeals !== "" ? Number(achievedDeals) : 0,
+            status,
+            remarks,
+          };
       await updateProgress.mutateAsync({ id: target.id, input: payload });
       toast.success("Target progress updated successfully.");
       onClose();
@@ -1092,44 +1335,78 @@ function ProgressDialog({
             <span className="text-muted-foreground">Cycle:</span>
             <span className="font-semibold text-foreground">{target.cycle} ({target.targetType})</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Target Amount:</span>
-            <span className="font-bold text-foreground">{formatCurrency(target.targetAmount)}</span>
-          </div>
-          {target.targetDeals && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Target Deals:</span>
-              <span className="font-semibold text-foreground">{target.targetDeals} deals</span>
-            </div>
+          {isOperation ? (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Client Tickets:</span>
+                <span className="font-bold text-foreground">{target.clientTickets ?? 0}</span>
+              </div>
+              {target.potentialCra != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Potential CRA:</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(target.potentialCra)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Target Amount:</span>
+                <span className="font-bold text-foreground">{formatCurrency(target.targetAmount)}</span>
+              </div>
+              {target.targetDeals && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Target Deals:</span>
+                  <span className="font-semibold text-foreground">{target.targetDeals} deals</span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div>
-          <label className="text-xs font-semibold text-foreground block mb-1">
-            Achieved Amount (₹) <span className="text-danger">*</span>
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="1000"
-            value={achievedAmount}
-            onChange={(e) => setAchievedAmount(e.target.value === "" ? "" : Number(e.target.value))}
-            className={inputClass}
-          />
-        </div>
+        {isOperation ? (
+          <div>
+            <label className="text-xs font-semibold text-foreground block mb-1">
+              Solved Tickets <span className="text-danger">*</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={solvedTickets}
+              onChange={(e) => setSolvedTickets(e.target.value === "" ? "" : Number(e.target.value))}
+              className={inputClass}
+            />
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">
+                Achieved Amount (₹) <span className="text-danger">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={achievedAmount}
+                onChange={(e) => setAchievedAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
 
-        <div>
-          <label className="text-xs font-semibold text-foreground block mb-1">
-            Achieved Deals Count
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={achievedDeals}
-            onChange={(e) => setAchievedDeals(e.target.value === "" ? "" : Number(e.target.value))}
-            className={inputClass}
-          />
-        </div>
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">
+                Achieved Deals Count
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={achievedDeals}
+                onChange={(e) => setAchievedDeals(e.target.value === "" ? "" : Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
+          </>
+        )}
 
         <div>
           <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
@@ -1180,6 +1457,7 @@ function ProgressDialog({
 function emptyInput(): SalesTargetInput {
   return {
     employeeId: "",
+    category: "SALES",
     targetType: "MONTHLY",
     cycle: "",
     periodStart: "",
@@ -1189,6 +1467,9 @@ function emptyInput(): SalesTargetInput {
     targetDeals: "",
     achievedDeals: 0,
     incentiveAmount: "",
+    clientTickets: "",
+    solvedTickets: 0,
+    potentialCra: "",
     status: "IN_PROGRESS",
     remarks: "",
   };
@@ -1198,6 +1479,7 @@ function toInput(target: SalesTarget): SalesTargetInput {
   return {
     employeeId: target.employeeId,
     assignedById: target.assignedById ?? undefined,
+    category: target.category ?? "SALES",
     targetType: target.targetType,
     cycle: target.cycle,
     periodStart: target.periodStart,
@@ -1207,6 +1489,9 @@ function toInput(target: SalesTarget): SalesTargetInput {
     targetDeals: target.targetDeals ?? "",
     achievedDeals: target.achievedDeals ?? 0,
     incentiveAmount: target.incentiveAmount ?? "",
+    clientTickets: target.clientTickets ?? "",
+    solvedTickets: target.solvedTickets ?? 0,
+    potentialCra: target.potentialCra ?? "",
     status: target.status,
     remarks: target.remarks ?? "",
   };
