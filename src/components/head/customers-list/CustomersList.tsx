@@ -1740,7 +1740,12 @@ function CustomerRow({
 
       {/* Internal Remark */}
       {showRemark && (
-        <td className="cl-td" data-label="Internal Remark">
+        <td
+          className="cl-td"
+          data-label="Internal Remark"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
           {remarkEditing ? (
             <div className="cl-remark-editor">
               <textarea
@@ -1748,6 +1753,7 @@ function CustomerRow({
                 value={remarkDraft}
                 onChange={(e) => setRemarkDraft(e.target.value)}
                 onKeyDown={(e) => {
+                  e.stopPropagation()
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     saveRemark()
@@ -1765,7 +1771,10 @@ function CustomerRow({
                   className="cl-remark-save"
                   title="Save remark"
                   aria-label="Save remark"
-                  onClick={saveRemark}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    saveRemark()
+                  }}
                 >
                   Save
                 </button>
@@ -1774,7 +1783,10 @@ function CustomerRow({
                   className="cl-remark-cancel"
                   title="Cancel editing remark"
                   aria-label="Cancel editing remark"
-                  onClick={cancelRemark}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    cancelRemark()
+                  }}
                 >
                   Cancel
                 </button>
@@ -1796,8 +1808,12 @@ function CustomerRow({
                 title={remarkEditable ? (customer.remark ? 'Click to edit remark' : 'Click to add remark') : (customer.remark || 'No remark')}
                 role={remarkEditable ? 'button' : undefined}
                 tabIndex={remarkEditable ? 0 : undefined}
-                onClick={startEditing}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  startEditing()
+                }}
                 onKeyDown={(event) => {
+                  event.stopPropagation()
                   if (remarkEditable && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault()
                     startEditing()
@@ -1809,7 +1825,10 @@ function CustomerRow({
               </div>
               <button
                 type="button"
-                onClick={() => onOpenDetail('internal-remarks')}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenDetail('internal-remarks')
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
