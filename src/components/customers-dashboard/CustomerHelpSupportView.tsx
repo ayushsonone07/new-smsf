@@ -346,6 +346,13 @@ export function CustomerHelpSupportView() {
   const [newSubject, setNewSubject] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newPhone, setNewPhone] = useState('')
+
+  // Pre-fill phone from session when modal opens
+  useEffect(() => {
+    if (createOpen && !newPhone && session?.phone) {
+      setNewPhone(session.phone)
+    }
+  }, [createOpen, session?.phone])
   // Business name (auto-fetched by email / phone, editable fallback)
   const [businessName, setBusinessName] = useState('')
   const [smsbCustomerId, setSmsbCustomerId] = useState<number | null>(null)
@@ -399,7 +406,7 @@ export function CustomerHelpSupportView() {
     const init = async () => {
       if (!customerEmail) return
       try {
-        await connectCustomerHelpCenter({ email: customerEmail, name: customerName })
+        await connectCustomerHelpCenter({ email: customerEmail, name: customerName, phone: session?.phone })
         const [depts, pris, sts] = await Promise.all([
           fetchHelpCenterDepartmentsList(),
           fetchActivePriorities(),
@@ -612,7 +619,7 @@ export function CustomerHelpSupportView() {
   const resetCreateForm = () => {
     setNewSubject('')
     setNewDescription('')
-    setNewPhone('')
+    setNewPhone(session?.phone || '')
     setBusinessName('')
     setSmsbCustomerId(null)
     setBusinessOptions([])
