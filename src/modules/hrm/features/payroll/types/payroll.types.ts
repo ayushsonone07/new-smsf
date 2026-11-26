@@ -264,7 +264,7 @@ export const DEDUCTION_LABELS: Record<DeductionType, string> = {
   ESI: "ESI",
   TDS: "TDS",
   PROFESSIONAL_TAX: "Professional Tax",
-  UNPAID_LEAVE: "Unpaid Leave",
+  UNPAID_LEAVE: "Excess Casual Leave",
   HALF_DAY: "Half-Day Attendance",
   ABSENT: "Absent",
   INSURANCE: "Insurance",

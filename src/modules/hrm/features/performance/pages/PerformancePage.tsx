@@ -13,7 +13,6 @@ import {
   DatePicker,
   Dialog,
   EmptyState,
-  PageHeader,
   TableSkeleton,
 } from "@shared/components/ui";
 import { getApiErrorMessage } from "@shared/lib";
@@ -158,19 +157,15 @@ const summary = usePerformanceSummary(!isEmployee);
   if (isEmployee) {
     const myRecords = myReviews.data ?? [];
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Performance"
-          description="Your performance reviews."
-          actions={
-            <RefreshButton
-              onRefresh={() => myReviews.refetch()}
-              isRefreshing={myReviews.isFetching}
-              label="performance reviews"
-              className="h-10 w-10 rounded-xl"
-            />
-          }
-        />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <RefreshButton
+            onRefresh={() => myReviews.refetch()}
+            isRefreshing={myReviews.isFetching}
+            label="performance reviews"
+            className="h-10 w-10 rounded-xl"
+          />
+        </div>
         <Card
           padding="none"
           className={`overflow-hidden transition-opacity ${
@@ -256,23 +251,19 @@ const summary = usePerformanceSummary(!isEmployee);
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Performance"
-        description="Create reviews, track progress, and complete employee performance evaluations."
-        actions={
-          canManage ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
-            >
-              <Plus size={18} />
-              Create Review
-            </button>
-          ) : undefined
-        }
-      />
+    <div className="space-y-4">
+      {canManage ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110"
+          >
+            <Plus size={18} />
+            Create Review
+          </button>
+        </div>
+      ) : null}
 
       <div
         className={`grid gap-4 transition-opacity md:grid-cols-5 ${

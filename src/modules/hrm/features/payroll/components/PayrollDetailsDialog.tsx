@@ -83,8 +83,14 @@ export function PayrollDetailsDialog({ open, payroll, onClose }: PayrollDetailsD
           <div className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-3">
             <Row label="Working days" value={String(details.workingDays)} />
             <Row label="Present days" value={String(details.presentDays)} />
-            <Row label="Paid leave" value={String(details.paidLeaveDays)} />
-            <Row label="Unpaid leave" value={String(details.unpaidLeaveDays)} />
+            <Row
+              label="Casual Leave (CL)"
+              value={
+                details.unpaidLeaveDays > 0 && details.paidLeaveDays > 0
+                  ? `${details.paidLeaveDays + details.unpaidLeaveDays} - ${details.paidLeaveDays} = ${details.unpaidLeaveDays}`
+                  : String(details.paidLeaveDays + details.unpaidLeaveDays)
+              }
+            />
             <Row label="Half-day attendance" value={String(details.halfDayAttendance)} />
             <Row label="Gross salary" value={`₹ ${formatMoney(details.grossSalary)}`} />
             <Row label="Net salary" value={`₹ ${formatMoney(details.netSalary)}`} />

@@ -448,6 +448,7 @@ export default function EmployeeDashboardPage() {
               <div className="mt-4 space-y-3">
                 {balances.slice(0, 3).map((balance, idx) => {
                   const percent = Math.min(100, Math.round(((balance.remaining ?? 0) / (balance.total || 1)) * 100));
+                  const used = Math.max(0, Number(((balance.total ?? 0) - (balance.remaining ?? 0)).toFixed(1)));
                   const barGradients = [
                     "linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)",
                     "linear-gradient(90deg, #10b981 0%, #059669 100%)",
@@ -456,20 +457,39 @@ export default function EmployeeDashboardPage() {
                   const barBg = barGradients[idx % barGradients.length];
 
                   return (
-                    <div key={balance.leaveType} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-700">{balance.leaveType}</span>
-                        <span className="font-black tabular-nums text-slate-900">
-                          {balance.remaining}{" "}
-                          <span className="font-normal text-slate-400">/ {balance.total} days</span>
-                        </span>
+                    <div key={balance.leaveType} className="space-y-2.5">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-700">{balance.leaveType}</span>
+                          <span className="font-black tabular-nums text-slate-900">
+                            {balance.remaining}{" "}
+                            <span className="font-normal text-slate-400">/ {balance.total} days</span>
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${percent}%`, background: barBg }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${percent}%`, background: barBg }}
-                        />
-                      </div>
+
+                      {balances.length === 1 && (
+                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Available</p>
+                            <p className="text-sm font-black tabular-nums text-emerald-600">{balance.remaining}</p>
+                          </div>
+                          <div className="border-x border-slate-200/70">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Used</p>
+                            <p className="text-sm font-black tabular-nums text-slate-700">{used}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quota</p>
+                            <p className="text-sm font-black tabular-nums text-slate-700">{balance.total}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -645,19 +665,19 @@ export default function EmployeeDashboardPage() {
                           </div>
 
                           {/* Status Badge & Working Hours */}
-                          <div className="mt-2.5 flex items-center justify-between gap-1">
+                          <div className="mt-2.5 flex flex-col items-start gap-1.5">
                             <span
                               style={{
                                 background: isPresent ? '#ecfdf5' : isWfh ? '#eff6ff' : '#fffbeb',
                                 color: isPresent ? '#065f46' : isWfh ? '#1e40af' : '#92400e',
                                 borderColor: isPresent ? '#a7f3d0' : isWfh ? '#bfdbfe' : '#fde68a',
                               }}
-                              className="inline-flex rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide border shrink-0"
+                              className="inline-flex rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide border"
                             >
                               {day.status.replaceAll("_", " ")}
                             </span>
 
-                            <span className="font-mono text-xs font-extrabold text-slate-900 shrink-0">
+                            <span className="font-mono text-sm font-extrabold text-slate-900">
                               {formatHours(day.workingMinutes)}
                             </span>
                           </div>
@@ -712,19 +732,17 @@ export default function EmployeeDashboardPage() {
                     >
                       <Star size={22} fill="currentColor" className="text-amber-100" />
                     </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
-                          className="rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider"
-                        >
-                          Company Circulars
-                        </span>
-                        <h2 className="text-base font-black text-slate-900">
-                          Company Announcements &amp; HR Updates
-                        </h2>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-600">
+                    <div className="space-y-1">
+                      <span
+                        style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}
+                        className="inline-block rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider"
+                      >
+                        Company Circulars
+                      </span>
+                      <h2 className="text-base font-black text-slate-900">
+                        Company Announcements &amp; HR Updates
+                      </h2>
+                      <p className="text-xs text-slate-600">
                         Check out policy announcements, holiday schedules, and published payslips.
                       </p>
                     </div>
@@ -854,22 +872,22 @@ export default function EmployeeDashboardPage() {
                   }}
                   className="rounded-2xl p-5"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span
                         style={{ background: '#fff7ed', color: '#ea580c' }}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl font-bold"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold"
                       >
                         <Users size={18} />
                       </span>
-                      <div>
+                      <div className="min-w-0">
                         <h2 className="text-sm font-black text-slate-900">Team Snapshot</h2>
                         <p className="text-xs text-slate-500">Live team status and shift visibility</p>
                       </div>
                     </div>
                     <Link
                       to="/hrm/attendance"
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                      className="inline-flex h-8 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
                     >
                       <span>Team Attendance</span>
                       <ExternalLink size={12} />
