@@ -879,6 +879,7 @@ function CustomerRow({
   } | null>(null)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
+  const remarkEditable = canEditRemark !== undefined ? canEditRemark : canEdit
 
   const statusRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
@@ -943,12 +944,16 @@ function CustomerRow({
   const statusMeta = STATUS_META[customer.status]
 
   function startEditing() {
-    if (!(canEditRemark !== undefined ? canEditRemark : canEdit)) return
+    if (!remarkEditable) return
     setRemarkDraft(customer.remark)
     setRemarkEditing(true)
   }
 
   function saveRemark() {
+    if (remarkDraft === customer.remark) {
+      setRemarkEditing(false)
+      return
+    }
     onRemarkChange(remarkDraft)
     setRemarkEditing(false)
   }
@@ -1742,7 +1747,6 @@ function CustomerRow({
                 className="cl-remark-textarea"
                 value={remarkDraft}
                 onChange={(e) => setRemarkDraft(e.target.value)}
-                onBlur={saveRemark}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -1752,12 +1756,13 @@ function CustomerRow({
                   }
                 }}
                 autoFocus
+                maxLength={1000}
                 aria-label="Edit internal remark"
               />
               <div className="cl-remark-actions">
                 <button
                   type="button"
-                  className="cl-action"
+                  className="cl-remark-save"
                   title="Save remark"
                   aria-label="Save remark"
                   onClick={saveRemark}
@@ -1766,29 +1771,12 @@ function CustomerRow({
                 </button>
                 <button
                   type="button"
-                  className="cl-action"
+                  className="cl-remark-cancel"
                   title="Cancel editing remark"
                   aria-label="Cancel editing remark"
                   onClick={cancelRemark}
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  className="cl-action"
-                  title="View schedule"
-                  aria-label="View schedule"
-                >
-                  <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
-                </button>
-                <button
-                  type="button"
-                  className="cl-action"
-                  title="View customer detail"
-                  aria-label="View customer detail"
-                  onClick={() => onOpenDetail()}
-                >
-                  <Icon name="eye" size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -1797,7 +1785,7 @@ function CustomerRow({
               <div
                 className={`cl-remark${
                   !customer.remark ? ' cl-remark--placeholder' : ''
-                }`}
+                }${remarkEditable ? ' cl-remark--editable' : ''}`}
                 style={{
                   position: 'relative',
                   padding: '6px 8px',
@@ -1805,9 +1793,19 @@ function CustomerRow({
                   borderRadius: '6px',
                   minHeight: '32px',
                 }}
-                title={customer.remark || 'No remark'}
+                title={remarkEditable ? (customer.remark ? 'Click to edit remark' : 'Click to add remark') : (customer.remark || 'No remark')}
+                role={remarkEditable ? 'button' : undefined}
+                tabIndex={remarkEditable ? 0 : undefined}
+                onClick={startEditing}
+                onKeyDown={(event) => {
+                  if (remarkEditable && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault()
+                    startEditing()
+                  }
+                }}
+                aria-label={remarkEditable ? (customer.remark ? 'Edit internal remark' : 'Add internal remark') : undefined}
               >
-                {customer.remark || '—'}
+                {customer.remark || (remarkEditable ? 'Click to add remark' : '—')}
               </div>
               <button
                 type="button"
