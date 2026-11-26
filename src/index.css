@@ -79,6 +79,11 @@
   --color-rose: hsl(var(--rose));
   --color-rose-ink: hsl(var(--rose-ink));
   --color-rose-soft: hsl(var(--rose-soft));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
 }
 
 @import "./styles/head.css";
@@ -157,6 +162,12 @@
   --rose: 347 82% 65%;
   --rose-ink: 345 52% 44%;
   --rose-soft: 345 75% 95%;
+
+  --chart-1: 24 95% 53%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 38 96% 50%;
+  --chart-4: 199 89% 48%;
+  --chart-5: 0 84% 60%;
 
   --app-font-family: "Jost Variable", Jost, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
