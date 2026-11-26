@@ -879,10 +879,43 @@ function CustomerRow({
   } | null>(null)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
+  const [copiedField, setCopiedField] = useState<'business' | 'email' | 'phone' | null>(null)
   const remarkEditable = canEditRemark !== undefined ? canEditRemark : canEdit
 
   const statusRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
+  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+    }
+  }, [])
+
+  const copyToClipboard = async (
+    field: 'business' | 'email' | 'phone',
+    value: string,
+  ) => {
+    const text = value.trim()
+    if (!text) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+
+    setCopiedField(field)
+    if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+    copyFeedbackTimerRef.current = setTimeout(() => setCopiedField(null), 1600)
+  }
 
   /* Close menus on outside click */
   useEffect(() => {
@@ -1162,6 +1195,19 @@ function CustomerRow({
             >
               {customer.businessName}
             </button>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'business' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'business' ? 'Copied' : 'Copy business name'}
+              aria-label="Copy business name"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('business', customer.businessName)
+              }}
+            >
+              <Icon name={copiedField === 'business' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'business' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
 
             {isGoogle ? (
               <>
@@ -1280,10 +1326,38 @@ function CustomerRow({
       {/* Contact */}
       {showContact && (
         <td className="cl-td" data-label="Contact">
-          <div className="cl-email" title={customer.email}>{customer.email}</div>
+          <div className="cl-contact-value-row">
+            <div className="cl-email" title={customer.email}>{customer.email}</div>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'email' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'email' ? 'Copied' : 'Copy email'}
+              aria-label="Copy email"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('email', customer.email)
+              }}
+            >
+              <Icon name={copiedField === 'email' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'email' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
+          </div>
 
           <div className="cl-phone-row">
             <span className="cl-phone-text" title={customer.phone}>{customer.phone}</span>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'phone' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'phone' ? 'Copied' : 'Copy phone number'}
+              aria-label="Copy phone number"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('phone', customer.phone)
+              }}
+            >
+              <Icon name={copiedField === 'phone' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'phone' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
             <button
               type="button"
               className="cl-icon-micro"
