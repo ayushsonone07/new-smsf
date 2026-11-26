@@ -62,6 +62,10 @@
   border-top: 1px solid #e2e8f0;
 }
 
+.cdb-form-notes {
+  display: grid;
+}
+
 .cdb-client-remark > label {
   color: #334155;
   font-size: 13px;
@@ -1229,6 +1233,33 @@
   margin-top: 9px;
 }
 
+.cdb-service-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.cdb-copy-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cdb-copy-all:hover {
+  color: #1e40af;
+  text-decoration: underline;
+}
+
 .cdb-service-chip {
   display: inline-flex;
   align-items: center;
@@ -1260,6 +1291,13 @@
 .cdb-service-chip button:hover {
   background: #bfdbfe;
   color: #1e40af;
+}
+
+.cdb-copy-feedback {
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .cdb-service-help {

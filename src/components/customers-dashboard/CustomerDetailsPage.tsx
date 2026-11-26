@@ -205,6 +205,7 @@ export function CustomerDetailsPage() {
   const [additionalInformation, setAdditionalInformation] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
+  const [copiedServiceKey, setCopiedServiceKey] = useState<string | null>(null)
 
   // Step 2: Billing Form State
   const [billingAddress, setBillingAddress] = useState('')
@@ -415,7 +416,7 @@ export function CustomerDetailsPage() {
   const serviceSuggestions = useMemo(() => {
     const entered = servicesInput.trim()
     const input = entered.toLowerCase()
-    if (!input) return []
+    if (!input || entered.includes(',')) return []
     const selected = new Set(mainServices.map((service) => service.toLowerCase()))
     const matches = COMMON_SERVICE_SUGGESTIONS
       .filter((service) => service.toLowerCase().includes(input) && !selected.has(service.toLowerCase()))
@@ -460,18 +461,16 @@ export function CustomerDetailsPage() {
       return
     }
 
-    const pendingService = servicesInput.trim()
-    const servicesForSave = [...mainServices]
-    if (
-      (isSharedForm || activeStep === 3)
-      && pendingService
-      && servicesForSave.length < 15
-      && !servicesForSave.some((service) => service.toLowerCase() === pendingService.toLowerCase())
-    ) {
-      servicesForSave.push(pendingService)
+    const servicesForSave = mergeServices(mainServices, servicesInput.split(','))
+    const autoServicesForSave = mergeServices(autoServices, autoServicesInput.split(','))
+    if ((isSharedForm || activeStep === 3) && servicesForSave.length !== mainServices.length) {
       setMainServices(servicesForSave)
       setServicesInput('')
       setServiceSuggestionsOpen(false)
+    }
+    if ((isSharedForm || activeStep === 5) && autoServicesForSave.length !== autoServices.length) {
+      setAutoServices(autoServicesForSave)
+      setAutoServicesInput('')
     }
 
     const rawPayload: Record<string, any> = {
@@ -495,7 +494,7 @@ export function CustomerDetailsPage() {
       businessCategory: resolvedBusinessCategory || websiteCategory.trim() || googleBusinessCategory.trim() || undefined,
       bookingLink: bookingLink.trim() || undefined,
       paymentLink: paymentLink.trim() || undefined,
-      topProducts: [...new Set([...servicesForSave, ...autoServices])].join(', ') || undefined,
+      topProducts: [...new Set([...servicesForSave, ...autoServicesForSave])].join(', ') || undefined,
       gmbProfileLink: noGmbLink ? undefined : gmbProfileLink.trim() || mapLink.trim() || undefined,
       googleReviewLink: googleReviewLink.trim() || undefined,
       appointmentLink: appointmentLink.trim() || undefined,
@@ -594,21 +593,6 @@ export function CustomerDetailsPage() {
     return merged
   }
 
-  function handleCommaSeparatedInput(
-    value: string,
-    setter: Dispatch<SetStateAction<string[]>>,
-    setInput: Dispatch<SetStateAction<string>>,
-  ) {
-    if (!value.includes(',')) {
-      setInput(value)
-      return
-    }
-    const parts = value.split(',')
-    const unfinishedValue = parts.pop() ?? ''
-    setter((items) => mergeServices(items, parts))
-    setInput(unfinishedValue.trimStart())
-  }
-
   function addMainService(value: string) {
     setMainServices((items) => mergeServices(items, value.split(',')))
     setServicesInput('')
@@ -626,6 +610,24 @@ export function CustomerDetailsPage() {
   function handleAddAutoService() {
     setAutoServices((items) => mergeServices(items, autoServicesInput.split(',')))
     setAutoServicesInput('')
+  }
+
+  async function copyServicesToClipboard(services: string[], copyAll = false, copyKey = '') {
+    const text = copyAll ? services.join(', ') : services[0]
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedServiceKey(copyKey)
+      window.setTimeout(() => setCopiedServiceKey((current) => current === copyKey ? null : current), 2000)
+      setToast({
+        type: 'success',
+        title: copyAll ? 'Services Copied' : 'Service Copied',
+        message: copyAll ? `${services.length} services copied to the clipboard.` : `“${text}” copied to the clipboard.`,
+      })
+      window.setTimeout(() => setToast(null), 2500)
+    } catch {
+      setToast({ type: 'error', title: 'Copy Failed', message: 'Clipboard access is unavailable. Please copy the text manually.' })
+    }
   }
 
   function addSocialLink() {
@@ -1111,7 +1113,7 @@ export function CustomerDetailsPage() {
                       onFocus={() => setServiceSuggestionsOpen(true)}
                       onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)}
                       onChange={(e) => {
-                        handleCommaSeparatedInput(e.target.value, setMainServices, setServicesInput)
+                        setServicesInput(e.target.value)
                         setServiceSuggestionsOpen(true)
                       }}
                       onKeyDown={(event) => {
@@ -1415,12 +1417,13 @@ export function CustomerDetailsPage() {
                     <span>Main Services / Products</span>
                     <div className="cdb-service-entry">
                       <div className="cdb-service-input-wrap">
-                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { handleCommaSeparatedInput(e.target.value, setMainServices, setServicesInput); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="Enter services separated by commas" />
+                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { setServicesInput(e.target.value); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="Paste comma-separated services and press Enter" />
                         {serviceSuggestionsOpen && serviceSuggestions.length > 0 ? <div className="cdb-service-suggestions">{serviceSuggestions.map((suggestion) => <button key={suggestion} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addMainService(suggestion)}><span>{suggestion}</span><span>+</span></button>)}</div> : null}
                       </div>
                       <button type="button" className="cdb-btn-primary" onClick={handleAddService}>+</button>
                     </div>
-                    <div className="cdb-service-stack">{mainServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}>{service}<button type="button" onClick={() => removeMainService(index)}><CloseIcon size={12} /></button></span>)}</div>
+                    <div className="cdb-service-list-header"><small>Separate with commas, then press Enter or +.</small>{mainServices.length > 0 ? <button type="button" className="cdb-copy-all" onClick={() => copyServicesToClipboard(mainServices, true, 'main-all')}><Icon name="copy" size={13} /> {copiedServiceKey === 'main-all' ? 'Text Copied' : 'Copy All'}</button> : null}</div>
+                    <div className="cdb-service-stack">{mainServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}><span>{service}</span><button type="button" title={`Copy ${service}`} aria-label={`Copy ${service}`} onClick={() => copyServicesToClipboard([service], false, `main-${index}`)}><Icon name="copy" size={11} /></button>{copiedServiceKey === `main-${index}` ? <span className="cdb-copy-feedback">Text Copied</span> : null}<button type="button" title={`Remove ${service}`} aria-label={`Remove ${service}`} onClick={() => removeMainService(index)}><CloseIcon size={12} /></button></span>)}</div>
                     <small>{mainServices.length}/15 added</small>
                   </div>
                 </div>
@@ -1757,13 +1760,13 @@ export function CustomerDetailsPage() {
                       className="cdb-input"
                       placeholder="Enter services separated by commas"
                       value={autoServicesInput}
-                      onChange={(e) => handleCommaSeparatedInput(e.target.value, setAutoServices, setAutoServicesInput)}
+                      onChange={(e) => setAutoServicesInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddAutoService() } }}
                     />
                     <button type="button" className="cdb-btn-primary" onClick={handleAddAutoService} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>+</button>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', display: 'block' }}>Separate multiple services with commas.</span>
-                  {autoServices.length > 0 ? <div className="cdb-service-stack">{autoServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}>{service}<button type="button" onClick={() => setAutoServices((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div> : null}
+                  <div className="cdb-service-list-header"><span style={{ fontSize: '11px', color: '#94a3b8' }}>Separate with commas, then press Enter or +.</span>{autoServices.length > 0 ? <button type="button" className="cdb-copy-all" onClick={() => copyServicesToClipboard(autoServices, true, 'auto-all')}><Icon name="copy" size={13} /> {copiedServiceKey === 'auto-all' ? 'Text Copied' : 'Copy All'}</button> : null}</div>
+                  {autoServices.length > 0 ? <div className="cdb-service-stack">{autoServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}><span>{service}</span><button type="button" title={`Copy ${service}`} aria-label={`Copy ${service}`} onClick={() => copyServicesToClipboard([service], false, `auto-${index}`)}><Icon name="copy" size={11} /></button>{copiedServiceKey === `auto-${index}` ? <span className="cdb-copy-feedback">Text Copied</span> : null}<button type="button" title={`Remove ${service}`} aria-label={`Remove ${service}`} onClick={() => setAutoServices((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div> : null}
                   <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>{autoServices.length}/15 added</span>
                 </div>
 
