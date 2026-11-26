@@ -1195,6 +1195,18 @@
   color: #0f172a;
 }
 
+.cl-remark:not(.cl-remark--editable) {
+  cursor: default;
+}
+
+.cl-remark--editable:hover,
+.cl-remark--editable:focus-visible {
+  color: #1d4ed8;
+  background: #eff6ff !important;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+  outline: none;
+}
+
 .cl-remark--placeholder {
   color: #64748b;
   font-style: italic;
