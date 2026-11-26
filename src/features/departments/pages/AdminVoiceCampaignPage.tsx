@@ -16,6 +16,7 @@ import {
   Tag,
   Building2,
   FileAudio,
+  Settings,
 } from 'lucide-react'
 import {
   getVoiceCampaigns,
@@ -24,6 +25,7 @@ import {
   type VoiceCampaignQuery,
 } from '../../../api/voice-campaign.api'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
+import { VoiceSettingsModal } from './VoiceSettingsModal'
 
 const formatDateTime = (iso?: string | null): string => {
   if (!iso) return '—'
@@ -83,6 +85,7 @@ export function AdminVoiceCampaignPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [selectedCall, setSelectedCall] = useState<VoiceCampaignItem | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const queryParams: VoiceCampaignQuery = {
     page,
@@ -167,7 +170,17 @@ export function AdminVoiceCampaignPage() {
           </div>
         </div>
 
-        <RefreshButton onRefresh={handleRefresh} isRefreshing={isFetching} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition shadow-sm"
+          >
+            <Settings className="h-4 w-4 text-slate-500" />
+            <span>Voice OBD Settings</span>
+          </button>
+          <RefreshButton onRefresh={handleRefresh} isRefreshing={isFetching} />
+        </div>
       </div>
 
       {/* Analytics KPI Cards */}
@@ -527,6 +540,13 @@ export function AdminVoiceCampaignPage() {
           </div>
         </div>
       )}
+
+      {/* Voice OBD Settings Modal */}
+      <VoiceSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={handleRefresh}
+      />
     </div>
   )
 }

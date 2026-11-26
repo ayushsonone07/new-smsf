@@ -87,3 +87,65 @@ export async function getVoiceCampaignAnalytics(): Promise<VoiceCampaignAnalytic
   }
   return response || {}
 }
+
+export interface VoiceConfig {
+  enabled: boolean
+  apiUrl: string
+  maskedToken?: string
+  tokenConfigured: boolean
+  callingNumber: string
+  defaultVoiceFileId: string
+  callbackUrl?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+export interface UpdateVoiceConfigInput {
+  enabled?: boolean
+  apiUrl?: string
+  token?: string
+  callingNumber?: string
+  defaultVoiceFileId?: string
+  callbackUrl?: string
+}
+
+export interface TestVoiceCallInput {
+  phoneNumber: string
+  voiceFileId?: string
+  callingNumber?: string
+}
+
+export async function getVoiceConfig(): Promise<VoiceConfig> {
+  const endpoint = `${VOICE_API_BASE}/config`
+  const response = await authedApiRequest<any>(endpoint)
+  if (response && response.data && typeof response.data === 'object') {
+    return response.data
+  }
+  return response || {}
+}
+
+export async function updateVoiceConfig(input: UpdateVoiceConfigInput): Promise<VoiceConfig> {
+  const endpoint = `${VOICE_API_BASE}/config`
+  const response = await authedApiRequest<any>(endpoint, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (response && response.data && typeof response.data === 'object') {
+    return response.data
+  }
+  return response || {}
+}
+
+export async function sendTestVoiceCall(input: TestVoiceCallInput): Promise<any> {
+  const endpoint = `${VOICE_API_BASE}/test-call`
+  const response = await authedApiRequest<any>(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (response && response.data && typeof response.data === 'object') {
+    return response.data
+  }
+  return response || {}
+}

@@ -25,6 +25,7 @@ import { DepartmentManagementTab } from './tabs/DepartmentManagementTab'
 import { TutorialsTab } from './tabs/TutorialsTab'
 import { WebhooksTab } from './tabs/WebhooksTab'
 import { SecurityTab } from './tabs/SecurityTab'
+import { VoiceObdTab } from './tabs/VoiceObdTab'
 
 type ConfigTabKey =
   | 'smtp'
@@ -37,6 +38,7 @@ type ConfigTabKey =
   | 'tutorials'
   | 'webhooks'
   | 'security'
+  | 'voice-obd'
 
 interface TabOption {
   key: ConfigTabKey
@@ -55,6 +57,7 @@ const TAB_OPTIONS: TabOption[] = [
   { key: 'tutorials', label: 'Tutorials', icon: GraduationCap },
   { key: 'webhooks', label: 'Webhooks', icon: WebhookIcon },
   { key: 'security', label: 'Security Settings', icon: ShieldAlert },
+  { key: 'voice-obd', label: 'Voice OBD', icon: Mic },
 ]
 
 export function ConfigPage() {
@@ -154,6 +157,7 @@ export function ConfigPage() {
         {activeTab === 'tutorials' && <TutorialsTab onNotify={showNotification} />}
         {activeTab === 'webhooks' && <WebhooksTab onNotify={showNotification} />}
         {activeTab === 'security' && <SecurityTab onNotify={showNotification} />}
+        {activeTab === 'voice-obd' && <VoiceObdTab onNotify={showNotification} />}
       </div>
     </div>
   )

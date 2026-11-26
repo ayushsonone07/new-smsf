@@ -179,6 +179,65 @@ export async function saveWhatsAppConfigs(configs: Record<string, string>): Prom
   })
 }
 
+// ── Voice OBD ────────────────────────────────────────────────────────────────
+export async function getCloudshopeConfigs(): Promise<Record<string, string>> {
+  try {
+    const res = await apiClient.get<CustomApiResponse<any>>('/api/v1/voice/config')
+    const d = res.data?.data || res.data
+    if (d && typeof d === 'object') {
+      return {
+        cloudshopeToken: d.maskedToken || '',
+        cloudshopeCallingNumber: d.callingNumber || '',
+        cloudshopeVoiceFileId: d.defaultVoiceFileId || '',
+        cloudshopeEnabled: String(d.enabled ?? true),
+        cloudshopeCallbackUrl: d.callbackUrl || '',
+        cloudshopeApiUrl: d.apiUrl || '',
+      }
+    }
+    return {}
+  } catch (err) {
+    console.warn('Failed to fetch Cloudshope OBD configs:', err)
+    return {}
+  }
+}
+
+export async function saveCloudshopeConfigs(configs: Record<string, string>): Promise<void> {
+  const payload: any = {
+    callingNumber: configs.cloudshopeCallingNumber,
+    defaultVoiceFileId: configs.cloudshopeVoiceFileId,
+    enabled: configs.cloudshopeEnabled !== 'false',
+    callbackUrl: configs.cloudshopeCallbackUrl,
+    apiUrl: configs.cloudshopeApiUrl,
+  }
+  if (configs.cloudshopeToken && !configs.cloudshopeToken.includes('••••')) {
+    payload.token = configs.cloudshopeToken
+  }
+  await apiClient.put('/api/v1/voice/config', payload)
+}
+
+export async function testCloudshopeConnection(phoneNumber: string): Promise<{
+  success: boolean
+  message: string
+}> {
+  try {
+    const res = await apiClient.post<CustomApiResponse<any>>('/api/v1/voice/test-call', {
+      phoneNumber,
+    })
+    const d = res.data?.data || res.data
+    const isSuccess = d?.status === 'SUCCESS' || d?.success === true
+    return {
+      success: isSuccess,
+      message: d?.message || (isSuccess ? 'Test call initiated successfully' : 'Test call failed'),
+    }
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error('Unknown error')
+    return {
+      success: false,
+      message: error.message || 'Test call failed with unknown error',
+    }
+  }
+}
+
 // ── Customer Management & Dynamic Service Templates ────────────────────────────
 export async function getOnboardingStatus(): Promise<boolean> {
   try {
