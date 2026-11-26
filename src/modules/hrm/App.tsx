@@ -36,6 +36,7 @@ import { LeavePage } from "@features/leave";
 import { PayrollPage, PayslipsPage } from "@features/payroll";
 import { PerformancePage } from "@features/performance";
 import { TargetsPage } from "@features/targets";
+import { WarningsPage } from "@features/warnings";
 import { CompanyPolicyPage } from "@features/policy";
 import { ReportsPage } from "@features/reports";
 import { RoleBasedAccessPage, SettingsPage, UpdateProfilePage } from "@features/settings";
@@ -253,6 +254,11 @@ function App() {
                     <TargetsPage />
                   </RequirePermission>
                 }
+              />
+
+              <Route
+                path={rel(ROUTES.warnings)}
+                element={<WarningsPage />}
               />
 
               <Route

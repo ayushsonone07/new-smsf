@@ -67,6 +67,7 @@ const ROUTE_TITLES: { path: string; title: string; subtitle: string }[] = [
 
   { path: ROUTES.performance, title: "Performance", subtitle: "Reviews and employee growth" },
   { path: ROUTES.targets, title: "Target", subtitle: "Sales goals and revenue progress" },
+  { path: ROUTES.warnings, title: "Warnings", subtitle: "Employee disciplinary notices and acknowledgements" },
   { path: ROUTES.companyPolicy, title: "Company Policies", subtitle: "Official employee policies and code of conduct" },
   { path: ROUTES.reports, title: "Reports", subtitle: "Organisation reports and insights" },
   { path: ROUTES.settings, title: "Settings", subtitle: "Workspace preferences and access" },
