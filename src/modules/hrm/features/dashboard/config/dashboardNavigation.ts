@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BarChart3,
   Bell,
   Briefcase,
@@ -174,6 +175,12 @@ export const ROLE_NAVIGATION = {
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
+        },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
         },
       ],
     },
@@ -353,6 +360,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/targets",
           permission: "performance:view",
         },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
+        },
       ],
     },
     {
@@ -524,6 +537,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/targets",
           permission: "performance:view",
         },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
+        },
       ],
     },
     {
@@ -688,6 +707,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/targets",
           permission: "performance:view",
         },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
+        },
       ],
     },
     {
@@ -776,6 +801,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/targets",
           permission: "performance:view",
         },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
+        },
       ],
     },
     {
@@ -858,6 +889,12 @@ export const ROLE_NAVIGATION = {
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
+        },
+        {
+          type: "leaf" as const,
+          label: "Warnings",
+          icon: AlertTriangle,
+          to: "/hrm/warnings",
         },
       ],
     },
