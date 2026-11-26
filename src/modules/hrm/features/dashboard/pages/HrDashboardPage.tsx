@@ -673,32 +673,6 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
       <StaggerItem variant="card">
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <DashboardChartCard
-          title="Onboarded by"
-          actions={
-            <RefreshButton
-              onRefresh={() => employeesQuery.refetch()}
-              isRefreshing={employeesQuery.isFetching}
-              label="onboarded by"
-            />
-          }
-          refreshing={employeesQuery.isFetching && !employeesQuery.isLoading}
-          className="xl:col-span-12"
-          loading={employeesQuery.isLoading}
-        >
-          <p className="mb-5 text-sm text-muted-foreground">
-            Who verified each employee&rsquo;s onboarding.
-          </p>
-          <OnboarderLeaderboard rows={onboarders} />
-        </DashboardChartCard>
-      </section>
-      </StaggerItem>
-
-      <StaggerItem variant="card">
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-7">
-          <BirthdayWidget />
-        </div>
-        <DashboardChartCard
           title="Onboarding status"
           actions={
             <RefreshButton
@@ -713,6 +687,32 @@ function WorkforceDashboard({ title, description, filter }: DashboardHeaderProps
         >
           <OnboardingStatusDonut counts={onboardingCounts} />
         </DashboardChartCard>
+        <DashboardChartCard
+          title="Onboarded by"
+          actions={
+            <RefreshButton
+              onRefresh={() => employeesQuery.refetch()}
+              isRefreshing={employeesQuery.isFetching}
+              label="onboarded by"
+            />
+          }
+          refreshing={employeesQuery.isFetching && !employeesQuery.isLoading}
+          className="xl:col-span-7"
+          loading={employeesQuery.isLoading}
+        >
+          <p className="mb-4 text-sm text-muted-foreground">
+            Who verified each employee&rsquo;s onboarding.
+          </p>
+          <OnboarderLeaderboard rows={onboarders} />
+        </DashboardChartCard>
+      </section>
+      </StaggerItem>
+
+      <StaggerItem variant="card">
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-12">
+          <BirthdayWidget />
+        </div>
       </section>
       </StaggerItem>
     </StaggerContainer>
@@ -737,93 +737,147 @@ function WorkforcePresenceDonut({
   total: number;
 }) {
   const segments = [
-    { name: "Present", count: present, dot: "bg-chart-2", fill: "fill-chart-2" },
-    { name: "Absent", count: absent, dot: "bg-chart-5", fill: "fill-chart-5" },
-    { name: "Half day", count: halfDay, dot: "bg-chart-3", fill: "fill-chart-3" },
-    { name: "Work from home", count: workFromHome, dot: "bg-chart-4", fill: "fill-chart-4" },
-    { name: "On leave", count: onLeave, dot: "bg-chart-1", fill: "fill-chart-1" },
+    { name: "Present", count: present, color: "#16a34a", soft: "rgba(22, 163, 74, 0.12)" },
+    { name: "Absent", count: absent, color: "#ef4444", soft: "rgba(239, 68, 68, 0.12)" },
+    { name: "Half day", count: halfDay, color: "#f59e0b", soft: "rgba(245, 158, 11, 0.12)" },
+    { name: "Work from home", count: workFromHome, color: "#0ea5e9", soft: "rgba(14, 165, 233, 0.12)" },
+    { name: "On leave", count: onLeave, color: "#f97316", soft: "rgba(249, 115, 22, 0.12)" },
   ].map((segment) => ({
     ...segment,
     pct: totalMarked ? Math.round((segment.count / totalMarked) * 100) : 0,
   }));
   const isEmpty = totalMarked === 0;
-  const data = segments.map((segment) => ({
-    name: segment.name,
-    value: Math.max(segment.pct, 0),
-    count: segment.count,
-    pct: segment.pct,
-  }));
-  const centerLabel = (
-    <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center text-center px-3">
-      <div>
-        <p className="text-2xl font-semibold tracking-tight text-card-foreground">
-          {total.toLocaleString()}
-        </p>
-        <p className="mt-1 text-xs font-medium text-muted-foreground">total staff</p>
-      </div>
-    </div>
-  );
+  const unmarked = Math.max(total - totalMarked, 0);
+  const activeSegments = segments
+    .filter((segment) => segment.count > 0)
+    .map((segment) => ({
+      name: segment.name,
+      value: segment.count,
+      count: segment.count,
+      pct: segment.pct,
+      color: segment.color,
+    }));
+  const isSingleSlice = activeSegments.length === 1;
+
   return (
-    <div className="flex min-h-[250px] flex-col items-center justify-center gap-6 sm:flex-row">
-      <div className="relative h-44 w-44 shrink-0">
-        {isEmpty ? (
-          <div className="group relative h-44 w-44">
-            <div className="h-44 w-44 rounded-full border-30 border-muted-foreground/40" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-muted-foreground opacity-0 shadow-[0_10px_15px_-3px_rgb(15_23_42/0.08)] transition-opacity duration-150 group-hover:opacity-100">
-              Not marked yet
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">Today&rsquo;s attendance distribution</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-400">
+            {totalMarked} marked
+          </span>
+          {unmarked > 0 && (
+            <span className="rounded-full bg-surface-muted px-2.5 py-0.5 font-medium text-muted-foreground">
+              {unmarked} unmarked
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+        <div className="relative h-48 w-48 shrink-0">
+          {isEmpty ? (
+            <div className="group relative h-48 w-48">
+              <div className="h-48 w-48 rounded-full border-[26px] border-muted" />
+              <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+                Not marked yet
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-10 h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={activeSegments}
+                    dataKey="value"
+                    nameKey="name"
+                    startAngle={90}
+                    endAngle={-270}
+                    innerRadius={62}
+                    outerRadius={88}
+                    paddingAngle={isSingleSlice ? 0 : 3}
+                    cornerRadius={isSingleSlice ? 0 : 6}
+                    stroke={isSingleSlice ? "none" : "hsl(var(--card))"}
+                    strokeWidth={isSingleSlice ? 0 : 2}
+                  >
+                    {activeSegments.map((segment) => (
+                      <Cell key={segment.name} fill={segment.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    wrapperStyle={{ zIndex: 20 }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const item = payload[0] as { name?: string; payload?: { count: number; pct: number; color: string } };
+                      return (
+                        <div className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-card-foreground shadow-lg">
+                          <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: item.payload?.color }} />
+                          <span className="font-semibold">{item.name}</span>{" "}
+                          <span className="font-mono text-muted-foreground">
+                            {(item.payload?.count ?? 0).toLocaleString()} · {item.payload?.pct ?? 0}%
+                          </span>
+                        </div>
+                      );
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center px-3 text-center">
+            <div>
+              <p className="text-3xl font-bold tracking-tight text-card-foreground">
+                {total.toLocaleString()}
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Total staff
+              </p>
             </div>
           </div>
-        ) : (
-          <div className="relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={58}
-                  outerRadius={88}
-                  paddingAngle={3}
-                  cornerRadius={6}
-                  stroke="var(--card)"
-                  strokeWidth={2}
-                >
-                  {segments.map((segment) => (
-                    <Cell key={segment.name} className={segment.fill} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  wrapperStyle={{ zIndex: 20 }}
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const item = payload[0] as { name?: string; payload?: { count: number; pct: number } };
-                    return (
-                      <div className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs text-card-foreground shadow-[0_10px_15px_-3px_rgb(15_23_42/0.08)]">
-                        <span className="font-semibold">{item.name}</span>{" "}
-                        <span className="text-muted-foreground">
-                          {(item.payload?.count ?? 0).toLocaleString()} · {item.payload?.pct ?? 0}%
-                        </span>
-                      </div>
-                    );
+        </div>
+
+        <div className="w-full flex-1 space-y-2.5">
+          {segments.map((segment) => (
+            <div
+              key={segment.name}
+              className="rounded-xl border border-border/50 bg-surface-muted/30 px-3 py-2 transition-colors hover:bg-surface-muted/60"
+            >
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-2 font-semibold text-card-foreground">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: segment.color }}
+                  />
+                  {segment.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-xs font-bold text-card-foreground">
+                    {segment.count.toLocaleString()}
+                  </span>
+                  <span
+                    className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+                    style={{
+                      backgroundColor: segment.count > 0 ? segment.soft : "transparent",
+                      color: segment.count > 0 ? segment.color : "hsl(var(--muted-foreground))",
+                    }}
+                  >
+                    {segment.pct}%
+                  </span>
+                </div>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${segment.pct}%`,
+                    backgroundColor: segment.color,
                   }}
                 />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        {centerLabel}
-      </div>
-      <div className="w-full max-w-[200px] space-y-2.5">
-        {segments.map((segment) => (
-          <div key={segment.name} className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 font-medium text-card-foreground">
-              <span className={`h-2.5 w-2.5 rounded-[4px] ${segment.dot}`} /> {segment.name}
-            </span>
-            <span className="font-mono text-xs font-semibold text-card-foreground">
-              {segment.count.toLocaleString()} · {segment.pct}%
-            </span>
-          </div>
-        ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -835,10 +889,10 @@ function OnboardingStatusDonut({
   counts: { pending: number; linkSent: number; detailsSubmitted: number; verified: number } | undefined;
 }) {
   const segments = [
-    { name: "Pending", count: counts?.pending ?? 0, dot: "bg-chart-3", fill: "fill-chart-3" },
-    { name: "Link sent", count: counts?.linkSent ?? 0, dot: "bg-chart-4", fill: "fill-chart-4" },
-    { name: "Details submitted", count: counts?.detailsSubmitted ?? 0, dot: "bg-chart-1", fill: "fill-chart-1" },
-    { name: "Verified", count: counts?.verified ?? 0, dot: "bg-chart-2", fill: "fill-chart-2" },
+    { name: "Pending", count: counts?.pending ?? 0, color: "#f59e0b", soft: "rgba(245, 158, 11, 0.12)" },
+    { name: "Link sent", count: counts?.linkSent ?? 0, color: "#0ea5e9", soft: "rgba(14, 165, 233, 0.12)" },
+    { name: "Details submitted", count: counts?.detailsSubmitted ?? 0, color: "#8b5cf6", soft: "rgba(139, 92, 246, 0.12)" },
+    { name: "Verified", count: counts?.verified ?? 0, color: "#16a34a", soft: "rgba(22, 163, 74, 0.12)" },
   ];
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
   if (total === 0) {
@@ -848,61 +902,119 @@ function OnboardingStatusDonut({
     ...segment,
     pct: Math.round((segment.count / total) * 100),
   }));
-  const data = rows.map((row) => ({ name: row.name, value: Math.max(row.pct, 0), count: row.count, pct: row.pct }));
+  const activeData = rows
+    .filter((row) => row.count > 0)
+    .map((row) => ({
+      name: row.name,
+      value: row.count,
+      count: row.count,
+      pct: row.pct,
+      color: row.color,
+    }));
+  const isSingleSlice = activeData.length === 1;
+  const verifiedPct = rows.find((r) => r.name === "Verified")?.pct ?? 0;
+
   return (
-    <div className="flex min-h-[250px] flex-col items-center justify-center gap-6 sm:flex-row">
-      <div className="relative h-44 w-44 shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={58}
-              outerRadius={88}
-              paddingAngle={3}
-              cornerRadius={6}
-              stroke="var(--card)"
-              strokeWidth={2}
-            >
-              {rows.map((row) => (
-                <Cell key={row.name} className={row.fill} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(_value: number, name: string, item: { payload?: { count: number; pct: number } }) => [
-                `${(item.payload?.count ?? 0).toLocaleString()} · ${item.payload?.pct ?? 0}%`,
-                name,
-              ]}
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                boxShadow: "0 10px 15px -3px rgb(15 23 42 / 0.08)",
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 grid place-items-center text-center px-3">
-          <div>
-            <p className="text-2xl font-semibold tracking-tight text-card-foreground">
-              {total.toLocaleString()}
-            </p>
-            <p className="mt-1 text-xs font-medium text-muted-foreground">onboarding</p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">Verification pipeline breakdown</span>
+        <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-400">
+          {verifiedPct}% verified
+        </span>
+      </div>
+
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+        <div className="relative h-48 w-48 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={activeData}
+                dataKey="value"
+                nameKey="name"
+                startAngle={90}
+                endAngle={-270}
+                innerRadius={62}
+                outerRadius={88}
+                paddingAngle={isSingleSlice ? 0 : 3}
+                cornerRadius={isSingleSlice ? 0 : 6}
+                stroke={isSingleSlice ? "none" : "hsl(var(--card))"}
+                strokeWidth={isSingleSlice ? 0 : 2}
+              >
+                {activeData.map((row) => (
+                  <Cell key={row.name} fill={row.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                wrapperStyle={{ zIndex: 20 }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const item = payload[0] as { name?: string; payload?: { count: number; pct: number; color: string } };
+                  return (
+                    <div className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-card-foreground shadow-lg">
+                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: item.payload?.color }} />
+                      <span className="font-semibold">{item.name}</span>{" "}
+                      <span className="font-mono text-muted-foreground">
+                        {(item.payload?.count ?? 0).toLocaleString()} · {item.payload?.pct ?? 0}%
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 grid place-items-center px-3 text-center">
+            <div>
+              <p className="text-3xl font-bold tracking-tight text-card-foreground">
+                {total.toLocaleString()}
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Employees
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="w-full max-w-[200px] space-y-2.5">
-        {rows.map((row) => (
-          <div key={row.name} className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 font-medium text-card-foreground">
-              <span className={`h-2.5 w-2.5 rounded-[4px] ${row.dot}`} /> {row.name}
-            </span>
-            <span className="font-mono text-xs font-semibold text-card-foreground">
-              {row.count.toLocaleString()} · {row.pct}%
-            </span>
-          </div>
-        ))}
+
+        <div className="w-full flex-1 space-y-2.5">
+          {rows.map((row) => (
+            <div
+              key={row.name}
+              className="rounded-xl border border-border/50 bg-surface-muted/30 px-3 py-2 transition-colors hover:bg-surface-muted/60"
+            >
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-2 font-semibold text-card-foreground">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: row.color }}
+                  />
+                  {row.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-xs font-bold text-card-foreground">
+                    {row.count.toLocaleString()}
+                  </span>
+                  <span
+                    className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+                    style={{
+                      backgroundColor: row.count > 0 ? row.soft : "transparent",
+                      color: row.count > 0 ? row.color : "hsl(var(--muted-foreground))",
+                    }}
+                  >
+                    {row.pct}%
+                  </span>
+                </div>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${row.pct}%`,
+                    backgroundColor: row.color,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -913,45 +1025,62 @@ function DepartmentHistogram({ rows }: { rows: [string, number][] }) {
     return (
       <PremiumEmpty icon={Building2} message="Add employees to see your department distribution." />
     );
+  const total = rows.reduce((sum, [, count]) => sum + count, 0);
   const max = Math.max(...rows.map(([, count]) => count), 1);
-  const chartArea = 148;
-  const palette = ["bg-chart-4", "bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-5"];
+  const chartArea = 152;
+  const palette = [
+    { top: "#38bdf8", bottom: "#0284c7" },
+    { top: "#fb923c", bottom: "#ea580c" },
+    { top: "#34d399", bottom: "#059669" },
+    { top: "#a78bfa", bottom: "#7c3aed" },
+    { top: "#fbbf24", bottom: "#d97706" },
+  ];
   return (
     <div>
-      <div className="relative flex h-[200px] items-end gap-6 border-b border-border px-2">
-        <div className="absolute inset-x-2 bottom-0 h-[33%] border-t border-dashed border-border/70" />
-        <div className="absolute inset-x-2 bottom-0 h-[66%] border-t border-dashed border-border/70" />
+      <div className="relative flex h-[205px] items-end gap-6 border-b border-border px-3">
+        <div className="pointer-events-none absolute inset-x-3 bottom-0 h-[33%] border-t border-dashed border-border/70" />
+        <div className="pointer-events-none absolute inset-x-3 bottom-0 h-[66%] border-t border-dashed border-border/70" />
         {rows.map(([department, count], index) => {
-          const barHeight = Math.max((count / max) * chartArea, 6);
+          const barHeight = Math.max((count / max) * chartArea, 10);
+          const color = palette[index % palette.length];
+          const pct = total ? Math.round((count / total) * 100) : 0;
           return (
-            <div key={department} className="flex h-full flex-1 flex-col items-center justify-end">
+            <div
+              key={department}
+              title={`${department}: ${count} (${pct}%)`}
+              className="group relative z-10 flex h-full flex-1 flex-col items-center justify-end"
+            >
               <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 + index * 0.15 }}
-                className="mb-1.5 text-xs font-bold text-card-foreground"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 + index * 0.1 }}
+                className="mb-2 rounded-full bg-surface-muted px-2.5 py-0.5 font-mono text-xs font-bold text-card-foreground shadow-xs"
               >
                 {count.toLocaleString()}
               </motion.span>
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: barHeight }}
-                transition={{ duration: 1, delay: index * 0.12, ease: [0.2, 0.8, 0.2, 1] }}
-                className={`w-full max-w-[56px] rounded-t-md ${palette[index % palette.length]}`}
+                transition={{ duration: 0.85, delay: index * 0.1, ease: [0.2, 0.8, 0.2, 1] }}
+                className="w-full max-w-[60px] rounded-t-xl shadow-sm transition-transform duration-200 group-hover:scale-[1.03]"
+                style={{
+                  background: `linear-gradient(180deg, ${color.top} 0%, ${color.bottom} 100%)`,
+                }}
               />
             </div>
           );
         })}
       </div>
-      <div className="flex gap-6 px-2 pt-2.5">
-        {rows.map(([department]) => (
-          <span
-            key={department}
-            className="min-w-0 flex-1 truncate text-center text-xs font-semibold text-muted-foreground"
-          >
-            {department}
-          </span>
-        ))}
+      <div className="flex gap-6 px-3 pt-3">
+        {rows.map(([department, count]) => {
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return (
+            <div key={department} className="min-w-0 flex-1 text-center">
+              <p className="truncate text-xs font-semibold text-card-foreground">{department}</p>
+              <p className="mt-0.5 font-mono text-[11px] font-medium text-muted-foreground">{pct}% of team</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -963,29 +1092,40 @@ function OnboarderLeaderboard({ rows }: { rows: [string, number][] }) {
       <PremiumEmpty icon={UserCheck} message="Onboarding activity will appear here once employees are verified." />
     );
   const total = rows.reduce((sum, [, count]) => sum + count, 0);
-  const palette = ["bg-chart-4", "bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-5"];
+  const palette = [
+    { bar: "linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%)", bg: "bg-sky-500/12", text: "text-sky-600 dark:text-sky-400" },
+    { bar: "linear-gradient(90deg, #f97316 0%, #fb923c 100%)", bg: "bg-orange-500/12", text: "text-orange-600 dark:text-orange-400" },
+    { bar: "linear-gradient(90deg, #22c55e 0%, #4ade80 100%)", bg: "bg-emerald-500/12", text: "text-emerald-600 dark:text-emerald-400" },
+    { bar: "linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%)", bg: "bg-violet-500/12", text: "text-violet-600 dark:text-violet-400" },
+    { bar: "linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)", bg: "bg-amber-500/12", text: "text-amber-600 dark:text-amber-400" },
+  ];
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {rows.map(([name, count], index) => {
         const pct = total ? Math.round((count / total) * 100) : 0;
+        const color = palette[index % palette.length];
         return (
-          <div key={name} className="flex items-center gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-muted text-xs font-bold text-card-foreground">
+          <div
+            key={name}
+            className="flex items-center gap-3.5 rounded-xl border border-border/60 bg-surface-muted/30 p-3 transition-colors hover:bg-surface-muted/60"
+          >
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold ${color.bg} ${color.text}`}>
               {initials(name)}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-sm font-semibold text-card-foreground">{name}</span>
-                <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+                <span className="shrink-0 rounded-md bg-card px-2 py-0.5 font-mono text-xs font-semibold text-card-foreground shadow-2xs">
                   {count.toLocaleString()} · {pct}%
                 </span>
               </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-muted">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.max(pct, 4)}%` }}
                   transition={{ duration: 0.8, delay: index * 0.1, ease: [0.2, 0.8, 0.2, 1] }}
-                  className={`h-full rounded-full ${palette[index % palette.length]}`}
+                  className="h-full rounded-full"
+                  style={{ background: color.bar }}
                 />
               </div>
             </div>
@@ -1014,31 +1154,49 @@ function WorkforceMetric({
   loading: boolean;
 }) {
   const tones = {
-    indigo: "bg-primary-soft text-primary",
-    emerald: "bg-success-soft text-success",
-    sky: "bg-info-soft text-info",
-    amber: "bg-warning-soft text-warning",
+    indigo: {
+      badge: "bg-primary-soft text-primary ring-1 ring-primary/20",
+      bar: "bg-primary",
+    },
+    emerald: {
+      badge: "bg-success-soft text-success ring-1 ring-success/20",
+      bar: "bg-success",
+    },
+    sky: {
+      badge: "bg-info-soft text-info ring-1 ring-info/20",
+      bar: "bg-info",
+    },
+    amber: {
+      badge: "bg-warning-soft text-warning ring-1 ring-warning/20",
+      bar: "bg-warning",
+    },
   };
+  const currentTone = tones[tone];
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay }}
-      className="mbg-card flex items-start justify-between gap-3 p-4"
+      className="mbg-card group relative flex flex-col justify-between overflow-hidden p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-medium text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-bold tracking-tight text-card-foreground">
-          <AnimatedNumber value={loading ? "—" : value} />
-        </p>
-        <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-muted-foreground">{label}</p>
+          <p className="mt-2.5 text-3xl font-bold tracking-tight text-card-foreground">
+            <AnimatedNumber value={loading ? "—" : value} />
+          </p>
+        </div>
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${currentTone.badge}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+        <p className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <ArrowUpRight className="h-3.5 w-3.5 text-success" />
           {note}
         </p>
+        <span className={`h-1.5 w-6 rounded-full opacity-75 ${currentTone.bar}`} />
       </div>
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${tones[tone]}`}>
-        <Icon className="h-4 w-4" />
-      </span>
     </motion.article>
   );
 }

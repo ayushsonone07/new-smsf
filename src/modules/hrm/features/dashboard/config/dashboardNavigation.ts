@@ -170,7 +170,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
@@ -348,7 +348,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
@@ -519,7 +519,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
@@ -683,7 +683,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
@@ -771,7 +771,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
@@ -854,7 +854,7 @@ export const ROLE_NAVIGATION = {
         },
         {
           type: "leaf" as const,
-          label: "Sales Targets",
+          label: "Target",
           icon: Target,
           to: "/hrm/targets",
           permission: "performance:view",
