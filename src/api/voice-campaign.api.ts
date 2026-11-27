@@ -33,6 +33,8 @@ export interface VoiceCampaignPagination {
 export interface VoiceCampaignPage extends VoiceCampaignPagination {
   data: VoiceCampaignItem[]
   content?: VoiceCampaignItem[]
+  total?: number
+  totalPages?: number
 }
 
 export interface VoiceCampaignAnalytics {

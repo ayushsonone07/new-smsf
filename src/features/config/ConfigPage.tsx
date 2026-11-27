@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Webhook as WebhookIcon,
   ShieldAlert,
+  Mic,
   CheckCircle2,
   AlertCircle,
   X,

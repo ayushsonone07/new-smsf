@@ -23,6 +23,7 @@ import {
   getVoiceCampaignAnalytics,
   type VoiceCampaignItem,
   type VoiceCampaignQuery,
+  type VoiceCampaignAnalytics,
 } from '../../../api/voice-campaign.api'
 import { RefreshButton } from '../../../components/ui/RefreshButton'
 import { VoiceSettingsModal } from './VoiceSettingsModal'
