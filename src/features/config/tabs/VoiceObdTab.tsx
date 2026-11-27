@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Cloud, Mic, Phone, Search, CheckCircle, XCircle, Setting, Eye, EyeOff, ToggleLeft, Loader2, AlertCircle } from 'lucide-react'
+import { Cloud, CheckCircle, XCircle, Eye, EyeOff, Loader2, Save, X } from 'lucide-react'
 import { getCloudshopeConfigs, saveCloudshopeConfigs, testCloudshopeConnection } from '../../../api/config.api'
 
 interface VoiceObdTabProps {
@@ -9,7 +9,7 @@ interface VoiceObdTabProps {
 interface VoiceObdConfig {
   key: string
   label: string
-  placeholder: string
+  placeholder?: string
   type: 'text' | 'number' | 'toggle'
   masked?: boolean
   showToggle?: boolean
@@ -53,6 +53,7 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
   const [configs, setConfigs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showToken, setShowToken] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
   const [testPhone, setTestPhone] = useState<string>('')
   const [testResult, setTestResult] = useState<{
@@ -178,7 +179,8 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                                             {configs[config.key]?.length > 16
                                               ? configs[config.key].substring(0, 10) + '...' + configs[config.key].substring(configs[config.key].length - 6) + ' (len=' + configs[config.key].length + ')'
                                               : '***'
-                                          }
+                                            }
+                                          </span>
                                         )}
                                       </label>
 
@@ -186,19 +188,17 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                                       {config.masked && (
                                         <button
                                           type="button"
-                                          onClick={() => {
-                                            // Toggle visibility - we'll handle this with state
-                                          }}
+                                          onClick={() => setShowToken((prev) => !prev)}
                                           className="absolute right-1 text-slate-400 hover:text-slate-700 text-sm p-1 rounded-md transition-colors"
-                                          aria-label={configs[config.key] ? 'Hide token' : 'Show token'}
+                                          aria-label={showToken ? 'Hide token' : 'Show token'}
                                         >
-                                          {configs[config.key] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                          {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                                         </button>
                                       )}
 
                                       {/* Input Field */}
                                       <input
-                                        type={configs[config.key] && !config.masked ? 'text' : 'password'}
+                                        type={!config.masked || showToken ? 'text' : 'password'}
                                         placeholder={config.placeholder}
                                         value={configs[config.key] || ''}
                                         onChange={(e) =>
@@ -234,7 +234,7 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                 </small>
               </div>
 
-              <VOB_CONFIGs.map((config) => {
+              {VOB_CONFIGS.map((config) => {
                 if (config.key === 'cloudshopeCallingNumber') {
                   return (
                     <div
@@ -257,15 +257,15 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                           })
                         }
                         className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                        maxLength="15"
+                        maxLength={15}
                         inputMode="numeric"
-                        ariaLabel="Caller ID number"
+                        aria-label="Caller ID number"
                       />
                     </div>
                   )
                 }
                 return null
-              })()
+              })}
             </div>
 
             {/* Voice File ID */}
@@ -301,13 +301,13 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                         }
                         className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
                         min="1"
-                        ariaLabel="Voice file ID"
+                        aria-label="Voice file ID"
                       />
                     </div>
                   )
                 }
                 return null
-              })()}
+              })}
             </div>
 
             {/* Voice Enabled Toggle */}
@@ -326,9 +326,9 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                       key="voice-enabled-config"
                       className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 ${configs[config.key] === 'true' ? 'border-emerald-200' : 'border-rose-200'}`}
                     >
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <ToggleLeft
-                          className="w-5 h-3 rounded-full bg-slate-200 transition-colors peer checked:bg-purple-600 peer-checked:bg-emerald-600"
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                        <input
+                          className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                           type="checkbox"
                           checked={configs[config.key] === 'true'}
                           onChange={(e) =>
@@ -338,13 +338,20 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                             })
                           }
                         />
-                        <span>Voice Calling {'<span className="text-emerald-600 font-medium">Active</span>'} {'<span className="text-rose-600 font-medium">Disabled</span>'}</span>
+                        <span>
+                          Voice Calling{' '}
+                          {configs[config.key] === 'true' ? (
+                            <span className="text-emerald-600 font-medium">Active</span>
+                          ) : (
+                            <span className="text-rose-600 font-medium">Disabled</span>
+                          )}
+                        </span>
                       </label>
                     </div>
                   )
                 }
                 return null
-              })()}
+              })}
             </div>
 
             {/* Test Call Section */}
@@ -362,9 +369,9 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                     value={testPhone}
                     onChange={(e) => setTestPhone(e.target.value)}
                     className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-mono"
-                    maxLength="15"
+                    maxLength={15}
                     inputMode="numeric"
-                    ariaLabel="Test phone number"
+                    aria-label="Test phone number"
                   />
 
                   <button
@@ -381,7 +388,11 @@ export function VoiceObdTab({ onNotify }: VoiceObdTabProps) {
                 {testResult && (
                   <div className={`p-3 rounded-lg ${testResult.success ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
                     <div className="flex items-center gap-2">
-                      <Icon className={testResult.success ? 'w-4 h-4 text-emerald-600' : 'w-4 h-4 text-rose-600'} />
+                      {testResult.success ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-rose-600" />
+                      )}
                       <span>{testResult.message}</span>
                     </div>
                   </div>
