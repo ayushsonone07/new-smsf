@@ -23,6 +23,7 @@ import {
   UserCheck,
   UsersRound,
   UserPlus,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
 
@@ -181,6 +182,20 @@ export const ROLE_NAVIGATION = {
           label: "Warnings",
           icon: AlertTriangle,
           to: "/hrm/warnings",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
         },
       ],
     },
@@ -370,6 +385,20 @@ export const ROLE_NAVIGATION = {
     },
     {
       type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
       label: "Analytics",
       icon: BarChart3,
       children: [
@@ -547,6 +576,20 @@ export const ROLE_NAVIGATION = {
     },
     {
       type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
       label: "Analytics",
       icon: BarChart3,
       children: [
@@ -717,6 +760,20 @@ export const ROLE_NAVIGATION = {
     },
     {
       type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
       label: "Reports",
       icon: BarChart3,
       children: [
@@ -811,6 +868,20 @@ export const ROLE_NAVIGATION = {
     },
     {
       type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
       label: "Resources",
       icon: Bell,
       children: [
@@ -895,6 +966,20 @@ export const ROLE_NAVIGATION = {
           label: "Warnings",
           icon: AlertTriangle,
           to: "/hrm/warnings",
+        },
+      ],
+    },
+    {
+      type: "group" as const,
+      label: "Exit",
+      icon: UserX,
+      children: [
+        {
+          type: "leaf" as const,
+          label: "Terminations",
+          icon: UserX,
+          to: "/hrm/terminations",
+          permission: "employee:directory",
         },
       ],
     },

@@ -312,16 +312,6 @@ export function LoginPage() {
                   "Sign in"
                 )}
               </button>
-
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => navigate("/login")}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors"
-                >
-                  ← Return to Task CRM Login
-                </button>
-              </div>
             </form>
 
           </div>
