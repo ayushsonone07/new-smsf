@@ -55,6 +55,9 @@ const HelpSupportConfigPage = lazy(() =>
 const AdminAirtelServicePage = lazy(() =>
   import('../features/departments/pages/AdminAirtelServicePage').then((module) => ({ default: module.AdminAirtelServicePage })),
 )
+const AdminVoiceCampaignPage = lazy(() =>
+  import('../features/departments/pages/AdminVoiceCampaignPage').then((module) => ({ default: module.AdminVoiceCampaignPage })),
+)
 const CreateDepartmentPage = lazy(() =>
   import('../features/departments/pages/CreateDepartmentPage').then((module) => ({ default: module.CreateDepartmentPage })),
 )
@@ -361,6 +364,20 @@ const airtelServiceAliasRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/airtel-service',
   component: AdminAirtelServicePage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminVoiceCampaignRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/voice-campaigns',
+  component: AdminVoiceCampaignPage,
+  beforeLoad: requireRole('ADMIN'),
+})
+
+const adminCampaignsAliasRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/admin/campaigns',
+  component: AdminVoiceCampaignPage,
   beforeLoad: requireRole('ADMIN'),
 })
 
@@ -947,6 +964,8 @@ const routeTree = rootRoute.addChildren([
     adminHelpSupportPriorityRoute,
     adminAirtelServiceRoute,
     airtelServiceAliasRoute,
+    adminVoiceCampaignRoute,
+    adminCampaignsAliasRoute,
     adminSalaryManagementRoute,
     salaryManagementAliasRoute,
     adminConfigRoute,

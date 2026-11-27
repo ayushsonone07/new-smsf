@@ -28,6 +28,7 @@ import {
   CircleDot,
   Flag,
   BarChart3,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,7 @@ type NavPath =
   | '/admin/service-flow'
   | '/admin/notification-history'
   | '/admin/bulk-email'
+  | '/admin/voice-campaigns'
   | '/admin/help-support'
   | '/admin/help-support/analytics'
   | '/admin/help-support/departments'
@@ -163,6 +165,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Mail,
     roles: ['ADMIN'],
     isActive: (pathname) => pathname.startsWith('/admin/bulk-email'),
+  },
+  {
+    to: '/admin/voice-campaigns',
+    label: 'Voice Campaigns',
+    icon: Megaphone,
+    roles: ['ADMIN'],
+    isActive: (pathname) => pathname.startsWith('/admin/voice-campaigns') || pathname.startsWith('/admin/campaigns'),
   },
 ]
 

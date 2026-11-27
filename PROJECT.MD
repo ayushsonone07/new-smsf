@@ -436,6 +436,19 @@ nahi karta — vo sirf admin/legacy `CustomerTable` par lagta hai.
 
 ### Latest completed (23 Oct 2026)
 
+- [x] **Automation Working Hours field removed (26 Nov 2026)** — `/customer-details?contact=...`
+      aur `/customers/details` dono me same `CustomerDetailsPage` ka Automation Details section se
+      Working Hours (From ~ To) editor hata diya. Website step ka editor aur saved `workingHours`
+      payload unchanged; unused automation state/prefill bhi cleanup.
+- [x] **Repeated-field prefill (26 Nov 2026)** — wizard me next step kholne par pehle se filled
+      values ab copy hoti hain: Working Hours step 3 ↔ step 5, website business/category/address,
+      map link, automation business/category aur services. Target field khali ho tabhi prefill hota
+      hai, taaki user ki edit overwrite na ho. `CustomerDetailsPage.tsx`.
+- [x] **Customer details reload fix (26 Nov 2026)** — `/customers/details` ab URL params na hone par
+      signed-in customer session (`customerId`, phone/email) se profile fetch karta hai. Load hone par
+      resolved `customerId` state me rakha jata hai, taaki agla save usi business ko update kare.
+      Isse `/customer-details?contact=...` se save ki gayi details customer portal ke My Details me
+      dikhti hain. `CustomerDetailsPage.tsx`; production build successful (3883 modules).
 - [x] **Registration payment attribution (02 Nov 2026)** — valid customer email enter karne
       par `GET /api/payment/info` lookup hota hai; case-insensitive exact email match milne par
       Email field ke neeche `Sold by <paymentReference>` render hota hai, payment reference bold
