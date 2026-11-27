@@ -37,6 +37,7 @@ import { PayrollPage, PayslipsPage } from "@features/payroll";
 import { PerformancePage } from "@features/performance";
 import { TargetsPage } from "@features/targets";
 import { WarningsPage } from "@features/warnings";
+import { TerminationsPage } from "@features/terminations";
 import { CompanyPolicyPage } from "@features/policy";
 import { ReportsPage } from "@features/reports";
 import { RoleBasedAccessPage, SettingsPage, UpdateProfilePage } from "@features/settings";
@@ -259,6 +260,15 @@ function App() {
               <Route
                 path={rel(ROUTES.warnings)}
                 element={<WarningsPage />}
+              />
+
+              <Route
+                path={rel(ROUTES.terminations)}
+                element={
+                  <RequirePermission permission="employee:directory">
+                    <TerminationsPage />
+                  </RequirePermission>
+                }
               />
 
               <Route

@@ -203,6 +203,7 @@ export function TopBar({ onMenuClick, title, subtitle, user }: TopBarProps) {
       { label: "Performance", path: "/hrm/performance" },
       { label: "Target", path: "/hrm/targets" },
       { label: "Warnings", path: "/hrm/warnings" },
+      { label: "Terminations", path: "/hrm/terminations" },
       { label: "Company Policies", path: "/hrm/company-policies" },
       { label: "Settings", path: "/hrm/settings" },
     ];
