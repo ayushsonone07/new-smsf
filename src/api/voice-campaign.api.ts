@@ -90,6 +90,17 @@ export async function getVoiceCampaignAnalytics(): Promise<VoiceCampaignAnalytic
   return response || {}
 }
 
+export interface VoiceEventRule {
+  eventKey: string
+  label: string
+  source?: string
+  enabled: boolean
+  campaignPrefix: string
+  voiceFileId?: string
+  callingNumber?: string
+  builtIn?: boolean
+}
+
 export interface VoiceConfig {
   enabled: boolean
   apiUrl: string
@@ -100,6 +111,7 @@ export interface VoiceConfig {
   callbackUrl?: string
   updatedBy?: string
   updatedAt?: string
+  eventRules?: VoiceEventRule[]
 }
 
 export interface UpdateVoiceConfigInput {
@@ -109,6 +121,7 @@ export interface UpdateVoiceConfigInput {
   callingNumber?: string
   defaultVoiceFileId?: string
   callbackUrl?: string
+  eventRules?: VoiceEventRule[]
 }
 
 export interface TestVoiceCallInput {

@@ -12,13 +12,33 @@ import {
   EyeOff,
   Globe,
   Sliders,
+  Plus,
+  Trash2,
+  Zap,
 } from 'lucide-react'
 import {
   getVoiceConfig,
   updateVoiceConfig,
   sendTestVoiceCall,
   type VoiceConfig,
+  type VoiceEventRule,
 } from '../../../api/voice-campaign.api'
+
+const DEFAULT_EVENT_RULES: VoiceEventRule[] = [
+  { eventKey: 'TICKET_CREATED', label: 'Ticket Creation', source: 'HELP_CENTER', enabled: true, campaignPrefix: 'TKT_CREATE_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'TICKET_STATUS_UPDATED', label: 'Ticket Status Update', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_STATUS_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'TICKET_DEPARTMENT_TRANSFERRED', label: 'Ticket Department Transfer', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_XFER_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'CUSTOMER_REGISTERED', label: 'Customer Register', source: 'SMSB', enabled: false, campaignPrefix: 'CUST_REG_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'DEPARTMENT_MAIN_STATUS_COMPLETE', label: 'Department Main Status Complete', source: 'SMSB', enabled: false, campaignPrefix: 'DEPT_DONE_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'SOP_SUB_SERVICE_COMPLETE', label: 'SOP (Sub Service Info) Complete', source: 'SMSB', enabled: false, campaignPrefix: 'SOP_DONE_', voiceFileId: '', callingNumber: '', builtIn: true },
+]
+
+function previewCampaignName(rule: { eventKey?: string; source?: string; campaignPrefix?: string }): string {
+  const prefix = (rule.campaignPrefix || '').trim() || 'OBD_'
+  if (rule.eventKey?.startsWith('TICKET_')) return `${prefix}TKT-1042`
+  if (rule.source === 'SMSB') return `${prefix}1001`
+  return `${prefix}9876543210`
+}
 
 interface VoiceSettingsModalProps {
   isOpen: boolean
@@ -41,6 +61,14 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
   const [showToken, setShowToken] = useState(false)
   const [maskedToken, setMaskedToken] = useState('')
   const [tokenConfigured, setTokenConfigured] = useState(false)
+  const [activeSection, setActiveSection] = useState<'triggers' | 'global'>('triggers')
+  const [eventRules, setEventRules] = useState<VoiceEventRule[]>(DEFAULT_EVENT_RULES)
+  const [showAddRule, setShowAddRule] = useState(false)
+  const [newRuleLabel, setNewRuleLabel] = useState('')
+  const [newRuleKey, setNewRuleKey] = useState('')
+  const [newRulePrefix, setNewRulePrefix] = useState('')
+  const [newRuleVoiceFileId, setNewRuleVoiceFileId] = useState('')
+  const [newRuleCallingNumber, setNewRuleCallingNumber] = useState('')
 
   // Test call states
   const [testPhone, setTestPhone] = useState('')
@@ -69,6 +97,11 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
       setMaskedToken(cfg.maskedToken || '')
       setTokenConfigured(!!cfg.tokenConfigured)
       setNewToken('')
+      setEventRules(
+        Array.isArray(cfg.eventRules) && cfg.eventRules.length > 0
+          ? cfg.eventRules
+          : DEFAULT_EVENT_RULES
+      )
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to load voice configuration')
     } finally {
@@ -97,6 +130,7 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
         defaultVoiceFileId: defaultVoiceFileId.trim(),
         callbackUrl: cleanCallbackUrl,
         apiUrl: cleanApiUrl || 'https://cloudshope.com/api/v1/voice/voiceCampaign',
+        eventRules,
       }
       if (newToken.trim()) {
         payload.token = newToken.trim()
@@ -105,6 +139,9 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
       const updated = await updateVoiceConfig(payload)
       setMaskedToken(updated.maskedToken || '')
       setTokenConfigured(!!updated.tokenConfigured)
+      if (Array.isArray(updated.eventRules) && updated.eventRules.length > 0) {
+        setEventRules(updated.eventRules)
+      }
       setNewToken('')
       setSaveSuccessMsg('Voice OBD settings updated and applied successfully!')
       if (onSaved) onSaved()
@@ -151,6 +188,54 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
     } finally {
       setTestCalling(false)
     }
+  }
+
+  function updateRule(eventKey: string, patch: Partial<VoiceEventRule>) {
+    setEventRules((prev) =>
+      prev.map((r) => (r.eventKey === eventKey ? { ...r, ...patch } : r))
+    )
+  }
+
+  function handleAddNewRule() {
+    const label = newRuleLabel.trim()
+    if (!label) {
+      setErrorMsg('Please enter a trigger label (e.g. Payment Reminder).')
+      return
+    }
+    const rawKey = (newRuleKey.trim() || label).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '')
+    if (!rawKey) {
+      setErrorMsg('Please enter a valid event key.')
+      return
+    }
+    if (eventRules.some((r) => r.eventKey === rawKey)) {
+      setErrorMsg(`Trigger key "${rawKey}" already exists.`)
+      return
+    }
+    const prefix = newRulePrefix.trim() || `${rawKey.slice(0, 12)}_`
+    setEventRules((prev) => [
+      ...prev,
+      {
+        eventKey: rawKey,
+        label,
+        source: 'CUSTOM',
+        enabled: true,
+        campaignPrefix: prefix,
+        voiceFileId: newRuleVoiceFileId.trim(),
+        callingNumber: newRuleCallingNumber.trim(),
+        builtIn: false,
+      },
+    ])
+    setNewRuleLabel('')
+    setNewRuleKey('')
+    setNewRulePrefix('')
+    setNewRuleVoiceFileId('')
+    setNewRuleCallingNumber('')
+    setShowAddRule(false)
+    setErrorMsg(null)
+  }
+
+  function handleDeleteRule(eventKey: string) {
+    setEventRules((prev) => prev.filter((r) => r.eventKey !== eventKey))
   }
 
   if (!isOpen) return null
@@ -253,6 +338,58 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
           </button>
         </div>
 
+        {/* Section Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            padding: '10px 24px',
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#f8fafc',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveSection('triggers')}
+            style={{
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: activeSection === 'triggers' ? '1px solid #2563eb' : '1px solid #e2e8f0',
+              backgroundColor: activeSection === 'triggers' ? '#eff6ff' : '#ffffff',
+              color: activeSection === 'triggers' ? '#1d4ed8' : '#475569',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <Zap size={14} />
+            <span>OBD Event Triggers ({eventRules.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('global')}
+            style={{
+              padding: '7px 14px',
+              borderRadius: '8px',
+              border: activeSection === 'global' ? '1px solid #2563eb' : '1px solid #e2e8f0',
+              backgroundColor: activeSection === 'global' ? '#eff6ff' : '#ffffff',
+              color: activeSection === 'global' ? '#1d4ed8' : '#475569',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <Sliders size={14} />
+            <span>Global Credentials &amp; Test Call</span>
+          </button>
+        </div>
+
         {/* Scrollable Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {loading ? (
@@ -301,6 +438,280 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
                 </div>
               )}
 
+              {/* OBD Event Triggers Section */}
+              {activeSection === 'triggers' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                        OBD Voice Call Event Triggers
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        Configure toggle, campaign prefix, voice file ID, and optional caller ID per event.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddRule((v) => !v)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Plus size={14} />
+                      <span>Add New Trigger</span>
+                    </button>
+                  </div>
+
+                  {showAddRule && (
+                    <div
+                      style={{
+                        padding: '14px',
+                        borderRadius: '10px',
+                        border: '1px dashed #2563eb',
+                        backgroundColor: '#eff6ff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#1e40af' }}>
+                        New Custom OBD Trigger
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Trigger Label *
+                          </label>
+                          <input
+                            type="text"
+                            value={newRuleLabel}
+                            onChange={(e) => setNewRuleLabel(e.target.value)}
+                            placeholder="e.g. Payment Reminder"
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Event Key (auto if blank)
+                          </label>
+                          <input
+                            type="text"
+                            value={newRuleKey}
+                            onChange={(e) => setNewRuleKey(e.target.value)}
+                            placeholder="e.g. PAYMENT_REMINDER"
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', backgroundColor: '#fff', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Campaign Prefix
+                          </label>
+                          <input
+                            type="text"
+                            value={newRulePrefix}
+                            onChange={(e) => setNewRulePrefix(e.target.value)}
+                            placeholder="e.g. PAY_REM_"
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', backgroundColor: '#fff', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Voice File ID
+                          </label>
+                          <input
+                            type="text"
+                            value={newRuleVoiceFileId}
+                            onChange={(e) => setNewRuleVoiceFileId(e.target.value)}
+                            placeholder={`Default: ${defaultVoiceFileId || '120447'}`}
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Calling Number (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={newRuleCallingNumber}
+                            onChange={(e) => setNewRuleCallingNumber(e.target.value)}
+                            placeholder={`Default: ${callingNumber || 'Global CLI'}`}
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                            Generated Campaign Name
+                          </label>
+                          <div style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #bfdbfe', backgroundColor: '#ffffff', fontSize: '12px', fontFamily: 'monospace', color: '#1e40af', fontWeight: 600 }}>
+                            {previewCampaignName({ eventKey: newRuleKey || newRuleLabel, source: 'CUSTOM', campaignPrefix: newRulePrefix })}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddRule(false)}
+                          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '12px', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddNewRule}
+                          style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Add Trigger
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {eventRules.map((rule) => (
+                    <div
+                      key={rule.eventKey}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '10px',
+                        border: rule.enabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                        backgroundColor: rule.enabled ? '#fafffe' : '#f8fafc',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>
+                            {rule.label}
+                          </span>
+                          <code style={{ fontSize: '10.5px', backgroundColor: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px' }}>
+                            {rule.eventKey}
+                          </code>
+                          {rule.source && (
+                            <span style={{ fontSize: '10px', fontWeight: 700, backgroundColor: '#eef2ff', color: '#4338ca', padding: '2px 6px', borderRadius: '999px' }}>
+                              {rule.source}
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {!rule.builtIn && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRule(rule.eventKey)}
+                              title="Delete custom trigger"
+                              style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                          <label style={{ position: 'relative', display: 'inline-block', width: '42px', height: '22px' }}>
+                            <input
+                              type="checkbox"
+                              checked={rule.enabled}
+                              onChange={(e) => updateRule(rule.eventKey, { enabled: e.target.checked })}
+                              style={{ opacity: 0, width: 0, height: 0 }}
+                            />
+                            <span
+                              style={{
+                                position: 'absolute',
+                                cursor: 'pointer',
+                                inset: 0,
+                                backgroundColor: rule.enabled ? '#10b981' : '#cbd5e1',
+                                borderRadius: '34px',
+                                transition: '0.25s',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  height: '16px',
+                                  width: '16px',
+                                  left: rule.enabled ? '22px' : '3px',
+                                  bottom: '3px',
+                                  backgroundColor: '#ffffff',
+                                  borderRadius: '50%',
+                                  transition: '0.25s',
+                                }}
+                              />
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                            Campaign Prefix
+                          </label>
+                          <input
+                            type="text"
+                            value={rule.campaignPrefix}
+                            onChange={(e) => updateRule(rule.eventKey, { campaignPrefix: e.target.value })}
+                            placeholder="e.g. TKT_CREATE_"
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', fontFamily: 'monospace', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                            Voice File ID
+                          </label>
+                          <input
+                            type="text"
+                            value={rule.voiceFileId || ''}
+                            onChange={(e) => updateRule(rule.eventKey, { voiceFileId: e.target.value })}
+                            placeholder={`Global: ${defaultVoiceFileId || '120447'}`}
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                            Calling Number (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={rule.callingNumber || ''}
+                            onChange={(e) => updateRule(rule.eventKey, { callingNumber: e.target.value })}
+                            placeholder={`Global: ${callingNumber || 'CLI'}`}
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: '#f1f5f9',
+                          fontSize: '11.5px',
+                        }}
+                      >
+                        <span style={{ color: '#475569', fontWeight: 600 }}>Generated Campaign Name:</span>
+                        <code style={{ color: '#1e40af', fontWeight: 700, fontSize: '12px' }}>
+                          {previewCampaignName(rule)}
+                        </code>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeSection === 'global' && (
+                <>
               {/* Service Enabled Switch */}
               <div
                 style={{
@@ -608,6 +1019,8 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
                   </div>
                 )}
               </div>
+                </>
+              )}
             </form>
           )}
         </div>
