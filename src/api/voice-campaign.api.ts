@@ -99,6 +99,7 @@ export interface VoiceEventRule {
   voiceFileId?: string
   callingNumber?: string
   builtIn?: boolean
+  cooldownMinutes?: number | null
 }
 
 export interface VoiceConfig {

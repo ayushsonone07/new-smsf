@@ -28,6 +28,7 @@ export type NotificationKind =
   | 'bill-generated'
   | 'service-completed'
   | 'call-initiated'
+  | 'ticket-sla-breach'
 
 export type NotificationAudience = 'ALL' | 'DEPARTMENT' | 'CUSTOMER'
 

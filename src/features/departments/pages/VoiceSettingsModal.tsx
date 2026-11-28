@@ -25,12 +25,12 @@ import {
 } from '../../../api/voice-campaign.api'
 
 const DEFAULT_EVENT_RULES: VoiceEventRule[] = [
-  { eventKey: 'TICKET_CREATED', label: 'Ticket Creation', source: 'HELP_CENTER', enabled: true, campaignPrefix: 'TKT_CREATE_', voiceFileId: '', callingNumber: '', builtIn: true },
-  { eventKey: 'TICKET_STATUS_UPDATED', label: 'Ticket Status Update', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_STATUS_', voiceFileId: '', callingNumber: '', builtIn: true },
-  { eventKey: 'TICKET_DEPARTMENT_TRANSFERRED', label: 'Ticket Department Transfer', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_XFER_', voiceFileId: '', callingNumber: '', builtIn: true },
-  { eventKey: 'CUSTOMER_REGISTERED', label: 'Customer Register', source: 'SMSB', enabled: false, campaignPrefix: 'CUST_REG_', voiceFileId: '', callingNumber: '', builtIn: true },
-  { eventKey: 'DEPARTMENT_MAIN_STATUS_COMPLETE', label: 'Department Main Status Complete', source: 'SMSB', enabled: false, campaignPrefix: 'DEPT_DONE_', voiceFileId: '', callingNumber: '', builtIn: true },
-  { eventKey: 'SOP_SUB_SERVICE_COMPLETE', label: 'SOP (Sub Service Info) Complete', source: 'SMSB', enabled: false, campaignPrefix: 'SOP_DONE_', voiceFileId: '', callingNumber: '', builtIn: true },
+  { eventKey: 'TICKET_CREATED', label: 'Ticket Creation', source: 'HELP_CENTER', enabled: true, campaignPrefix: 'TKT_CREATE_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 10 },
+  { eventKey: 'TICKET_STATUS_UPDATED', label: 'Ticket Status Update', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_STATUS_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 2 },
+  { eventKey: 'TICKET_DEPARTMENT_TRANSFERRED', label: 'Ticket Department Transfer', source: 'HELP_CENTER', enabled: false, campaignPrefix: 'TKT_XFER_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 10 },
+  { eventKey: 'CUSTOMER_REGISTERED', label: 'Customer Register', source: 'SMSB', enabled: false, campaignPrefix: 'CUST_REG_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 10 },
+  { eventKey: 'DEPARTMENT_MAIN_STATUS_COMPLETE', label: 'Department Main Status Complete', source: 'SMSB', enabled: false, campaignPrefix: 'DEPT_DONE_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 10 },
+  { eventKey: 'SOP_SUB_SERVICE_COMPLETE', label: 'SOP (Sub Service Info) Complete', source: 'SMSB', enabled: false, campaignPrefix: 'SOP_DONE_', voiceFileId: '', callingNumber: '', builtIn: true, cooldownMinutes: 10 },
 ]
 
 function previewCampaignName(rule: { eventKey?: string; source?: string; campaignPrefix?: string }): string {
@@ -650,7 +650,7 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 110px', gap: '10px' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
                             Campaign Prefix
@@ -684,6 +684,23 @@ export function VoiceSettingsModal({ isOpen, onClose, onSaved }: VoiceSettingsMo
                             value={rule.callingNumber || ''}
                             onChange={(e) => updateRule(rule.eventKey, { callingNumber: e.target.value })}
                             placeholder={`Global: ${callingNumber || 'CLI'}`}
+                            style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                            Cooldown (min)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={rule.cooldownMinutes ?? 10}
+                            onChange={(e) => {
+                              const parsed = parseInt(e.target.value, 10)
+                              updateRule(rule.eventKey, {
+                                cooldownMinutes: Number.isNaN(parsed) ? 0 : Math.max(0, parsed),
+                              })
+                            }}
                             style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
                           />
                         </div>
