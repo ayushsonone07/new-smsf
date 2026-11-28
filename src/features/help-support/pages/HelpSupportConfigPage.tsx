@@ -143,16 +143,8 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
 
   const createStatusMutation = useMutation({
     mutationFn: async (form: StatusFormState) => isStatus
-      ? createTicketStatus({ name: form.name, isActive: form.isActive, isDefault: form.isDefault })
-      : createTicketPriority({
-          name: form.name,
-          followupHours: Number(form.followupHours),
-          resolveHours: Number(form.resolveHours),
-          color: '#2563EB',
-          sortOrder: Math.max(0, ...(query.data ?? []).map((item) => item.sortOrder)) + 1,
-          isActive: form.isActive,
-          isDefault: form.isDefault,
-        }),
+      ? createTicketStatus({ name: form.name, isActive: form.isActive, isDefault: form.isDefault, followupHours: Number(form.followupHours), resolveHours: Number(form.resolveHours) })
+      : createTicketPriority({ name: form.name, followupHours: Number(form.followupHours), resolveHours: Number(form.resolveHours), color: '#2563EB', sortOrder: Math.max(0, ...(query.data ?? []).map((item) => item.sortOrder)) + 1, isActive: form.isActive, isDefault: form.isDefault }),
     onSuccess: async (createdItem) => {
       if (createdItem) {
         queryClient.setQueryData<HelpCenterConfigItem[]>(['help-center-config', type], (old) => {
@@ -263,10 +255,10 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
   function submitStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!statusForm.name.trim()) return
-    if (!isStatus && (
+    if (
       !statusForm.followupHours || Number(statusForm.followupHours) < 1 ||
       !statusForm.resolveHours || Number(statusForm.resolveHours) < 1
-    )) return
+    ) return
     createStatusMutation.mutate({ ...statusForm, name: statusForm.name.trim() })
   }
 
@@ -547,18 +539,16 @@ export function HelpSupportConfigPage({ type }: HelpSupportConfigPageProps) {
             </label>
           </div>
 
-          {!isStatus && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label>
-                <span className="mb-1.5 block text-xs font-bold text-slate-700">Follow-up time (hours)</span>
-                <input required type="number" min="1" step="1" value={statusForm.followupHours} onChange={(event) => setStatusForm((form) => ({ ...form, followupHours: event.target.value }))} placeholder="2" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-              </label>
-              <label>
-                <span className="mb-1.5 block text-xs font-bold text-slate-700">Resolve time (hours)</span>
-                <input required type="number" min="1" step="1" value={statusForm.resolveHours} onChange={(event) => setStatusForm((form) => ({ ...form, resolveHours: event.target.value }))} placeholder="6" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-              </label>
-            </div>
-          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Follow-up time (hours)</span>
+              <input required type="number" min="1" step="1" value={statusForm.followupHours} onChange={(event) => setStatusForm((form) => ({ ...form, followupHours: event.target.value }))} placeholder="2" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Resolve time (hours)</span>
+              <input required type="number" min="1" step="1" value={statusForm.resolveHours} onChange={(event) => setStatusForm((form) => ({ ...form, resolveHours: event.target.value }))} placeholder="6" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+          </div>
 
           <div className="flex flex-wrap gap-5 rounded-xl bg-slate-50 p-3">
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">

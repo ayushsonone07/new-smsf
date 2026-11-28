@@ -45,7 +45,7 @@ function emitScoped(options: EmitOptions): void {
     customerId: options.customerId,
   }
   const eventId = `${options.kind}:${crypto.randomUUID()}`
-  void createNotificationEvent({
+  createNotificationEvent({
     eventId,
     kind: options.kind,
     title: options.title,
@@ -186,6 +186,27 @@ function formatDepartmentLabel(dept?: string): string {
     .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+export function notifyTicketSLAExceeded(
+  ticketNumber: string,
+  status: string,
+  exceedType: 'resolve' | 'followup',
+  departmentType?: string,
+): void {
+  const title = exceedType === 'resolve'
+    ? `Ticket ${ticketNumber} SLA Breach: Resolve Time exceeded`
+    : `Ticket ${ticketNumber} SLA Breach: Follow-up Time exceeded`
+  const message = exceedType === 'resolve'
+    ? `Ticket ${ticketNumber} was not resolved within the configured resolve time.`
+    : `Ticket ${ticketNumber} follow-up is overdue beyond the configured follow-up time.`
+
+  emitScoped({
+    kind: 'ticket-sla-breach',
+    title,
+    message,
+    departmentType,
+  })
 }
 
 export function notifyServiceCompleted(
