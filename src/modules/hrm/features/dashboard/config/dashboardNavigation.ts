@@ -197,6 +197,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -395,6 +401,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -586,6 +598,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -770,6 +788,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -878,6 +902,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -980,6 +1010,12 @@ export const ROLE_NAVIGATION = {
           icon: UserX,
           to: "/hrm/terminations",
           permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
         },
       ],
     },

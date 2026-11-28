@@ -69,6 +69,7 @@ const ROUTE_TITLES: { path: string; title: string; subtitle: string }[] = [
   { path: ROUTES.targets, title: "Target", subtitle: "Sales goals and revenue progress" },
   { path: ROUTES.warnings, title: "Warnings", subtitle: "Employee disciplinary notices and acknowledgements" },
   { path: ROUTES.terminations, title: "Terminations", subtitle: "Employee exits, clearance checklist and reinstatements" },
+  { path: ROUTES.resignations, title: "Resignations", subtitle: "Resignation requests, notice periods and exit clearance" },
   { path: ROUTES.companyPolicy, title: "Company Policies", subtitle: "Official employee policies and code of conduct" },
   { path: ROUTES.reports, title: "Reports", subtitle: "Organisation reports and insights" },
   { path: ROUTES.settings, title: "Settings", subtitle: "Workspace preferences and access" },

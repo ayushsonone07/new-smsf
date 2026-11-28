@@ -34,6 +34,7 @@ export const ROUTES = {
   targets: "/hrm/targets",
   warnings: "/hrm/warnings",
   terminations: "/hrm/terminations",
+  resignations: "/hrm/resignations",
   companyPolicy: "/hrm/company-policies",
   reports: "/hrm/reports",
   announcements: "/hrm/announcements",
