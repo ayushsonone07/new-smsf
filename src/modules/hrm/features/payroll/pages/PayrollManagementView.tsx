@@ -14,6 +14,7 @@ import { MarkPaidDialog } from "../components/MarkPaidDialog";
 import { PayrollDetailsDialog } from "../components/PayrollDetailsDialog";
 import { PayrollStagePills, PayrollSummaryCards } from "../components/PayrollSummaryCards";
 import { payrollActionButtons, PayrollTable } from "../components/PayrollTable";
+import { PayslipModal } from "../components/PayslipModal";
 import { SalaryStructureDialog } from "../components/SalaryStructureDialog";
 import {
   useApprovePayroll,
@@ -23,9 +24,10 @@ import {
   usePayrolls,
   useProcessPayroll,
 } from "../hooks";
-import { toYearMonth } from "../lib/payrollFormat";
+import { toYearMonth, triggerBlobDownload } from "../lib/payrollFormat";
+import { payrollService } from "../services";
 
-import type { Payroll, PayrollStatus } from "../types";
+import type { Payroll, PayrollStatus, PayslipDetails } from "../types";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const CURRENT_YEAR = new Date().getFullYear();
@@ -63,6 +65,9 @@ export function PayrollManagementView() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [details, setDetails] = useState<Payroll | null>(null);
   const [paying, setPaying] = useState<Payroll | null>(null);
+  const [viewingPayslip, setViewingPayslip] = useState<PayslipDetails | null>(null);
+  const [loadingPayslipId, setLoadingPayslipId] = useState<number | null>(null);
+  const [downloadingPayslip, setDownloadingPayslip] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkPay, setShowBulkPay] = useState(false);
 
@@ -146,6 +151,36 @@ export function PayrollManagementView() {
   function confirmCancel(p: Payroll) {
     const ok = window.confirm(`Cancel payroll for ${p.employeeCode} (${p.payrollMonth}/${p.payrollYear})? This cannot be undone.`);
     if (ok) runTransition(cancel, p.id, `Payroll ${p.employeeCode} cancelled.`);
+  }
+
+  async function handleViewPayslip(p: Payroll) {
+    setLoadingPayslipId(p.id);
+    try {
+      const slip = await payrollService.payslipDetail(p.id);
+      setViewingPayslip(slip);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not load payslip."));
+    } finally {
+      setLoadingPayslipId(null);
+    }
+  }
+
+  async function handleDownloadPayslip() {
+    if (!viewingPayslip) return;
+    setDownloadingPayslip(true);
+    try {
+      const blob = await payrollService.downloadPayslipPdf(viewingPayslip.payrollId);
+      const filename =
+        viewingPayslip.payslipNumber && viewingPayslip.payslipNumber !== "-"
+          ? `${viewingPayslip.payslipNumber}.pdf`
+          : `payslip-${viewingPayslip.payrollId}.pdf`;
+      triggerBlobDownload(blob, filename);
+      toast.success("Payslip downloaded.");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not download the payslip."));
+    } finally {
+      setDownloadingPayslip(false);
+    }
   }
 
   return (
@@ -281,6 +316,8 @@ export function PayrollManagementView() {
         payrolls={data?.data}
         loading={isLoading}
         onDetails={(p) => setDetails(p)}
+        onViewPayslip={(p) => void handleViewPayslip(p)}
+        loadingPayslipId={loadingPayslipId}
         renderActions={(p) =>
           canManage
             ? payrollActionButtons(p, {
@@ -330,6 +367,13 @@ export function PayrollManagementView() {
       <BulkSalaryStructureDialog open={showBulkImport} onClose={() => setShowBulkImport(false)} />
       <PayrollDetailsDialog open={details !== null} payroll={details} onClose={() => setDetails(null)} />
       <MarkPaidDialog open={paying !== null} payroll={paying} onClose={() => setPaying(null)} />
+      <PayslipModal
+        open={viewingPayslip !== null}
+        payslip={viewingPayslip}
+        onClose={() => setViewingPayslip(null)}
+        onDownload={() => void handleDownloadPayslip()}
+        isDownloading={downloadingPayslip}
+      />
 
       {canManage ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

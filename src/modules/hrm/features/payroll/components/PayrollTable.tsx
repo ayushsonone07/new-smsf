@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 
-import { CheckCircle2, Download, Eye, Loader2, RotateCcw, Wallet, XCircle } from "lucide-react";
+import { CheckCircle2, Download, Eye, FileText, Loader2, RotateCcw, Wallet, XCircle } from "lucide-react";
 
 import { Skeleton } from "@shared/components/ui";
 
@@ -19,6 +19,8 @@ interface PayrollTableProps {
   /** Optional overlay of actions rendered per row. */
   renderActions?: (payroll: Payroll) => ReactNode;
   onDetails?: (payroll: Payroll) => void;
+  onViewPayslip?: (payroll: Payroll) => void;
+  loadingPayslipId?: number | null;
   emptyMessage?: string;
 }
 
@@ -30,6 +32,8 @@ export function PayrollTable({
   onToggleSelectAll,
   renderActions,
   onDetails,
+  onViewPayslip,
+  loadingPayslipId,
   emptyMessage = "No payroll records found.",
 }: PayrollTableProps) {
   if (loading) {
@@ -136,6 +140,23 @@ export function PayrollTable({
                       >
                         <Eye className="h-4 w-4" />
                         <span className="hidden md:inline">View</span>
+                      </button>
+                    ) : null}
+                    {onViewPayslip && payroll.status !== "CANCELLED" ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewPayslip(payroll)}
+                        disabled={loadingPayslipId === payroll.id}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg p-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                        aria-label={`View payslip of ${payroll.employeeName}`}
+                        title="View Payslip"
+                      >
+                        {loadingPayslipId === payroll.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                        <span className="hidden md:inline">View Payslip</span>
                       </button>
                     ) : null}
                   </div>
