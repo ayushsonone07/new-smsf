@@ -296,6 +296,7 @@ export function CustomerDetailsPage() {
   const [socialLinkInput, setSocialLinkInput] = useState('')
   const [socialLinks, setSocialLinks] = useState<string[]>([])
   const [websiteWorkingHours, setWebsiteWorkingHours] = useState<WorkingHourItem[]>([])
+  const isWebsiteNotInPackage = domainStatus === 'Website Not in Package'
 
   // Step 4: Google Step Specific Form State
   const [gmbProfileLink, setGmbProfileLink] = useState('')
@@ -1673,7 +1674,11 @@ export function CustomerDetailsPage() {
                       <option value="">Select domain status...</option>
                       <option value="Already Have">Already Have Domain</option>
                       <option value="Need New">Need New Domain</option>
+                      <option value="Website Not in Package">Website Not in Package</option>
                     </select>
+                    {isWebsiteNotInPackage ? (
+                      <small className="cdb-website-disabled-note">Website fields are disabled for this package.</small>
+                    ) : null}
                   </div>
 
                   <div>
@@ -1686,43 +1691,46 @@ export function CustomerDetailsPage() {
                       placeholder="e.g. example.com"
                       value={domainName}
                       onChange={(e) => setDomainName(e.target.value)}
+                      disabled={isWebsiteNotInPackage}
                     />
                   </div>
                 </div>
 
-                <div className="cdb-details-grid">
-                  <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Use business name</option></select></label>
-                  {/* <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label> */}
-                  <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => updateWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
-                  <label className="cdb-field"><span>Booking Link</span><input className="cdb-input" value={bookingLink} onChange={(e) => setBookingLink(e.target.value)} placeholder="e.g. https://..." /></label>
-                  <label className="cdb-field"><span>Payment Link</span><input className="cdb-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="e.g. https://razorpay.me/..." /></label>
-                  <label className="cdb-field"><span>Business Category</span><input className="cdb-input" value={websiteCategory} onChange={(e) => updateWebsiteCategory(e.target.value)} placeholder="e.g. Restaurant, Clothing Store" /><small>Will display as: Best [category] in [area], [city] [state] India</small></label>
-                  <label className="cdb-field cdb-field-wide"><span>Business Tagline</span><textarea className="cdb-textarea" rows={2} value={businessTagline} onChange={(e) => setBusinessTagline(e.target.value)} placeholder="e.g. Best IT Services in Navi Mumbai, Maharashtra" /><small>Auto-generated: Best [category] in [area], [city], [state], India</small></label>
-                  <div className="cdb-field cdb-field-wide">
-                    <span>Main Services / Products</span>
-                    <div className="cdb-service-entry">
-                      <div className="cdb-service-input-wrap">
-                        <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { setServicesInput(e.target.value); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="Paste comma-separated services and press Enter" />
-                        {serviceSuggestionsOpen && serviceSuggestions.length > 0 ? <div className="cdb-service-suggestions">{serviceSuggestions.map((suggestion) => <button key={suggestion} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addMainService(suggestion)}><span>{suggestion}</span><span>+</span></button>)}</div> : null}
-                      </div>
-                      <button type="button" className="cdb-btn-primary" onClick={handleAddService}>+</button>
-                    </div>
-                    <div className="cdb-service-list-header"><small>Separate with commas, then press Enter or +.</small>{mainServices.length > 0 ? <button type="button" className="cdb-copy-all" onClick={() => copyServicesToClipboard(mainServices, true, 'main-all')}><Icon name="copy" size={13} /> {copiedServiceKey === 'main-all' ? 'Text Copied' : 'Copy All'}</button> : null}</div>
-                    <div className="cdb-service-stack">{mainServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}><span>{service}</span><button type="button" title={`Copy ${service}`} aria-label={`Copy ${service}`} onClick={() => copyServicesToClipboard([service], false, `main-${index}`)}><Icon name="copy" size={11} /></button>{copiedServiceKey === `main-${index}` ? <span className="cdb-copy-feedback">Text Copied</span> : null}<button type="button" title={`Remove ${service}`} aria-label={`Remove ${service}`} onClick={() => removeMainService(index)}><CloseIcon size={12} /></button></span>)}</div>
-                    <small>{mainServices.length}/15 added</small>
-                  </div>
-                </div>
-
-                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
-                  <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px', marginBottom: '16px' }}><h3 style={{ margin: 0, fontSize: '16px' }}>Contact Details</h3></div>
+                <fieldset className="cdb-website-fields" disabled={isWebsiteNotInPackage}>
                   <div className="cdb-details-grid">
-                    <label className="cdb-field"><span>Full Address</span><input className="cdb-input" value={websiteFullAddress} onChange={(e) => updateWebsiteFullAddress(e.target.value)} placeholder="e.g. 123, Main Street, Jabalpur" /></label>
-                    <label className="cdb-field"><span>Email</span><input type="email" className="cdb-input" value={websiteContactEmail} onChange={(e) => setWebsiteContactEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
-                    <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => updateMapLink(e.target.value)} placeholder="Google maps link" /></label>
-                    <div className="cdb-field"><span>Social Links</span><div className="cdb-service-entry"><input className="cdb-input" value={socialLinkInput} onChange={(e) => setSocialLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSocialLink() } }} placeholder="https://instagram.com/your-handle" /><button type="button" className="cdb-btn-primary" onClick={addSocialLink}>+</button></div><div className="cdb-service-stack">{socialLinks.map((link, index) => <span className="cdb-service-chip" key={`${link}-${index}`}>{link}<button type="button" onClick={() => setSocialLinks((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div></div>
-                    <div className="cdb-field cdb-field-wide"><WorkingHoursEditor value={websiteWorkingHours} onChange={setWebsiteWorkingHours} /></div>
+                    <label className="cdb-field"><span>Logo Options</span><select className="cdb-select" value={logoOption} onChange={(e) => setLogoOption(e.target.value)}><option value="">Select logo options...</option><option>I have a logo</option><option>Use business name</option></select></label>
+                    {/* <label className="cdb-field"><span>Image Options</span><select className="cdb-select" value={imageOption} onChange={(e) => setImageOption(e.target.value)}><option value="">Select image options...</option><option>I'll provide images</option><option>Use stock images</option><option>Mixed</option></select></label> */}
+                    <label className="cdb-field"><span>Business Name</span><input className="cdb-input" value={websiteBusinessName} onChange={(e) => updateWebsiteBusinessName(e.target.value)} placeholder="e.g. CV Sales & Marketing" /></label>
+                    <label className="cdb-field"><span>Booking Link</span><input className="cdb-input" value={bookingLink} onChange={(e) => setBookingLink(e.target.value)} placeholder="e.g. https://..." /></label>
+                    <label className="cdb-field"><span>Payment Link</span><input className="cdb-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="e.g. https://razorpay.me/..." /></label>
+                    <label className="cdb-field"><span>Business Category</span><input className="cdb-input" value={websiteCategory} onChange={(e) => updateWebsiteCategory(e.target.value)} placeholder="e.g. Restaurant, Clothing Store" /><small>Will display as: Best [category] in [area], [city] [state] India</small></label>
+                    <label className="cdb-field cdb-field-wide"><span>Business Tagline</span><textarea className="cdb-textarea" rows={2} value={businessTagline} onChange={(e) => setBusinessTagline(e.target.value)} placeholder="e.g. Best IT Services in Navi Mumbai, Maharashtra" /><small>Auto-generated: Best [category] in [area], [city], [state], India</small></label>
+                    <div className="cdb-field cdb-field-wide">
+                      <span>Main Services / Products</span>
+                      <div className="cdb-service-entry">
+                        <div className="cdb-service-input-wrap">
+                          <input className="cdb-input" value={servicesInput} onFocus={() => setServiceSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setServiceSuggestionsOpen(false), 120)} onChange={(e) => { setServicesInput(e.target.value); setServiceSuggestionsOpen(true) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddService() } }} placeholder="Paste comma-separated services and press Enter" />
+                          {serviceSuggestionsOpen && serviceSuggestions.length > 0 ? <div className="cdb-service-suggestions">{serviceSuggestions.map((suggestion) => <button key={suggestion} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => addMainService(suggestion)}><span>{suggestion}</span><span>+</span></button>)}</div> : null}
+                        </div>
+                        <button type="button" className="cdb-btn-primary" onClick={handleAddService}>+</button>
+                      </div>
+                      <div className="cdb-service-list-header"><small>Separate with commas, then press Enter or +.</small>{mainServices.length > 0 ? <button type="button" className="cdb-copy-all" onClick={() => copyServicesToClipboard(mainServices, true, 'main-all')}><Icon name="copy" size={13} /> {copiedServiceKey === 'main-all' ? 'Text Copied' : 'Copy All'}</button> : null}</div>
+                      <div className="cdb-service-stack">{mainServices.map((service, index) => <span className="cdb-service-chip" key={`${service}-${index}`}><span>{service}</span><button type="button" title={`Copy ${service}`} aria-label={`Copy ${service}`} onClick={() => copyServicesToClipboard([service], false, `main-${index}`)}><Icon name="copy" size={11} /></button>{copiedServiceKey === `main-${index}` ? <span className="cdb-copy-feedback">Text Copied</span> : null}<button type="button" title={`Remove ${service}`} aria-label={`Remove ${service}`} onClick={() => removeMainService(index)}><CloseIcon size={12} /></button></span>)}</div>
+                      <small>{mainServices.length}/15 added</small>
+                    </div>
                   </div>
-                </div>
+
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+                    <div style={{ borderLeft: '3px solid #2563eb', paddingLeft: '12px', marginBottom: '16px' }}><h3 style={{ margin: 0, fontSize: '16px' }}>Contact Details</h3></div>
+                    <div className="cdb-details-grid">
+                      <label className="cdb-field"><span>Full Address</span><input className="cdb-input" value={websiteFullAddress} onChange={(e) => updateWebsiteFullAddress(e.target.value)} placeholder="e.g. 123, Main Street, Jabalpur" /></label>
+                      <label className="cdb-field"><span>Email</span><input type="email" className="cdb-input" value={websiteContactEmail} onChange={(e) => setWebsiteContactEmail(e.target.value)} placeholder="e.g. info@company.com" /></label>
+                      <label className="cdb-field"><span>Map Link</span><input className="cdb-input" value={mapLink} onChange={(e) => updateMapLink(e.target.value)} placeholder="Google maps link" /></label>
+                      <div className="cdb-field"><span>Social Links</span><div className="cdb-service-entry"><input className="cdb-input" value={socialLinkInput} onChange={(e) => setSocialLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSocialLink() } }} placeholder="https://instagram.com/your-handle" /><button type="button" className="cdb-btn-primary" onClick={addSocialLink}>+</button></div><div className="cdb-service-stack">{socialLinks.map((link, index) => <span className="cdb-service-chip" key={`${link}-${index}`}>{link}<button type="button" onClick={() => setSocialLinks((items) => items.filter((_, i) => i !== index))}><CloseIcon size={12} /></button></span>)}</div></div>
+                      <div className="cdb-field cdb-field-wide"><WorkingHoursEditor value={websiteWorkingHours} onChange={setWebsiteWorkingHours} /></div>
+                    </div>
+                  </div>
+                </fieldset>
               </div>
 
               {/* Website Graphic Box */}

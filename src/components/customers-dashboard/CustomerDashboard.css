@@ -1153,6 +1153,35 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
+.cdb-input:disabled,
+.cdb-select:disabled,
+.cdb-textarea:disabled,
+.cdb-website-fields button:disabled {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cdb-website-disabled-note {
+  display: block;
+  margin-top: 5px;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cdb-website-fields {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .cdb-form-row-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
