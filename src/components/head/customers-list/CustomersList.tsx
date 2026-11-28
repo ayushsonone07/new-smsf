@@ -881,6 +881,7 @@ function CustomerRow({
   const [remarkDraft, setRemarkDraft] = useState('')
   const [copiedField, setCopiedField] = useState<'business' | 'email' | 'phone' | null>(null)
   const remarkEditable = canEditRemark !== undefined ? canEditRemark : canEdit
+  const customerCreatedDateLabel = formatOnboardingCompletedDate(customer.createdAt)
 
   const statusRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
@@ -1378,6 +1379,15 @@ function CustomerRow({
               <Icon name="phone" size={13} strokeWidth={2} />
             </button>
           </div>
+
+          {(_isDepartmentUser || isDepartmentHead) && customerCreatedDateLabel && (
+            <div
+              className="cl-customer-created-date"
+              title={`Customer created: ${customerCreatedDateLabel}`}
+            >
+              Created: {customerCreatedDateLabel}
+            </div>
+          )}
 
         {customer.callStatus ? (
           <span
