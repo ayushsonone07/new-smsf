@@ -26,7 +26,7 @@ vi.mock('../app/auth/session', () => ({
 describe('Ticket SLA Breach Notifications', () => {
   beforeEach(() => {
     queryClient.clear()
-    createNotificationEvent.mockReset()
+    createNotificationEvent.mockClear()
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -59,7 +59,9 @@ describe('Ticket SLA Breach Notifications', () => {
     
     expect(createNotificationEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        departmentType: 'CUSTOMER_DEPARTMENT',
+        scope: expect.objectContaining({
+          departmentType: 'CUSTOMER_DEPARTMENT',
+        }),
       })
     )
   })
@@ -69,7 +71,9 @@ describe('Ticket SLA Breach Notifications', () => {
     
     expect(createNotificationEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        departmentType: 'AUTOMATION_DEPARTMENT',
+        scope: expect.objectContaining({
+          departmentType: 'AUTOMATION_DEPARTMENT',
+        }),
       })
     )
   })
