@@ -39,6 +39,7 @@ import { TargetsPage } from "@features/targets";
 import { WarningsPage } from "@features/warnings";
 import { TerminationsPage } from "@features/terminations";
 import { ResignationsPage } from "@features/resignations";
+import { OffersPage } from "@features/offers";
 import { CompanyPolicyPage } from "@features/policy";
 import { ReportsPage } from "@features/reports";
 import { RoleBasedAccessPage, SettingsPage, UpdateProfilePage } from "@features/settings";
@@ -275,6 +276,11 @@ function App() {
               <Route
                 path={rel(ROUTES.resignations)}
                 element={<ResignationsPage />}
+              />
+
+              <Route
+                path={rel(ROUTES.offers)}
+                element={<OffersPage />}
               />
 
               <Route
