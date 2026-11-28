@@ -113,6 +113,13 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/onboarding",
           permission: "onboarding:manage",
         },
+        {
+          type: "leaf" as const,
+          label: "Offer Letters",
+          icon: FileText,
+          to: "/hrm/offers",
+          permission: "employee:directory",
+        },
       ],
     },
     {
@@ -196,6 +203,12 @@ export const ROLE_NAVIGATION = {
           icon: UserX,
           to: "/hrm/terminations",
           permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
         },
       ],
     },
@@ -311,6 +324,13 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/onboarding",
           permission: "onboarding:manage",
         },
+        {
+          type: "leaf" as const,
+          label: "Offer Letters",
+          icon: FileText,
+          to: "/hrm/offers",
+          permission: "employee:directory",
+        },
       ],
     },
     {
@@ -395,6 +415,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -466,6 +492,13 @@ export const ROLE_NAVIGATION = {
           icon: Handshake,
           to: "/hrm/onboarding",
           permission: "onboarding:manage",
+        },
+        {
+          type: "leaf" as const,
+          label: "Offer Letters",
+          icon: FileText,
+          to: "/hrm/offers",
+          permission: "employee:directory",
         },
       ],
     },
@@ -585,6 +618,12 @@ export const ROLE_NAVIGATION = {
           icon: UserX,
           to: "/hrm/terminations",
           permission: "employee:directory",
+        },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
         },
       ],
     },
@@ -770,6 +809,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -878,6 +923,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -981,6 +1032,12 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/terminations",
           permission: "employee:directory",
         },
+        {
+          type: "leaf" as const,
+          label: "Resignations",
+          icon: UserX,
+          to: "/hrm/resignations",
+        },
       ],
     },
     {
@@ -1002,6 +1059,7 @@ export const ROLE_NAVIGATION = {
           to: "/hrm/company-policies",
         },
         { type: "leaf" as const, label: "Documents", icon: FileText, to: "/hrm/documents" },
+        { type: "leaf" as const, label: "My Offer Letter", icon: FileText, to: "/hrm/offers" },
         { type: "leaf" as const, label: "Help & Support", icon: HelpCircle, to: "/hrm/help" },
       ],
     },
