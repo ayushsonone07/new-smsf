@@ -11,7 +11,7 @@ export interface ServiceTagsModalProps {
   onClose: () => void
   customer: OnboardingCustomer | null
   serviceType?: string
-  onTagsUpdated?: () => void
+  onTagsUpdated?: (updatedTags?: Record<string, string>) => void
   readOnly?: boolean
   /** Reloads the customer's tags (the parent list query); the modal re-syncs from the new customer prop. */
   onRefresh?: () => unknown
@@ -141,6 +141,15 @@ interface ActiveTagItem {
   date?: string
 }
 
+function toTagsRecord(items: ActiveTagItem[]): Record<string, string> {
+  const map: Record<string, string> = {}
+  items.forEach((item, idx) => {
+    const key = item.date || `${new Date().toISOString()}_${idx}`
+    map[key] = item.id
+  })
+  return map
+}
+
 function parseActiveTags(raw: any): ActiveTagItem[] {
   if (!raw) return []
   let obj = raw
@@ -228,11 +237,24 @@ export function ServiceTagsModal({
 
   async function handleQuickAdd(tag: TagItem) {
     if (!customer) return
+    const alreadyExists = localTags.some(
+      (t) =>
+        t.id.toUpperCase() === tag.id.toUpperCase() ||
+        t.name.toUpperCase() === tag.name.toUpperCase(),
+    )
+    if (alreadyExists) {
+      setMessage({
+        type: 'error',
+        text: `Tag "${tag.name}" already exists on this service.`,
+      })
+      return
+    }
+
     setActiveTagLoading(tag.name)
     setMessage(null)
 
     try {
-      await editServiceTag({
+      const res = await editServiceTag({
         operation: 'add',
         customerId: customer.id,
         serviceType: effectiveServiceType,
@@ -243,12 +265,14 @@ export function ServiceTagsModal({
         type: 'success',
         text: `Tag "${tag.name}" added successfully!`,
       })
-      // Optimistic update
-      setLocalTags((prev) => {
-        if (prev.some((t) => t.id === tag.id)) return prev
-        return [...prev, { id: tag.id, name: tag.name }]
-      })
-      onTagsUpdated?.()
+      // Optimistic / response update
+      const nextTags = res?.tags
+        ? parseActiveTags(res.tags)
+        : localTags.some((t) => t.id.toUpperCase() === tag.id.toUpperCase())
+          ? localTags
+          : [...localTags, { id: tag.id, name: tag.name, date: new Date().toISOString() }]
+      setLocalTags(nextTags)
+      onTagsUpdated?.(res?.tags && typeof res.tags === 'object' ? res.tags : toTagsRecord(nextTags))
     } catch (err: any) {
       console.error('Failed to add tag:', err)
       setMessage({
@@ -266,7 +290,7 @@ export function ServiceTagsModal({
     setMessage(null)
 
     try {
-      await editServiceTag({
+      const res = await editServiceTag({
         operation: 'remove',
         customerId: customer.id,
         serviceType: effectiveServiceType,
@@ -277,9 +301,11 @@ export function ServiceTagsModal({
         type: 'success',
         text: `Tag "${displayName}" removed successfully!`,
       })
-      // Optimistic update
-      setLocalTags((prev) => prev.filter((t) => t.id !== tagId))
-      onTagsUpdated?.()
+      const nextTags = res?.tags
+        ? parseActiveTags(res.tags)
+        : localTags.filter((t) => t.id.toUpperCase() !== tagId.toUpperCase())
+      setLocalTags(nextTags)
+      onTagsUpdated?.(res?.tags && typeof res.tags === 'object' ? res.tags : toTagsRecord(nextTags))
     } catch (err: any) {
       console.error('Failed to remove tag:', err)
       setMessage({
@@ -296,11 +322,22 @@ export function ServiceTagsModal({
     const rawTag = customTagName.trim().toUpperCase().replace(/\s+/g, '_')
     if (!rawTag || !customer) return
 
+    if (
+      customOperation === 'add' &&
+      localTags.some((t) => t.id.toUpperCase() === rawTag.toUpperCase())
+    ) {
+      setMessage({
+        type: 'error',
+        text: `Tag "${rawTag.replace(/_/g, ' ')}" already exists on this service.`,
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setMessage(null)
 
     try {
-      await editServiceTag({
+      const res = await editServiceTag({
         operation: customOperation,
         customerId: customer.id,
         serviceType: effectiveServiceType,
@@ -312,18 +349,18 @@ export function ServiceTagsModal({
         type: 'success',
         text: `Tag "${rawTag}" ${customOperation === 'add' ? 'added' : 'removed'} successfully!`,
       })
-      if (customOperation === 'add') {
-        setLocalTags((prev) => {
-          if (prev.some((t) => t.id === rawTag)) return prev
-          return [...prev, { id: rawTag, name: rawTag.replace(/_/g, ' ') }]
-        })
-      } else {
-        setLocalTags((prev) => prev.filter((t) => t.id !== rawTag))
-      }
+      const nextTags = res?.tags
+        ? parseActiveTags(res.tags)
+        : customOperation === 'add'
+          ? localTags.some((t) => t.id.toUpperCase() === rawTag.toUpperCase())
+            ? localTags
+            : [...localTags, { id: rawTag, name: rawTag.replace(/_/g, ' '), date: new Date().toISOString() }]
+          : localTags.filter((t) => t.id.toUpperCase() !== rawTag.toUpperCase())
+      setLocalTags(nextTags)
       setCustomTagName('')
       setCustomDescription('')
       setShowCustomSection(false)
-      onTagsUpdated?.()
+      onTagsUpdated?.(res?.tags && typeof res.tags === 'object' ? res.tags : toTagsRecord(nextTags))
     } catch (err: any) {
       console.error('Failed to execute tag operation:', err)
       setMessage({

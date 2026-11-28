@@ -511,3 +511,133 @@
   cursor: not-allowed;
 }
 
+.stm-footer-toggle {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 12px;
+}
+
+.stm-toggle-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #d8b4fe;
+  background: #faf5ff;
+  color: #7e22ce;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stm-toggle-link:hover {
+  background: #f3e8ff;
+  border-color: #c084fc;
+  color: #6b21a8;
+}
+
+.stm-custom-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.stm-custom-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stm-custom-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stm-required {
+  color: #dc2626;
+}
+
+.stm-optional {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.74rem;
+}
+
+.stm-custom-op-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stm-op-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stm-op-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.stm-op-btn--active {
+  background: #f3e8ff;
+  border-color: #9333ea;
+  color: #7e22ce;
+}
+
+.stm-op-btn--active-remove {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+.stm-custom-input,
+.stm-custom-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.stm-custom-textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+
+.stm-custom-input:focus,
+.stm-custom-textarea:focus {
+  border-color: #7e22ce;
+  box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.12);
+}
+
+.stm-custom-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+

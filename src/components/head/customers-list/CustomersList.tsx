@@ -845,6 +845,7 @@ function CustomerRow({
   onOpenDetail,
   onOpenDuplicate,
   onOpenServiceFlow,
+  onOpenServiceTags,
   isGoogle = false,
   isDepartmentUser: _isDepartmentUser,
   isSupport = false,
@@ -1614,6 +1615,67 @@ function CustomerRow({
                 +{subServicesList.length - 2} more
               </button>
             )}
+            {isGoogle && onOpenServiceTags && (() => {
+              const canAddTags = Boolean(_isDepartmentUser && !isDepartmentHead)
+              const rawTags = customer.serviceTags
+              const tagEntries: { key: string; label: string }[] = []
+              if (rawTags && typeof rawTags === 'object' && !Array.isArray(rawTags)) {
+                Object.entries(rawTags).forEach(([k, v]) => {
+                  const label = typeof v === 'string' && v.trim() ? v.trim() : k
+                  if (label) tagEntries.push({ key: k, label })
+                })
+              } else if (Array.isArray(rawTags)) {
+                rawTags.forEach((t, idx) => {
+                  const label = typeof t === 'string' ? t : (t?.tagName || t?.name || t?.id || '')
+                  if (label) tagEntries.push({ key: `${idx}-${label}`, label: String(label) })
+                })
+              }
+              if (tagEntries.length === 0 && !canAddTags) return null
+
+              return (
+                <div
+                  className="flex flex-wrap items-center gap-1 mt-1 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {tagEntries.slice(0, 2).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={
+                        canAddTags
+                          ? `Manage service tags (${label.replace(/_/g, ' ')})`
+                          : `Service tag: ${label.replace(/_/g, ' ')} (Click to view)`
+                      }
+                      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                    >
+                      {label.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                  {tagEntries.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={canAddTags ? 'View & manage all service tags' : 'View all tags (Read only)'}
+                      className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                    >
+                      +{tagEntries.length - 2}
+                    </button>
+                  )}
+                  {canAddTags && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={tagEntries.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                    >
+                      <Icon name="plus" size={10} strokeWidth={2.5} />
+                      {tagEntries.length === 0 && <span>Add Tag</span>}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )}
         </td>
@@ -1929,6 +1991,69 @@ function CustomerRow({
                 <Icon name="messageSquare" size={10} strokeWidth={2} />
                 view remark history
               </button>
+
+              {!isGoogle && onOpenServiceTags && (() => {
+                const canAddTags = Boolean(_isDepartmentUser && !isDepartmentHead)
+                const rawTags = customer.serviceTags
+                const tagEntries: { key: string; label: string }[] = []
+                if (rawTags && typeof rawTags === 'object' && !Array.isArray(rawTags)) {
+                  Object.entries(rawTags).forEach(([k, v]) => {
+                    const label = typeof v === 'string' && v.trim() ? v.trim() : k
+                    if (label) tagEntries.push({ key: k, label })
+                  })
+                } else if (Array.isArray(rawTags)) {
+                  rawTags.forEach((t, idx) => {
+                    const label = typeof t === 'string' ? t : (t?.tagName || t?.name || t?.id || '')
+                    if (label) tagEntries.push({ key: `${idx}-${label}`, label: String(label) })
+                  })
+                }
+
+                if (tagEntries.length === 0 && !canAddTags) return null
+
+                return (
+                  <div
+                    className="flex flex-wrap items-center gap-1 mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {tagEntries.slice(0, 2).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={
+                          canAddTags
+                            ? `Manage service tags (${label.replace(/_/g, ' ')})`
+                            : `Service tag: ${label.replace(/_/g, ' ')} (Click to view)`
+                        }
+                        className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                      >
+                        {label.replace(/_/g, ' ')}
+                      </button>
+                    ))}
+                    {tagEntries.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={canAddTags ? 'View & manage all service tags' : 'View all tags (Read only)'}
+                        className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                      >
+                        +{tagEntries.length - 2}
+                      </button>
+                    )}
+                    {canAddTags && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={tagEntries.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
+                        className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                      >
+                        <Icon name="plus" size={10} strokeWidth={2.5} />
+                        {tagEntries.length === 0 && <span>Add Tag</span>}
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
         </td>
