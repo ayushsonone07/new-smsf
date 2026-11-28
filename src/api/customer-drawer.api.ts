@@ -459,6 +459,20 @@ export async function getCustomerServiceRowById(
   }
 }
 
+export async function deleteCustomerService(
+  customerId: number | string,
+  selector: { serviceType?: string; departmentType?: string },
+): Promise<void> {
+  const query = new URLSearchParams()
+  if (selector.serviceType?.trim()) query.set('serviceType', selector.serviceType.trim())
+  if (selector.departmentType?.trim()) query.set('departmentType', selector.departmentType.trim())
+
+  await authedApiRequest(
+    `/api/auth/admin/customers/${encodeURIComponent(String(customerId))}/services?${query.toString()}`,
+    { method: 'DELETE' },
+  )
+}
+
 export async function addClientRemark(
   customerId: number | string,
   remark: string,

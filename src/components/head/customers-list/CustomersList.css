@@ -2301,6 +2301,42 @@
   font-size: 14px;
 }
 
+.cl-drawer__delete-service {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.cl-drawer__delete-service:hover {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.cl-drawer__delete-service:focus-visible {
+  outline: 3px solid rgba(239, 68, 68, 0.2);
+  outline-offset: 2px;
+}
+
+.cl-drawer__delete-service svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .cl-drawer__deliverable > p {
   margin: 14px 0 0;
   color: #64748b;
@@ -2344,6 +2380,117 @@
   color: #64748b;
   font-size: 13px;
   text-align: center;
+}
+
+.cl-delete-service-overlay {
+  position: fixed;
+  z-index: 4200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.cl-delete-service-dialog {
+  width: min(100%, 460px);
+  padding: 26px;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.26);
+}
+
+.cl-delete-service-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.cl-delete-service-dialog h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.cl-delete-service-dialog > p {
+  margin: 10px 0 20px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.cl-delete-service-dialog label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.cl-delete-service-dialog input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.cl-delete-service-dialog input:focus {
+  border-color: #dc2626;
+  outline: 3px solid rgba(239, 68, 68, 0.13);
+}
+
+.cl-delete-service-dialog > .cl-delete-service-dialog__error {
+  margin: 9px 0 0;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.cl-delete-service-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.cl-delete-service-dialog__actions button {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cl-delete-service-dialog__cancel {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.cl-delete-service-dialog__confirm {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+}
+
+.cl-delete-service-dialog__confirm:disabled {
+  border-color: #fecaca;
+  background: #fecaca;
+  color: #991b1b;
+  cursor: not-allowed;
 }
 
 .cl-drawer__timeline {
