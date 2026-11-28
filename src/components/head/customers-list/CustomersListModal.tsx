@@ -31,7 +31,11 @@ import type {
   CustomerRemark,
   CustomerServiceRow,
 } from '../../../api/customer-drawer.api'
-import { addClientRemark, downloadCustomerExport } from '../../../api/customer-drawer.api'
+import {
+  addClientRemark,
+  deleteCustomerService,
+  downloadCustomerExport,
+} from '../../../api/customer-drawer.api'
 import {
   CUSTOMER_ACTIVITY_EVENT,
   getCustomerActivities,
@@ -56,6 +60,14 @@ export interface CustomersListModalProps {
   /** Fetch only the common customer profile endpoint (used by superadmin). */
   profileOnly?: boolean
   requestUsername?: string
+}
+
+interface DrawerDepartmentServiceItem {
+  name: string
+  status?: OnboardingStatus
+  row?: CustomerServiceRow
+  departmentType?: string
+  serviceType?: string
 }
 
 type DrawerTab =
@@ -349,6 +361,12 @@ export function CustomersListModal({
   const [invoiceSaving, setInvoiceSaving] = useState(false)
   const [invoiceError, setInvoiceError] = useState('')
   const [invoiceSuccess, setInvoiceSuccess] = useState('')
+  const [servicePendingDelete, setServicePendingDelete] =
+    useState<DrawerDepartmentServiceItem | null>(null)
+  const [deleteServiceConfirmation, setDeleteServiceConfirmation] = useState('')
+  const [deleteServiceError, setDeleteServiceError] = useState('')
+  const [isDeletingService, setIsDeletingService] = useState(false)
+  const [deletedServiceKeys, setDeletedServiceKeys] = useState<string[]>([])
   const [invoiceDraftId, setInvoiceDraftId] = useState<number | null>(null)
   const billInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -403,6 +421,13 @@ export function CustomersListModal({
     departmentType,
     requestUsername,
   })
+
+  useEffect(() => {
+    setServicePendingDelete(null)
+    setDeleteServiceConfirmation('')
+    setDeleteServiceError('')
+    setDeletedServiceKeys([])
+  }, [current?.id])
 
   const isCreatedIn2025 = useMemo(() => {
     const rawCreated =
@@ -550,12 +575,19 @@ export function CustomersListModal({
     if (!customer) return
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') startClose()
+      if (e.key !== 'Escape') return
+      if (servicePendingDelete && !isDeletingService) {
+        setServicePendingDelete(null)
+        setDeleteServiceConfirmation('')
+        setDeleteServiceError('')
+        return
+      }
+      if (!servicePendingDelete) startClose()
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [customer, onClose])
+  }, [customer, onClose, servicePendingDelete, isDeletingService])
 
   const duplicatesQuery = useQuery({
     queryKey: ['duplicate-customer-summaries', customer?.id ?? 0, departmentType],
@@ -851,13 +883,6 @@ export function CustomersListModal({
   const serviceRow = customerServiceRows[0]
   const rowDetails = serviceRow?.customerDetails
   const profile = apiDetails.profile
-  interface DrawerDepartmentServiceItem {
-    name: string
-    status?: OnboardingStatus
-    row?: CustomerServiceRow
-    departmentType?: string
-  }
-
   const unfilteredServices: DrawerDepartmentServiceItem[] = useMemo(() => {
     if (serviceRow?.departmentStatuses != null) {
       return getDepartmentServices(
@@ -875,6 +900,7 @@ export function CustomersListModal({
         return {
           name: formatServiceName(String(name)),
           status: toOnboardingStatus(String(status)),
+          serviceType: String(sub?.serviceType || name),
           row: undefined,
         }
       })
@@ -883,11 +909,12 @@ export function CustomersListModal({
     // Fallback 2: current.services
     if (Array.isArray(current?.services) && current.services.length > 0) {
       return current.services.map((s: any): DrawerDepartmentServiceItem => {
-        const name = s?.serviceType || s?.name || 'Service'
-        const status = s?.status || 'pending'
+        const name = typeof s === 'string' ? s : (s?.serviceType || s?.name || 'Service')
+        const status = typeof s === 'string' ? 'pending' : (s?.status || 'pending')
         return {
           name: formatServiceName(String(name)),
           status: toOnboardingStatus(String(status)),
+          serviceType: String(name),
           row: undefined,
         }
       })
@@ -903,6 +930,7 @@ export function CustomersListModal({
         return {
           name: formatServiceName(String(name)),
           status: toOnboardingStatus(String(status)) || current?.status,
+          serviceType: String(cs?.serviceType || name),
           row: undefined,
         }
       })
@@ -913,6 +941,7 @@ export function CustomersListModal({
       return raw.serviceTypes.map((st: string): DrawerDepartmentServiceItem => ({
         name: formatServiceName(st),
         status: current?.status,
+        serviceType: st,
         row: undefined,
       }))
     }
@@ -922,6 +951,8 @@ export function CustomersListModal({
       return apiDetails.superAdminRemarks!.departments.map((dept): DrawerDepartmentServiceItem => ({
         name: formatServiceName(dept.serviceType || dept.departmentType),
         status: current?.status || 'pending',
+        serviceType: dept.serviceType || undefined,
+        departmentType: dept.departmentType || undefined,
         row: undefined,
       }))
     }
@@ -943,6 +974,7 @@ export function CustomersListModal({
       return [{
         name: formatServiceName(current.serviceType),
         status: current?.status,
+        serviceType: current.serviceType,
         row: undefined,
       }]
     }
@@ -952,7 +984,10 @@ export function CustomersListModal({
 
   const services = useMemo(() => {
     const registry = departmentServiceStatusesQuery.data
-    if (!registry) return unfilteredServices
+    const notDeleted = unfilteredServices.filter(
+      (service) => !deletedServiceKeys.includes(serviceSelectionKey(service)),
+    )
+    if (!registry) return notDeleted
 
     const activeByKey = new Map<string, boolean>()
     for (const item of registry) {
@@ -962,7 +997,7 @@ export function CustomersListModal({
       }
     }
 
-    return unfilteredServices.filter((service) => {
+    return notDeleted.filter((service) => {
       const departmentKey = service.departmentType
         ? normalizeServiceStatusKey(service.departmentType)
         : ''
@@ -971,7 +1006,57 @@ export function CustomersListModal({
       }
       return activeByKey.get(normalizeServiceStatusKey(service.name)) !== false
     })
-  }, [unfilteredServices, departmentServiceStatusesQuery.data])
+  }, [unfilteredServices, departmentServiceStatusesQuery.data, deletedServiceKeys])
+
+  function openDeleteServiceDialog(service: DrawerDepartmentServiceItem) {
+    setServicePendingDelete(service)
+    setDeleteServiceConfirmation('')
+    setDeleteServiceError('')
+  }
+
+  function closeDeleteServiceDialog() {
+    if (isDeletingService) return
+    setServicePendingDelete(null)
+    setDeleteServiceConfirmation('')
+    setDeleteServiceError('')
+  }
+
+  async function confirmDeleteService() {
+    if (
+      !servicePendingDelete ||
+      !current?.id ||
+      deleteServiceConfirmation !== 'Delete' ||
+      isDeletingService
+    ) return
+
+    setIsDeletingService(true)
+    setDeleteServiceError('')
+    try {
+      await deleteCustomerService(current.id, {
+        serviceType: servicePendingDelete.serviceType,
+        departmentType: servicePendingDelete.departmentType,
+      })
+      setDeletedServiceKeys((keys) => [
+        ...keys,
+        serviceSelectionKey(servicePendingDelete),
+      ])
+      setServicePendingDelete(null)
+      setDeleteServiceConfirmation('')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['customer-drawer-profile'] }),
+        queryClient.invalidateQueries({ queryKey: ['customer-drawer-rows'] }),
+      ])
+    } catch (error) {
+      setDeleteServiceError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not delete this service. Please try again.',
+      )
+    } finally {
+      setIsDeletingService(false)
+    }
+  }
 
   const hasDepartmentServiceSummary =
     serviceRow?.departmentStatuses != null || services.length > 0
@@ -2565,6 +2650,19 @@ export function CustomersListModal({
                             Status unavailable
                           </span>
                         )}
+                        {isSuperAdmin && (service.serviceType || service.departmentType) && (
+                          <button
+                            type="button"
+                            className="cl-drawer__delete-service"
+                            onClick={() => openDeleteServiceDialog(service)}
+                            aria-label={`Delete ${service.name}`}
+                            title={`Delete ${service.name}`}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                       <p className="cl-drawer__deliverable-status">
                         {service.row
@@ -3019,8 +3117,83 @@ export function CustomersListModal({
           </div>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {servicePendingDelete && (
+          <motion.div
+            className="cl-delete-service-overlay"
+            role="presentation"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeDeleteServiceDialog()
+            }}
+          >
+            <motion.div
+              className="cl-delete-service-dialog"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-customer-service-title"
+              aria-describedby="delete-customer-service-description"
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            >
+              <div className="cl-delete-service-dialog__icon" aria-hidden="true">!</div>
+              <h2 id="delete-customer-service-title">Delete service?</h2>
+              <p id="delete-customer-service-description">
+                This will remove <strong>{servicePendingDelete.name}</strong> from this
+                customer. The global service definition and other customers are not affected.
+              </p>
+              <label htmlFor="delete-customer-service-confirmation">
+                Type <strong>Delete</strong> to confirm
+              </label>
+              <input
+                id="delete-customer-service-confirmation"
+                value={deleteServiceConfirmation}
+                onChange={(event) => {
+                  setDeleteServiceConfirmation(event.target.value)
+                  setDeleteServiceError('')
+                }}
+                autoComplete="off"
+                autoFocus
+                placeholder="Delete"
+                disabled={isDeletingService}
+              />
+              {deleteServiceError && (
+                <p className="cl-delete-service-dialog__error" role="alert">
+                  {deleteServiceError}
+                </p>
+              )}
+              <div className="cl-delete-service-dialog__actions">
+                <button
+                  type="button"
+                  className="cl-delete-service-dialog__cancel"
+                  onClick={closeDeleteServiceDialog}
+                  disabled={isDeletingService}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cl-delete-service-dialog__confirm"
+                  onClick={confirmDeleteService}
+                  disabled={deleteServiceConfirmation !== 'Delete' || isDeletingService}
+                >
+                  {isDeletingService ? 'Deleting...' : 'Delete service'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
+}
+
+function serviceSelectionKey(service: DrawerDepartmentServiceItem) {
+  return `${service.serviceType || ''}|${service.departmentType || ''}|${service.name}`
 }
 
 function toOnboardingStatus(status?: string): OnboardingStatus | undefined {
