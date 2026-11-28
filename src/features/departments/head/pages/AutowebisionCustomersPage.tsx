@@ -106,6 +106,17 @@ function parseSafeDate(raw: any): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
+function formatCustomerCreatedDate(raw?: string): string {
+  if (!raw) return ''
+  const parsed = parseSafeDate(raw)
+  if (!parsed) return raw
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 export type AutowebsionSubTab = 'ALL' | 'WEBSITE' | 'AUTOMATION'
 export type AutowebsionStatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
 
@@ -141,6 +152,7 @@ export function AutowebisionCustomersPage({
     (normalizedRole === 'USER' ||
       normalizedRole === 'DEPARTMENT_USER' ||
       normalizedRole === 'DEPARTMENT USER' ||
+      normalizedRole === 'DEPARTMENT_SUB_USER' ||
       Boolean(isUserPath))
   const userEmail = session?.user.email || session?.user.username || ''
 
@@ -211,6 +223,7 @@ export function AutowebisionCustomersPage({
     : !isDepartmentUser
   const canEditServices =
     isDepartmentUser || (isColumnConfigured('Services') ? canEditColumn('Services') : false)
+  const canManageServiceTags = !isHead && canEditServices
   const canEditRemark =
     isDepartmentUser || (
       isColumnConfigured('Internal Remark') || isColumnConfigured('Remark')
@@ -1377,7 +1390,7 @@ export function AutowebisionCustomersPage({
             <tbody>
               {rawRows.map((customer, index) => {
                 const customerId = customer.customerId
-                // Created Date and Expiration are displayed in the Eye icon drawer modal
+                const customerCreatedDateLabel = formatCustomerCreatedDate(customer.createdAt)
 
                 const websiteStatus =
                   localStatusMap[`${customer.customerId}_WEBSITE`] ||
@@ -1583,6 +1596,14 @@ export function AutowebisionCustomersPage({
                             </button>
                           )}
                         </div>
+                        {(isHead || isDepartmentUser) && customerCreatedDateLabel && (
+                          <div
+                            className="cl-customer-created-date"
+                            title={`Customer created: ${customerCreatedDateLabel}`}
+                          >
+                            Created: {customerCreatedDateLabel}
+                          </div>
+                        )}
                       </td>
                     )}
 
@@ -1768,50 +1789,6 @@ export function AutowebisionCustomersPage({
                               </button>
                             </div>
                           )}
-
-                          {/* Rendered Service Tags: visible to both Department User and Head */}
-                          {(() => {
-                            const targetTab =
-                              activeSubTab === 'WEBSITE'
-                                ? 'WEBSITE'
-                                : activeSubTab === 'AUTOMATION'
-                                  ? 'AUTOMATION'
-                                  : undefined
-                            const tags = getServiceTagsForCustomer(customer, targetTab)
-                            if (tags.length === 0) return null
-
-                            return (
-                              <div className="flex flex-wrap gap-1 mt-1 max-w-[210px]">
-                                {tags.slice(0, 2).map(({ key, label }) => (
-                                  <span
-                                    key={key}
-                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
-                                    title={
-                                      isDepartmentUser
-                                        ? `Click to manage tags (${label})`
-                                        : `Service tag: ${label} (Click to view)`
-                                    }
-                                    className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
-                                  >
-                                    {label.replace(/_/g, ' ')}
-                                  </span>
-                                ))}
-                                {tags.length > 2 && (
-                                  <span
-                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
-                                    title={
-                                      isDepartmentUser
-                                        ? 'View & manage all tags'
-                                        : 'View all tags (Read only)'
-                                    }
-                                    className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
-                                  >
-                                    +{tags.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })()}
                         </div>
                       </td>
                     )}
@@ -2039,6 +2016,61 @@ export function AutowebisionCustomersPage({
                               )}
                             </>
                           )}
+
+                          {/* Rendered Service Tags in Internal Remark column: Head sees read-only, Department User can add/manage */}
+                          {(() => {
+                            const targetTab =
+                              activeSubTab === 'WEBSITE'
+                                ? 'WEBSITE'
+                                : activeSubTab === 'AUTOMATION'
+                                  ? 'AUTOMATION'
+                                  : undefined
+                            const tags = getServiceTagsForCustomer(customer, targetTab)
+                            if (tags.length === 0 && !canManageServiceTags) return null
+
+                            return (
+                              <div className="flex flex-wrap items-center gap-1 mt-1 max-w-[210px]">
+                                {tags.slice(0, 2).map(({ key, label }) => (
+                                  <span
+                                    key={key}
+                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                    title={
+                                      canManageServiceTags
+                                        ? `Click to manage tags (${label})`
+                                        : `Service tag: ${label} (Click to view)`
+                                    }
+                                    className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                                  >
+                                    {label.replace(/_/g, ' ')}
+                                  </span>
+                                ))}
+                                {tags.length > 2 && (
+                                  <span
+                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                    title={
+                                      canManageServiceTags
+                                        ? 'View & manage all tags'
+                                        : 'View all tags (Read only)'
+                                    }
+                                    className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                                  >
+                                    +{tags.length - 2}
+                                  </span>
+                                )}
+                                {canManageServiceTags && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenServiceTags(customer, index, targetTab)}
+                                    title={tags.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
+                                    className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                                  >
+                                    <span>+</span>
+                                    {tags.length === 0 && <span>Add Tag</span>}
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </div>
                       </td>
                     )}
@@ -2859,7 +2891,7 @@ export function AutowebisionCustomersPage({
         </div>
       )}
 
-      {/* Service Tags Modal: editable for Department User, read-only for Department Head */}
+      {/* Service Tags Modal: editable for Department User and Department Head */}
       {serviceTagsTarget && (
         <ServiceTagsModal
           isOpen={Boolean(serviceTagsTarget)}
@@ -2867,10 +2899,46 @@ export function AutowebisionCustomersPage({
           serviceType={serviceTagsTarget.serviceType}
           onRefresh={() => customersQuery.refetch()}
           isRefreshing={customersQuery.isFetching}
-          readOnly={!canEditServices}
+          readOnly={!canManageServiceTags}
           onClose={() => setServiceTagsTarget(null)}
-          onTagsUpdated={() => {
-            customersQuery.refetch()
+          onTagsUpdated={(updatedTags) => {
+            if (!updatedTags) return
+            const targetCustomerId = Number(serviceTagsTarget.customer.id)
+            const targetSvc = String(serviceTagsTarget.serviceType || '').toUpperCase()
+
+            queryClient.setQueriesData(
+              { queryKey: ['autowebisionCustomers'] },
+              (oldData: any) => {
+                if (!oldData) return oldData
+                const listKey = Array.isArray(oldData.data)
+                  ? 'data'
+                  : Array.isArray(oldData.content)
+                    ? 'content'
+                    : null
+                if (!listKey) return oldData
+
+                return {
+                  ...oldData,
+                  [listKey]: oldData[listKey].map((c: any) => {
+                    if (Number(c.customerId) !== targetCustomerId) return c
+                    const updatedServices = Array.isArray(c.services)
+                      ? c.services.map((s: any) => {
+                          const st = String(s?.serviceType || '').toUpperCase()
+                          if (!targetSvc || st === targetSvc) {
+                            return { ...s, serviceTags: updatedTags }
+                          }
+                          return s
+                        })
+                      : c.services
+                    return {
+                      ...c,
+                      services: updatedServices,
+                      ...(c.serviceTags !== undefined ? { serviceTags: updatedTags } : {}),
+                    }
+                  }),
+                }
+              },
+            )
           }}
         />
       )}

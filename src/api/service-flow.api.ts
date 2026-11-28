@@ -266,6 +266,9 @@ export async function editServiceTag(params: {
       }),
     },
   )
+  if (res?.success === false) {
+    throw new Error(res?.message || 'Failed to update service tag.')
+  }
   return res?.data ?? res
 }
 
@@ -444,12 +447,18 @@ export function extractServiceTags(c: any): Record<string, string> {
     }
   }
 
-  // Fallbacks: serviceTag, tags
+  // Fallbacks: serviceTag, tags, taginfo, tagInfo
   if (c.serviceTag) {
     tags = { ...tags, ...parseTags(c.serviceTag) }
   }
   if (c.tags) {
     tags = { ...tags, ...parseTags(c.tags) }
+  }
+  if (c.taginfo) {
+    tags = { ...tags, ...parseTags(c.taginfo) }
+  }
+  if (c.tagInfo) {
+    tags = { ...tags, ...parseTags(c.tagInfo) }
   }
 
   return tags

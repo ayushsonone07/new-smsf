@@ -289,6 +289,8 @@ export function CustomerListPage() {
   const isDeptUser =
     role === 'USER' ||
     role === 'DEPARTMENT_USER' ||
+    role === 'DEPARTMENT USER' ||
+    role === 'DEPARTMENT_SUB_USER' ||
     (session?.user as any)?.isHead === false ||
     isUserPath
 
@@ -1427,11 +1429,47 @@ export function CustomerListPage() {
             onboardingCustomers.find((c) => c.id === serviceTagsCustomer.id)) ||
           serviceTagsCustomer
         }
+        serviceType={serviceTagsCustomer?.serviceType || (isGoogle ? 'GOOGLE' : undefined)}
+        readOnly={isHead}
         onClose={() => setServiceTagsCustomer(null)}
         onRefresh={() => activeCustomerQuery.refetch()}
         isRefreshing={activeCustomerQuery.isFetching}
-        onTagsUpdated={() => {
-          activeCustomerQuery.refetch()
+        onTagsUpdated={(updatedTags) => {
+          if (!updatedTags || !serviceTagsCustomer) return
+          const targetId = String(serviceTagsCustomer.id)
+
+          setServiceTagsCustomer((prev) =>
+            prev && String(prev.id) === targetId ? { ...prev, serviceTags: updatedTags } : prev,
+          )
+
+          const updateTagsInCache = (oldData: any) => {
+            if (!oldData) return oldData
+            const listKey = Array.isArray(oldData.data)
+              ? 'data'
+              : Array.isArray(oldData.customers)
+                ? 'customers'
+                : Array.isArray(oldData.content)
+                  ? 'content'
+                  : null
+            if (!listKey) return oldData
+
+            return {
+              ...oldData,
+              [listKey]: oldData[listKey].map((row: any) => {
+                const rowId = String(row?.customerId ?? row?.id ?? '')
+                if (rowId !== targetId) return row
+                return {
+                  ...row,
+                  serviceTags: updatedTags,
+                }
+              }),
+            }
+          }
+
+          queryClient.setQueriesData({ queryKey: ['customer-list'] }, updateTagsInCache)
+          queryClient.setQueriesData({ queryKey: ['department-customer-rows'] }, updateTagsInCache)
+          queryClient.setQueriesData({ queryKey: ['onboarding-customers-list'] }, updateTagsInCache)
+          queryClient.setQueriesData({ queryKey: ['departmentCustomers'] }, updateTagsInCache)
         }}
       />
 

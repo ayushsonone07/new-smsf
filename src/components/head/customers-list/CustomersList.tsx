@@ -845,6 +845,7 @@ function CustomerRow({
   onOpenDetail,
   onOpenDuplicate,
   onOpenServiceFlow,
+  onOpenServiceTags,
   isGoogle = false,
   isDepartmentUser: _isDepartmentUser,
   isSupport = false,
@@ -879,9 +880,44 @@ function CustomerRow({
   } | null>(null)
   const [remarkEditing, setRemarkEditing] = useState(false)
   const [remarkDraft, setRemarkDraft] = useState('')
+  const [copiedField, setCopiedField] = useState<'business' | 'email' | 'phone' | null>(null)
+  const remarkEditable = canEditRemark !== undefined ? canEditRemark : canEdit
+  const customerCreatedDateLabel = formatOnboardingCompletedDate(customer.createdAt)
 
   const statusRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
+  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+    }
+  }, [])
+
+  const copyToClipboard = async (
+    field: 'business' | 'email' | 'phone',
+    value: string,
+  ) => {
+    const text = value.trim()
+    if (!text) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+
+    setCopiedField(field)
+    if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+    copyFeedbackTimerRef.current = setTimeout(() => setCopiedField(null), 1600)
+  }
 
   /* Close menus on outside click */
   useEffect(() => {
@@ -943,12 +979,16 @@ function CustomerRow({
   const statusMeta = STATUS_META[customer.status]
 
   function startEditing() {
-    if (!(canEditRemark !== undefined ? canEditRemark : canEdit)) return
+    if (!remarkEditable) return
     setRemarkDraft(customer.remark)
     setRemarkEditing(true)
   }
 
   function saveRemark() {
+    if (remarkDraft === customer.remark) {
+      setRemarkEditing(false)
+      return
+    }
     onRemarkChange(remarkDraft)
     setRemarkEditing(false)
   }
@@ -1157,6 +1197,19 @@ function CustomerRow({
             >
               {customer.businessName}
             </button>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'business' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'business' ? 'Copied' : 'Copy business name'}
+              aria-label="Copy business name"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('business', customer.businessName)
+              }}
+            >
+              <Icon name={copiedField === 'business' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'business' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
 
             {isGoogle ? (
               <>
@@ -1275,10 +1328,38 @@ function CustomerRow({
       {/* Contact */}
       {showContact && (
         <td className="cl-td" data-label="Contact">
-          <div className="cl-email" title={customer.email}>{customer.email}</div>
+          <div className="cl-contact-value-row">
+            <div className="cl-email" title={customer.email}>{customer.email}</div>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'email' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'email' ? 'Copied' : 'Copy email'}
+              aria-label="Copy email"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('email', customer.email)
+              }}
+            >
+              <Icon name={copiedField === 'email' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'email' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
+          </div>
 
           <div className="cl-phone-row">
             <span className="cl-phone-text" title={customer.phone}>{customer.phone}</span>
+            <button
+              type="button"
+              className={`cl-copy-button${copiedField === 'phone' ? ' cl-copy-button--copied' : ''}`}
+              title={copiedField === 'phone' ? 'Copied' : 'Copy phone number'}
+              aria-label="Copy phone number"
+              onClick={(event) => {
+                event.stopPropagation()
+                void copyToClipboard('phone', customer.phone)
+              }}
+            >
+              <Icon name={copiedField === 'phone' ? 'check' : 'copyFiles'} size={12} strokeWidth={2} />
+              {copiedField === 'phone' && <span className="cl-copy-feedback" role="status">Copied</span>}
+            </button>
             <button
               type="button"
               className="cl-icon-micro"
@@ -1299,6 +1380,15 @@ function CustomerRow({
               <Icon name="phone" size={13} strokeWidth={2} />
             </button>
           </div>
+
+          {(_isDepartmentUser || isDepartmentHead) && customerCreatedDateLabel && (
+            <div
+              className="cl-customer-created-date"
+              title={`Customer created: ${customerCreatedDateLabel}`}
+            >
+              Created: {customerCreatedDateLabel}
+            </div>
+          )}
 
         {customer.callStatus ? (
           <span
@@ -1525,6 +1615,67 @@ function CustomerRow({
                 +{subServicesList.length - 2} more
               </button>
             )}
+            {isGoogle && onOpenServiceTags && (() => {
+              const canAddTags = Boolean(_isDepartmentUser && !isDepartmentHead)
+              const rawTags = customer.serviceTags
+              const tagEntries: { key: string; label: string }[] = []
+              if (rawTags && typeof rawTags === 'object' && !Array.isArray(rawTags)) {
+                Object.entries(rawTags).forEach(([k, v]) => {
+                  const label = typeof v === 'string' && v.trim() ? v.trim() : k
+                  if (label) tagEntries.push({ key: k, label })
+                })
+              } else if (Array.isArray(rawTags)) {
+                rawTags.forEach((t, idx) => {
+                  const label = typeof t === 'string' ? t : (t?.tagName || t?.name || t?.id || '')
+                  if (label) tagEntries.push({ key: `${idx}-${label}`, label: String(label) })
+                })
+              }
+              if (tagEntries.length === 0 && !canAddTags) return null
+
+              return (
+                <div
+                  className="flex flex-wrap items-center gap-1 mt-1 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {tagEntries.slice(0, 2).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={
+                        canAddTags
+                          ? `Manage service tags (${label.replace(/_/g, ' ')})`
+                          : `Service tag: ${label.replace(/_/g, ' ')} (Click to view)`
+                      }
+                      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                    >
+                      {label.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                  {tagEntries.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={canAddTags ? 'View & manage all service tags' : 'View all tags (Read only)'}
+                      className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                    >
+                      +{tagEntries.length - 2}
+                    </button>
+                  )}
+                  {canAddTags && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenServiceTags()}
+                      title={tagEntries.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
+                      className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                    >
+                      <Icon name="plus" size={10} strokeWidth={2.5} />
+                      {tagEntries.length === 0 && <span>Add Tag</span>}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )}
         </td>
@@ -1735,15 +1886,20 @@ function CustomerRow({
 
       {/* Internal Remark */}
       {showRemark && (
-        <td className="cl-td" data-label="Internal Remark">
+        <td
+          className="cl-td"
+          data-label="Internal Remark"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
           {remarkEditing ? (
             <div className="cl-remark-editor">
               <textarea
                 className="cl-remark-textarea"
                 value={remarkDraft}
                 onChange={(e) => setRemarkDraft(e.target.value)}
-                onBlur={saveRemark}
                 onKeyDown={(e) => {
+                  e.stopPropagation()
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     saveRemark()
@@ -1752,43 +1908,33 @@ function CustomerRow({
                   }
                 }}
                 autoFocus
+                maxLength={1000}
                 aria-label="Edit internal remark"
               />
               <div className="cl-remark-actions">
                 <button
                   type="button"
-                  className="cl-action"
+                  className="cl-remark-save"
                   title="Save remark"
                   aria-label="Save remark"
-                  onClick={saveRemark}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    saveRemark()
+                  }}
                 >
                   Save
                 </button>
                 <button
                   type="button"
-                  className="cl-action"
+                  className="cl-remark-cancel"
                   title="Cancel editing remark"
                   aria-label="Cancel editing remark"
-                  onClick={cancelRemark}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    cancelRemark()
+                  }}
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  className="cl-action"
-                  title="View schedule"
-                  aria-label="View schedule"
-                >
-                  <Icon name="calendarSmall" size={14} strokeWidth={1.8} />
-                </button>
-                <button
-                  type="button"
-                  className="cl-action"
-                  title="View customer detail"
-                  aria-label="View customer detail"
-                  onClick={() => onOpenDetail()}
-                >
-                  <Icon name="eye" size={14} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -1797,7 +1943,7 @@ function CustomerRow({
               <div
                 className={`cl-remark${
                   !customer.remark ? ' cl-remark--placeholder' : ''
-                }`}
+                }${remarkEditable ? ' cl-remark--editable' : ''}`}
                 style={{
                   position: 'relative',
                   padding: '6px 8px',
@@ -1805,13 +1951,30 @@ function CustomerRow({
                   borderRadius: '6px',
                   minHeight: '32px',
                 }}
-                title={customer.remark || 'No remark'}
+                title={remarkEditable ? (customer.remark ? 'Click to edit remark' : 'Click to add remark') : (customer.remark || 'No remark')}
+                role={remarkEditable ? 'button' : undefined}
+                tabIndex={remarkEditable ? 0 : undefined}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  startEditing()
+                }}
+                onKeyDown={(event) => {
+                  event.stopPropagation()
+                  if (remarkEditable && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault()
+                    startEditing()
+                  }
+                }}
+                aria-label={remarkEditable ? (customer.remark ? 'Edit internal remark' : 'Add internal remark') : undefined}
               >
-                {customer.remark || '—'}
+                {customer.remark || (remarkEditable ? 'Click to add remark' : '—')}
               </div>
               <button
                 type="button"
-                onClick={() => onOpenDetail('internal-remarks')}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenDetail('internal-remarks')
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1828,6 +1991,69 @@ function CustomerRow({
                 <Icon name="messageSquare" size={10} strokeWidth={2} />
                 view remark history
               </button>
+
+              {!isGoogle && onOpenServiceTags && (() => {
+                const canAddTags = Boolean(_isDepartmentUser && !isDepartmentHead)
+                const rawTags = customer.serviceTags
+                const tagEntries: { key: string; label: string }[] = []
+                if (rawTags && typeof rawTags === 'object' && !Array.isArray(rawTags)) {
+                  Object.entries(rawTags).forEach(([k, v]) => {
+                    const label = typeof v === 'string' && v.trim() ? v.trim() : k
+                    if (label) tagEntries.push({ key: k, label })
+                  })
+                } else if (Array.isArray(rawTags)) {
+                  rawTags.forEach((t, idx) => {
+                    const label = typeof t === 'string' ? t : (t?.tagName || t?.name || t?.id || '')
+                    if (label) tagEntries.push({ key: `${idx}-${label}`, label: String(label) })
+                  })
+                }
+
+                if (tagEntries.length === 0 && !canAddTags) return null
+
+                return (
+                  <div
+                    className="flex flex-wrap items-center gap-1 mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {tagEntries.slice(0, 2).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={
+                          canAddTags
+                            ? `Manage service tags (${label.replace(/_/g, ' ')})`
+                            : `Service tag: ${label.replace(/_/g, ' ')} (Click to view)`
+                        }
+                        className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                      >
+                        {label.replace(/_/g, ' ')}
+                      </button>
+                    ))}
+                    {tagEntries.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={canAddTags ? 'View & manage all service tags' : 'View all tags (Read only)'}
+                        className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                      >
+                        +{tagEntries.length - 2}
+                      </button>
+                    )}
+                    {canAddTags && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenServiceTags()}
+                        title={tagEntries.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
+                        className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                      >
+                        <Icon name="plus" size={10} strokeWidth={2.5} />
+                        {tagEntries.length === 0 && <span>Add Tag</span>}
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
         </td>
