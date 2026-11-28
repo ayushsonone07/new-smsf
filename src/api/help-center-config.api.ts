@@ -27,6 +27,8 @@ export interface CreateTicketStatusRequest {
   name: string
   isActive: boolean
   isDefault: boolean
+  followupHours?: number | null
+  resolveHours?: number | null
 }
 
 export interface CreateTicketPriorityRequest {
@@ -44,6 +46,8 @@ export interface UpdateTicketStatusRequest {
   sortOrder: number
   isActive: boolean
   isDefault: boolean
+  followupHours?: number | null
+  resolveHours?: number | null
 }
 
 async function fetchConfigItems(path: 'statuses' | 'priorities') {

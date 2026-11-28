@@ -1647,7 +1647,8 @@ function CustomerRow({
                           ? `Manage service tags (${label.replace(/_/g, ' ')})`
                           : `Service tag: ${label.replace(/_/g, ' ')} (Click to view)`
                       }
-                      className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[140px]"
+                      style={{ padding: '2px 7px', fontSize: '10px', lineHeight: '1.3', minHeight: 0, height: 'auto' }}
+                      className="inline-flex items-center font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer truncate max-w-[125px]"
                     >
                       {label.replace(/_/g, ' ')}
                     </button>
@@ -1657,7 +1658,8 @@ function CustomerRow({
                       type="button"
                       onClick={() => onOpenServiceTags()}
                       title={canAddTags ? 'View & manage all service tags' : 'View all tags (Read only)'}
-                      className="inline-flex items-center text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-1"
+                      style={{ padding: '1px 4px', fontSize: '10px', lineHeight: '1.3', minHeight: 0, height: 'auto', background: 'transparent', border: 'none' }}
+                      className="inline-flex items-center font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
                     >
                       +{tagEntries.length - 2}
                     </button>
@@ -1667,9 +1669,10 @@ function CustomerRow({
                       type="button"
                       onClick={() => onOpenServiceTags()}
                       title={tagEntries.length === 0 ? 'Add Service Tag' : 'Add / Manage Service Tags'}
-                      className="inline-flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
+                      style={{ padding: '2px 7px', fontSize: '10px', lineHeight: '1.3', minHeight: 0, height: 'auto' }}
+                      className="inline-flex items-center justify-center gap-1 font-bold rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors cursor-pointer"
                     >
-                      <Icon name="plus" size={10} strokeWidth={2.5} />
+                      <Icon name="plus" size={9} strokeWidth={2.5} />
                       {tagEntries.length === 0 && <span>Add Tag</span>}
                     </button>
                   )}

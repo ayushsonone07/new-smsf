@@ -6,7 +6,9 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Download,
   ExternalLink,
+  FileText,
   Flame,
   Gift,
   ListTodo,
@@ -29,6 +31,8 @@ import { Link } from "react-router-dom";
 import { env } from "@config/env";
 import { useAuth } from "@features/auth";
 import { BirthdayWidget } from "@features/birthdays";
+import { useMyOfferLetters } from "@features/offers/hooks";
+import { offersService } from "@features/offers/services";
 import { ErrorDisplay, StaggerContainer, StaggerItem } from "@shared/components/ui";
 import { RefreshButton } from "@/components/ui/RefreshButton";
 
@@ -88,6 +92,10 @@ export default function EmployeeDashboardPage() {
     const timer = setInterval(() => setLiveClock(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const myOffersQuery = useMyOfferLetters();
+  const [downloadingOfferId, setDownloadingOfferId] = useState<number | null>(null);
+  const myOffers = myOffersQuery.data ?? [];
 
   const dashboardData = data ?? (env.enableDashboardDemo ? EMPLOYEE_DEMO_DATA : undefined);
 
@@ -656,6 +664,74 @@ export default function EmployeeDashboardPage() {
               <BirthdayWidget />
             </StaggerItem>
           </StaggerContainer>
+
+          {/* MY OFFER LETTER QUICK DOWNLOAD */}
+          {myOffers.length > 0 ? (
+            <StaggerContainer>
+              <StaggerItem variant="card">
+                <section className="mbg-card p-5 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                        <FileText className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h2 className="text-sm font-semibold text-slate-900">My Offer Letter</h2>
+                        <p className="text-xs text-slate-500">Official onboarding document</p>
+                      </div>
+                    </div>
+                    <Link
+                      to="/hrm/offers"
+                      className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                    >
+                      View all
+                    </Link>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {myOffers.map((offer) => {
+                      const isDownloading = downloadingOfferId === offer.id;
+                      const safeName = (offer.recipientName || "Offer_Letter").replace(/\s+/g, "_");
+                      return (
+                        <div
+                          key={offer.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-900">
+                                {offer.designation || "Offer Letter"}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {offer.offerType === "INTERNSHIP" ? "Internship" : "Full-Time"}
+                                {offer.issuedDate ? ` • Issued ${offer.issuedDate}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isDownloading}
+                            onClick={async () => {
+                              try {
+                                setDownloadingOfferId(offer.id);
+                                await offersService.downloadPdf(offer.id, `${safeName}_Offer_Letter.pdf`);
+                              } finally {
+                                setDownloadingOfferId(null);
+                              }
+                            }}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-60"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {isDownloading ? "Downloading..." : "Download PDF"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </StaggerItem>
+            </StaggerContainer>
+          ) : null}
 
           {/* MANAGER TEAM SNAPSHOT (IF MANAGER) */}
           {isManager ? (
