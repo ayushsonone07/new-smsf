@@ -106,6 +106,17 @@ function parseSafeDate(raw: any): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
+function formatCustomerCreatedDate(raw?: string): string {
+  if (!raw) return ''
+  const parsed = parseSafeDate(raw)
+  if (!parsed) return raw
+  return parsed.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 export type AutowebsionSubTab = 'ALL' | 'WEBSITE' | 'AUTOMATION'
 export type AutowebsionStatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
 
@@ -1379,7 +1390,7 @@ export function AutowebisionCustomersPage({
             <tbody>
               {rawRows.map((customer, index) => {
                 const customerId = customer.customerId
-                // Created Date and Expiration are displayed in the Eye icon drawer modal
+                const customerCreatedDateLabel = formatCustomerCreatedDate(customer.createdAt)
 
                 const websiteStatus =
                   localStatusMap[`${customer.customerId}_WEBSITE`] ||
@@ -1585,6 +1596,14 @@ export function AutowebisionCustomersPage({
                             </button>
                           )}
                         </div>
+                        {(isHead || isDepartmentUser) && customerCreatedDateLabel && (
+                          <div
+                            className="cl-customer-created-date"
+                            title={`Customer created: ${customerCreatedDateLabel}`}
+                          >
+                            Created: {customerCreatedDateLabel}
+                          </div>
+                        )}
                       </td>
                     )}
 
